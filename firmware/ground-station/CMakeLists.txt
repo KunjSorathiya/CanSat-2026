@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(cansat_ground_bridge LANGUAGES CXX)
+
+add_library(ground_radio_bridge INTERFACE)
+target_include_directories(ground_radio_bridge INTERFACE include)
+target_compile_features(ground_radio_bridge INTERFACE cxx_std_17)
