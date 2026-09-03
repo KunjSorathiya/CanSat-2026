@@ -1,0 +1,146 @@
+#include "flight/pico/pico_hal.hpp"
+
+#include "flight/sensor_math.hpp"
+
+#ifdef PICO_BUILD
+#include "hardware/adc.h"
+#include "hardware/gpio.h"
+#include "hardware/i2c.h"
+#include "hardware/spi.h"
+#include "pico/stdlib.h"
+#endif
+
+namespace flight {
+
+#ifdef PICO_BUILD
+
+namespace {
+bool g_i2c_ready = false;
+bool g_spi_ready = false;
+bool g_adc_ready = false;
+
+void ensure_i2c0() {
+    if (g_i2c_ready) return;
+    i2c_init(i2c0, 400 * 1000);
+    gpio_set_function(BoardPins::i2c_sda, GPIO_FUNC_I2C);
+    gpio_set_function(BoardPins::i2c_scl, GPIO_FUNC_I2C);
+    gpio_pull_up(BoardPins::i2c_sda);
+    gpio_pull_up(BoardPins::i2c_scl);
+    g_i2c_ready = true;
+}
+
+void ensure_spi0() {
+    if (g_spi_ready) return;
+    spi_init(spi0, 400 * 1000);  // SD-safe; bumped by the SD driver after init
+    spi_set_format(spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    gpio_set_function(BoardPins::spi_sck, GPIO_FUNC_SPI);
+    gpio_set_function(BoardPins::spi_mosi, GPIO_FUNC_SPI);
+    gpio_set_function(BoardPins::spi_miso, GPIO_FUNC_SPI);
+    g_spi_ready = true;
+}
+
+void ensure_adc() {
+    if (g_adc_ready) return;
+    adc_init();
+    adc_gpio_init(BoardPins::battery_adc);
+    g_adc_ready = true;
+}
+}  // namespace
+
+void pico_buses_init() {
+    ensure_i2c0();
+    ensure_spi0();
+    ensure_adc();
+}
+
+// ---- IMU ----
+bool PicoImu::initialize() {
+    ensure_i2c0();
+    gpio_init(BoardPins::imu_int);
+    gpio_set_dir(BoardPins::imu_int, GPIO_IN);
+    const bool ok = device_.begin(i2c0, {});
+    health_.initialized = ok;
+    health_.healthy = ok;
+    return ok;
+}
+
+bool PicoImu::read(ImuSample& out, std::uint64_t now_ms) {
+    const bool ok = device_.read(out, now_ms);
+    health_.healthy = ok;
+    if (ok) health_.last_update_ms = now_ms;
+    return ok;
+}
+
+// ---- Barometer ----
+bool PicoBarometer::initialize() {
+    ensure_i2c0();
+    pico::Bmp280::Options options;
+    options.reference_pressure_pa = reference_pressure_pa_;
+    const bool ok = device_.begin(i2c0, options);
+    health_.initialized = ok;
+    health_.healthy = ok;
+    return ok;
+}
+
+bool PicoBarometer::read(BaroSample& out, std::uint64_t now_ms) {
+    const bool ok = device_.read(out, now_ms);
+    health_.healthy = ok;
+    if (ok) health_.last_update_ms = now_ms;
+    return ok;
+}
+
+// ---- GPS ----
+bool PicoGps::initialize() {
+    const bool ok = device_.begin(uart0, BoardPins::gps_tx, BoardPins::gps_rx, 9600);
+    health_.initialized = ok;
+    health_.healthy = ok;
+    return ok;
+}
+
+void PicoGps::poll(std::uint64_t now_ms) {
+    device_.poll(now_ms);
+    health_.last_update_ms = now_ms;
+    health_.healthy = true;
+}
+
+bool PicoGps::latest(cansat::GpsData& data) const { return device_.latest(data); }
+
+// ---- Board I/O ----
+void PicoBoardIo::set_status_led(bool on) {
+    static bool configured = false;
+    if (!configured) {
+        gpio_init(BoardPins::status_led);
+        gpio_set_dir(BoardPins::status_led, GPIO_OUT);
+        configured = true;
+    }
+    gpio_put(BoardPins::status_led, on ? 1 : 0);
+}
+
+float PicoBoardIo::battery_voltage() const {
+    ensure_adc();
+    adc_select_input(0);  // ADC0 == GPIO26
+    const std::uint16_t raw = adc_read();
+    const float counts = config_.battery_adc_max_counts == 0 ? 4095.0f : config_.battery_adc_max_counts;
+    return static_cast<float>(raw) * config_.battery_adc_ref_v / counts;  // raw pin voltage
+}
+
+#else  // ------------------------- host stubs -------------------------
+
+void pico_buses_init() {}
+
+bool PicoImu::initialize() { return false; }
+bool PicoImu::read(ImuSample&, std::uint64_t) { return false; }
+
+bool PicoBarometer::initialize() { return false; }
+bool PicoBarometer::read(BaroSample&, std::uint64_t) { return false; }
+
+bool PicoGps::initialize() { return false; }
+void PicoGps::poll(std::uint64_t) {}
+bool PicoGps::latest(cansat::GpsData&) const { return false; }
+
+void PicoBoardIo::set_status_led(bool) {}
+float PicoBoardIo::battery_voltage() const { return 0.0f; }
+
+#endif
+
+}  // namespace flight

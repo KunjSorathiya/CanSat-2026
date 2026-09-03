@@ -1,0 +1,2491 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>CanSat Telemetry Console</title>
+<meta name="description" content="Ground-station console for CanSat-2026 433 MHz LoRa telemetry.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap">
+
+<style>
+/* ================================================================
+   TOKENS — dark is the primary theme (this is a field instrument);
+   light is the alternate. Text pairs are >= 4.5:1, non-text >= 3:1.
+   ================================================================ */
+:root {
+  color-scheme: dark;
+  --bg:        #070a0f;
+  --bg-2:      #04060a;
+  --panel:     #0f141c;
+  --panel-2:   #0b1017;
+  --panel-3:   #141b25;
+  --border:    #1e2836;
+  --border-2:  #161e29;
+  --ink:       #e8eef5;
+  --muted:     #93a3b8;
+  --faint:     #7c8b9e;
+  --accent:    #38bdf8;
+  --accent-dim:#0e7490;
+  --accent-ink:#04121a;
+  --good:      #34d399;
+  --warn:      #fbbf24;
+  --crit:      #f87171;
+  --s-alt:     #38bdf8;
+  --s-vsp:     #22d3ee;
+  --s-prs:     #a78bfa;
+  --s-tmp:     #fb923c;
+  --s-acc:     #34d399;
+  --grid:      rgba(232,238,245,.09);
+  --grid-2:    rgba(232,238,245,.045);
+  --shadow:    0 1px 2px rgba(0,0,0,.5);
+  --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: "Exo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --disp: "Exo", var(--sans);
+  --r:   7px;
+  --r-s: 5px;
+  /* density 8/10 - dashboard */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg:        #e9eef2;
+  --bg-2:      #dde5ea;
+  --panel:     #ffffff;
+  --panel-2:   #f4f7f9;
+  --panel-3:   #eaf0f4;
+  --border:    #cbd6e0;
+  --border-2:  #e1e8ee;
+  --ink:       #0d1620;
+  --muted:     #4a5b6c;
+  --faint:     #556575;
+  --accent:    #0369a1;
+  --accent-dim:#7dd3fc;
+  --accent-ink:#ffffff;
+  --good:      #047857;
+  --warn:      #92600e;
+  --crit:      #b91c1c;
+  --s-alt:     #0369a1;
+  --s-vsp:     #0e7490;
+  --s-prs:     #6d28d9;
+  --s-tmp:     #c2410c;
+  --s-acc:     #047857;
+  --grid:      rgba(13,22,32,.13);
+  --grid-2:    rgba(13,22,32,.06);
+  --shadow:    0 1px 2px rgba(15,30,45,.10);
+}
+
+/* ============================ base ============================ */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+@media (max-width: 1080px) { body { overflow: auto; } }
+h1, h2, h3 { margin: 0; font-family: var(--disp); font-weight: 600; letter-spacing: .01em; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+button { font-family: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+/* a section title that reads as a label but is a real heading */
+.label { font-size: 10.5px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--muted); font-family: var(--sans); margin: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: -999px; top: 8px; z-index: 999; background: var(--accent); color: var(--accent-ink); padding: 8px 14px; border-radius: var(--r-s); font-weight: 600; font-size: 13px; }
+.skip:focus { left: 8px; }
+
+/* ============================ shell ============================ */
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 284px 1fr;
+  grid-template-areas: "head head" "rail main";
+  height: 100%;
+}
+@media (max-width: 1080px) {
+  /* Below the app-shell breakpoint the PAGE scrolls, not each pane. Leaving the
+     rail and main as independent scrollers here collapsed the whole console
+     into a short strip with three nested scrollbars. */
+  .app { grid-template-columns: 1fr; grid-template-areas: "head" "main" "rail"; height: auto; min-height: 100%; }
+  .app .rail, .app .main { overflow: visible; }   /* must outrank the base pane rules below */
+}
+
+/* ---- header ---- */
+header {
+  grid-area: head;
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  padding: 10px var(--sp-4);
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+  border-bottom: 1px solid var(--border);
+  position: relative; z-index: 3;
+}
+header::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: .45;
+}
+.brand { display: flex; align-items: center; gap: 11px; margin-right: auto; min-width: 0; }
+.brand .mark { flex: 0 0 auto; color: var(--accent); display: block; }
+.brand .txt { display: flex; flex-direction: column; min-width: 0; }
+.brand h1 { font-size: 17px; font-weight: 700; letter-spacing: .015em; white-space: nowrap; }
+.brand .sub { font-size: 10.5px; color: var(--muted); letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
+.brand .sub b { color: var(--accent); font-weight: 600; }
+
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-s); overflow: hidden; background: var(--panel-2); }
+.seg button {
+  background: transparent; border: 0; padding: 7px 12px; font-size: 12px; font-weight: 500;
+  color: var(--muted); border-left: 1px solid var(--border);
+  display: inline-flex; align-items: center; gap: 6px; transition: background .15s, color .15s;
+  min-height: 32px;
+}
+.seg button:first-child { border-left: 0; }
+.seg button:hover:not(:disabled) { color: var(--ink); background: var(--panel-3); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.seg button:disabled { opacity: .4; cursor: not-allowed; }
+
+.hbtn {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r-s);
+  padding: 7px 11px; font-size: 12px; font-weight: 500; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: background .15s, color .15s, border-color .15s;
+  min-height: 32px; white-space: nowrap;
+}
+.hbtn:hover { color: var(--ink); border-color: var(--faint); background: var(--panel-3); }
+.hbtn[aria-pressed="true"] { background: var(--warn); color: #1a1206; border-color: transparent; font-weight: 600; }
+.hbtn svg { flex: 0 0 auto; }
+
+/* ---- rail ---- */
+.rail {
+  grid-area: rail;
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--bg-2);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+@media (max-width: 1080px) { .rail { border-right: 0; border-top: 1px solid var(--border); } }
+@media (max-width: 1080px) { .mon-list { max-height: 260px; } }
+
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); }
+.panel > .phead { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: 8px 11px; border-bottom: 1px solid var(--border-2); }
+.panel > .pbody { padding: 11px; }
+
+/* mission state */
+.state-chip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; border-radius: var(--r-s);
+  background: var(--state-bg, var(--panel-2));
+  color: var(--state-ink, var(--ink));
+  border: 1px solid var(--state-bd, var(--border));
+}
+.state-chip .name { font-family: var(--disp); font-weight: 700; font-size: 20px; letter-spacing: .03em; }
+.state-chip .clock { margin-left: auto; font-size: 14px; opacity: .95; }
+
+/* mission phase ladder — progress as position, not colour alone */
+.ladder { display: flex; gap: 3px; margin-top: 9px; }
+.ladder .step { flex: 1; height: 3px; border-radius: 2px; background: var(--border); transition: background .3s; }
+.ladder .step.done { background: var(--accent-dim); }
+.ladder .step.now  { background: var(--accent); box-shadow: 0 0 8px -1px var(--accent); }
+.ladder-names { display: flex; gap: 3px; margin-top: 4px; }
+.ladder-names span { flex: 1; font-size: 8.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ladder-names span.now { color: var(--accent); font-weight: 600; }
+
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; align-items: baseline; margin: 11px 0 0; }
+.kv dt { font-size: 11px; color: var(--muted); }
+.kv dd { margin: 0; font-size: 12.5px; font-family: var(--mono); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
+.kv dd.warnv { color: var(--warn); }
+.kv dd.critv { color: var(--crit); }
+.kv dd.goodv { color: var(--good); }
+.kv dd svg { flex: 0 0 auto; }
+
+/* connection pill */
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+.pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.pill.ok   { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: color-mix(in srgb, var(--good) 10%, transparent); }
+.pill.stale{ color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.pill.lost { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, transparent); background: color-mix(in srgb, var(--crit) 10%, transparent); }
+@media (prefers-reduced-motion: no-preference) { .pill.ok .dot { animation: blink 2.4s ease-in-out infinite; } }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+/* signal-strength meter — link quality carried by bar count, not hue */
+.sigmeter { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
+.sigmeter i { width: 3px; background: var(--border); border-radius: 1px; display: block; }
+.sigmeter i:nth-child(1) { height: 4px; }
+.sigmeter i:nth-child(2) { height: 7px; }
+.sigmeter i:nth-child(3) { height: 10px; }
+.sigmeter i:nth-child(4) { height: 13px; }
+.sigmeter i.on { background: var(--good); }
+.sigmeter.q2 i.on { background: var(--warn); }
+.sigmeter.q1 i.on { background: var(--crit); }
+.rate-spark { display: block; width: 100%; height: 30px; margin-top: 10px; }
+
+details.note { font-size: 11px; color: var(--faint); border: 1px solid var(--border); border-radius: var(--r-s); padding: 7px 10px; background: var(--panel-2); }
+details.note summary { cursor: pointer; color: var(--muted); font-weight: 500; list-style: none; display: flex; align-items: center; gap: 6px; min-height: 24px; }
+details.note summary::-webkit-details-marker { display: none; }
+details.note summary::after { content: "+"; margin-left: auto; font-family: var(--mono); }
+details.note[open] summary::after { content: "-"; }
+details.note p { margin: 8px 0 0; line-height: 1.65; }
+details.note .mono { color: var(--muted); overflow-wrap: anywhere; }
+
+/* ============================ main ============================ */
+.main {
+  grid-area: main;
+  padding: var(--sp-3);
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  background:
+    radial-gradient(1100px 520px at 78% -8%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
+    var(--bg);
+}
+
+/* ---- stat tiles: value in front, sparkline behind ---- */
+.tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--sp-3); }
+@media (max-width: 1400px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 760px)  { .tiles { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px)  { .tiles { grid-template-columns: 1fr; } }
+
+.tile {
+  position: relative; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 2px;
+  box-shadow: var(--shadow); min-width: 0;
+}
+.tile canvas.spark { position: absolute; inset: auto 0 0 0; width: 100%; height: 46px; opacity: .5; pointer-events: none; }
+.tile > * { position: relative; z-index: 1; }
+.tile .t-head { display: flex; align-items: center; gap: 6px; }
+.tile .t-head svg { color: var(--t-color, var(--accent)); flex: 0 0 auto; }
+.tile .t-val { font-family: var(--mono); font-weight: 600; font-size: 25px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.15; }
+.tile .t-unit { font-size: 10.5px; color: var(--faint); font-weight: 500; letter-spacing: .04em; }
+.tile .t-delta { font-size: 10.5px; font-family: var(--mono); color: var(--muted); display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+.tile .t-delta svg { flex: 0 0 auto; }
+@media (max-width: 420px) {
+  /* Five full-height tiles push the telemetry itself a screen and a half down
+     on a phone. Below 420px they lie down instead. This block must sit after
+     the base .tile rules — equal specificity, so source order decides. */
+  .tiles .tile { flex-flow: row wrap; align-items: baseline; padding: 9px 12px; gap: 3px 9px; }
+  .tiles .tile .t-head { flex: 1 0 100%; }
+  .tiles .tile .t-val { font-size: 22px; }
+  .tiles .tile .t-unit { margin-right: auto; }
+  .tiles .tile .t-delta { margin-top: 0; }
+  .tiles .tile canvas.spark { height: 34px; opacity: .4; }
+}
+
+/* ---- shared card chrome for the big blocks ---- */
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 0; }
+.card > .chead { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; padding: 9px 12px; border-bottom: 1px solid var(--border-2); }
+.card > .chead h2 { font-size: 13px; font-weight: 600; letter-spacing: .02em; margin-right: auto; display: flex; align-items: center; gap: 7px; }
+.card > .chead h2 svg { color: var(--accent); }
+
+.chip {
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
+  border-radius: var(--r-s); padding: 4px 9px; font-size: 11px; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 5px; min-height: 26px; white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.chip:hover { color: var(--ink); background: var(--panel-3); border-color: var(--faint); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+.chipset { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+
+/* ============================ 3D flight view ============================ */
+.scene-wrap { position: relative; flex: 1; min-height: 0; }
+#scene {
+  display: block; width: 100%; height: 380px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, var(--panel-2)) 0%, var(--panel-2) 62%, var(--panel) 100%);
+  border-radius: 0 0 var(--r) var(--r);
+  touch-action: none; cursor: grab;
+}
+#scene:active { cursor: grabbing; }
+@media (max-width: 900px) { #scene { height: 300px; } }
+
+/* HUD overlays inside the scene */
+.hud { position: absolute; pointer-events: none; font-family: var(--mono); font-size: 11px; letter-spacing: .02em; }
+.hud.tl { top: 10px; left: 12px; display: flex; flex-direction: column; gap: 3px; }
+.hud.tr { top: 10px; right: 12px; text-align: right; display: flex; flex-direction: column; gap: 3px; }
+.hud.bl { bottom: 10px; left: 12px; display: flex; flex-direction: column; gap: 4px; }
+.hud .hrow { display: flex; align-items: baseline; gap: 7px; }
+.hud .hk { color: var(--faint); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; font-family: var(--sans); }
+.hud .hv { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+.hud .hv.big { font-size: 19px; font-weight: 600; }
+.hud-legend { display: flex; flex-direction: column; gap: 3px; }
+.hud-legend .lg { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; font-family: var(--sans); }
+.hud-legend .sw { width: 14px; height: 3px; border-radius: 2px; flex: 0 0 auto; }
+.hud-legend .sw.dash { background: none; border-top: 2px dashed currentColor; height: 0; }
+
+.scene-hint {
+  position: absolute; right: 12px; bottom: 10px;
+  font-size: 10px; color: var(--faint); font-family: var(--sans);
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  border: 1px solid var(--border-2); border-radius: var(--r-s); padding: 3px 8px;
+  pointer-events: none;
+}
+@media (max-width: 700px) { .scene-hint { display: none; } }
+.scene-empty {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px; text-align: center;
+  color: var(--muted); font-size: 13px; padding: var(--sp-4);
+}
+.scene-empty svg { color: var(--faint); }
+.scene-empty .sub { font-size: 11.5px; color: var(--faint); max-width: 40ch; line-height: 1.6; }
+
+/* ============================ charts ============================ */
+.charts .cbody { padding: 8px 12px 4px; display: flex; flex-direction: column; gap: 6px; position: relative; }
+.chart-row { position: relative; }
+.chart-row canvas { display: block; width: 100%; height: 128px; }
+.chart-row.short canvas { height: 96px; }
+.chart-row .cr-label {
+  position: absolute; top: 4px; left: 58px;
+  font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); pointer-events: none;
+  display: flex; align-items: center; gap: 10px;
+}
+.chart-row .cr-label .lg { display: inline-flex; align-items: center; gap: 5px; }
+.chart-row .cr-label .sw { width: 13px; height: 2.5px; border-radius: 2px; }
+.chart-row .cr-label .sw.d { border-top: 2px dashed currentColor; background: none; height: 0; }
+
+.scrubwrap { display: flex; align-items: center; gap: 10px; padding: 2px 12px 10px; }
+.scrubwrap label { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
+input[type=range].scrub { flex: 1; accent-color: var(--accent); height: 24px; cursor: pointer; min-width: 80px; }
+.scrub-read { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.tooltip {
+  position: absolute; pointer-events: none; z-index: 5;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--border); border-radius: var(--r-s);
+  padding: 7px 10px; font-size: 11px; font-family: var(--mono); white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(0,0,0,.45); opacity: 0; transition: opacity .1s;
+  backdrop-filter: blur(6px);
+}
+.tooltip b { font-family: var(--sans); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
+.tooltip .tr { display: flex; gap: 10px; justify-content: space-between; }
+.tooltip .tr span:first-child { color: var(--muted); }
+
+.datatable { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11px; }
+.datatable th, .datatable td { padding: 4px 10px; text-align: right; border-bottom: 1px solid var(--border-2); font-variant-numeric: tabular-nums; }
+.datatable th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); font-family: var(--sans); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; }
+.datatable tbody tr:hover { background: var(--panel-2); }
+.datatable-wrap { max-height: 300px; overflow: auto; }
+
+.empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 44px var(--sp-4); text-align: center; color: var(--muted); font-size: 13px;
+}
+.empty svg { color: var(--faint); }
+.empty .sub { font-size: 11.5px; color: var(--faint); max-width: 44ch; line-height: 1.6; }
+
+/* ============================ instrument row ============================ */
+.row3 { display: grid; grid-template-columns: 1.05fr 1fr 1.15fr; gap: var(--sp-3); }
+@media (max-width: 1200px) { .row3 { grid-template-columns: 1fr 1fr; } .row3 > :last-child { grid-column: 1 / -1; } }
+@media (max-width: 720px)  { .row3 { grid-template-columns: 1fr; } .row3 > :last-child { grid-column: auto; } }
+
+.inst-body { padding: 12px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.inst-body .dials { display: flex; gap: 10px; flex: 0 0 auto; }
+.inst-body svg.dial { display: block; width: 128px; height: 128px; max-width: 38vw; }
+.att-nums { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; align-items: baseline; flex: 1 1 120px; min-width: 110px; }
+.att-nums .v { font-family: var(--mono); font-size: 18px; font-variant-numeric: tabular-nums; text-align: right; }
+
+.gps-body { padding: 12px; display: flex; flex-direction: column; gap: 11px; }
+.gps-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: baseline; }
+.gps-grid .v { font-family: var(--mono); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+canvas.polar { display: block; width: 100%; max-width: 260px; height: 190px; margin: 0 auto; }
+
+/* ============================ raw monitor ============================ */
+.mon-list { font-family: var(--mono); font-size: 11.5px; line-height: 1.65; padding: 4px 0; max-height: 190px; overflow-y: auto; }
+.mon-list .r { display: grid; grid-template-columns: 44px 32px 1fr; gap: 9px; padding: 2px 12px; align-items: baseline; }
+.mon-list .r:hover { background: var(--panel-2); }
+.mon-list .r .n { color: var(--faint); }
+.mon-list .r .tag { font-weight: 600; font-size: 10px; letter-spacing: .06em; }
+.mon-list .r .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mon-list .r .why { grid-column: 3; color: var(--crit); font-size: 10.5px; font-family: var(--sans); letter-spacing: .01em; }
+.mon-list .r.dup .why { color: var(--warn); }
+.mon-list .r.ok  .tag { color: var(--good); }
+.mon-list .r.bad { color: var(--crit); }
+.mon-list .r.bad .tag { color: var(--crit); }
+.mon-list .r.dup { color: var(--muted); }
+.mon-list .r.dup .tag { color: var(--warn); }
+.mon-list .divider { padding: 3px 12px; color: var(--warn); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; font-family: var(--sans); display: flex; align-items: center; gap: 7px; }
+.mon-list .divider::before, .mon-list .divider::after { content: ""; height: 1px; background: color-mix(in srgb, var(--warn) 35%, transparent); flex: 1; }
+@media (prefers-reduced-motion: no-preference) { .mon-list .r.fresh { animation: slidein .25s ease-out; } }
+@keyframes slidein { from { opacity: 0; transform: translateX(-4px); } }
+@media (max-width: 760px) {
+  .mon-list .r { grid-template-columns: 40px 30px 1fr; }
+  .mon-list .r .txt { white-space: normal; overflow-wrap: anywhere; }
+}
+
+.toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(10px);
+  background: var(--panel-3); color: var(--ink); border: 1px solid var(--border);
+  padding: 9px 16px; border-radius: var(--r-s); font-size: 12px; font-weight: 500;
+  opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 50; max-width: min(92vw, 460px);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.hidden { display: none !important; }
+input[type=file] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+</style>
+
+<!-- ================================================================
+     Icon sprite — one family, 24px grid, 1.75 stroke, round caps.
+     No emoji is used as a structural icon anywhere in this console.
+     ================================================================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <g id="ic" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></g>
+
+    <symbol id="i-sat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M13 7 9.2 3.2a1 1 0 0 0-1.4 0L5 6a1 1 0 0 0 0 1.4L8.8 11"/>
+      <path d="M17 11l3.8 3.8a1 1 0 0 1 0 1.4L18 19a1 1 0 0 1-1.4 0L12.8 15.2"/>
+      <path d="m9 15-2 2"/><path d="M14.5 6.5 17.5 9.5"/>
+      <path d="M6 21a3 3 0 0 0 3-3"/><path d="M3 21a6 6 0 0 0 6-6"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 13 8-13 8z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v16M15 4v16"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/></symbol>
+    <symbol id="i-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-usb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="20" r="2"/><path d="M12 18V7"/><path d="m8 11 4-4 4 4"/><path d="M12 14h5a2 2 0 0 0 2-2V9"/><rect x="17" y="5" width="4" height="4" rx="1"/></symbol>
+    <symbol id="i-flask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v6.5L4.5 18A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-3L14 9.5V3"/><path d="M8.5 3h7"/><path d="M6.7 15h10.6"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5v10l-9 5-9-5V7z"/><path d="m3 7 9 5 9-5"/><path d="M12 12v10"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l3-8 4 16 3-10 2 2h5"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5.2-5.2 2 2-5.2z"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 5.5-8 12-8 12s-8-6.5-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m6.5 9 3 3-3 3"/><path d="M12.5 15h5"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m7 14 3.5-4 3 2.5L20 6"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></symbol>
+    <symbol id="i-flat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.2 2.4 2.4 4.6-5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14 16 9"/><path d="M3.6 18a9 9 0 1 1 16.8 0"/></symbol>
+    <symbol id="i-therm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.8V5a2.5 2.5 0 0 0-5 0v9.8a5 5 0 1 0 5 0"/></symbol>
+    <symbol id="i-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M7.8 16.2a6 6 0 0 1 0-8.4"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4"/><path d="M4.9 19.1a10 10 0 0 1 0-14.2"/><path d="M19.1 4.9a10 10 0 0 1 0 14.2"/></symbol>
+    <symbol id="i-orbit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-28 12 12)"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to telemetry</a>
+
+<div class="app">
+  <!-- ============================ header ============================ -->
+  <header>
+    <div class="brand">
+      <svg class="mark" width="26" height="26" aria-hidden="true"><use href="#i-sat"/></svg>
+      <div class="txt">
+        <h1>CanSat Telemetry Console</h1>
+        <div class="sub">Ground station &middot; 433&nbsp;MHz LoRa &middot; <b id="src-mode">DEMO</b></div>
+      </div>
+    </div>
+
+    <div class="seg" role="group" aria-label="Telemetry source">
+      <button id="src-demo" aria-pressed="true"><svg width="14" height="14" aria-hidden="true"><use href="#i-flask"/></svg>Demo</button>
+      <button id="src-file" aria-pressed="false"><svg width="14" height="14" aria-hidden="true"><use href="#i-file"/></svg>File</button>
+      <button id="src-serial" aria-pressed="false"><svg width="14" height="14" aria-hidden="true"><use href="#i-usb"/></svg>Web Serial</button>
+    </div>
+    <input type="file" id="file-input" accept=".txt,.tsv,.log,.csv,.bin">
+
+    <button class="hbtn" id="pause-btn" aria-pressed="false" title="Freeze the display; packets keep arriving and are buffered">
+      <svg width="14" height="14" aria-hidden="true"><use href="#i-pause" id="pause-icon"/></svg><span id="pause-label">Pause</span>
+    </button>
+    <button class="hbtn" id="copy-csv" title="Copy the accepted telemetry as CSV">
+      <svg width="14" height="14" aria-hidden="true"><use href="#i-copy"/></svg>Copy CSV
+    </button>
+    <button class="hbtn" id="theme-toggle" title="Toggle light / dark" aria-label="Toggle light or dark theme">
+      <svg width="15" height="15" aria-hidden="true"><use href="#i-theme"/></svg>
+    </button>
+  </header>
+
+  <!-- ============================ rail ============================ -->
+  <aside class="rail" aria-label="Mission and link status">
+    <section class="panel" aria-labelledby="h-mission">
+      <div class="phead">
+        <h2 class="label" id="h-mission">Mission</h2>
+        <span id="conn-pill" class="pill lost"><span class="dot"></span><span id="conn-text">No signal</span></span>
+      </div>
+      <div class="pbody">
+        <div class="state-chip" id="state-chip">
+          <span class="name" id="state-name">INIT</span>
+          <span class="clock mono" id="mission-clock">00:00:00:000</span>
+        </div>
+        <p class="sr-only" id="state-live" aria-live="polite"></p>
+
+        <div class="ladder" id="ladder" aria-hidden="true"></div>
+        <div class="ladder-names" id="ladder-names" aria-hidden="true"></div>
+
+        <dl class="kv">
+          <dt>Team</dt><dd id="kv-team">&mdash;</dd>
+          <dt>Packet</dt><dd id="kv-packet">&mdash;</dd>
+          <dt>Calibration</dt><dd id="kv-cal">&mdash;</dd>
+          <dt>Armed</dt><dd id="kv-arm">&mdash;</dd>
+          <dt>Active faults</dt><dd id="kv-faults">&mdash;</dd>
+          <dt>Sync word</dt><dd id="kv-sync">TEST &middot; 0xF3</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-link">
+      <div class="phead">
+        <h2 class="label" id="h-link">Link health</h2>
+        <span class="sigmeter" id="sigmeter" role="img" aria-label="Link quality: no signal"><i></i><i></i><i></i><i></i></span>
+      </div>
+      <div class="pbody">
+        <dl class="kv" style="margin-top:0">
+          <dt>Rate</dt><dd id="lh-rate">0.00 Hz</dd>
+          <dt>Packets OK</dt><dd id="lh-ok">0</dd>
+          <dt>Missing</dt><dd id="lh-missing">0</dd>
+          <dt>Duplicates</dt><dd id="lh-dup">0</dd>
+          <dt>Invalid</dt><dd id="lh-invalid">0</dd>
+          <dt>CRC errors</dt><dd id="lh-crc">0</dd>
+          <dt>Packet loss</dt><dd id="lh-loss">0.0 %</dd>
+          <dt>Since last RX</dt><dd id="lh-age">&mdash;</dd>
+        </dl>
+        <canvas class="rate-spark" id="rate-spark" role="img" aria-label="Packet rate over the last 60 samples"></canvas>
+      </div>
+    </section>
+
+    <details class="note">
+      <summary>Packet format</summary>
+      <p>Packets follow the CanSat&nbsp;2026 rulebook string:</p>
+      <p class="mono">CAN-Team-XX; P-XXX; Ti-&hellip;; A-&hellip;; Pr-&hellip;; T-&hellip;; Ro-&hellip;; Pi-&hellip;; Ya-&hellip;; AX-&hellip;; AY-&hellip;; AZ-&hellip;;</p>
+      <p>Optional <span class="mono">GP-Lat/Lon/Alt</span> and diagnostic <span class="mono">MODE</span> / <span class="mono">FAULTS</span> / <span class="mono">CAL</span> / <span class="mono">ARM</span> tags follow the mandatory block.</p>
+    </details>
+  </aside>
+
+  <!-- ============================ main ============================ -->
+  <main class="main" id="main" tabindex="-1">
+    <div class="tiles" id="tiles"></div>
+
+    <!-- ---------------- 3D flight view ---------------- -->
+    <section class="card" aria-labelledby="h-3d">
+      <div class="chead">
+        <h2 id="h-3d"><svg width="15" height="15" aria-hidden="true"><use href="#i-cube"/></svg>Flight view &middot; 3D</h2>
+        <div class="chipset" role="group" aria-label="Camera view">
+          <button class="chip" data-cam="orbit" aria-pressed="true"><svg width="13" height="13" aria-hidden="true"><use href="#i-orbit"/></svg>Orbit</button>
+          <button class="chip" data-cam="chase" aria-pressed="false"><svg width="13" height="13" aria-hidden="true"><use href="#i-eye"/></svg>Chase</button>
+          <button class="chip" data-cam="top" aria-pressed="false">Top</button>
+          <button class="chip" data-cam="profile" aria-pressed="false">Profile</button>
+        </div>
+        <button class="chip" id="scene-reset" title="Reset camera to the default framing">Reset</button>
+      </div>
+      <div class="scene-wrap">
+        <canvas id="scene" tabindex="0" role="img"
+                aria-label="Three-dimensional flight view. Awaiting telemetry."
+                aria-describedby="scene-help"></canvas>
+        <p class="sr-only" id="scene-help">Interactive 3D view of the CanSat trajectory. Drag or use arrow keys to orbit the camera, plus and minus to zoom, Home to reset. The same information is available as numbers in the Attitude, GPS and Flight profile panels.</p>
+
+        <div class="hud tl" id="hud-tl" aria-hidden="true">
+          <div class="hrow"><span class="hk">ALT</span><span class="hv big" id="hud-alt">&mdash;</span><span class="hk">m</span></div>
+          <div class="hrow"><span class="hk">V/S</span><span class="hv" id="hud-vsp">&mdash;</span><span class="hk">m/s</span></div>
+        </div>
+        <div class="hud tr" id="hud-tr" aria-hidden="true">
+          <div class="hrow"><span class="hv" id="hud-range">&mdash;</span><span class="hk">m range</span></div>
+          <div class="hrow"><span class="hv" id="hud-brg">&mdash;</span><span class="hk">bearing</span></div>
+        </div>
+        <div class="hud bl hud-legend" id="hud-legend" aria-hidden="true">
+          <span class="lg"><span class="sw" style="background:var(--s-alt)"></span>Ascent</span>
+          <span class="lg"><span class="sw" style="background:var(--s-tmp)"></span>Descent</span>
+          <span class="lg" style="color:var(--faint)"><span class="sw dash"></span>Ground track (filtered)</span>
+        </div>
+        <div class="scene-hint" id="scene-hint">Drag to orbit &middot; scroll to zoom &middot; body shown 25&times; scale</div>
+
+        <div class="scene-empty" id="scene-empty">
+          <svg width="34" height="34" aria-hidden="true"><use href="#i-sat"/></svg>
+          <div>Awaiting telemetry</div>
+          <div class="sub">The flight view builds itself from accepted packets. Pick a source above, or drop in a recorded packet file.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- flight profile ---------------- -->
+    <section class="card charts" aria-labelledby="h-prof">
+      <div class="chead">
+        <h2 id="h-prof"><svg width="15" height="15" aria-hidden="true"><use href="#i-chart"/></svg>Flight profile</h2>
+        <div class="chipset" role="group" aria-label="Time window">
+          <button class="chip" data-win="30" aria-pressed="false">30 s</button>
+          <button class="chip" data-win="60" aria-pressed="false">60 s</button>
+          <button class="chip" data-win="0" aria-pressed="true">All</button>
+        </div>
+        <button class="chip" id="toggle-table" aria-pressed="false"><svg width="13" height="13" aria-hidden="true"><use href="#i-table"/></svg><span id="toggle-table-label">Data table</span></button>
+      </div>
+
+      <div class="cbody" id="chart-body">
+        <div class="chart-row" data-key="altitude">
+          <span class="cr-label">
+            <span class="lg" style="color:var(--s-alt)"><span class="sw" style="background:currentColor"></span>Altitude &middot; m AGL</span>
+            <span class="lg" style="color:var(--s-vsp)"><span class="sw d"></span>Vertical speed &middot; m/s</span>
+          </span>
+          <canvas></canvas>
+        </div>
+        <div class="chart-row" data-key="pressure">
+          <span class="cr-label"><span class="lg" style="color:var(--s-prs)"><span class="sw" style="background:currentColor"></span>Pressure &middot; Pa</span></span>
+          <canvas></canvas>
+        </div>
+        <div class="chart-row" data-key="temperature">
+          <span class="cr-label"><span class="lg" style="color:var(--s-tmp)"><span class="sw" style="background:currentColor"></span>Temperature &middot; &deg;C</span></span>
+          <canvas></canvas>
+        </div>
+        <div class="chart-row short" data-key="amag">
+          <span class="cr-label"><span class="lg" style="color:var(--s-acc)"><span class="sw" style="background:currentColor"></span>|Acceleration| &middot; m/s&sup2;</span></span>
+          <canvas></canvas>
+        </div>
+        <div class="tooltip" id="chart-tt"></div>
+        <div class="empty hidden" id="chart-empty">
+          <svg width="30" height="30" aria-hidden="true"><use href="#i-wave"/></svg>
+          <div>No samples yet</div>
+          <div class="sub">Traces appear as soon as the first packet passes validation.</div>
+        </div>
+      </div>
+
+      <div class="scrubwrap" id="scrubwrap">
+        <label for="scrub">Inspect</label>
+        <input type="range" class="scrub" id="scrub" min="0" max="0" step="1" value="0"
+               aria-label="Inspect a sample on the flight profile" aria-valuetext="No samples yet">
+        <span class="scrub-read mono" id="scrub-read">live</span>
+      </div>
+
+      <div class="datatable-wrap hidden" id="table-wrap"></div>
+      <p class="sr-only" id="chart-summary"></p>
+    </section>
+
+    <!-- ---------------- instruments ---------------- -->
+    <div class="row3">
+      <section class="card" aria-labelledby="h-att">
+        <div class="chead"><h2 id="h-att"><svg width="15" height="15" aria-hidden="true"><use href="#i-compass"/></svg>Attitude</h2></div>
+        <div class="inst-body">
+          <div class="dials">
+            <svg class="dial" id="adi" viewBox="0 0 132 132" role="img" aria-label="Attitude indicator"></svg>
+            <svg class="dial" id="hsi" viewBox="0 0 132 132" role="img" aria-label="Heading indicator"></svg>
+          </div>
+          <dl class="att-nums">
+            <dt class="label">Roll</dt><dd class="v mono" id="att-roll">&mdash;</dd>
+            <dt class="label">Pitch</dt><dd class="v mono" id="att-pitch">&mdash;</dd>
+            <dt class="label">Yaw</dt><dd class="v mono" id="att-yaw">&mdash;</dd>
+            <dt class="label">Spin</dt><dd class="v mono" id="att-spin">&mdash;</dd>
+          </dl>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-gps">
+        <div class="chead">
+          <h2 id="h-gps"><svg width="15" height="15" aria-hidden="true"><use href="#i-pin"/></svg>GPS</h2>
+          <span id="gps-fix" class="pill lost"><span class="dot"></span>No fix</span>
+        </div>
+        <div class="gps-body">
+          <canvas class="polar" id="polar" role="img" aria-label="Ground track relative to the launch point"></canvas>
+          <dl class="gps-grid">
+            <dt class="label">Latitude</dt><dd class="v" id="gps-lat">&mdash;</dd>
+            <dt class="label">Longitude</dt><dd class="v" id="gps-lon">&mdash;</dd>
+            <dt class="label">Altitude</dt><dd class="v" id="gps-alt">&mdash;</dd>
+            <dt class="label">Range</dt><dd class="v" id="gps-range">&mdash;</dd>
+          </dl>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-mon">
+        <div class="chead">
+          <h2 id="h-mon"><svg width="15" height="15" aria-hidden="true"><use href="#i-term"/></svg>Raw packet monitor</h2>
+          <span class="label" id="mon-count">0 shown</span>
+        </div>
+        <div class="mon-list" id="mon-list" role="log" aria-label="Raw packet monitor" aria-live="off"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ================================================================
+   1. Framing (mirror of firmware/ground-station/src/framing.cpp)
+   ================================================================ */
+function crc16ccitt(bytes) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc ^= bytes[i] << 8;
+    for (let b = 0; b < 8; b++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+  }
+  return crc;
+}
+function frameEncode(str) {
+  const p = new TextEncoder().encode(str);
+  const head = "$" + p.length + "," + crc16ccitt(p).toString(16).padStart(4, "0") + ",";
+  return new TextEncoder().encode(head).reduce((a, c) => (a.push(c), a), []).concat([...p], [10]);
+}
+class FrameDecoder {
+  constructor() { this.reset(); this.framesOk = 0; this.crcErrors = 0; this.resyncs = 0; }
+  reset() { this.state = "idle"; this.len = ""; this.crc = ""; this.payload = []; this.expected = 0; }
+  *feed(bytes) {
+    for (const byte of bytes) { const f = this._byte(byte); if (f) yield f; }
+  }
+  _finish() {
+    const buf = Uint8Array.from(this.payload);
+    const ok = crc16ccitt(buf) === parseInt(this.crc, 16);
+    const text = new TextDecoder().decode(buf);
+    this.reset();
+    if (ok) { this.framesOk++; return { kind: text.startsWith("#") ? "status" : "packet", payload: text, crcOk: true }; }
+    this.crcErrors++; return { kind: "crc", payload: text, crcOk: false };
+  }
+  _byte(byte) {
+    const ch = String.fromCharCode(byte);
+    if (this.state === "idle") { if (ch === "$") { this.reset(); this.state = "len"; } return null; }
+    if (this.state === "len") {
+      if (ch >= "0" && ch <= "9") { this.len += ch; if (this.len.length > 6) { this.resyncs++; this.reset(); } }
+      else if (ch === "," && this.len) { this.expected = +this.len; if (this.expected > 512) { this.resyncs++; this.reset(); } else this.state = "crc"; }
+      else if (ch === "$") this.len = "";
+      else { this.resyncs++; this.reset(); }
+      return null;
+    }
+    if (this.state === "crc") {
+      if (/[0-9a-fA-F]/.test(ch)) { this.crc += ch; if (this.crc.length > 4) { this.resyncs++; this.reset(); } }
+      else if (ch === "," && this.crc.length === 4) { this.state = "payload"; if (this.expected === 0) return this._finish(); }
+      else { this.resyncs++; this.reset(); }
+      return null;
+    }
+    if (this.state === "payload") { this.payload.push(byte); if (this.payload.length >= this.expected) return this._finish(); }
+    return null;
+  }
+}
+
+/* ================================================================
+   2. Packet parser (mirror of ground-station/software/src/telemetry.py)
+   ================================================================ */
+const TEAM_RE = /^CAN-Team-[A-Za-z0-9]+$/;
+const TS_RE = /^\d{2}:\d{2}:\d{2}:\d{3}$/;
+const MAND = [["A-", 1], ["Pr-", 2], ["T-", 1], ["Ro-", 1], ["Pi-", 1], ["Ya-", 1], ["AX-", 2], ["AY-", 2], ["AZ-", 2]];
+const MAND_NAME = ["altitude", "pressure", "temperature", "roll", "pitch", "yaw", "ax", "ay", "az"];
+
+function parsePacket(str, team) {
+  const f = str.split(";").map(s => s.trim()).filter(Boolean);
+  if (f.length < 12) return { error: "missing mandatory fields" };
+  if (!TEAM_RE.test(f[0]) || f[0] === "CAN-Team-XX") return { error: "invalid team identifier" };
+  if (team && f[0] !== team) return { error: "unexpected team identifier" };
+  if (!f[1].startsWith("P-")) return { error: "invalid packet prefix" };
+  const pn = Number(f[1].slice(2));
+  if (!Number.isInteger(pn) || pn < 1) return { error: "invalid packet number" };
+  if (!f[2].startsWith("Ti-")) return { error: "invalid timestamp prefix" };
+  const ts = f[2].slice(3);
+  if (!TS_RE.test(ts)) return { error: "invalid timestamp" };
+  const [hh, mm, ss, ms] = ts.split(":").map(Number);
+  if (mm > 59 || ss > 59 || hh > 99) return { error: "invalid timestamp range" };
+  const rec = { team_id: f[0], packet_number: pn, timestamp: ts, timestamp_ms: ((hh * 60 + mm) * 60 + ss) * 1000 + ms, tags: {} };
+  for (let i = 0; i < 9; i++) {
+    const fv = f[3 + i], pre = MAND[i][0], prec = MAND[i][1];
+    if (!fv.startsWith(pre)) return { error: "expected " + pre + " field" };
+    const num = fv.slice(pre.length);
+    if (!new RegExp("^-?\\d+\\.\\d{" + prec + "}$").test(num)) return { error: "invalid " + pre + " precision" };
+    const v = parseFloat(num);
+    if (!isFinite(v)) return { error: "invalid " + pre + " value" };
+    rec[MAND_NAME[i]] = v;
+  }
+  for (const of of f.slice(12)) {
+    const k = of.lastIndexOf("-");
+    if (k > 0) rec.tags[of.slice(0, k)] = of.slice(k + 1);
+  }
+  const g = k => rec.tags[k] !== undefined ? parseFloat(rec.tags[k]) : null;
+  rec.gps_lat = g("GP-Lat"); rec.gps_lon = g("GP-Lon"); rec.gps_alt = g("GP-Alt");
+  rec.mode = rec.tags["MODE"] || null;
+  rec.faults = rec.tags["FAULTS"] !== undefined ? parseInt(rec.tags["FAULTS"], 10) : null;
+  rec.calibrated = rec.tags["CAL"] !== undefined ? rec.tags["CAL"] === "1" : null;
+  rec.armed = rec.tags["ARM"] !== undefined ? rec.tags["ARM"] === "1" : null;
+  return { record: rec };
+}
+
+/* ================================================================
+   3. Stream validator (mirror of validator.py)
+   ================================================================ */
+class StreamValidator {
+  constructor(team) {
+    this.team = team || null;
+    this.stats = { received: 0, accepted: 0, rejected: 0, missing: 0, duplicates: 0, outOfOrder: 0, wrongTeam: 0, tsReg: 0, gpsRej: 0 };
+    this._last = null; this._seen = new Set(); this._lastTs = null;
+  }
+  check(rec) {
+    const r = { accepted: true, missing: 0, duplicate: false, outOfOrder: false, notes: [] };
+    this.stats.received++;
+    const pad = n => String(n).padStart(3, "0");
+    if (this.team && rec.team_id !== this.team) {
+      r.accepted = false; r.notes.push("wrong team " + rec.team_id);
+      this.stats.wrongTeam++; this.stats.rejected++; return r;
+    }
+    const n = rec.packet_number;
+    if (this._seen.has(n)) { r.duplicate = true; r.notes.push("duplicate P-" + pad(n)); this.stats.duplicates++; }
+    else if (this._last !== null) {
+      if (n <= this._last) { r.outOfOrder = true; r.notes.push("out of order"); this.stats.outOfOrder++; }
+      else if (n > this._last + 1) { r.missing = n - this._last - 1; this.stats.missing += r.missing; r.notes.push(r.missing + " missing before P-" + pad(n)); }
+    }
+    if (this._lastTs !== null && rec.timestamp_ms < this._lastTs) { r.notes.push("timestamp regression"); this.stats.tsReg++; }
+    if (rec.gps_lat !== null && rec.gps_lon !== null) {
+      const ok = rec.gps_lat >= -90 && rec.gps_lat <= 90 && rec.gps_lon >= -180 && rec.gps_lon <= 180;
+      if (!ok) { r.notes.push("implausible GPS fix ignored"); this.stats.gpsRej++; }
+    }
+    this._seen.add(n);
+    if (this._last === null || n > this._last) this._last = n;
+    this._lastTs = rec.timestamp_ms;
+    this.stats.accepted++;
+    return r;
+  }
+}
+
+/* ================================================================
+   4. Link health (mirror of health.py)
+   ================================================================ */
+const RATE_WINDOW_S = 5;   // packet-rate averaging window, seconds (mirrors health.py)
+class LinkHealth {
+  constructor() {
+    this.frames = 0; this.packetsOk = 0; this.packetsInvalid = 0; this.statusFrames = 0;
+    this.crcErrors = 0; this.missing = 0; this.duplicates = 0;
+    this._arrivals = []; this.lastRxAt = null;
+    this.rateHistory = [];
+  }
+  onFrame(kind) {
+    this.frames++;
+    const now = performance.now() / 1000;
+    if (kind === "packet" || kind === "raw") {
+      this._arrivals.push(now);
+      this.lastRxAt = now;
+      this.rateHistory.push(this.rate);
+      if (this.rateHistory.length > 60) this.rateHistory.shift();
+    } else if (kind === "status") this.statusFrames++;
+    else if (kind === "crc") this.crcErrors++;
+  }
+  onPacket(ok, missing, dup) {
+    if (ok) this.packetsOk++; else this.packetsInvalid++;
+    this.missing += Math.max(0, missing || 0);
+    if (dup) this.duplicates++;
+  }
+  get connected() { return this.lastRxAt !== null && (performance.now() / 1000 - this.lastRxAt) < 3; }
+  /* Packets per second over the last RATE_WINDOW_S seconds. A sliding window rather
+     than an EWMA of instantaneous 1/dt intervals: two frames arriving in the same
+     millisecond -- a duplicate, or a serial buffer flushing a burst -- push an EWMA
+     to thousands of Hz and it then needs ~10 packets to decay, which misreads the
+     link exactly when an operator is watching it. Mirrors health.py. */
+  get rate() {
+    const cutoff = performance.now() / 1000 - RATE_WINDOW_S;
+    while (this._arrivals.length && this._arrivals[0] < cutoff) this._arrivals.shift();
+    const n = this._arrivals.length;
+    if (n < 2) return 0;
+    const span = this._arrivals[n - 1] - this._arrivals[0];
+    if (span <= 0) return n / RATE_WINDOW_S;
+    return (n - 1) / span;
+  }
+  get age() { return this.lastRxAt === null ? null : performance.now() / 1000 - this.lastRxAt; }
+  get lossPct() { const exp = this.packetsOk + this.missing; return exp <= 0 ? 0 : 100 * this.missing / exp; }
+}
+
+/* ================================================================
+   5. Demo mission generator (realistic drone-lift profile)
+   ================================================================ */
+const GROUND_P = 101325, GROUND_T = 24.0, GROUND_ELEV = 12.0;
+const BASE_LAT = 21.16670, BASE_LON = 72.78330;          // Physics Club, SVNIT (Surat)
+const PROFILE_END = 56;
+
+function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+function noise(a) { return (Math.random() - 0.5) * 2 * a; }
+
+// returns {alt, vspd, roll, pitch, yaw, ax, ay, az, mode}
+function missionSample(t, yawState) {
+  let alt = 0, vspd = 0, roll = 0, pitch = 0, az = 9.81, ax = 0, ay = 0, mode = "READY";
+  if (t < 6) {
+    mode = t < 1 ? "SELF_TEST" : "READY";
+    alt = noise(0.15); roll = noise(0.6); pitch = noise(0.6);
+  } else if (t < 22) {                        // drone lifts the CanSat to ~46 m
+    mode = "FLIGHT";
+    const k = smooth((t - 6) / 16);
+    alt = 46 * k;
+    vspd = 46 * (6 * ((t - 6) / 16) * (1 - (t - 6) / 16)) / 16;
+    az = 9.81 + (t < 9 ? noise(4) + 6 * (1 - (t - 6) / 3) : noise(0.7));
+    roll = 6 * Math.sin(t * 1.7) + noise(1.2);
+    pitch = 5 * Math.sin(t * 1.3 + 1) + noise(1.2);
+  } else if (t < 24.5) {                      // hold before release
+    mode = "FLIGHT"; alt = 46 + noise(0.25); roll = noise(1.5); pitch = noise(1.5);
+  } else if (t < 34.7) {                      // parachute descent ~4.5 m/s, tumbling
+    mode = "FLIGHT";
+    alt = Math.max(0, 46 - 4.5 * (t - 24.5)); vspd = -4.5;
+    az = 9.81 + noise(2.2);
+    roll = 24 * Math.sin(t * 3.1) + noise(6);
+    pitch = 20 * Math.sin(t * 2.6 + 2) + noise(6);
+  } else if (t < 35.3) {                      // impact
+    mode = "LANDED"; alt = noise(0.3); az = 9.81 + 28 * (1 - (t - 34.7) / 0.6) + noise(3);
+    roll = noise(12); pitch = noise(12);
+  } else if (t < 40.5) {                      // post-impact telemetry (>= 5 s)
+    mode = "LANDED"; alt = noise(0.2); az = 9.81 + noise(0.4); roll = 8 + noise(1); pitch = -4 + noise(1);
+  } else {                                    // recovery beacon
+    mode = "RECOVERY"; alt = noise(0.2); az = 9.81 + noise(0.3); roll = 8 + noise(.6); pitch = -4 + noise(.6);
+  }
+  const spin = (mode === "FLIGHT" && t > 24.5) ? 40 : (mode === "FLIGHT" ? 6 : 1);
+  yawState.v = (yawState.v + spin * 0.5) % 360;
+  ax = noise(0.15); ay = noise(0.15);
+  const pressure = GROUND_P * Math.pow(Math.max(0.5, 1 - alt / 44330), 5.255);
+  const temperature = GROUND_T - 0.0065 * alt + noise(0.08);
+  return { alt, vspd, roll, pitch, yaw: yawState.v > 180 ? yawState.v - 360 : yawState.v,
+           ax, ay, az, pressure, temperature, mode };
+}
+function tfmt(ms) {
+  const t = Math.max(0, Math.round(ms));
+  const h = Math.floor(t / 3600000), m = Math.floor(t / 60000) % 60, s = Math.floor(t / 1000) % 60, x = t % 1000;
+  const p = (n, w) => String(n).padStart(w, "0");
+  return p(h, 2) + ":" + p(m, 2) + ":" + p(s, 2) + ":" + p(x, 3);
+}
+function buildPacket(team, pn, tSec, smp, withGps, cal, arm) {
+  const f2 = (v, d) => v.toFixed(d);
+  let s = team + "; P-" + String(pn).padStart(3, "0") + "; Ti-" + tfmt(tSec * 1000) + "; "
+    + "A-" + f2(smp.alt, 1) + "; Pr-" + f2(smp.pressure, 2) + "; T-" + f2(smp.temperature, 1) + "; "
+    + "Ro-" + f2(smp.roll, 1) + "; Pi-" + f2(smp.pitch, 1) + "; Ya-" + f2(smp.yaw, 1) + "; "
+    + "AX-" + f2(smp.ax, 2) + "; AY-" + f2(smp.ay, 2) + "; AZ-" + f2(smp.az, 2) + ";";
+  if (withGps) {
+    s += " GP-Lat-" + (BASE_LAT + noise(0.00004)).toFixed(6)
+      + "; GP-Lon-" + (BASE_LON + noise(0.00004)).toFixed(6)
+      + "; GP-Alt-" + (GROUND_ELEV + smp.alt).toFixed(1) + ";";
+  }
+  s += " MODE-" + smp.mode + "; FAULTS-0; CAL-" + (cal ? 1 : 0) + "; ARM-" + (arm ? 1 : 0) + ";";
+  return s;
+}
+
+/* ================================================================
+   6. Console state + pipeline
+   ================================================================ */
+const TEAM = "CAN-Team-01";
+const MAX_SAMPLES = 480, MAX_ROWS = 90;
+let validator, health, samples, rows, latest, source, demoTimer, missionT, pn, yawState, anomaly, rowsDirty;
+let origin = null;              // {lat, lon} of the first accepted GPS fix — local ENU datum
+let events = [];                // apogee / touchdown / peak-g markers derived from samples
+let paused = false;
+let scrubIndex = -1;            // -1 = live; otherwise an index into samples
+let winSec = 0;                 // 0 = whole mission
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+function resetSession() {
+  validator = new StreamValidator(TEAM);
+  health = new LinkHealth();
+  samples = [];
+  rows = [];
+  latest = null;
+  missionT = 0;
+  pn = 0;
+  yawState = { v: 0 };
+  anomaly = { gap: false, dup: false, dupPacket: null };
+  rowsDirty = true;
+  origin = null;
+  events = [];
+  scrubIndex = -1;
+  // A new session throws away the mission the paused view was pinned to, so the
+  // freeze cannot survive it. Clearing frozenSample alone would leave the button
+  // reading "Resume" over a display that had quietly gone live again.
+  setPaused(false);
+  render(true);
+}
+
+function ingest(raw, frameKind) {
+  health.onFrame(frameKind === "raw" ? "raw" : "packet");
+  const res = parsePacket(raw, TEAM);
+  if (!res.record) {
+    health.onPacket(false, 0, false);
+    pushRow({ n: null, cls: "bad", tag: "err", text: raw, note: res.error });
+    return;
+  }
+  const rep = validator.check(res.record);
+  health.onPacket(rep.accepted, rep.missing, rep.duplicate);
+  if (rep.missing > 0) pushRow({ divider: rep.missing + (rep.missing > 1 ? " packets missing" : " packet missing") });
+  pushRow({
+    n: res.record.packet_number,
+    cls: rep.duplicate ? "dup" : (rep.accepted ? "ok" : "bad"),
+    tag: rep.duplicate ? "dup" : (rep.accepted ? "ok" : "rej"),
+    text: raw, note: rep.notes.join("; "),
+  });
+  if (rep.accepted && !rep.duplicate) { latest = res.record; pushSample(res.record); }
+}
+
+/* Local ENU metres from the first accepted fix — the datum for the 3D scene
+   and the polar ground track. Equirectangular is exact enough at CanSat range. */
+const M_PER_DEG_LAT = 110540;
+function enu(lat, lon) {
+  if (origin === null) return { x: 0, y: 0 };
+  return {
+    x: (lon - origin.lon) * 111320 * Math.cos(origin.lat * Math.PI / 180),
+    y: (lat - origin.lat) * M_PER_DEG_LAT,
+  };
+}
+
+function pushSample(r) {
+  const prev = samples[samples.length - 1];
+  const amag = Math.hypot(r.ax, r.ay, r.az);
+  let vspd = 0;
+  if (prev) { const dt = (r.timestamp_ms - prev.tms) / 1000; if (dt > 0) vspd = 0.6 * prev.vspd + 0.4 * ((r.altitude - prev.altitude) / dt); }
+
+  let x = 0, y = 0, hasFix = false;
+  if (r.gps_lat !== null && r.gps_lon !== null &&
+      r.gps_lat >= -90 && r.gps_lat <= 90 && r.gps_lon >= -180 && r.gps_lon <= 180) {
+    if (origin === null) origin = { lat: r.gps_lat, lon: r.gps_lon };
+    const p = enu(r.gps_lat, r.gps_lon);
+    x = p.x; y = p.y; hasFix = true;
+  } else if (prev) { x = prev.x; y = prev.y; }
+
+  // A 2 Hz fix scatters several metres. Drawing every raw fix turns a clean
+  // descent into a scribble, so the 3D track and the polar plot use a light
+  // exponential filter. Raw x/y stay on the sample for the CSV, the data
+  // table and the lat/lon readout — nothing recorded is smoothed.
+  const fx = prev ? prev.fx + (x - prev.fx) * 0.28 : x;
+  const fy = prev ? prev.fy + (y - prev.fy) * 0.28 : y;
+
+  let spin = 0;
+  if (prev) {
+    const dt = (r.timestamp_ms - prev.tms) / 1000;
+    if (dt > 0) {
+      let dy = r.yaw - prev.yaw;
+      while (dy > 180) dy -= 360;
+      while (dy < -180) dy += 360;
+      spin = 0.7 * prev.spin + 0.3 * (dy / dt);
+    } else spin = prev.spin;
+  }
+
+  const s = { tms: r.timestamp_ms, t: r.timestamp_ms / 1000, altitude: r.altitude, pressure: r.pressure,
+    temperature: r.temperature, amag, roll: r.roll, pitch: r.pitch, yaw: r.yaw, vspd, spin,
+    x, y, fx, fy, hasFix, mode: r.mode || "",
+    lat: r.gps_lat, lon: r.gps_lon, galt: r.gps_alt };
+  samples.push(s);
+  if (samples.length > MAX_SAMPLES) samples.shift();
+  markEvents(s);
+}
+
+/* Apogee / touchdown / peak-g, recomputed incrementally so the charts can
+   label the moments that actually matter instead of only drawing lines. */
+function markEvents(s) {
+  const find = k => events.find(e => e.kind === k);
+  const ap = find("apogee");
+  if (!ap || s.altitude > ap.value) {
+    if (ap) { ap.t = s.t; ap.value = s.altitude; }
+    else events.push({ kind: "apogee", label: "Apogee", t: s.t, value: s.altitude, series: "altitude" });
+  }
+  const pg = find("peakg");
+  if (!pg || s.amag > pg.value) {
+    if (pg) { pg.t = s.t; pg.value = s.amag; }
+    else events.push({ kind: "peakg", label: "Peak g", t: s.t, value: s.amag, series: "amag" });
+  }
+  if (s.mode === "LANDED" && !find("touchdown")) {
+    events.push({ kind: "touchdown", label: "Touchdown", t: s.t, value: s.altitude, series: "altitude" });
+  }
+}
+
+function pushRow(row) { row.fresh = true; rows.unshift(row); if (rows.length > MAX_ROWS) rows.pop(); rowsDirty = true; }
+
+/* ---- demo driver ---- */
+function demoTick() {
+  missionT += 0.5;
+  if (missionT > PROFILE_END) {
+    // A silent reset reads exactly like a link dropout — say so instead.
+    toast("Demo mission complete — restarting");
+    resetSession();
+    return;
+  }
+  const smp = missionSample(missionT, yawState);
+  pn += 1;
+  const withGps = missionT > 3;
+  const calibrated = missionT > 5;                 // ~5 s of stationary pad samples
+  const armed = calibrated && missionT > 5;        // arming_delay + calibration settled
+  const packet = buildPacket(TEAM, pn, missionT, smp, withGps, calibrated, armed);
+
+  // one dropped packet and one duplicate per mission, to exercise link health
+  if (pn === 42 && !anomaly.gap) { anomaly.gap = true; anomaly.dupPacket = null; return; }
+  ingest(packet, "packet");
+  if (pn === 56 && !anomaly.dup && anomaly.dupPacket) { anomaly.dup = true; ingest(anomaly.dupPacket, "packet"); }
+  anomaly.dupPacket = packet;
+}
+function startDemo() {
+  stopSources();
+  source = "demo";
+  resetSession();
+  $("#src-mode").textContent = "DEMO";
+  $("#kv-sync").textContent = "TEST · 0xF3";
+  demoTimer = setInterval(demoTick, 500);
+}
+function stopSources() {
+  if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+  if (serialReader) { try { serialReader.cancel(); } catch (e) {} serialReader = null; }
+}
+
+/* ---- file replay ---- */
+function replayFile(file) {
+  stopSources();
+  source = "file";
+  resetSession();
+  $("#src-mode").textContent = "FILE";
+  const reader = new FileReader();
+  reader.onload = () => {
+    const buf = new Uint8Array(reader.result);
+    const text = new TextDecoder().decode(buf);
+    const framed = text.trimStart().startsWith("$");
+    let queue = [];
+    if (framed) {
+      const dec = new FrameDecoder();
+      for (const fr of dec.feed(buf)) {
+        if (fr.kind === "packet") queue.push(["packet", fr.payload]);
+        else if (fr.kind === "crc") queue.push(["crc", fr.payload]);
+      }
+    } else {
+      for (let line of text.split(/\r?\n/)) {
+        line = line.includes("\t") ? line.split("\t").pop() : line;
+        line = line.trim();
+        if (line && !line.startsWith("#") && line.includes(";")) queue.push(["packet", line]);
+      }
+    }
+    let i = 0;
+    demoTimer = setInterval(() => {
+      if (i >= queue.length) { clearInterval(demoTimer); demoTimer = null; toast("Replay complete · " + queue.length + " packets"); return; }
+      const [kind, payload] = queue[i++];
+      if (kind === "crc") { health.onFrame("crc"); pushRow({ n: null, cls: "bad", tag: "crc", text: payload, note: "transport CRC error" }); }
+      else ingest(payload, "packet");
+    }, 250);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ---- Web Serial ---- */
+let serialPort = null, serialReader = null;
+async function connectSerial() {
+  if (!("serial" in navigator)) { toast("Web Serial needs Chrome/Edge over HTTPS"); return; }
+  try {
+    serialPort = await navigator.serial.requestPort();
+    await serialPort.open({ baudRate: 115200 });
+  } catch (e) { toast("Serial connection cancelled"); return; }
+  stopSources();
+  source = "serial";
+  resetSession();
+  $("#src-mode").textContent = "SERIAL";
+  setSource("serial");
+  const dec = new FrameDecoder();
+  serialReader = serialPort.readable.getReader();
+  (async () => {
+    try {
+      while (true) {
+        const { value, done } = await serialReader.read();
+        if (done) break;
+        for (const fr of dec.feed(value)) {
+          if (fr.kind === "packet") ingest(fr.payload, "packet");
+          else if (fr.kind === "status") { health.onFrame("status"); applyBridgeStatus(fr.payload); }
+          else if (fr.kind === "crc") { health.onFrame("crc"); pushRow({ n: null, cls: "bad", tag: "crc", text: fr.payload, note: "transport CRC error" }); }
+        }
+      }
+    } catch (e) { toast("Serial link lost"); }
+    finally { try { serialReader.releaseLock(); } catch (e) {} }
+  })();
+  toast("Connected to ground-station bridge");
+}
+function applyBridgeStatus(line) {
+  const m = /battery=([\d.]+)/.exec(line);
+  if (m) { /* reserved: bridge battery telemetry */ }
+  const s = /radio=([01])/.exec(line);
+  if (s) $("#kv-sync").textContent = (s[1] === "1" ? "LINK · " : "DOWN · ") + $("#kv-sync").textContent.split("· ").pop();
+}
+
+/* ================================================================
+   7. Theme-aware colour reader
+   Canvas cannot resolve CSS custom properties, so resolve them once
+   per theme change and hand concrete colours to the renderers.
+   ================================================================ */
+const C = {};
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ["ink", "muted", "faint", "border", "border-2", "panel", "panel-2", "panel-3",
+                   "accent", "accent-dim", "good", "warn", "crit",
+                   "s-alt", "s-vsp", "s-prs", "s-tmp", "s-acc", "grid", "grid-2", "bg"]) {
+    C[k] = cs.getPropertyValue("--" + k).trim();
+  }
+  C.dark = document.documentElement.getAttribute("data-theme") !== "light";
+}
+/* Blend two hex colours; used for depth fog and shading in the 3D view. */
+function hexToRgb(h) {
+  h = h.replace("#", "").trim();
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  const n = parseInt(h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function mix(a, b, t) {
+  const A = hexToRgb(a), B = hexToRgb(b);
+  return "rgb(" + Math.round(A[0] + (B[0] - A[0]) * t) + "," +
+                  Math.round(A[1] + (B[1] - A[1]) * t) + "," +
+                  Math.round(A[2] + (B[2] - A[2]) * t) + ")";
+}
+function rgba(hex, a) { const [r, g, b] = hexToRgb(hex); return "rgba(" + r + "," + g + "," + b + "," + a + ")"; }
+
+/* Size a canvas to its CSS box at device pixel ratio. Returns css px w/h. */
+function fitCanvas(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const r = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+/* ================================================================
+   8. 3D flight view
+
+   A self-contained software renderer on a 2D canvas — no library, no
+   CDN, so the console keeps the "single file, works offline" property
+   the ground station needs in the field.
+
+   World frame is aerospace-conventional: X east, Y north, Z up, metres.
+   Pipeline: world -> view basis -> perspective divide -> painter's sort.
+   ================================================================ */
+const scene = (function () {
+  const cv = $("#scene");
+  const NEAR = 0.6, FOV = 50 * Math.PI / 180;
+  const BODY_SCALE = 25;          // the can is 66 x 115 mm; at true scale it is
+                                  // one pixel next to a 46 m trajectory.
+  const CAN_R = 0.033, CAN_H = 0.115;
+
+  const cam = { az: -0.62, el: 0.40, r: 95, t: [0, 0, 18] };
+  const home = { az: -0.62, el: 0.40, r: 95 };
+  let mode = "orbit", userMoved = false, lastT = 0;
+  // The scene reads the sample buffer directly instead of mirroring it into a
+  // second array. One buffer means Pause is exact and a reset cannot desync.
+  let trail = [];                 // rebuilt per frame from displaySamples()
+  let W = 1, H = 1, ctx = null, f = 1;
+  let eye = [0, 0, 0], right = [1, 0, 0], upv = [0, 0, 1], fwd = [0, 1, 0];
+  const prims = [];               // depth-sorted draw list
+  const labels = [];              // always drawn last, on top
+
+  /* ---------------- vector helpers ---------------- */
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const scl = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+  function norm(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+  const LIGHT = norm([0.45, -0.65, 0.75]);
+
+  /* ---------------- camera ---------------- */
+  function updateCamera() {
+    // Spherical orbit: both drag axes must move the camera, so the position
+    // is rebuilt from (azimuth, elevation, radius) rather than nudged in x.
+    const ce = Math.cos(cam.el), se = Math.sin(cam.el);
+    eye = add(cam.t, [cam.r * ce * Math.sin(cam.az), cam.r * ce * Math.cos(cam.az), cam.r * se]);
+    fwd = norm(sub(cam.t, eye));
+    right = norm(cross(fwd, [0, 0, 1]));
+    upv = cross(right, fwd);
+    f = (H / 2) / Math.tan(FOV / 2);
+  }
+  function toView(p) {
+    const d = sub(p, eye);
+    return [dot(d, right), dot(d, upv), dot(d, fwd)];
+  }
+  function projView(v) { return [W / 2 + v[0] * f / v[2], H / 2 - v[1] * f / v[2]]; }
+  function project(p) { const v = toView(p); return v[2] < NEAR ? null : projView(v); }
+
+  /* Clip a view-space segment against the near plane, then project. */
+  function segment(p0, p1) {
+    let a = toView(p0), b = toView(p1);
+    if (a[2] < NEAR && b[2] < NEAR) return null;
+    if (a[2] < NEAR) { const t = (NEAR - a[2]) / (b[2] - a[2]); a = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, NEAR]; }
+    else if (b[2] < NEAR) { const t = (NEAR - b[2]) / (a[2] - b[2]); b = [b[0] + (a[0] - b[0]) * t, b[1] + (a[1] - b[1]) * t, NEAR]; }
+    return { a: projView(a), b: projView(b), z: (a[2] + b[2]) / 2 };
+  }
+
+  /* ---------------- draw-list primitives ---------------- */
+  function line3(p0, p1, color, width, alpha, dash) {
+    const s = segment(p0, p1);
+    if (!s) return;
+    prims.push({ z: s.z, kind: "l", a: s.a, b: s.b, c: color, w: width, o: alpha, d: dash });
+  }
+  function poly3(pts, color, alpha, stroke) {
+    // Cull anything crossing the near plane rather than clipping a polygon —
+    // faces that close are the vehicle's own, and it is never at the camera.
+    const scr = [];
+    let zsum = 0;
+    for (const p of pts) {
+      const v = toView(p);
+      if (v[2] < NEAR) return;
+      zsum += v[2];
+      scr.push(projView(v));
+    }
+    prims.push({ z: zsum / pts.length, kind: "p", pts: scr, c: color, o: alpha, s: stroke });
+  }
+  function label3(p, text, color, dy) {
+    const s = project(p);
+    if (!s) return;
+    labels.push({ x: s[0], y: s[1] + (dy || 0), t: text, c: color });
+  }
+
+  /* ---------------- fog ---------------- */
+  function fog(d, near, far) { return Math.max(0.06, Math.min(1, 1 - (d - near) / (far - near))); }
+
+  /* ---------------- CanSat body model (body frame, metres) ----------------
+     Body +Z is the nose. Rotation is aerospace ZYX: yaw about Z, pitch about
+     Y, roll about X — so roll=pitch=yaw=0 is a can standing upright, which is
+     exactly what the pad telemetry reports.                                */
+  const SEG = 14;
+  const bodyFaces = (function () {
+    const F = [];
+    const hz = CAN_H / 2;
+    const ring = (r, z) => {
+      const out = [];
+      for (let i = 0; i < SEG; i++) {
+        const a = i / SEG * Math.PI * 2;
+        out.push([r * Math.cos(a), r * Math.sin(a), z]);
+      }
+      return out;
+    };
+    const lo = ring(CAN_R, -hz), hi = ring(CAN_R, hz), band = ring(CAN_R, hz - CAN_H * 0.22);
+    for (let i = 0; i < SEG; i++) {
+      const j = (i + 1) % SEG;
+      F.push({ v: [lo[i], lo[j], band[j], band[i]], k: "shell" });
+      F.push({ v: [band[i], band[j], hi[j], hi[i]], k: "band" });
+    }
+    // Winding decides the outward normal, which decides backface culling:
+    // CCW seen from +Z gives +Z, so the bottom cap is the reversed one.
+    F.push({ v: hi.slice(), k: "cap" });
+    F.push({ v: lo.slice().reverse(), k: "cap2" });
+    // three fins at 120 degrees
+    for (let n = 0; n < 3; n++) {
+      const a = n / 3 * Math.PI * 2 + 0.4;
+      const ux = Math.cos(a), uy = Math.sin(a);
+      F.push({ v: [
+        [CAN_R * ux, CAN_R * uy, -hz],
+        [CAN_R * 2.3 * ux, CAN_R * 2.3 * uy, -hz],
+        [CAN_R * 1.5 * ux, CAN_R * 1.5 * uy, -hz + CAN_H * 0.34],
+        [CAN_R * ux, CAN_R * uy, -hz + CAN_H * 0.34],
+      ], k: "fin" });
+    }
+    return F;
+  })();
+
+  const chuteRim = (function () {
+    const R = CAN_R * 5.6, zc = CAN_H / 2 + CAN_R * 5.4;
+    const rings = [];
+    for (let v = 0; v <= 4; v++) {
+      const th = v / 4 * (Math.PI / 2);
+      const rr = R * Math.sin(th), zz = zc + R * 0.62 * Math.cos(th);
+      const pts = [];
+      for (let i = 0; i < 12; i++) {
+        const a = i / 12 * Math.PI * 2;
+        pts.push([rr * Math.cos(a), rr * Math.sin(a), zz]);
+      }
+      rings.push(pts);
+    }
+    return rings;
+  })();
+
+  function rotMatrix(rollDeg, pitchDeg, yawDeg) {
+    const r = rollDeg * Math.PI / 180, p = pitchDeg * Math.PI / 180, y = yawDeg * Math.PI / 180;
+    const cr = Math.cos(r), sr = Math.sin(r), cp = Math.cos(p), sp = Math.sin(p), cy = Math.cos(y), sy = Math.sin(y);
+    return [
+      [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+      [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+      [-sp,     cp * sr,                cp * cr],
+    ];
+  }
+  const applyR = (M, v) => [
+    M[0][0] * v[0] + M[0][1] * v[1] + M[0][2] * v[2],
+    M[1][0] * v[0] + M[1][1] * v[1] + M[1][2] * v[2],
+    M[2][0] * v[0] + M[2][1] * v[1] + M[2][2] * v[2],
+  ];
+
+  function shade(hex, k) {
+    const [r, g, b] = hexToRgb(hex);
+    const m = Math.max(0, Math.min(1.25, k));
+    return "rgb(" + Math.round(r * m) + "," + Math.round(g * m) + "," + Math.round(b * m) + ")";
+  }
+
+  /* ---------------- the vehicle ---------------- */
+  function drawVehicle(s) {
+    const M = rotMatrix(s.roll, s.pitch, s.yaw);
+    const pos = [s.fx, s.fy, Math.max(0, s.altitude)];
+    const toWorld = v => add(pos, scl(applyR(M, v), BODY_SCALE));
+
+    const SHELL = C.dark ? "#c3ced9" : "#8b97a4";
+    const BAND  = C.accent;
+    const FIN   = C.dark ? "#7f8b98" : "#5b6773";
+
+    for (const face of bodyFaces) {
+      const w = face.v.map(toWorld);
+      const n = norm(cross(sub(w[1], w[0]), sub(w[2], w[0])));
+      const centroid = scl(w.reduce(add, [0, 0, 0]), 1 / w.length);
+      // Fins are single-sided plates: culling them would blink them out for
+      // half of every spin, so they are lit from whichever side faces us.
+      const flat = face.k === "fin";
+      if (!flat && dot(n, sub(eye, centroid)) < 0) continue;         // backface
+      const lam = 0.42 + 0.58 * (flat ? Math.abs(dot(n, LIGHT)) : Math.max(0, dot(n, LIGHT)));
+      const base = face.k === "band" || face.k === "cap" ? BAND : flat ? FIN : SHELL;
+      poly3(w, shade(base, lam), 1, true);
+    }
+    // antenna whip
+    line3(toWorld([0, 0, CAN_H / 2]), toWorld([0, 0, CAN_H / 2 + CAN_H * 0.85]), C.muted, 1.4, 0.9);
+
+    // parachute — only while actually descending under canopy
+    if (s.vspd < -1.2 && s.altitude > 1.5) {
+      const canopy = C.dark ? "#f97316" : "#ea580c";
+      for (let v = 0; v < chuteRim.length - 1; v++) {
+        const a = chuteRim[v].map(toWorld), b = chuteRim[v + 1].map(toWorld);
+        for (let i = 0; i < a.length; i++) {
+          const j = (i + 1) % a.length;
+          const quad = [a[i], a[j], b[j], b[i]];
+          const n = norm(cross(sub(quad[1], quad[0]), sub(quad[2], quad[0])));
+          const centroid = scl(quad.reduce(add, [0, 0, 0]), 0.25);
+          const facing = dot(n, sub(eye, centroid)) > 0;
+          const lam = 0.5 + 0.5 * Math.abs(dot(n, LIGHT));
+          poly3(quad, shade(canopy, lam), facing ? 0.85 : 0.42, false);
+        }
+      }
+      const rim = chuteRim[chuteRim.length - 1];
+      for (let i = 0; i < rim.length; i += 3) {
+        line3(toWorld(rim[i]), toWorld([0, 0, CAN_H / 2]), rgba(canopy, 0.55), 1, 0.8);
+      }
+    }
+  }
+
+  /* ---------------- environment ---------------- */
+  function niceStep(span) {
+    const raw = span / 6;
+    const p = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-6))));
+    const n = raw / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+  }
+
+  function drawGround(reach, step) {
+    // Ground disc first: coplanar geometry is layered explicitly rather than
+    // depth-sorted, which would z-fight against the grid drawn on top of it.
+    const ringPts = [];
+    for (let i = 0; i < 48; i++) {
+      const a = i / 48 * Math.PI * 2;
+      const p = project([reach * Math.cos(a), reach * Math.sin(a), 0]);
+      if (p) ringPts.push(p);
+    }
+    if (ringPts.length > 8) {
+      ctx.beginPath();
+      ctx.moveTo(ringPts[0][0], ringPts[0][1]);
+      for (let i = 1; i < ringPts.length; i++) ctx.lineTo(ringPts[i][0], ringPts[i][1]);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, H * 0.35, 0, H);
+      g.addColorStop(0, rgba(C.dark ? "#0e1a24" : "#e4ebf1", C.dark ? 0.9 : 0.55));
+      g.addColorStop(1, rgba(C.dark ? "#060a0e" : "#c8d6e2", C.dark ? 0.95 : 0.72));
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
+    // grid, faded by distance from the pad
+    const n = Math.round(reach / step);
+    for (let i = -n; i <= n; i++) {
+      const d = Math.abs(i * step);
+      const al = fog(d, reach * 0.35, reach * 1.15) * 0.55;
+      const col = i === 0 ? C.accent : C.ink;
+      const wid = i === 0 ? 1.4 : 1;
+      const alpha = i === 0 ? 0.42 : al * 0.5;
+      line3([i * step, -reach, 0], [i * step, reach, 0], col, wid, alpha);
+      line3([-reach, i * step, 0], [reach, i * step, 0], col, wid, alpha);
+    }
+    // range rings every 2 steps, so distance is readable without a legend
+    for (let rr = step * 2; rr <= reach; rr += step * 2) {
+      const pts = [];
+      for (let i = 0; i <= 64; i++) {
+        const a = i / 64 * Math.PI * 2;
+        pts.push([rr * Math.cos(a), rr * Math.sin(a), 0]);
+      }
+      for (let i = 0; i < pts.length - 1; i++) line3(pts[i], pts[i + 1], C.accent, 1, 0.16);
+      label3([rr * 0.707, rr * 0.707, 0], rr.toFixed(0) + " m", C.faint, -4);
+    }
+    // cardinal marks
+    label3([reach * 0.98, 0, 0], "E", C.muted, -4);
+    label3([0, reach * 0.98, 0], "N", C.muted, -4);
+    label3([-reach * 0.98, 0, 0], "W", C.muted, -4);
+    label3([0, -reach * 0.98, 0], "S", C.muted, -4);
+  }
+
+  function drawRuler(maxAlt, step) {
+    const top = Math.max(step, Math.ceil(maxAlt / step) * step);
+    line3([0, 0, 0], [0, 0, top], C.faint, 1.2, 0.5);
+    for (let z = 0; z <= top + 1e-6; z += step) {
+      line3([-1.6, 0, z], [1.6, 0, z], C.faint, 1, 0.45);
+      if (z > 0) label3([2.6, 0, z], z.toFixed(0), C.faint, 3);
+    }
+  }
+
+  function drawTrail() {
+    if (trail.length < 2) return;
+    const ASC = C["s-alt"], DES = C["s-tmp"];
+    // ground track (dashed shadow on the plane) — reads as "where", the ribbon reads as "how high"
+    for (let i = 1; i < trail.length; i++) {
+      const a = trail[i - 1], b = trail[i];
+      line3([a.fx, a.fy, 0], [b.fx, b.fy, 0], C.faint, 1.2, 0.5, [4, 4]);
+    }
+    // drop lines tie the ribbon to the ground so altitude is spatially legible
+    const every = Math.max(1, Math.round(trail.length / 26));
+    for (let i = 0; i < trail.length; i += every) {
+      const p = trail[i], z = Math.max(0, p.altitude);
+      if (z > 0.6) line3([p.fx, p.fy, 0], [p.fx, p.fy, z], C.ink, 1, 0.13);
+    }
+    // the trajectory ribbon, coloured by climb / descent
+    for (let i = 1; i < trail.length; i++) {
+      const a = trail[i - 1], b = trail[i];
+      const climbing = b.vspd >= 0;
+      const age = i / trail.length;
+      line3([a.fx, a.fy, Math.max(0, a.altitude)], [b.fx, b.fy, Math.max(0, b.altitude)],
+            climbing ? ASC : DES, 2.6, 0.35 + 0.65 * age);
+    }
+  }
+
+  function drawPad() {
+    const pts = [];
+    for (let i = 0; i <= 24; i++) {
+      const a = i / 24 * Math.PI * 2;
+      pts.push([1.8 * Math.cos(a), 1.8 * Math.sin(a), 0.02]);
+    }
+    for (let i = 0; i < pts.length - 1; i++) line3(pts[i], pts[i + 1], C.good, 1.6, 0.85);
+    line3([-2.6, 0, 0.02], [2.6, 0, 0.02], C.good, 1.2, 0.5);
+    line3([0, -2.6, 0.02], [0, 2.6, 0.02], C.good, 1.2, 0.5);
+    label3([0, 0, 0], "PAD", C.good, 16);
+  }
+
+  /* ---------------- camera modes ---------------- */
+  function frame(sample, reach, maxAlt) {
+    if (mode === "chase" && sample) {
+      cam.t = [sample.x, sample.y, Math.max(2, sample.altitude)];
+      cam.az = (sample.yaw + 180) * Math.PI / 180;
+      cam.el = 0.22; cam.r = 26;
+    } else if (mode === "top") {
+      cam.t = [0, 0, 0];
+      cam.az = 0; cam.el = 1.40; cam.r = Math.max(40, reach * 2.1);
+    } else if (mode === "profile") {
+      cam.t = [0, 0, maxAlt * 0.5];
+      cam.az = -Math.PI / 2; cam.el = 0.06; cam.r = Math.max(60, Math.max(reach * 2.4, maxAlt * 2.6));
+    } else {
+      cam.t = [0, 0, Math.max(6, maxAlt * 0.45)];
+      if (!userMoved) cam.r = Math.max(45, Math.max(reach * 2.2, maxAlt * 1.9));
+    }
+  }
+
+  /* ---------------- main draw ---------------- */
+  function draw(ts) {
+    const fit = fitCanvas(cv);
+    ctx = fit.ctx; W = fit.w; H = fit.h;
+    ctx.clearRect(0, 0, W, H);
+    prims.length = 0; labels.length = 0;
+
+    const ds = displaySamples();
+    trail = ds;
+    const s = currentSample();
+    const hasData = ds.length > 0;
+    $("#scene-empty").classList.toggle("hidden", hasData);
+    if (!hasData) return;
+
+    let maxAlt = 1, reach = 20;
+    for (const p of ds) {
+      const z = Math.max(0, p.altitude);
+      if (z > maxAlt) maxAlt = z;
+      reach = Math.max(reach, Math.abs(p.fx) * 1.6, Math.abs(p.fy) * 1.6);
+    }
+    reach = Math.max(24, Math.min(reach, 400));
+
+    // slow idle orbit: motion that shows the third dimension, disabled the
+    // moment the operator takes the camera or asks for reduced motion
+    if (mode === "orbit" && !userMoved && !reducedMotion.matches && lastT) {
+      cam.az += Math.min(0.05, (ts - lastT) / 1000) * 0.075;
+    }
+    lastT = ts;
+
+    frame(s, reach, maxAlt);
+    updateCamera();
+
+    const step = niceStep(reach * 2);
+    drawGround(reach, step);
+    drawPad();
+    drawRuler(maxAlt, niceStep(maxAlt * 1.6));
+    drawTrail();
+    if (s) drawVehicle(s);
+
+    // painter's algorithm: far primitives first
+    prims.sort((a, b) => b.z - a.z);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (const p of prims) {
+      ctx.globalAlpha = p.o;
+      if (p.kind === "l") {
+        ctx.setLineDash(p.d || []);
+        ctx.strokeStyle = p.c; ctx.lineWidth = p.w;
+        ctx.beginPath(); ctx.moveTo(p.a[0], p.a[1]); ctx.lineTo(p.b[0], p.b[1]); ctx.stroke();
+      } else {
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(p.pts[0][0], p.pts[0][1]);
+        for (let i = 1; i < p.pts.length; i++) ctx.lineTo(p.pts[i][0], p.pts[i][1]);
+        ctx.closePath();
+        ctx.fillStyle = p.c; ctx.fill();
+        if (p.s) { ctx.strokeStyle = rgba(C.dark ? "#000000" : "#334155", 0.35); ctx.lineWidth = 0.7; ctx.stroke(); }
+      }
+    }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+    // Labels sit over ground, sky and trajectory alike, so each gets a halo
+    // rather than a colour that only works against one of them.
+    ctx.font = "500 10px " + (getComputedStyle(document.body).fontFamily);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = rgba(C.panel, 0.82);
+    for (const l of labels) {
+      if (l.x < -20 || l.x > W + 20 || l.y < -20 || l.y > H + 20) continue;
+      ctx.strokeText(l.t, l.x, l.y);
+      ctx.fillStyle = l.c; ctx.fillText(l.t, l.x, l.y);
+    }
+  }
+
+  /* ---------------- input: pointer, wheel, touch pinch, keyboard ---------------- */
+  const active = new Map();
+  let pinchDist = 0;
+  cv.addEventListener("pointerdown", e => {
+    cv.setPointerCapture(e.pointerId);
+    active.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (active.size === 2) {
+      const [a, b] = [...active.values()];
+      pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+    }
+  });
+  cv.addEventListener("pointermove", e => {
+    const prev = active.get(e.pointerId);
+    if (!prev) return;
+    if (active.size === 2) {
+      active.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const [a, b] = [...active.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDist > 0) zoom(pinchDist / d);
+      pinchDist = d;
+      return;
+    }
+    orbit(-(e.clientX - prev.x) * 0.006, -(e.clientY - prev.y) * 0.006);
+    active.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  });
+  const release = e => { active.delete(e.pointerId); pinchDist = 0; };
+  cv.addEventListener("pointerup", release);
+  cv.addEventListener("pointercancel", release);
+  cv.addEventListener("wheel", e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.1 : 1 / 1.1); }, { passive: false });
+
+  // Keyboard is a first-class path, not a fallback: every drag gesture here
+  // has an equivalent key so the view is operable without a pointer.
+  cv.addEventListener("keydown", e => {
+    const k = e.key;
+    if (k === "ArrowLeft") orbit(0.09, 0);
+    else if (k === "ArrowRight") orbit(-0.09, 0);
+    else if (k === "ArrowUp") orbit(0, 0.07);
+    else if (k === "ArrowDown") orbit(0, -0.07);
+    else if (k === "+" || k === "=") zoom(1 / 1.15);
+    else if (k === "-" || k === "_") zoom(1.15);
+    else if (k === "Home") { reset(); toast("Camera reset"); }
+    else return;
+    e.preventDefault();
+  });
+
+  function orbit(daz, del) {
+    if (mode !== "orbit") setMode("orbit");
+    userMoved = true;
+    cam.az += daz;
+    cam.el = Math.max(-1.35, Math.min(1.45, cam.el + del));   // clamp off the poles
+  }
+  function zoom(k) { userMoved = true; cam.r = Math.max(9, Math.min(700, cam.r * k)); }
+  function reset() { cam.az = home.az; cam.el = home.el; cam.r = home.r; userMoved = false; setMode("orbit"); }
+  function setMode(m) {
+    mode = m;
+    // Returning to free orbit hands the camera back to the idle rotation;
+    // any framed mode counts as the operator having taken control.
+    userMoved = m !== "orbit";
+    $$(".chip[data-cam]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.cam === m)));
+    $("#scene-hint").textContent = m === "orbit"
+      ? "Drag to orbit · scroll to zoom · body shown " + BODY_SCALE + "× scale"
+      : m + " view · press Reset to return to free orbit";
+  }
+
+  return {
+    draw,
+    setMode,
+    reset,
+    get mode() { return mode; },
+  };
+})();
+
+/* ================================================================
+   9. Display buffer
+
+   Pause freezes what is drawn, never what is received: packets keep
+   arriving, keep being validated and keep counting towards link health,
+   so a paused console still tells you the link is alive.
+   ================================================================ */
+let frozenSample = null;
+function displaySamples() {
+  if (!paused || !frozenSample) return samples;
+  const i = samples.indexOf(frozenSample);
+  // -1 means the frozen sample has aged out of the ring buffer; render() spots
+  // that and resumes, so this only has to stay well-defined for one frame.
+  return i >= 0 ? samples.slice(0, i + 1) : samples;
+}
+function setPaused(v, why) {
+  paused = v;
+  frozenSample = v ? (samples.length ? samples[samples.length - 1] : null) : null;
+  $("#pause-btn").setAttribute("aria-pressed", String(v));
+  $("#pause-label").textContent = v ? "Resume" : "Pause";
+  $("#pause-icon").setAttribute("href", v ? "#i-play" : "#i-pause");
+  if (why) toast(why);
+}
+function currentSample() {
+  const ds = displaySamples();
+  if (!ds.length) return null;
+  if (scrubIndex >= 0 && scrubIndex < ds.length) return ds[scrubIndex];
+  return ds[ds.length - 1];
+}
+
+/* ================================================================
+   10. Flight-profile charts (canvas)
+
+   Canvas rather than rebuilt SVG markup: the streaming profile wants a
+   redraw several times a second, and string-building four plots of 480
+   points at 5 Hz is what made the old console stutter.
+   ================================================================ */
+const CHART_KEYS = {
+  // `min` is a floor on the y-span. Without it a steady sensor auto-scales its
+  // own last digit of noise to full height and reads as a fault.
+  altitude:    { col: () => C["s-alt"], fmt: v => v.toFixed(1), unit: "m",    min: 5,   overlay: "vspd", omin: 2 },
+  pressure:    { col: () => C["s-prs"], fmt: v => v.toFixed(0), unit: "Pa",   min: 300 },
+  temperature: { col: () => C["s-tmp"], fmt: v => v.toFixed(1), unit: "°C",   min: 2 },
+  amag:        { col: () => C["s-acc"], fmt: v => v.toFixed(1), unit: "m/s²", min: 3 },
+};
+const PHASE = {
+  pad:      { c: () => C.faint,     name: "Pad" },
+  ascent:   { c: () => C["s-alt"],  name: "Ascent" },
+  coast:    { c: () => C.muted,     name: "Coast" },
+  descent:  { c: () => C["s-tmp"],  name: "Descent" },
+  landed:   { c: () => C.good,      name: "Landed" },
+  recovery: { c: () => C.good,      name: "Recovery" },
+};
+function phaseOf(s) {
+  if (s.mode === "LANDED") return "landed";
+  if (s.mode === "RECOVERY") return "recovery";
+  if (s.mode === "FLIGHT") return s.vspd > 0.4 ? "ascent" : s.vspd < -0.4 ? "descent" : "coast";
+  return "pad";
+}
+function timeDomain(ds) {
+  if (!ds.length) return [0, 1];
+  const tS = ds[0].t, tE = ds[ds.length - 1].t;
+  // The x-axis follows the data. The old console pinned it to the demo
+  // mission length, so a real flight ran straight off the right edge.
+  if (winSec > 0) return [Math.max(tS, tE - winSec), tE + 1e-6];
+  return [tS, Math.max(tE, tS + 5)];
+}
+function extent(arr, get, minSpan) {
+  let lo = Infinity, hi = -Infinity;
+  for (const s of arr) { const v = get(s); if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (!isFinite(lo)) return [0, 1];
+  if (lo === hi) { lo -= 1; hi += 1; }
+  if (minSpan && hi - lo < minSpan) { const c = (lo + hi) / 2; lo = c - minSpan / 2; hi = c + minSpan / 2; }
+  const pad = (hi - lo) * 0.14;
+  return [lo - pad, hi + pad];
+}
+function niceTicks(lo, hi, n) {
+  const raw = (hi - lo) / n;
+  const p = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-9))));
+  const k = raw / p;
+  const step = (k <= 1 ? 1 : k <= 2 ? 2 : k <= 5 ? 5 : 10) * p;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(v);
+  return out;
+}
+
+let hoverSample = null;
+
+function drawChart(row) {
+  const key = row.dataset.key, cfg = CHART_KEYS[key];
+  const cvs = row.querySelector("canvas");
+  const { ctx, w, h } = fitCanvas(cvs);
+  ctx.clearRect(0, 0, w, h);
+
+  const padL = 52, padR = cfg.overlay ? 46 : 14, padT = 18, padB = key === "amag" ? 20 : 8;
+  const pw = Math.max(10, w - padL - padR), ph = Math.max(10, h - padT - padB);
+
+  const ds = displaySamples();
+  const [t0, t1] = timeDomain(ds);
+  const vis = [];
+  for (const s of ds) if (s.t >= t0 && s.t <= t1) vis.push(s);
+
+  const X = t => padL + (t1 === t0 ? 0 : (t - t0) / (t1 - t0)) * pw;
+  const [lo, hi] = extent(vis.length ? vis : ds, s => s[key], cfg.min);
+  const Y = v => padT + (1 - (v - lo) / (hi - lo || 1)) * ph;
+
+  // ---- phase bands: what the vehicle was doing, behind what it measured
+  if (vis.length > 1) {
+    let runStart = 0;
+    for (let i = 1; i <= vis.length; i++) {
+      const endOfRun = i === vis.length || phaseOf(vis[i]) !== phaseOf(vis[runStart]);
+      if (!endOfRun) continue;
+      const ph_ = PHASE[phaseOf(vis[runStart])];
+      const xa = X(vis[runStart].t), xb = X(vis[i - 1].t);
+      if (xb - xa > 1) {
+        ctx.fillStyle = rgba(ph_.c(), 0.085);
+        ctx.fillRect(xa, padT, xb - xa, ph);
+        if (key === "altitude" && xb - xa > 46) {
+          ctx.fillStyle = ph_.c();
+          ctx.globalAlpha = 0.8;
+          ctx.font = "600 9px " + getComputedStyle(document.body).fontFamily;
+          ctx.textAlign = "center"; ctx.textBaseline = "top";
+          ctx.fillText(ph_.name.toUpperCase(), (xa + xb) / 2, padT + 2);
+          ctx.globalAlpha = 1;
+        }
+      }
+      runStart = i;
+    }
+  }
+
+  // ---- grid + y axis
+  ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
+  ctx.textBaseline = "middle";
+  for (const v of niceTicks(lo, hi, 3)) {
+    const y = Y(v);
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, y + 0.5); ctx.lineTo(padL + pw, y + 0.5); ctx.stroke();
+    ctx.fillStyle = C.faint; ctx.textAlign = "right";
+    ctx.fillText(cfg.fmt(v), padL - 7, y);
+  }
+  // ---- x axis on the bottom plot only
+  if (key === "amag") {
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (const t of niceTicks(t0, t1, 6)) {
+      const x = X(t);
+      ctx.strokeStyle = C["grid-2"]; ctx.beginPath();
+      ctx.moveTo(x + 0.5, padT); ctx.lineTo(x + 0.5, padT + ph); ctx.stroke();
+      ctx.fillStyle = C.faint;
+      ctx.fillText(t.toFixed(t1 - t0 > 30 ? 0 : 1) + "s", x, padT + ph + 5);
+    }
+  }
+
+  if (vis.length > 1) {
+    const col = cfg.col();
+    // ---- area
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + ph);
+    grad.addColorStop(0, rgba(col, 0.30));
+    grad.addColorStop(1, rgba(col, 0.02));
+    ctx.beginPath();
+    ctx.moveTo(X(vis[0].t), padT + ph);
+    for (const s of vis) ctx.lineTo(X(s.t), Y(s[key]));
+    ctx.lineTo(X(vis[vis.length - 1].t), padT + ph);
+    ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+    // ---- trace
+    ctx.beginPath();
+    vis.forEach((s, i) => { const x = X(s.t), y = Y(s[key]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.stroke();
+
+    // ---- secondary series (vertical speed against altitude), dashed so it is
+    //      distinguishable without relying on hue
+    if (cfg.overlay) {
+      const [vlo, vhi] = extent(vis, s => s[cfg.overlay], cfg.omin);
+      const VY = v => padT + (1 - (v - vlo) / (vhi - vlo || 1)) * ph;
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      vis.forEach((s, i) => { const x = X(s.t), y = VY(s[cfg.overlay]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      ctx.strokeStyle = C["s-vsp"]; ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.restore();
+      ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = C.faint;
+      for (const v of niceTicks(vlo, vhi, 2)) ctx.fillText(v.toFixed(1), padL + pw + 7, VY(v));
+      // zero line for vertical speed: the ascent / descent boundary
+      if (vlo < 0 && vhi > 0) {
+        ctx.save(); ctx.setLineDash([2, 3]);
+        ctx.strokeStyle = rgba(C["s-vsp"], 0.45); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(padL, VY(0) + 0.5); ctx.lineTo(padL + pw, VY(0) + 0.5); ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // ---- event markers: apogee, peak g, touchdown get a shape and a word,
+    //      never a colour alone
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    for (const e of events) {
+      if (e.series !== key || e.t < t0 || e.t > t1) continue;
+      const x = X(e.t), y = Y(e.value);
+      ctx.save();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = rgba(C.ink, 0.35); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x + 0.5, y); ctx.lineTo(x + 0.5, padT + ph); ctx.stroke();
+      ctx.restore();
+      ctx.beginPath();
+      ctx.moveTo(x, y - 5); ctx.lineTo(x + 4.5, y); ctx.lineTo(x, y + 5); ctx.lineTo(x - 4.5, y);
+      ctx.closePath();
+      ctx.fillStyle = C.ink; ctx.fill();
+      ctx.fillStyle = C.muted;
+      ctx.font = "600 9px " + getComputedStyle(document.body).fontFamily;
+      ctx.fillText(e.label, Math.min(Math.max(x, padL + 24), padL + pw - 24), y - 8);
+    }
+
+    // ---- current value marker
+    const last = vis[vis.length - 1];
+    const lx = X(last.t), ly = Y(last[key]);
+    ctx.beginPath(); ctx.arc(lx, ly, 8, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(col, 0.18); ctx.fill();
+    ctx.beginPath(); ctx.arc(lx, ly, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = col; ctx.strokeStyle = C.panel; ctx.lineWidth = 1.5;
+    ctx.fill(); ctx.stroke();
+  }
+
+  // ---- crosshair driven by hover OR the keyboard scrubber
+  const cs = scrubIndex >= 0 ? currentSample() : hoverSample;
+  if (cs && cs.t >= t0 && cs.t <= t1) {
+    const x = X(cs.t);
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = C.muted; ctx.lineWidth = 1; ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.moveTo(x + 0.5, padT); ctx.lineTo(x + 0.5, padT + ph); ctx.stroke();
+    ctx.restore();
+    if (vis.length) {
+      ctx.beginPath(); ctx.arc(x, Y(cs[key]), 3.6, 0, Math.PI * 2);
+      ctx.fillStyle = C.ink; ctx.fill();
+    }
+  }
+}
+
+/* ================================================================
+   11. Sparklines, dials and the ground-track plot
+   ================================================================ */
+function drawSpark(cvs, values, color, fill, minSpan) {
+  const { ctx, w, h } = fitCanvas(cvs);
+  ctx.clearRect(0, 0, w, h);
+  if (values.length < 2) return;
+  let lo = Infinity, hi = -Infinity;
+  for (const v of values) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (lo === hi) { lo -= 1; hi += 1; }
+  if (minSpan && hi - lo < minSpan) { const c = (lo + hi) / 2; lo = c - minSpan / 2; hi = c + minSpan / 2; }
+  const X = i => (i / (values.length - 1)) * w;
+  const Y = v => h - 3 - ((v - lo) / (hi - lo)) * (h - 6);
+  if (fill) {
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    values.forEach((v, i) => ctx.lineTo(X(i), Y(v)));
+    ctx.lineTo(w, h); ctx.closePath();
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, rgba(color, 0.36));
+    g.addColorStop(1, rgba(color, 0));
+    ctx.fillStyle = g; ctx.fill();
+  }
+  ctx.beginPath();
+  values.forEach((v, i) => { i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)); });
+  ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.stroke();
+}
+
+/* Attitude director indicator — a real pitch ladder and roll scale, so roll
+   and pitch are readable as angles and not only as a tilted horizon. */
+function drawADI(roll, pitch) {
+  const svg = $("#adi"), R = 56, C0 = 66;
+  const p = Math.max(-60, Math.min(60, pitch)) * 1.15;
+  let lad = "";
+  for (let d = -60; d <= 60; d += 10) {
+    if (d === 0) continue;
+    const y = C0 + p - d * 1.15;
+    const wdt = d % 20 === 0 ? 20 : 11;
+    lad += '<line x1="' + (C0 - wdt) + '" y1="' + y.toFixed(1) + '" x2="' + (C0 + wdt) + '" y2="' + y.toFixed(1) +
+           '" stroke="rgba(255,255,255,.55)" stroke-width="1"/>';
+    if (d % 20 === 0) {
+      lad += '<text x="' + (C0 - wdt - 4) + '" y="' + (y + 3).toFixed(1) + '" font-size="7" fill="rgba(255,255,255,.7)" text-anchor="end">' + Math.abs(d) + '</text>';
+    }
+  }
+  let rollTicks = "";
+  for (const a of [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60]) {
+    const rad = (a - 90) * Math.PI / 180;
+    const r1 = R, r2 = R - (a % 30 === 0 ? 8 : 5);
+    rollTicks += '<line x1="' + (C0 + r1 * Math.cos(rad)).toFixed(1) + '" y1="' + (C0 + r1 * Math.sin(rad)).toFixed(1) +
+                 '" x2="' + (C0 + r2 * Math.cos(rad)).toFixed(1) + '" y2="' + (C0 + r2 * Math.sin(rad)).toFixed(1) +
+                 '" stroke="' + C.muted + '" stroke-width="' + (a === 0 ? 2 : 1.2) + '"/>';
+  }
+  svg.innerHTML =
+    '<defs>' +
+      '<clipPath id="adiclip"><circle cx="66" cy="66" r="' + (R - 2) + '"/></clipPath>' +
+      '<linearGradient id="skyg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d5c94"/><stop offset="1" stop-color="#3b8dc4"/></linearGradient>' +
+      '<linearGradient id="grdg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a5a25"/><stop offset="1" stop-color="#4a2f12"/></linearGradient>' +
+    '</defs>' +
+    '<g clip-path="url(#adiclip)">' +
+      '<g transform="rotate(' + (-roll).toFixed(1) + ' 66 66)">' +
+        '<rect x="-70" y="' + (C0 - 260 + p).toFixed(1) + '" width="272" height="260" fill="url(#skyg)"/>' +
+        '<rect x="-70" y="' + (C0 + p).toFixed(1) + '" width="272" height="260" fill="url(#grdg)"/>' +
+        '<line x1="-70" y1="' + (C0 + p).toFixed(1) + '" x2="202" y2="' + (C0 + p).toFixed(1) + '" stroke="#fff" stroke-width="1.6"/>' +
+        lad +
+      '</g>' +
+    '</g>' +
+    rollTicks +
+    '<circle cx="66" cy="66" r="' + (R - 2) + '" fill="none" stroke="' + C.border + '" stroke-width="2"/>' +
+    '<g transform="rotate(' + (-roll).toFixed(1) + ' 66 66)"><path d="M66 ' + (C0 - R + 3) + ' l-5 8 h10 z" fill="' + C.accent + '"/></g>' +
+    '<path d="M44 66 h13 M75 66 h13 M66 62.5 v7" stroke="' + C.accent + '" stroke-width="2.6" fill="none" stroke-linecap="round"/>';
+}
+
+/* Heading indicator — yaw as a rotating card, plus the spin rate that a
+   tumbling CanSat actually cares about. */
+function drawHSI(yaw, spin) {
+  const svg = $("#hsi"), R = 56, C0 = 66;
+  let card = "", marks = "";
+  for (let a = 0; a < 360; a += 15) {
+    const rad = (a - 90) * Math.PI / 180;
+    const major = a % 90 === 0, mid = a % 45 === 0;
+    const r2 = R - 4 - (major ? 9 : mid ? 6 : 3);
+    card += '<line x1="' + (C0 + (R - 4) * Math.cos(rad)).toFixed(1) + '" y1="' + (C0 + (R - 4) * Math.sin(rad)).toFixed(1) +
+            '" x2="' + (C0 + r2 * Math.cos(rad)).toFixed(1) + '" y2="' + (C0 + r2 * Math.sin(rad)).toFixed(1) +
+            '" stroke="' + (major ? C.ink : C.faint) + '" stroke-width="' + (major ? 1.6 : 1) + '"/>';
+    if (major) {
+      // The tick card rotates with heading, but the letters do not: baking the
+      // rotation into their position keeps them upright, so "E" past 90 degrees
+      // of yaw stays an E instead of a mirrored glyph.
+      const rl = R - 20, ra = (a - yaw - 90) * Math.PI / 180;
+      marks += '<text x="' + (C0 + rl * Math.cos(ra)).toFixed(1) + '" y="' + (C0 + rl * Math.sin(ra) + 3.5).toFixed(1) +
+               '" font-size="9" font-weight="600" fill="' + C.ink + '" text-anchor="middle">' + ["N", "E", "S", "W"][a / 90] + '</text>';
+    }
+  }
+  svg.innerHTML =
+    '<circle cx="66" cy="66" r="' + (R - 2) + '" fill="' + C["panel-2"] + '" stroke="' + C.border + '" stroke-width="2"/>' +
+    '<g transform="rotate(' + (-yaw).toFixed(1) + ' 66 66)">' + card + '</g>' + marks +
+    '<path d="M66 ' + (C0 - R + 2) + ' l-5.5 9 h11 z" fill="' + C.accent + '"/>' +
+    '<path d="M66 54 l7 20 -7-5 -7 5 z" fill="' + C.accent + '" opacity=".9"/>';
+}
+
+/* Ground track relative to the pad — range rings answer "how far do we walk
+   to recover it", which a lat/lon pair alone never does. */
+function drawPolar() {
+  const cvs = $("#polar");
+  const { ctx, w, h } = fitCanvas(cvs);
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 16;
+
+  const ds = displaySamples().filter(s => s.hasFix);
+  let maxR = 8;
+  for (const s of ds) maxR = Math.max(maxR, Math.hypot(s.fx, s.fy));
+  maxR = Math.max(8, maxR * 1.25);
+  const step = maxR / 2;
+  const P = (x, y) => [cx + (x / maxR) * R, cy - (y / maxR) * R];
+
+  ctx.font = "9px " + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (let i = 1; i <= 2; i++) {
+    ctx.beginPath(); ctx.arc(cx, cy, (i / 2) * R, 0, Math.PI * 2);
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = C.faint;
+    const lr = (i / 2) * R * 0.707;
+    const rv = step * i;
+    ctx.fillText((Number.isInteger(rv) ? rv : rv.toFixed(1)) + " m", cx + lr, cy - lr - 5);
+  }
+  ctx.strokeStyle = C["grid-2"];
+  ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+  ctx.fillStyle = C.muted; ctx.font = "600 9px " + getComputedStyle(document.body).fontFamily;
+  ctx.fillText("N", cx, cy - R - 8); ctx.fillText("S", cx, cy + R + 8);
+  ctx.fillText("E", cx + R + 8, cy); ctx.fillText("W", cx - R - 8, cy);
+
+  if (ds.length > 1) {
+    // Fade with age so the newest metres of track read out of the older ones.
+    ctx.lineWidth = 1.6; ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.strokeStyle = C.accent;
+    for (let i = 1; i < ds.length; i++) {
+      const [ax, ay] = P(ds[i - 1].fx, ds[i - 1].fy), [bx, by] = P(ds[i].fx, ds[i].fy);
+      ctx.globalAlpha = 0.18 + 0.72 * (i / ds.length);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // pad marker
+  ctx.strokeStyle = C.good; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(cx - 5, cy); ctx.lineTo(cx + 5, cy); ctx.moveTo(cx, cy - 5); ctx.lineTo(cx, cy + 5); ctx.stroke();
+  if (ds.length) {
+    const s = ds[ds.length - 1], [px, py] = P(s.fx, s.fy);
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(C.accent, 0.22); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, 3.4, 0, Math.PI * 2);
+    ctx.fillStyle = C.accent; ctx.strokeStyle = C.panel; ctx.lineWidth = 1.4; ctx.fill(); ctx.stroke();
+  }
+}
+
+/* ================================================================
+   12. Rendering
+   ================================================================ */
+const STATE_COLOR = {
+  INIT:      ["var(--panel-2)", "var(--muted)", "var(--border)"],
+  SELF_TEST: ["var(--panel-2)", "var(--ink)", "var(--border)"],
+  READY:     ["color-mix(in srgb, var(--accent) 14%, var(--panel-2))", "var(--ink)", "color-mix(in srgb, var(--accent) 40%, transparent)"],
+  FLIGHT:    ["var(--accent)", "var(--accent-ink)", "transparent"],
+  LANDED:    ["color-mix(in srgb, var(--good) 18%, var(--panel-2))", "var(--ink)", "color-mix(in srgb, var(--good) 45%, transparent)"],
+  RECOVERY:  ["color-mix(in srgb, var(--good) 28%, var(--panel-2))", "var(--ink)", "color-mix(in srgb, var(--good) 55%, transparent)"],
+  FAULT:     ["var(--crit)", "#ffffff", "transparent"],
+};
+const PHASES = ["SELF_TEST", "READY", "FLIGHT", "LANDED", "RECOVERY"];
+const PHASE_SHORT = ["Test", "Ready", "Flight", "Landed", "Recov"];
+
+const TILES = [
+  { key: "altitude",    label: "Altitude",       unit: "m AGL", dp: 1, icon: "i-up",    v: "--s-alt", min: 5, col: () => C["s-alt"] },
+  { key: "vspd",        label: "Vertical speed", unit: "m/s",   dp: 2, icon: "i-bolt",  v: "--s-vsp", min: 2, col: () => C["s-vsp"] },
+  { key: "pressure",    label: "Pressure",       unit: "Pa",    dp: 2, icon: "i-gauge", v: "--s-prs", min: 300, col: () => C["s-prs"] },
+  { key: "temperature", label: "Temperature",    unit: "°C",    dp: 1, icon: "i-therm", v: "--s-tmp", min: 2, col: () => C["s-tmp"] },
+  { key: "amag",        label: "|Acceleration|", unit: "m/s²",  dp: 2, icon: "i-wave",  v: "--s-acc", min: 3, col: () => C["s-acc"] },
+];
+
+(function buildTiles() {
+  $("#tiles").innerHTML = TILES.map(t =>
+    '<article class="tile" style="--t-color:var(' + t.v + ')">' +
+      '<canvas class="spark" id="sp-' + t.key + '" aria-hidden="true"></canvas>' +
+      '<div class="t-head"><svg width="13" height="13" aria-hidden="true"><use href="#' + t.icon + '"/></svg>' +
+        '<h3 class="label">' + t.label + '</h3></div>' +
+      '<span class="t-val mono" id="tv-' + t.key + '">—</span>' +
+      '<span class="t-unit">' + t.unit + '</span>' +
+      '<span class="t-delta mono" id="td-' + t.key + '">·</span>' +
+    '</article>'
+  ).join("");
+})();
+
+(function buildLadder() {
+  $("#ladder").innerHTML = PHASES.map(() => '<span class="step"></span>').join("");
+  $("#ladder-names").innerHTML = PHASE_SHORT.map(n => "<span>" + n + "</span>").join("");
+})();
+
+let lastState = "", slowTick = 0;
+
+function render(force) {
+  // The buffer holds MAX_SAMPLES; pause for longer than that and the sample the
+  // display was pinned to is gone. Resume deliberately and say so, rather than
+  // letting the "frozen" view silently start moving again.
+  if (paused && frozenSample && samples.indexOf(frozenSample) === -1) {
+    setPaused(false, "Paused view expired — the buffer moved past it. Back to live.");
+  }
+  const ds = displaySamples();
+  const s = currentSample();
+  slowTick++;
+  const slow = force || slowTick % 6 === 0;      // ~1 Hz for text that assistive tech reads
+
+  /* ---- link health (keeps updating while paused: the link is still live) ---- */
+  const c = health.connected, age = health.age;
+  const pill = $("#conn-pill");
+  let cls = "lost", txt = "No signal";
+  if (c) { cls = "ok"; txt = "Connected"; }
+  else if (age !== null && age < 12) { cls = "stale"; txt = "Stale"; }
+  pill.className = "pill " + cls; $("#conn-text").textContent = txt;
+
+  $("#lh-rate").textContent = health.rate.toFixed(2) + " Hz";
+  $("#lh-ok").textContent = health.packetsOk;
+  setStat($("#lh-missing"), health.missing, health.missing ? "warnv" : "", health.missing ? "i-warn" : "");
+  $("#lh-dup").textContent = health.duplicates;
+  setStat($("#lh-invalid"), health.packetsInvalid, health.packetsInvalid ? "critv" : "", health.packetsInvalid ? "i-warn" : "");
+  setStat($("#lh-crc"), health.crcErrors, health.crcErrors ? "critv" : "", health.crcErrors ? "i-warn" : "");
+  setStat($("#lh-loss"), health.lossPct.toFixed(1) + " %", health.lossPct > 5 ? "warnv" : "", health.lossPct > 5 ? "i-warn" : "");
+  $("#lh-age").textContent = age === null ? "—" : age.toFixed(1) + " s";
+
+  // quality expressed as a bar count first, colour second
+  const bars = !c ? 0 : health.lossPct < 2 ? 4 : health.lossPct < 8 ? 3 : health.lossPct < 20 ? 2 : 1;
+  const meter = $("#sigmeter");
+  meter.className = "sigmeter" + (bars === 2 ? " q2" : bars === 1 ? " q1" : "");
+  [...meter.children].forEach((b, i) => b.classList.toggle("on", i < bars));
+  meter.setAttribute("aria-label", "Link quality: " + (bars === 0 ? "no signal" : bars + " of 4 bars, " + health.lossPct.toFixed(1) + "% loss"));
+  drawSpark($("#rate-spark"), health.rateHistory, C.accent, true);
+
+  /* ---- mission ---- */
+  const st = latest ? latest.mode || "READY" : (source === "demo" && missionT < 1 ? "SELF_TEST" : "INIT");
+  $("#state-name").textContent = st.replace("_", " ");
+  const sc = STATE_COLOR[st] || STATE_COLOR.INIT;
+  const chip = $("#state-chip");
+  chip.style.setProperty("--state-bg", sc[0]);
+  chip.style.setProperty("--state-ink", sc[1]);
+  chip.style.setProperty("--state-bd", sc[2]);
+  if (st !== lastState) {
+    lastState = st;
+    $("#state-live").textContent = "Mission state " + st.replace("_", " ").toLowerCase();
+  }
+  const pi = PHASES.indexOf(st);
+  [...$("#ladder").children].forEach((el, i) => {
+    el.className = "step" + (pi >= 0 && i < pi ? " done" : "") + (i === pi ? " now" : "");
+  });
+  [...$("#ladder-names").children].forEach((el, i) => { el.className = i === pi ? "now" : ""; });
+
+  $("#mission-clock").textContent = latest ? latest.timestamp : "00:00:00:000";
+  $("#kv-team").textContent = latest ? latest.team_id : "—";
+  $("#kv-packet").textContent = latest ? "P-" + String(latest.packet_number).padStart(3, "0") : "—";
+  const calEl = $("#kv-cal"), armEl = $("#kv-arm");
+  if (latest && latest.calibrated !== null && latest.calibrated !== undefined) {
+    setStat(calEl, latest.calibrated ? "complete" : "in progress",
+            latest.calibrated ? "goodv" : "warnv", latest.calibrated ? "i-check" : "i-warn");
+  } else setStat(calEl, "—", "", "");
+  if (latest && latest.armed !== null && latest.armed !== undefined) {
+    setStat(armEl, latest.armed ? "ARMED" : "safe", latest.armed ? "critv" : "", latest.armed ? "i-bolt" : "i-lock");
+  } else setStat(armEl, "—", "", "");
+  const fc = latest && latest.faults !== null ? latest.faults : null;
+  setStat($("#kv-faults"), fc === null ? "—" : fc, fc ? "critv" : "", fc ? "i-warn" : "");
+
+  /* ---- tiles ---- */
+  const ref = ds.length > 10 ? ds[ds.length - 11] : ds[0];
+  for (const t of TILES) {
+    const val = s ? s[t.key] : null;
+    $("#tv-" + t.key).textContent = val === null || val === undefined ? "—" : val.toFixed(t.dp);
+    const dEl = $("#td-" + t.key);
+    if (val !== null && val !== undefined && ref && s !== ref) {
+      const d = val - ref[t.key];
+      const dir = d > 0.01 ? "i-up" : d < -0.01 ? "i-down" : "i-flat";
+      dEl.innerHTML = '<svg width="11" height="11" aria-hidden="true"><use href="#' + dir + '"/></svg>' +
+                      (d >= 0 ? "+" : "") + d.toFixed(t.dp) + " / 5s";
+    } else dEl.textContent = "·";
+    drawSpark($("#sp-" + t.key), ds.map(x => x[t.key]).filter(v => typeof v === "number"), t.col(), true, t.min);
+  }
+
+  /* ---- charts ---- */
+  const hasSamples = ds.length > 1;
+  $("#chart-empty").classList.toggle("hidden", hasSamples);
+  $$(".chart-row").forEach(r => r.classList.toggle("hidden", !hasSamples));
+  if (hasSamples) $$(".chart-row").forEach(drawChart);
+  if (!$("#table-wrap").classList.contains("hidden")) renderTable();
+
+  const scrub = $("#scrub");
+  const maxIdx = Math.max(0, ds.length - 1);
+  scrub.max = String(maxIdx);
+  scrub.disabled = ds.length < 2;
+  if (scrubIndex < 0) scrub.value = String(maxIdx);
+  if (slow) {
+    scrub.setAttribute("aria-valuetext", s
+      ? "t " + s.t.toFixed(1) + " seconds, altitude " + s.altitude.toFixed(1) + " metres, vertical speed " +
+        s.vspd.toFixed(1) + " metres per second, pressure " + s.pressure.toFixed(0) + " pascal, temperature " +
+        s.temperature.toFixed(1) + " degrees, acceleration " + s.amag.toFixed(1) + " metres per second squared"
+      : "No samples yet");
+    $("#scrub-read").textContent = scrubIndex < 0 ? "live" : "t = " + (s ? s.t.toFixed(1) : "—") + " s";
+    $("#chart-summary").textContent = s
+      ? "Flight profile. " + ds.length + " samples from t " + ds[0].t.toFixed(1) + " to " +
+        ds[ds.length - 1].t.toFixed(1) + " seconds. Latest altitude " + s.altitude.toFixed(1) +
+        " metres, vertical speed " + s.vspd.toFixed(1) + " metres per second. " +
+        events.map(e => e.label + " at t " + e.t.toFixed(1) + " seconds, " + e.value.toFixed(1)).join(". ")
+      : "Flight profile. No samples yet.";
+  }
+
+  /* ---- instruments ---- */
+  if (s) {
+    drawADI(s.roll, s.pitch);
+    drawHSI(s.yaw, s.spin);
+    $("#att-roll").textContent = s.roll.toFixed(1) + "°";
+    $("#att-pitch").textContent = s.pitch.toFixed(1) + "°";
+    $("#att-yaw").textContent = s.yaw.toFixed(1) + "°";
+    $("#att-spin").textContent = s.spin.toFixed(0) + "°/s";
+  } else {
+    drawADI(0, 0); drawHSI(0, 0);
+  }
+
+  /* ---- GPS ---- */
+  const hasFix = !!(s && s.hasFix);
+  $("#gps-fix").className = "pill " + (hasFix ? "ok" : "lost");
+  $("#gps-fix").innerHTML = '<span class="dot"></span>' + (hasFix ? "Fix" : "No fix");
+  if (hasFix && s.lat !== null && s.lon !== null) {
+    $("#gps-lat").textContent = s.lat.toFixed(6) + "°";
+    $("#gps-lon").textContent = s.lon.toFixed(6) + "°";
+    $("#gps-alt").textContent = s.galt !== null && s.galt !== undefined ? s.galt.toFixed(1) + " m" : "—";
+  } else {
+    $("#gps-lat").textContent = "—"; $("#gps-lon").textContent = "—"; $("#gps-alt").textContent = "—";
+  }
+  const rng = s && s.hasFix ? Math.hypot(s.fx, s.fy) : null;
+  const brg = rng !== null ? (Math.atan2(s.fx, s.fy) * 180 / Math.PI + 360) % 360 : null;
+  $("#gps-range").textContent = rng === null ? "—" : rng.toFixed(1) + " m @ " + brg.toFixed(0) + "°";
+  drawPolar();
+
+  /* ---- 3D HUD + accessible description ---- */
+  $("#hud-alt").textContent = s ? s.altitude.toFixed(1) : "—";
+  $("#hud-vsp").textContent = s ? (s.vspd >= 0 ? "+" : "") + s.vspd.toFixed(1) : "—";
+  $("#hud-range").textContent = rng === null ? "—" : rng.toFixed(1);
+  $("#hud-brg").textContent = brg === null ? "—" : brg.toFixed(0) + "°";
+  if (slow) {
+    $("#scene").setAttribute("aria-label", s
+      ? "Three-dimensional flight view. Altitude " + s.altitude.toFixed(1) + " metres, vertical speed " +
+        s.vspd.toFixed(1) + " metres per second, roll " + s.roll.toFixed(0) + ", pitch " + s.pitch.toFixed(0) +
+        ", yaw " + s.yaw.toFixed(0) + " degrees" +
+        (rng !== null ? ", " + rng.toFixed(1) + " metres from the pad on bearing " + brg.toFixed(0) + " degrees" : "") + "."
+      : "Three-dimensional flight view. Awaiting telemetry.");
+  }
+
+  /* ---- raw monitor: the reject reason is text in the row, not a title= ---- */
+  if (rowsDirty || force) {
+    const html = rows.map(r => {
+      if (r.divider) return '<div class="divider">' + esc(r.divider) + '</div>';
+      const tag = { ok: "OK", rej: "REJ", err: "ERR", crc: "CRC", dup: "DUP" }[r.tag] || r.tag;
+      const n = r.n !== null ? "P-" + String(r.n).padStart(3, "0") : "----";
+      return '<div class="r ' + r.cls + (r.fresh ? " fresh" : "") + '">' +
+        '<span class="n">' + n + '</span><span class="tag">' + tag + '</span>' +
+        '<span class="txt">' + esc(r.text) + '</span>' +
+        (r.note ? '<span class="why">' + esc(r.note) + '</span>' : "") + '</div>';
+    }).join("");
+    $("#mon-list").innerHTML = html;
+    $("#mon-count").textContent = rows.filter(r => !r.divider).length + " shown";
+    rows.forEach(r => r.fresh = false);
+    rowsDirty = false;
+  }
+}
+function esc(t) { return String(t).replace(/[<>&"]/g, x => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[x])); }
+function setStat(el, text, cls, icon) {
+  el.className = cls || "";
+  el.innerHTML = (icon ? '<svg width="12" height="12" aria-hidden="true"><use href="#' + icon + '"/></svg>' : "") + esc(text);
+}
+
+function renderTable() {
+  const wrap = $("#table-wrap");
+  const head = "<tr><th>t · s</th><th>alt · m</th><th>v/s · m/s</th><th>pr · Pa</th><th>T · °C</th>" +
+               "<th>|a| · m/s²</th><th>roll</th><th>pitch</th><th>yaw</th></tr>";
+  const body = displaySamples().slice(-200).reverse().map(s =>
+    "<tr><td>" + s.t.toFixed(1) + "</td><td>" + s.altitude.toFixed(1) + "</td><td>" + s.vspd.toFixed(2) +
+    "</td><td>" + s.pressure.toFixed(0) + "</td><td>" + s.temperature.toFixed(1) + "</td><td>" + s.amag.toFixed(2) +
+    "</td><td>" + s.roll.toFixed(1) + "</td><td>" + s.pitch.toFixed(1) + "</td><td>" + s.yaw.toFixed(1) +
+    "</td></tr>").join("");
+  wrap.innerHTML = '<table class="datatable"><caption class="sr-only">Accepted telemetry samples, newest first</caption>' +
+    '<thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+}
+
+/* ---- chart hover: throttled to one hit-test per animation frame ---- */
+function hookChartHover() {
+  const body = $("#chart-body"), tt = $("#chart-tt");
+  let pending = null, raf = 0;
+  function resolve() {
+    raf = 0;
+    if (!pending) return;
+    const { cx, cy } = pending;
+    const ds = displaySamples();
+    if (ds.length < 2) return;
+    const first = body.querySelector(".chart-row canvas");
+    if (!first) return;
+    const rect = first.getBoundingClientRect();
+    const padL = 52, padR = 46;
+    const [t0, t1] = timeDomain(ds);
+    const frac = (cx - rect.left - padL) / Math.max(1, rect.width - padL - padR);
+    const tRel = t0 + Math.max(0, Math.min(1, frac)) * (t1 - t0);
+    let best = null, bd = Infinity;
+    for (const s of ds) { const d = Math.abs(s.t - tRel); if (d < bd) { bd = d; best = s; } }
+    hoverSample = best;
+    if (!best) return;
+    tt.innerHTML =
+      "<b>t = " + best.t.toFixed(1) + " s · " + PHASE[phaseOf(best)].name + "</b>" +
+      row("alt", best.altitude.toFixed(1) + " m") +
+      row("v/s", best.vspd.toFixed(2) + " m/s") +
+      row("pr", best.pressure.toFixed(0) + " Pa") +
+      row("T", best.temperature.toFixed(1) + " °C") +
+      row("|a|", best.amag.toFixed(2) + " m/s²") +
+      row("att", best.roll.toFixed(0) + " / " + best.pitch.toFixed(0) + " / " + best.yaw.toFixed(0) + "°");
+    tt.style.opacity = "1";
+    const br = body.getBoundingClientRect();
+    let left = cx - br.left + 16;
+    if (left + 190 > br.width) left = cx - br.left - 200;
+    tt.style.left = Math.max(4, left) + "px";
+    tt.style.top = Math.min(br.height - 130, cy - br.top + 12) + "px";
+  }
+  const row = (k, v) => '<div class="tr"><span>' + k + "</span><span>" + v + "</span></div>";
+  body.addEventListener("pointermove", e => {
+    pending = { cx: e.clientX, cy: e.clientY };
+    if (!raf) raf = requestAnimationFrame(resolve);
+  });
+  body.addEventListener("pointerleave", () => {
+    pending = null; hoverSample = null; tt.style.opacity = "0";
+  });
+}
+
+/* ---- paint loop ---- */
+let lastPaint = 0;
+function loop(ts) {
+  scene.draw(ts);                       // every frame: the camera must stay smooth
+  if (ts - lastPaint > 180) { render(false); lastPaint = ts; }
+  requestAnimationFrame(loop);
+}
+
+/* ================================================================
+   13. Controls
+   ================================================================ */
+function setSource(which) {
+  ["demo", "file", "serial"].forEach(k => $("#src-" + k).setAttribute("aria-pressed", String(k === which)));
+}
+$("#src-demo").addEventListener("click", () => { setSource("demo"); startDemo(); });
+$("#src-file").addEventListener("click", () => { $("#file-input").click(); });
+$("#src-serial").addEventListener("click", () => { connectSerial(); });
+$("#file-input").addEventListener("change", e => {
+  if (e.target.files[0]) { setSource("file"); replayFile(e.target.files[0]); }
+});
+
+$("#pause-btn").addEventListener("click", () => {
+  setPaused(!paused, paused ? "Live" : "Display frozen — packets are still being received and logged");
+  render(true);
+});
+
+$$(".chip[data-win]").forEach(b => b.addEventListener("click", () => {
+  winSec = +b.dataset.win;
+  $$(".chip[data-win]").forEach(o => o.setAttribute("aria-pressed", String(o === b)));
+  render(true);
+}));
+$$(".chip[data-cam]").forEach(b => b.addEventListener("click", () => scene.setMode(b.dataset.cam)));
+$("#scene-reset").addEventListener("click", () => { scene.reset(); toast("Camera reset"); });
+
+$("#scrub").addEventListener("input", e => {
+  const ds = displaySamples();
+  const v = +e.target.value;
+  scrubIndex = v >= ds.length - 1 ? -1 : v;      // parking at the end means "follow live"
+  render(true);
+});
+
+$("#toggle-table").addEventListener("click", () => {
+  // The table accompanies the charts rather than replacing them: it is the
+  // non-visual equivalent of the plots, not an either/or view.
+  const w = $("#table-wrap");
+  const show = w.classList.contains("hidden");
+  w.classList.toggle("hidden", !show);
+  $("#toggle-table").setAttribute("aria-pressed", String(show));
+  $("#toggle-table-label").textContent = show ? "Hide table" : "Data table";
+  if (show) renderTable();
+});
+
+$("#copy-csv").addEventListener("click", async () => {
+  const header = "t_s,altitude_m,pressure_pa,temperature_c,accel_mag_mps2,roll_deg,pitch_deg,yaw_deg,vspeed_mps,east_m,north_m";
+  const lines = samples.map(s => [s.t.toFixed(2), s.altitude.toFixed(1), s.pressure.toFixed(2),
+    s.temperature.toFixed(1), s.amag.toFixed(2), s.roll.toFixed(1), s.pitch.toFixed(1), s.yaw.toFixed(1),
+    s.vspd.toFixed(2), s.x.toFixed(2), s.y.toFixed(2)].join(","));
+  const csv = [header, ...lines].join("\n");
+  try { await navigator.clipboard.writeText(csv); toast(samples.length + " rows copied to clipboard"); }
+  catch (e) { toast("Clipboard blocked — open the data table and copy from there"); }
+});
+
+/* theme */
+const root = document.documentElement;
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem("cansat-theme"); } catch (e) {}
+  if (saved) root.setAttribute("data-theme", saved);
+  else if (matchMedia("(prefers-color-scheme: light)").matches) root.setAttribute("data-theme", "light");
+})();
+$("#theme-toggle").addEventListener("click", () => {
+  const next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+  root.setAttribute("data-theme", next);
+  try { localStorage.setItem("cansat-theme", next); } catch (e) {}
+  readTheme();
+  render(true);
+});
+
+/* toast */
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 3200);
+}
+
+/* serial availability */
+if (!("serial" in navigator)) {
+  $("#src-serial").disabled = true;
+  $("#src-serial").title = "Web Serial API not available in this browser";
+}
+
+/* ================================================================
+   14. Boot
+   ================================================================ */
+readTheme();
+let resizeRaf = 0;
+addEventListener("resize", () => {
+  if (resizeRaf) return;
+  resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; render(true); });
+});
+hookChartHover();
+scene.setMode("orbit");
+startDemo();
+requestAnimationFrame(loop);
+</script>

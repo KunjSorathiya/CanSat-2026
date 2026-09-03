@@ -1,12 +1,21 @@
+"""Backwards-compatible shim.
+
+The radio/serial handling now lives in ``transport.py``. This module keeps the old
+``FilePacketSource`` API and re-exports the transport helpers.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Protocol
 
-
-class PacketSource(Protocol):
-    def packets(self) -> Iterable[str]:
-        ...
+from transport import (  # noqa: F401  re-exported for convenience
+    FileReplayTransport,
+    Frame,
+    FrameDecoder,
+    LoopbackTransport,
+    frame_encode,
+    crc16_ccitt,
+)
 
 
 class FilePacketSource:

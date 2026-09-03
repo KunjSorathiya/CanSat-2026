@@ -25,7 +25,10 @@ struct GpsData {
     double latitude = 0.0;
     double longitude = 0.0;
     double altitude = 0.0;
-    bool valid = false;
+    bool valid = false;               // has a position fix
+    double time_of_day_s = 0.0;       // UTC seconds since midnight, when time_valid
+    bool time_valid = false;
+    std::uint8_t satellites = 0;
 };
 
 struct TelemetryRecord {

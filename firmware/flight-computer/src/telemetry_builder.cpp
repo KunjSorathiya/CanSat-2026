@@ -1,0 +1,105 @@
+#include "flight/telemetry_builder.hpp"
+
+#include "flight/health.hpp"
+
+#include <cmath>
+#include <iomanip>
+#include <sstream>
+#include <utility>
+#include <vector>
+
+namespace flight {
+
+namespace {
+
+std::string fixed(double value, int decimals) {
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(decimals) << value;
+    return out.str();
+}
+
+std::string optional_field(const char* prefix, double value, int decimals) {
+    return std::string(prefix) + fixed(value, decimals);
+}
+
+}  // namespace
+
+TelemetryBuilder::TelemetryBuilder(Configuration config) : config_(std::move(config)) {}
+
+std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
+    std::uint32_t packet_number, std::uint64_t mission_ms,
+    const SensorSnapshot& s, const std::vector<std::string>& extra_optional) const {
+    cansat::TelemetryRecord record;
+    record.team_id = config_.team_id;
+    record.packet_number = packet_number;
+    record.timestamp_ms = mission_ms;
+
+    record.altitude_m = s.altitude_m;
+    record.pressure_pa = s.pressure_pa;
+    record.temperature_c = s.temperature_c;
+    record.roll_deg = s.roll_deg;
+    record.pitch_deg = s.pitch_deg;
+    record.yaw_deg = s.yaw_deg;
+    record.acceleration_x_mps2 = s.ax_mps2;
+    record.acceleration_y_mps2 = s.ay_mps2;
+    record.acceleration_z_mps2 = s.az_mps2;
+
+    record.validity.altitude = s.baro_valid;
+    record.validity.pressure = s.baro_valid;
+    record.validity.temperature = s.baro_valid;
+    record.validity.roll = s.orientation_valid;
+    record.validity.pitch = s.orientation_valid;
+    record.validity.yaw = s.orientation_valid;
+    record.validity.acceleration_x = s.imu_valid;
+    record.validity.acceleration_y = s.imu_valid;
+    record.validity.acceleration_z = s.imu_valid;
+
+    std::vector<std::string> optional;
+    if (s.gps.valid && std::isfinite(s.gps.latitude) && std::isfinite(s.gps.longitude) &&
+        std::isfinite(s.gps.altitude)) {
+        record.gps = s.gps;
+        optional.push_back(optional_field("GP-Lat-", s.gps.latitude, config_.gps_latlon_decimals));
+        optional.push_back(optional_field("GP-Lon-", s.gps.longitude, config_.gps_latlon_decimals));
+        optional.push_back(optional_field("GP-Alt-", s.gps.altitude, config_.gps_alt_decimals));
+    }
+    for (const auto& extra : extra_optional) {
+        if (!extra.empty()) {
+            optional.push_back(extra);
+        }
+    }
+
+    auto packet = cansat::format_packet(record, optional);
+    if (!packet) {
+        return std::nullopt;
+    }
+    return Built{record, *packet};
+}
+
+std::string TelemetryBuilder::sd_header() {
+    return "mission_ms,packet_number,state,fault_total,altitude_m,pressure_pa,temperature_c,"
+           "roll_deg,pitch_deg,yaw_deg,ax_mps2,ay_mps2,az_mps2,gps_valid,gps_lat,gps_lon,"
+           "gps_alt,packet";
+}
+
+std::string TelemetryBuilder::sd_line(const Built& b, MissionState state,
+                                      std::uint32_t fault_total) const {
+    const auto& r = b.record;
+    std::ostringstream out;
+    out << r.timestamp_ms << ',' << r.packet_number << ',' << to_string(state) << ','
+        << fault_total << ',' << fixed(r.altitude_m, 1) << ',' << fixed(r.pressure_pa, 2)
+        << ',' << fixed(r.temperature_c, 1) << ',' << fixed(r.roll_deg, 1) << ','
+        << fixed(r.pitch_deg, 1) << ',' << fixed(r.yaw_deg, 1) << ','
+        << fixed(r.acceleration_x_mps2, 2) << ',' << fixed(r.acceleration_y_mps2, 2) << ','
+        << fixed(r.acceleration_z_mps2, 2) << ',' << (r.gps ? 1 : 0) << ',';
+    if (r.gps) {
+        out << fixed(r.gps->latitude, config_.gps_latlon_decimals) << ','
+            << fixed(r.gps->longitude, config_.gps_latlon_decimals) << ','
+            << fixed(r.gps->altitude, config_.gps_alt_decimals);
+    } else {
+        out << ",,";
+    }
+    out << ',' << b.packet;
+    return out.str();
+}
+
+}  // namespace flight

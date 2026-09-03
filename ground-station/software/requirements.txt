@@ -1,1 +1,10 @@
-# Ground-station PC software uses Python standard library only.
+# The core ground-station code (parser, validator, logger, health, app, file replay)
+# uses only the Python standard library -- nothing needs to be installed to run
+# `python src/main.py replay ...` or the test suite.
+#
+# Uncomment for the live features:
+#   pyserial   -> connect to the ground-station Pico over USB serial
+#   matplotlib -> live altitude / pressure / temperature plots in the dashboard
+#
+# pyserial>=3.5
+# matplotlib>=3.7

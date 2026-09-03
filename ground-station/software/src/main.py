@@ -1,40 +1,104 @@
+"""CanSat ground-station entry point.
+
+Subcommands:
+  replay <file>   parse + validate + log a file of packets (headless), print a summary
+  live            run the live pipeline from a serial bridge or a paced file replay,
+                  with the Tk dashboard unless --no-dashboard is given
+"""
+
 from __future__ import annotations
 
 import argparse
+import time
 from pathlib import Path
 
-from logger import PacketLog, detect_missing
-from telemetry import parse_packet
+from app import GroundStation
+from transport import FileReplayTransport
 
 
-def process_lines(lines: list[str], log: PacketLog, expected_team: str | None = None) -> tuple[int, int]:
-    received = 0
-    missing = 0
-    previous: int | None = None
-    for line in lines:
-        raw = line.rstrip("\r\n")
-        if not raw:
-            continue
-        result = parse_packet(raw, expected_team)
-        log.append(raw, result.record, result.error)
-        if result.record is None:
-            continue
-        received += 1
-        missing += detect_missing(previous, result.record.packet_number)
-        previous = result.record.packet_number
-    return received, missing
+def _run_replay(args: argparse.Namespace) -> int:
+    transport = FileReplayTransport(str(args.input), framed=args.framed)
+    station = GroundStation(transport, expected_team=args.team, log_dir=str(args.output))
+    station.run_forever()  # synchronous: file transport ends on EOF
+
+    link = station.health.snapshot()
+    stats = vars(station.validator.stats)
+    print(
+        "received={received} accepted={accepted} rejected={rejected} "
+        "missing={missing} duplicates={duplicates} out_of_order={out_of_order} "
+        "crc_errors={crc}".format(crc=link["crc_errors"], **stats)
+    )
+    if args.export:
+        dest = station.export_csv(args.export)
+        print(f"exported {dest}")
+    return 0
+
+
+def _run_live(args: argparse.Namespace) -> int:
+    if args.replay:
+        transport = FileReplayTransport(str(args.replay), rate_hz=args.rate,
+                                        framed=args.framed)
+    else:
+        from transport import SerialTransport
+
+        transport = SerialTransport(args.port, baud=args.baud, framed=args.framed)
+
+    station = GroundStation(transport, expected_team=args.team, log_dir=str(args.output))
+
+    if args.no_dashboard:
+        station.start()
+        print("live pipeline running; Ctrl-C to stop")
+        try:
+            while True:
+                time.sleep(2.0)
+                snap = station.snapshot()
+                print(snap["link"])
+        except KeyboardInterrupt:
+            pass
+        finally:
+            station.stop()
+        return 0
+
+    from dashboard import run_dashboard
+
+    run_dashboard(station)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="CanSat ground station")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    replay = sub.add_parser("replay", help="offline parse/validate/log of a packet file")
+    replay.add_argument("input", type=Path)
+    replay.add_argument("--output", type=Path, default=Path("logs"))
+    replay.add_argument("--team", default=None)
+    replay.add_argument("--framed", action="store_true",
+                        help="input uses the '$len,crc,payload' bridge framing")
+    replay.add_argument("--export", type=Path, default=None,
+                        help="copy the parsed CSV to this path when done")
+    replay.set_defaults(func=_run_replay)
+
+    live = sub.add_parser("live", help="live pipeline from serial or a paced file")
+    live.add_argument("--port", default=None, help="serial port of the ground-station Pico")
+    live.add_argument("--baud", type=int, default=115200)
+    live.add_argument("--replay", type=Path, default=None,
+                      help="use a file instead of a serial port")
+    live.add_argument("--rate", type=float, default=2.0, help="replay packets/second")
+    live.add_argument("--output", type=Path, default=Path("logs"))
+    live.add_argument("--team", default=None)
+    live.add_argument("--framed", action="store_true")
+    live.add_argument("--no-dashboard", action="store_true")
+    live.set_defaults(func=_run_live)
+    return parser
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="CanSat telemetry replay and logger")
-    parser.add_argument("input", type=Path, help="file containing raw telemetry packets")
-    parser.add_argument("--output", type=Path, default=Path("logs"))
-    parser.add_argument("--team", default=None)
-    args = parser.parse_args()
-    log = PacketLog(args.output / "raw_packets.tsv", args.output / "telemetry.csv")
-    received, missing = process_lines(args.input.read_text(encoding="utf-8").splitlines(), log, args.team)
-    print(f"received={received} missing={missing}")
-    return 0
+    args = build_parser().parse_args()
+    if args.command == "live" and not args.replay and not args.port:
+        print("live: provide --port <serial> or --replay <file>")
+        return 2
+    return args.func(args)
 
 
 if __name__ == "__main__":

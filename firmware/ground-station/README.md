@@ -1,5 +1,16 @@
-# Ground Station Pico Firmware Boundary
+# Ground-Station Pico Bridge
 
-The ground-station Pico owns the RA-02 radio-side boundary. `include/ground/radio_bridge.hpp` defines the minimal receive interface expected by the PC ground-station application.
+Physical LoRa bridge: `RA-02 -> ground-station Pico -> USB serial -> PC`.
 
-The exact Pico SDK adapter is intentionally deferred until the RA-02 carrier pinout and electrical behavior are verified. The provisional onboard radio resources remain the project reference; no new GPIO assignments are introduced here.
+- `include/ground/radio_bridge.hpp` - radio-side boundary contract.
+- `include/ground/framing.hpp`, `src/framing.cpp` - USB-serial framing shared with the
+  PC application: `'$' <len> ',' <crc16-ccitt-hex> ',' <payload> '\n'`. Host-buildable and
+  unit-tested (`tests/framing_test.cpp`); the Python side (`ground-station/software/src/transport.py`)
+  mirrors it byte for byte.
+- `src/pico/main.cpp` - the bridge firmware: brings up the SX1278 in continuous RX,
+  frames every received payload and every `#status` line to USB, and re-initialises the
+  radio after repeated failures. Reuses `firmware/common/src/sx1278.cpp`. Default sync
+  word `0xF3` (test); change `SYNC_WORD` to `0xA5` for the official launch configuration.
+
+The Pico SDK is required only for the `cansat_ground_bridge_firmware` target. The framing
+library and its tests build with the host toolchain (`tools/build_host.sh`).

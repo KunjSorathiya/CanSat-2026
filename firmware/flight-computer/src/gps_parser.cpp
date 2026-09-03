@@ -1,67 +1,185 @@
 #include "flight/gps_parser.hpp"
 
-#include <cstdio>
-#include <sstream>
-#include <vector>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 namespace flight {
 
 namespace {
-std::vector<std::string> split(const std::string& input, char delimiter) {
-    std::vector<std::string> result;
-    std::stringstream stream(input);
-    std::string part;
-    while (std::getline(stream, part, delimiter)) result.push_back(part);
-    return result;
+
+int hex_value(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return -1;
 }
 
-double coordinate(const std::string& value, const std::string& hemisphere) {
-    double raw = std::stod(value);
-    const double degrees = static_cast<int>(raw / 100.0);
-    const double minutes = raw - degrees * 100.0;
-    const double result = degrees + minutes / 60.0;
-    return (hemisphere == "S" || hemisphere == "W") ? -result : result;
+// Strict double parse: whole token must be a finite number.
+bool parse_double(const char* s, double& out) {
+    if (s == nullptr || *s == '\0') return false;
+    char* end = nullptr;
+    const double value = std::strtod(s, &end);
+    if (end == s || *end != '\0' || !std::isfinite(value)) return false;
+    out = value;
+    return true;
 }
+
+bool parse_coordinate(const char* dm, char hemisphere, double& out) {
+    double raw = 0.0;
+    if (!parse_double(dm, raw)) return false;
+    const double degrees = std::floor(raw / 100.0);
+    const double minutes = raw - degrees * 100.0;
+    double value = degrees + minutes / 60.0;
+    if (hemisphere == 'S' || hemisphere == 'W') value = -value;
+    if (!std::isfinite(value)) return false;
+    out = value;
+    return true;
+}
+
+bool parse_utc(const char* hhmmss, double& seconds_of_day) {
+    double t = 0.0;
+    if (!parse_double(hhmmss, t) || t < 0.0) return false;
+    const double hh = std::floor(t / 10000.0);
+    const double mm = std::floor((t - hh * 10000.0) / 100.0);
+    const double ss = t - hh * 10000.0 - mm * 100.0;
+    if (hh > 23.0 || mm > 59.0 || ss >= 61.0) return false;
+    seconds_of_day = hh * 3600.0 + mm * 60.0 + ss;
+    return true;
+}
+
 }  // namespace
 
 bool NmeaParser::consume(char character) {
-    if (sentence_.size() >= 128) sentence_.clear();
-    sentence_ += character;
-    if (character != '\n') return false;
-    const bool parsed = parse_sentence(sentence_);
-    sentence_.clear();
-    return parsed;
+    if (character == '\r') {
+        return false;
+    }
+    if (character == '\n') {
+        bool applied = false;
+        if (!overflowed_ && length_ > 0) {
+            applied = apply_sentence();
+        }
+        length_ = 0;
+        overflowed_ = false;
+        return applied;
+    }
+    if (character == '$') {
+        length_ = 0;
+        overflowed_ = false;
+    }
+    if (length_ < kMaxSentence - 1) {
+        buffer_[length_++] = character;
+    } else {
+        overflowed_ = true;  // resync on the next newline
+    }
+    return false;
 }
 
-const cansat::GpsData& NmeaParser::latest() const { return latest_; }
-bool NmeaParser::has_fix() const { return latest_.valid; }
-std::uint32_t NmeaParser::checksum_errors() const { return checksum_errors_; }
+bool NmeaParser::apply_sentence() {
+    buffer_[length_] = '\0';
+    if (buffer_[0] != '$') {
+        return false;
+    }
 
-bool NmeaParser::parse_sentence(const std::string& sentence) {
-    if (sentence.size() < 10 || sentence.front() != '$') return false;
-    const auto star = sentence.find('*');
-    if (star == std::string::npos || star + 2 >= sentence.size()) return false;
+    // Locate the checksum delimiter.
+    std::size_t star = 0;
+    for (star = 1; star < length_; ++star) {
+        if (buffer_[star] == '*') break;
+    }
+    if (star >= length_ || star + 2 >= length_) {
+        return false;
+    }
+    const int hi = hex_value(buffer_[star + 1]);
+    const int lo = hex_value(buffer_[star + 2]);
+    if (hi < 0 || lo < 0) {
+        return false;
+    }
     std::uint8_t checksum = 0;
-    for (std::size_t index = 1; index < star; ++index) checksum ^= static_cast<std::uint8_t>(sentence[index]);
-    unsigned supplied = 0;
-    if (std::sscanf(sentence.c_str() + star + 1, "%2x", &supplied) != 1 || checksum != supplied) {
+    for (std::size_t i = 1; i < star; ++i) {
+        checksum ^= static_cast<std::uint8_t>(buffer_[i]);
+    }
+    if (checksum != static_cast<std::uint8_t>((hi << 4) | lo)) {
         ++checksum_errors_;
         return false;
     }
-    const auto fields = split(sentence.substr(1, star - 1), ',');
-    if (fields.size() < 10 || (fields[0] != "GPGGA" && fields[0] != "GNGGA")) return false;
-    try {
-        const int fix_quality = std::stoi(fields[6]);
-        if (fix_quality == 0) { latest_.valid = false; return true; }
-        latest_.latitude = coordinate(fields[2], fields[3]);
-        latest_.longitude = coordinate(fields[4], fields[5]);
-        latest_.altitude = std::stod(fields[9]);
-        latest_.valid = true;
-        return true;
-    } catch (...) {
+
+    // Tokenise [1, star) on commas, in place.
+    char* fields[26];
+    std::size_t field_count = 0;
+    fields[field_count++] = &buffer_[1];
+    for (std::size_t i = 1; i < star && field_count < 26; ++i) {
+        if (buffer_[i] == ',') {
+            buffer_[i] = '\0';
+            fields[field_count++] = &buffer_[i + 1];
+        }
+    }
+    buffer_[star] = '\0';
+
+    const char* type = fields[0];
+    const std::size_t type_len = std::strlen(type);
+    if (type_len < 5) {
+        return false;
+    }
+    const char* code = type + (type_len - 3);  // strip the talker id (GP/GN/GL/...)
+
+    if (std::strcmp(code, "GGA") == 0 && field_count >= 11) {
+        double t = 0.0;
+        if (parse_utc(fields[1], t)) {
+            latest_.time_of_day_s = t;
+            latest_.time_valid = true;
+        }
+        long quality = std::strtol(fields[6], nullptr, 10);
+        if (quality <= 0) {
+            latest_.valid = false;
+            ++sentences_parsed_;
+            return true;
+        }
+        double lat = 0.0;
+        double lon = 0.0;
+        double alt = 0.0;
+        if (parse_coordinate(fields[2], fields[3][0], lat) &&
+            parse_coordinate(fields[4], fields[5][0], lon) &&
+            parse_double(fields[9], alt)) {
+            latest_.latitude = lat;
+            latest_.longitude = lon;
+            latest_.altitude = alt;
+            long sats = std::strtol(fields[7], nullptr, 10);
+            latest_.satellites = (sats < 0) ? 0 : static_cast<std::uint8_t>(sats > 255 ? 255 : sats);
+            latest_.valid = true;
+            ++sentences_parsed_;
+            return true;
+        }
         latest_.valid = false;
         return false;
     }
+
+    if (std::strcmp(code, "RMC") == 0 && field_count >= 7) {
+        double t = 0.0;
+        if (parse_utc(fields[1], t)) {
+            latest_.time_of_day_s = t;
+            latest_.time_valid = true;
+        }
+        const bool active = fields[2][0] == 'A';
+        if (!active) {
+            latest_.valid = false;
+            ++sentences_parsed_;
+            return true;
+        }
+        double lat = 0.0;
+        double lon = 0.0;
+        if (parse_coordinate(fields[3], fields[4][0], lat) &&
+            parse_coordinate(fields[5], fields[6][0], lon)) {
+            latest_.latitude = lat;
+            latest_.longitude = lon;
+            latest_.valid = true;
+            ++sentences_parsed_;
+            return true;
+        }
+        latest_.valid = false;
+        return false;
+    }
+
+    return false;
 }
 
 }  // namespace flight

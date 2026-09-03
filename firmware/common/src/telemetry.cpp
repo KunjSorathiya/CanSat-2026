@@ -1,8 +1,8 @@
 #include "cansat/telemetry.hpp"
 
 #include <cmath>
+#include <cstddef>
 #include <iomanip>
-#include <regex>
 #include <sstream>
 
 namespace cansat {
@@ -40,9 +40,46 @@ bool field_prefix(const std::string& field, const std::string& prefix, std::stri
     return !value.empty();
 }
 
+bool digit(char c) { return c >= '0' && c <= '9'; }
+
+// Equivalent to the anchored regex "-?[0-9]+\.[0-9]{precision}", written by hand so the
+// shared telemetry library carries no <regex> dependency. On the Pico that removes a
+// large amount of flash and the per-call regex construction cost; this runs nine times
+// for every parsed packet.
 bool exact_precision(const std::string& value, int precision) {
-    const std::string pattern = "-?[0-9]+\\\\.[0-9]{" + std::to_string(precision) + "}";
-    return std::regex_match(value, std::regex(pattern));
+    std::size_t i = 0;
+    if (i < value.size() && value[i] == '-') ++i;
+
+    const std::size_t integer_start = i;
+    while (i < value.size() && digit(value[i])) ++i;
+    if (i == integer_start) return false;  // no integer digits
+
+    if (i >= value.size() || value[i] != '.') return false;
+    ++i;
+
+    const std::size_t fraction_start = i;
+    while (i < value.size() && digit(value[i])) ++i;
+    if (i != value.size()) return false;  // trailing characters after the fraction
+    return static_cast<int>(i - fraction_start) == precision;
+}
+
+// "HH:MM:SS:MS": exactly two/two/two/three digits separated by colons.
+bool timestamp_shape(const std::string& value) {
+    if (value.size() != 12) return false;
+    if (value[2] != ':' || value[5] != ':' || value[8] != ':') return false;
+    for (std::size_t i = 0; i < value.size(); ++i) {
+        if (i == 2 || i == 5 || i == 8) continue;
+        if (!digit(value[i])) return false;
+    }
+    return true;
+}
+
+unsigned digits_to_uint(const std::string& value, std::size_t offset, std::size_t count) {
+    unsigned out = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        out = out * 10 + static_cast<unsigned>(value[offset + i] - '0');
+    }
+    return out;
 }
 
 }  // namespace
@@ -63,8 +100,19 @@ std::string format_timestamp(std::uint64_t timestamp_ms) {
 }
 
 bool is_valid_team_id(const std::string& team_id) {
-    static const std::regex pattern(R"(CAN-Team-[A-Za-z0-9]+)");
-    return std::regex_match(team_id, pattern) && team_id != "CAN-Team-XX";
+    // "CAN-Team-" followed by at least one alphanumeric character, and never the
+    // "CAN-Team-XX" placeholder from the rulebook example.
+    static const char kPrefix[] = "CAN-Team-";
+    const std::size_t prefix_length = sizeof(kPrefix) - 1;
+    if (team_id.size() <= prefix_length) return false;
+    if (team_id.compare(0, prefix_length, kPrefix) != 0) return false;
+    for (std::size_t i = prefix_length; i < team_id.size(); ++i) {
+        const char c = team_id[i];
+        const bool alphanumeric = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') ||
+                                  (c >= 'a' && c <= 'z');
+        if (!alphanumeric) return false;
+    }
+    return team_id != "CAN-Team-XX";
 }
 
 std::optional<std::string> format_packet(
@@ -144,10 +192,15 @@ ParseResult parse_packet(const std::string& packet) {
         result.error = "invalid timestamp";
         return result;
     }
-    unsigned hours = 0, minutes = 0, seconds = 0, milliseconds = 0;
-    if (std::sscanf(value.c_str(), "%u:%u:%u:%u", &hours, &minutes, &seconds,
-                    &milliseconds) != 4 || minutes > 59 || seconds > 59 ||
-        milliseconds > 999) {
+    if (!timestamp_shape(value)) {
+        result.error = "invalid timestamp";
+        return result;
+    }
+    const unsigned hours = digits_to_uint(value, 0, 2);
+    const unsigned minutes = digits_to_uint(value, 3, 2);
+    const unsigned seconds = digits_to_uint(value, 6, 2);
+    const unsigned milliseconds = digits_to_uint(value, 9, 3);
+    if (minutes > 59 || seconds > 59) {
         result.error = "invalid timestamp";
         return result;
     }
