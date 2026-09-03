@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  host-build-and-test:
+    name: Host build + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compiler version
+        run: g++ --version
+
+      - name: Build and run the host test suites
+        run: bash tools/build_host.sh
+
+  pico-syntax:
+    name: Pico firmware syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax-check every PICO_BUILD translation unit
+        run: bash tools/check_pico_syntax.sh
+
+  cmake-configure:
+    name: CMake configure (host targets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure and build the host CMake targets
+        run: |
+          cmake -S . -B build/ci -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/ci --parallel
+
+      - name: Run CTest
+        run: ctest --test-dir build/ci --output-on-failure

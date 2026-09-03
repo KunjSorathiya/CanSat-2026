@@ -34,7 +34,7 @@ The alternate functions listed above must still be checked against the exact Pic
 
 ## Pico Documentation Basis
 
-Source: [Raspberry Pi Pico datasheet](raspberry_pi_pico_datasheet.pdf) and [official online copy](https://datasheets.raspberrypi.com/pico/pico-datasheet.pdf).
+Source: [Raspberry Pi Pico datasheet](datasheets/raspberry_pi_pico_datasheet.pdf) and [official online copy](https://datasheets.raspberrypi.com/pico/pico-datasheet.pdf).
 
 The selected pins use these documented RP2040 function roles:
 

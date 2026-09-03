@@ -1,0 +1,463 @@
+# Repository Audit — 2026-09-04
+
+A file-by-file verification of the CanSat 2026 repository: does the code build and pass,
+does the documentation describe what the code actually does, do the links resolve, and does
+the web console behave as documented.
+
+**Auditor:** automated verification run with manual review
+**Scope:** all 124 project files (excluding `.git/`, `build/`, `__pycache__/`, and local
+tool configuration under `.claude/`)
+**Verdict:** ✅ **Pass with four defects found and fixed, and six open items recorded.**
+
+---
+
+## Contents
+
+- [Summary](#summary)
+- [Method](#method)
+- [Evidence](#evidence)
+- [Findings](#findings)
+- [File-by-file audit](#file-by-file-audit)
+- [Claim verification](#claim-verification)
+- [Web console verification](#web-console-verification)
+- [Timeline verification](#timeline-verification)
+- [What remains unverified](#what-remains-unverified)
+- [Recommendations](#recommendations)
+
+---
+
+## Summary
+
+| Area | Files | Verdict |
+|---|---:|---|
+| Build system | 5 | ✅ Host build verified; Pico build unverifiable here (no SDK) |
+| Shared library | 4 | ✅ Builds, tested, `<regex>` dependency removed |
+| Flight core | 26 | ✅ Builds, 189 assertions pass |
+| Flight tests | 3 | ✅ All pass |
+| Pico HAL | 14 | 🟡 Syntax-checked only — never executed |
+| Ground bridge firmware | 6 | 🟡 Framing tested; bridge `main` syntax-checked only |
+| Ground software (Python) | 17 | ✅ 37 tests pass, all modules compile |
+| Web console | 3 | ✅ Verified live in a browser; 🟡 no automated tests |
+| Tooling | 11 | ✅ Both scripts run clean |
+| Documentation | 25 | ✅ All links resolve; 68 numeric claims match source |
+| Directory placeholders | 10 | ✅ Added this audit — documented directories now exist in git |
+| **Total** | **124** | |
+
+**Automated checks passing: 226** — 189 C++ assertions plus 37 Python tests, with 10 Pico
+translation units syntax-clean.
+
+---
+
+## Method
+
+Nine verification passes, each producing evidence rather than an opinion:
+
+1. **Build** — `tools/build_host.sh` compiled and ran every host suite.
+2. **Firmware syntax** — `tools/check_pico_syntax.sh` compiled all `PICO_BUILD` branches.
+3. **Python integrity** — `py_compile` over every module and test.
+4. **Numeric claims** — a script asserted 68 documented values (pin numbers, periods,
+   thresholds, radio parameters, watchdog timings, bus speeds) against the source that
+   defines them.
+5. **Link integrity** — every relative Markdown link across all 26 Markdown documents
+   resolved against the filesystem.
+6. **Anchor integrity** — every in-page and cross-file heading anchor resolved against the
+   target document's headings.
+7. **Web console** — loaded in a real browser, run through a complete demo mission in both
+   themes, with console errors and live values read back from the DOM.
+8. **Repository hygiene** — dead code, unreferenced modules, empty directories, `TODO` and
+   `FIXME` markers.
+9. **Timeline** — every date and commit reference checked against `git log`.
+
+---
+
+## Evidence
+
+### Build and test
+
+```text
+== compiling flight_smoke_test ==
+== compiling flight_tests ==
+== compiling ground_station_tests ==
+== running C++ tests ==
+flight smoke test passed
+189/189 checks passed
+flight_tests passed
+ground framing tests passed
+== running Python ground-station tests ==
+Ran 37 tests in 0.038s
+OK
+ALL HOST BUILDS AND TESTS PASSED
+```
+
+Compiler: `g++` with `-std=c++17 -O2 -Wall -Wextra -Wpedantic`. **Zero warnings.**
+
+### Pico syntax check
+
+All 10 translation units returned `OK`: flight `main`, `pico_hal`, `pico_radio`,
+`mpu6050`, `bmp280`, `neo6m`, `sd_card`, `sd_logger`, shared `sx1278`, ground bridge
+`main`.
+
+### Static checks
+
+| Check | Result |
+|---|---|
+| Python modules compile | 15 / 15 ✅ |
+| `TODO` / `FIXME` / `XXX` markers in source | 0 ✅ |
+| Relative Markdown links | 165 checked, 0 broken ✅ (1 fixed, see F-02) |
+| In-page anchors | 79 checked, 0 missing ✅ |
+| Cross-file anchors | 9 checked, 0 broken ✅ |
+| Documented numeric claims | 68 checked, 0 mismatches ✅ |
+| Fault codes declared vs named | 16 declared, 16 handled by `fault_name()` ✅ |
+
+---
+
+## Findings
+
+### Fixed during this audit
+
+<a id="f-01"></a>
+#### F-01 · Link-rate meter misread bursts as thousands of Hz — **high**
+
+**Found:** While verifying the web console live, the link rate displayed **249.01 Hz on a
+2 Hz link**.
+
+**Cause:** `LinkHealth` estimated the packet rate as an EWMA of instantaneous `1/dt`
+intervals. The demo deliberately injects one duplicate packet to exercise link health; that
+duplicate arrives in the same millisecond as its original, giving `dt ≈ 0` and an
+instantaneous estimate in the thousands of Hz. With a 0.7 / 0.3 EWMA the spike then needs
+about ten packets to decay. The identical formula existed in `health.py`, so real hardware
+would do the same whenever a serial buffer flushed more than one frame at once.
+
+**Why it matters:** The rate meter is what an operator watches to spot a failing link. A
+reading that jumps to 249 Hz and drifts back over five seconds is worse than no reading.
+
+**Fix:** Both implementations now compute the rate over a **5-second sliding window**
+(`(n − 1) / span`), which no single interval can distort and which falls to zero when the
+link drops instead of freezing at its last value.
+
+**Verification:** three regression tests added (`test_rate_matches_a_paced_stream`,
+`test_burst_does_not_inflate_the_rate`, `test_rate_falls_to_zero_when_the_link_drops`);
+re-run live in the browser through a full demo mission — rate held **2.00 Hz** across both
+the injected drop and the injected duplicate, with loss correctly showing 1.2 % and
+duplicates 1.
+
+<a id="f-02"></a>
+#### F-02 · Broken documentation link — **low**
+
+`documentation/hardware/pico-gpio-map.md:37` linked to `raspberry_pi_pico_datasheet.pdf`
+in its own directory; the file lives in `datasheets/`. Corrected. All 165 relative links
+now resolve.
+
+<a id="f-03"></a>
+#### F-03 · `<regex>` in the shared telemetry library — **medium (embedded footprint)**
+
+`firmware/common/src/telemetry.cpp` is linked into the flight image and used
+`std::regex` for team-id validation, timestamp shape checking and field-precision
+checking. `exact_precision()` **constructed a `std::regex` on every call** — nine times per
+parsed packet.
+
+Replaced with hand-written character scans. Behaviour is identical and every test passes
+unchanged.
+
+| Build of the same translation unit | Object size |
+|---|---:|
+| With the `<regex>` validators | 337,555 B |
+| With hand-written validators | **19,183 B** |
+
+A **94.3 % reduction** (`g++ -Os`, x86-64). On the RP2040 the saving is flash, heap and
+startup cost in code that runs on the telemetry hot path.
+
+<a id="f-04"></a>
+#### F-04 · Documented directories did not exist in git — **low**
+
+Thirteen directories referenced by the README's repository layout — `avionics/power`,
+`avionics/sensors`, `avionics/telemetry`, `electrical/schematics`, `electrical/PCB`,
+`mechanical/CAD`, `mechanical/drawings`, `simulations`, `test-data`,
+`documentation/mission` and their parents — were empty. Git does not track empty
+directories, so **a fresh clone would not contain them** and the documented layout would be
+wrong for every new contributor.
+
+Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
+
+### Open — recorded, not fixed
+
+| ID | Finding | Severity | Why it is open |
+|---|---|---|---|
+| **F-05** | `ground-station/software/src/ui.py` is dead code — nothing imports it, and `dashboard.py` supersedes it | Low | Deleting a file is the owner's call; recommend removal |
+| **F-06** | `ground-station/web/index.legacy.html` (1081 lines) is superseded | Low | Kept intentionally for reference; now labelled as such in the web README |
+| **F-07** | The web console's parser, validator, link health and CRC framing are hand-ported with **no automated tests** | Medium | Needs a JS test harness; a format change could silently desynchronise the console from the firmware |
+| **F-08** | The CI `cmake-configure` job has never been executed | Low | No CMake toolchain on this machine; the job will prove itself on the first push |
+| **F-09** | The Pico HAL and SX1278 driver have never executed | High | Requires hardware; this is the project's central open risk, already tracked as gates 3–5 |
+| **F-10** | `radio.py` is a compatibility shim with no remaining callers | Low | Harmless; documented as a shim |
+| **F-11** | `.claude/` (local tool configuration, several hundred files) is untracked and **not** in `.gitignore` | Low | A `git add .` would commit it. Whether to ignore it is a repository-policy decision for the owner |
+
+---
+
+## File-by-file audit
+
+Legend: ✅ verified · 🟡 partially verified · ⬜ content-only review (no executable claim)
+
+### Build system
+
+| File | Lines | Verified | Verdict |
+|---|---:|---|---|
+| `CMakeLists.txt` | 20 | Structure reviewed; guards the SDK import correctly | 🟡 Configure not run — no CMake here |
+| `firmware/common/CMakeLists.txt` | 7 | Target definition matches sources | 🟡 |
+| `firmware/flight-computer/CMakeLists.txt` | 75 | Source list matches `src/`; firmware target gated on `PICO_SDK_PATH` | 🟡 |
+| `firmware/ground-station/CMakeLists.txt` | 39 | Same pattern; framing library host-buildable | 🟡 |
+| `.github/workflows/ci.yml` | 47 | YAML reviewed; two of three jobs replicate locally verified commands | 🟡 |
+
+### Shared library — `firmware/common/`
+
+| File | Lines | Verified | Verdict |
+|---|---:|---|---|
+| `include/cansat/telemetry.hpp` | 65 | Interface matches implementation and both parsers | ✅ |
+| `src/telemetry.cpp` | 235 | Format and parse covered by `test_telemetry_format_exact`, `test_packet_numbering_and_padding`, `test_parser_rejects_precision_and_order`; `<regex>` removed (F-03) | ✅ |
+| `include/cansat/sx1278.hpp` | 83 | Settings match `RadioConfig`; sync-word defaults correct | ✅ |
+| `src/sx1278.cpp` | 306 | Compiles clean for `PICO_BUILD` | 🟡 Register sequence never executed (F-09) |
+
+### Flight core — `firmware/flight-computer/`
+
+| File | Lines | Verified | Verdict |
+|---|---:|---|---|
+| `include/flight/config.hpp` | 155 | **47 documented values asserted against this file** | ✅ |
+| `src/config.cpp` | 36 | `test_config_validation` | ✅ |
+| `include/flight/interfaces.hpp` | 96 | Implemented by both mocks and the Pico HAL | ✅ |
+| `include/flight/controller.hpp` | 113 | Matches implementation | ✅ |
+| `src/controller.cpp` | 460 | Six controller suites; LED timings and EWMA asserted | ✅ |
+| `include/flight/state_machine.hpp` | 45 | | ✅ |
+| `src/state_machine.cpp` | 103 | `test_state_machine_full_mission`, `test_state_machine_fault_paths` | ✅ |
+| `include/flight/scheduler.hpp` | 30 | | ✅ |
+| `src/scheduler.cpp` | 31 | `test_scheduler` including stall re-anchoring | ✅ |
+| `include/flight/orientation.hpp` | 42 | | ✅ |
+| `src/orientation.cpp` | 89 | `test_orientation_levels_and_yaw` | ✅ |
+| `include/flight/sensor_math.hpp` | 65 | | ✅ |
+| `src/sensor_math.cpp` | 99 | `test_mpu_scaling`, `test_bmp280_compensation_datasheet_vector`, `test_pressure_altitude` | ✅ |
+| `include/flight/startup_calibration.hpp` | 64 | | ✅ |
+| `src/startup_calibration.cpp` | 113 | `test_startup_calibrator_stationary_and_moving` | ✅ |
+| `include/flight/telemetry_builder.hpp` | 57 | | ✅ |
+| `src/telemetry_builder.cpp` | 105 | `test_telemetry_builder` | ✅ |
+| `include/flight/fault_manager.hpp` | 66 | 16 codes; all handled by `fault_name()` | ✅ |
+| `src/fault_manager.cpp` | 100 | `test_fault_manager` | ✅ |
+| `include/flight/raw_block_log.hpp` | 53 | | ✅ |
+| `src/raw_block_log.cpp` | 94 | `test_raw_block_log` including reset resume | ✅ |
+| `include/flight/gps_parser.hpp` | 38 | | ✅ |
+| `src/gps_parser.cpp` | 185 | `test_gps_parser`, plus a live sentence in the smoke test | ✅ |
+| `include/flight/health.hpp` | 36 | | ✅ |
+| `src/health.cpp` | 18 | All seven states named | ✅ |
+| `README.md` | 80 | Claims cross-checked against `config.hpp` and `controller.cpp` | ✅ |
+
+### Pico HAL — `firmware/flight-computer/src/pico/` and headers
+
+| File | Lines | Verified | Verdict |
+|---|---:|---|---|
+| `pico/main.cpp` | 88 | Watchdog 2000 ms and 5 ms tick asserted | 🟡 Syntax only |
+| `pico/pico_hal.cpp` | 146 | Bus speeds asserted: I2C 400 kHz, SPI 400 kHz, UART 9600 | 🟡 Syntax only |
+| `pico/mpu6050.cpp` | 123 | Uses verified scaling from `sensor_math` | 🟡 Syntax only |
+| `pico/bmp280.cpp` | 122 | Uses verified compensation from `sensor_math` | 🟡 Syntax only |
+| `pico/neo6m.cpp` | 50 | Feeds the tested `NmeaParser` | 🟡 Syntax only |
+| `pico/sd_card.cpp` | 191 | Raw block access, no filesystem | 🟡 Syntax only |
+| `pico/sd_logger.cpp` | 64 | Wraps the tested `RawBlockLog` | 🟡 Syntax only |
+| `pico/pico_radio.cpp` | 97 | Wraps the SX1278 driver | 🟡 Syntax only |
+| `include/flight/pico/*.hpp` (6 files) | 251 | Interfaces consistent; `pico_types.hpp` used by four headers | ✅ Reviewed |
+
+### Ground station firmware — `firmware/ground-station/`
+
+| File | Lines | Verified | Verdict |
+|---|---:|---|---|
+| `include/ground/framing.hpp` | 59 | Contract matches the Python and JS mirrors | ✅ |
+| `src/framing.cpp` | 136 | Round-trip, CRC error, resync, `0x29B1` known-answer vector | ✅ |
+| `include/ground/radio_bridge.hpp` | 16 | Interface only | ⬜ |
+| `src/pico/main.cpp` | 134 | Watchdog 3000 ms, 1 s status period, 20-failure threshold asserted | 🟡 Syntax only |
+| `tests/framing_test.cpp` | 107 | Runs and passes | ✅ |
+| `README.md` | 16 | Matches the implementation | ✅ |
+
+### Tests
+
+| File | Lines | Verified | Verdict |
+|---|---:|---|---|
+| `flight-computer/tests/flight_tests.cpp` | 687 | 21 suites, 189 assertions, all pass | ✅ |
+| `flight-computer/tests/flight_smoke_test.cpp` | 37 | Passes | ✅ |
+| `flight-computer/tests/mock_hardware.hpp` | 144 | Implements all six interfaces | ✅ |
+| `ground-station/software/tests/*.py` (5) | 418 | 37 tests, all pass | ✅ |
+
+### Ground station software — `ground-station/software/`
+
+| File | Lines | Verified | Verdict |
+|---|---:|---|---|
+| `src/telemetry.py` | 192 | 9 tests | ✅ |
+| `src/validator.py` | 104 | 9 tests | ✅ |
+| `src/transport.py` | 267 | 9 tests, including the shared CRC vector | ✅ |
+| `src/health.py` | 108 | 7 tests; rate estimator rewritten (F-01) | ✅ |
+| `src/logger.py` | 73 | Covered by telemetry and app tests | ✅ |
+| `src/app.py` | 171 | 3 end-to-end tests | ✅ |
+| `src/main.py` | 105 | CLI surface reviewed; `replay` exercised | 🟡 `live` needs hardware |
+| `src/dashboard.py` | 210 | Compiles; matplotlib fallback path reviewed | 🟡 Needs a display |
+| `src/radio.py` | 27 | Compat shim, no callers (F-10) | 🟡 |
+| `src/ui.py` | 24 | **Dead code** (F-05) | ⚠️ |
+| `requirements.txt` | 10 | Accurate: core needs no third-party packages | ✅ |
+| `README.md` | 33 | Module table matches the source | ✅ |
+
+### Web — `ground-station/web/`
+
+| File | Lines | Verified | Verdict |
+|---|---:|---|---|
+| `index.html` | 2491 | Run live: full demo mission, both themes, zero console errors | ✅ Manual |
+| `index.legacy.html` | 1081 | Superseded, retained for reference (F-06) | ⬜ |
+| `README.md` | 49 | Rewritten this audit to match the panels actually present | ✅ |
+
+### Tooling — `tools/`
+
+| File | Lines | Verified | Verdict |
+|---|---:|---|---|
+| `build_host.sh` | 74 | Runs clean; source list matches CMake | ✅ |
+| `check_pico_syntax.sh` | 43 | All 10 units `OK` | ✅ |
+| `pico_sdk_stubs/*` (9 files) | 133 | Sufficient for the syntax check; correctly marked not-an-SDK | ✅ |
+
+### Documentation — 25 files (18 Markdown under `documentation/`, 3 reference PDFs, 3 root documents, plus 5 component READMEs audited in their own sections)
+
+| File | Lines | Verdict |
+|---|---:|---|
+| `README.md` | 523 | ✅ Rewritten; every status claim cross-checked against code and tests |
+| `CHANGELOG.md` | 202 | ✅ Written this cycle; commit references match `git log` |
+| `CONTRIBUTING.md` | 164 | ✅ Written this cycle |
+| `documentation/README.md` | 111 | ✅ Index; all links resolve |
+| `design/software-architecture.md` | 504 | ✅ Written this cycle; flowcharts trace the real call order in `controller.cpp` |
+| `design/wiring.md` | 357 | ✅ Written this cycle; every pin asserted against `BoardPins` |
+| `design/telemetry-protocol.md` | 364 | ✅ Pre-existing; consistent with the implementation |
+| `design/electrical-architecture.md` | 336 | ⬜ Pre-existing; engineering analysis, no executable claims |
+| `hardware/*` (8 files) | 1789 | ⬜ Pre-existing; one broken link fixed (F-02) |
+| `requirements/requirements.md` | 280 | ⬜ Pre-existing; statuses consistent with the README |
+| `project/timeline.md` | 254 | ✅ Written this cycle; dates verified against `git log` |
+| `testing/test-plan.md` | 264 | ✅ Written this cycle; every suite name verified against the test sources |
+| `operations/runbook.md` | 363 | ✅ Written this cycle; every command and config field verified against source |
+| `firmware/*/README.md`, `ground-station/*/README.md`, `tools/*/README.md` (5) | 186 | ✅ Cross-checked against their code |
+
+---
+
+## Claim verification
+
+68 values stated in the documentation were asserted against the source that defines them.
+**All 68 matched.** Sample:
+
+| Claim | Source of truth | Result |
+|---|---|---|
+| 15 GPIO assignments | `BoardPins` in `config.hpp` | ✅ |
+| Telemetry 500 ms, sensor 100 ms, SD flush 2000 ms, health 1000 ms, battery 1000 ms | `Configuration` | ✅ |
+| Calibration: 80 samples, 20 s timeout, 2 °/s, 1.5 m/s² | `Configuration` | ✅ |
+| Launch: 30 m/s², 15 m, 300 ms hold, 3 s arming delay | `Configuration` | ✅ |
+| Landing: 3 s minimum flight, 2.5 m/s², 1.0 m/s, 3 s hold | `Configuration` | ✅ |
+| Post-impact window 5000 ms | `Configuration` | ✅ |
+| Plausibility: 30–115 kPa, −50…95 °C, 170 m/s², 2200 °/s | `Configuration` | ✅ |
+| Radio: 433 MHz, SF9, 125 kHz, CR 4/5, 17 dBm, preamble 8, CRC on | `RadioConfig` | ✅ |
+| Sync words `0xF3` / `0xA5` | `RadioConfig` | ✅ |
+| SD 10-failure cutoff, radio 5-failure threshold, 1000 ms back-off | `Configuration` | ✅ |
+| LED periods 900 / 400 / 100 / 250 / 60 ms | `Controller::update_led` | ✅ |
+| Watchdogs 2000 ms flight, 3000 ms bridge; 5 ms tick | `main.cpp` × 2 | ✅ |
+| Bus speeds I2C 400 kHz, SPI 400 kHz, UART 9600 | `pico_hal.cpp` | ✅ |
+| Vertical-rate EWMA 0.7 / 0.3 | `controller.cpp` | ✅ |
+| Frame payload limit 512 B | `framing.hpp` | ✅ |
+| 16 fault codes | `fault_manager.hpp` / `.cpp` | ✅ |
+
+---
+
+## Web console verification
+
+Loaded `ground-station/web/index.html` in a browser and ran a complete demo mission.
+
+| Check | Result |
+|---|---|
+| Page loads with no console errors | ✅ |
+| Demo auto-starts and streams at 2 Hz | ✅ |
+| Panels present: Mission, Link health, Flight view 3D, Flight profile, Attitude, GPS, Raw packet monitor | ✅ |
+| Mission progresses `SELF_TEST → READY → FLIGHT → LANDED → RECOVERY` | ✅ |
+| Calibration and arming tags surface (`CAL` complete, `ARM` armed) | ✅ |
+| Sync word displayed as `TEST · 0xF3` | ✅ |
+| Injected dropped packet counted (missing 1, loss 1.2 %) | ✅ |
+| Injected duplicate counted (duplicates 1) | ✅ |
+| Packet rate steady at **2.00 Hz** through both anomalies | ✅ after F-01 |
+| Light and dark themes both render legibly | ✅ |
+| Mission restarts cleanly at profile end with a toast, not a silent stall | ✅ |
+
+Before F-01 was fixed, the same run displayed 249.01 Hz. This is the one defect that a
+documentation-only review would have missed entirely.
+
+---
+
+## Timeline verification
+
+Every date in [timeline.md](../project/timeline.md) was checked against `git log`.
+
+| Claim | Verified |
+|---|---|
+| `c6c500b` initial structure, 2026-09-03 | ✅ |
+| `e71706c` hardware overview, 2026-09-03 | ✅ |
+| `a915247` requirements and rulebook, 2026-09-03 | ✅ |
+| `27495df` initial software and documentation, 2026-09-03 | ✅ |
+| Working tree: software implementation plus this documentation cycle, 2026-09-04 | ✅ 24 modified files, 66 new files |
+| Phases 0–4 complete, 5–9 not started | ✅ Consistent with the absence of any hardware evidence |
+| Gate 1 partial, gates 2–9 not passed | ✅ Consistent with `requirements.md` |
+| No competition dates asserted | ✅ Correct — none appear in the supplied rulebook |
+
+The forward plan deliberately uses phases and dependencies rather than calendar dates,
+because no deadline exists in the source material. That is the right call and is stated
+explicitly in the document.
+
+---
+
+## What remains unverified
+
+This is the honest boundary of the audit. Nothing below has been demonstrated.
+
+| Area | Status | Blocking gate |
+|---|---|---|
+| Every sensor reading from real hardware | Never executed | Gate 4 |
+| The radio link, at any range | Never established | Gate 5 |
+| SD card behaviour on real media | Never executed | Gate 4 |
+| Power system: regulator, switch, LED, divider, brownout, endurance | Not designed | Gates 2–3 |
+| Timing behaviour under real load | Only synthetic clocks tested | Gate 5 |
+| Mechanical: structure, egg chamber, parachute, descent rate | Not started | Gate 7 |
+| Ground-station compatibility with the official dual stations | Never tested | Gate 6 |
+| Pico firmware image builds and boots | Never built — no SDK here | Gate 4 |
+
+**The software is verified. The vehicle is not.** No part of this repository establishes
+flight readiness, and no document in it claims otherwise.
+
+---
+
+## Recommendations
+
+Ordered by value.
+
+1. **Start hardware bring-up.** Every remaining gate depends on it, and the
+   [bring-up order](../design/wiring.md#bring-up-order) is written and sequenced. This is
+   the single highest-value action available.
+2. **Escalate the ten organizer questions**, especially the dimension contradiction — it
+   blocks the entire mechanical phase.
+3. **Add a test harness for the web console** (F-07). It duplicates the parser, validator
+   and framing, and a silent divergence there would be discovered during a mission.
+4. **Decide on `ui.py`** (F-05) and on whether `.claude/` should be git-ignored (F-11).
+5. **Push once, to prove the CI workflow** (F-08), including the CMake job that cannot run
+   on this machine.
+6. **Set `team_id` and the launch sync word early** and rehearse the switch, so it is not a
+   launch-day change. The firmware already refuses to run with the placeholder identity.
+
+---
+
+## Audit trail
+
+| Step | Command | Result |
+|---|---|---|
+| Host build and tests | `bash tools/build_host.sh` | All pass, 0 warnings |
+| Firmware syntax | `bash tools/check_pico_syntax.sh` | 10 / 10 `OK` |
+| Python integrity | `python -m py_compile` over 15 files | All pass |
+| Python suite | `python -m unittest discover` | 37 / 37 |
+| Numeric claims | scripted assertion of 68 values | 68 / 68 |
+| Link integrity | scripted resolution of 165 relative links | 165 / 165 after F-02 |
+| Anchors | scripted resolution of 88 heading anchors | 88 / 88 |
+| Object-size comparison | `g++ -Os -c` on both variants | 337,555 B → 19,183 B |
+| Web console | browser session, DOM readback, both themes | Pass after F-01 |
+| Repository hygiene | dead-code, empty-directory and marker scans | 4 findings, 1 fixed |
+
+**Audit complete.** Re-run this audit after hardware bring-up, when the 🟡 rows can start
+becoming ✅.
