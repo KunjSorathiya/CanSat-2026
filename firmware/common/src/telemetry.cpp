@@ -42,6 +42,26 @@ bool field_prefix(const std::string& field, const std::string& prefix, std::stri
 
 bool digit(char c) { return c >= '0' && c <= '9'; }
 
+// Strict unsigned parse of a packet number: digits only, no sign, no whitespace, no
+// overflow. std::stoul would accept "-1" (wrapping to 4294967295), " 7" and "7abc"; the
+// Python and JavaScript ground-station parsers accept none of those, and a parser that
+// disagrees with its own transmitter about what a packet number is cannot be trusted to
+// count packet loss.
+bool parse_packet_number(const std::string& text, std::uint32_t& value) {
+    if (text.empty() || text.size() > 10) return false;
+    std::uint64_t accumulated = 0;
+    for (const char c : text) {
+        if (!digit(c)) return false;
+        accumulated = accumulated * 10 + static_cast<std::uint64_t>(c - '0');
+        if (accumulated > 0xFFFFFFFFull) return false;
+    }
+    // The rulebook numbers packets from P-001; the formatter refuses to emit zero, so the
+    // parser must refuse to accept it.
+    if (accumulated == 0) return false;
+    value = static_cast<std::uint32_t>(accumulated);
+    return true;
+}
+
 // Equivalent to the anchored regex "-?[0-9]+\.[0-9]{precision}", written by hand so the
 // shared telemetry library carries no <regex> dependency. On the Pico that removes a
 // large amount of flash and the per-call regex construction cost; this runs nine times
@@ -180,9 +200,7 @@ ParseResult parse_packet(const std::string& packet) {
         result.error = "invalid packet number prefix";
         return result;
     }
-    try {
-        record.packet_number = std::stoul(fields[1].substr(2));
-    } catch (...) {
+    if (!parse_packet_number(fields[1].substr(2), record.packet_number)) {
         result.error = "invalid packet number";
         return result;
     }

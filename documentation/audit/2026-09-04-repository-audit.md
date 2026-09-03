@@ -185,13 +185,14 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 |---|---|---|---|
 | **F-05** | ~~`ground-station/software/src/ui.py` is dead code~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — file removed |
 | **F-06** | `ground-station/web/index.legacy.html` (1081 lines) is superseded | Low | Kept intentionally for reference; now labelled as such in the web README |
-| **F-07** | The web console's parser, validator, link health and CRC framing are hand-ported with **no automated tests** | Medium | Needs a JS test harness; a format change could silently desynchronise the console from the firmware |
+| **F-07** | ~~The web console's parser, validator, link health and CRC framing are hand-ported with **no automated tests**~~ | Medium | ✅ **Closed 2026-09-04 (cycle 2)** — 30 Node tests extract the core from `index.html`; all three parsers now read one fixture file |
 | **F-08** | The CI `cmake-configure` job has never been executed | Low | No CMake toolchain on this machine; the job will prove itself on the first push |
 | **F-09** | The Pico HAL and SX1278 driver have never executed | High | Requires hardware; this is the project's central open risk, already tracked as gates 3–5 |
 | **F-10** | ~~`radio.py` is a compatibility shim with no remaining callers~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — file removed |
 | **F-11** | ~~`.claude/` (local tool configuration) is untracked and **not** in `.gitignore`~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — added to `.gitignore` |
 | **F-12** | The telemetry rate was set without reference to LoRa airtime: SF9/125 kHz gives 1004 ms per packet against a 500 ms schedule | **High** | ✅ **Closed 2026-09-04 (cycle 2)** — see [link-budget.md](../design/link-budget.md); profile moved to SF7 at 1 Hz, with compile-time, startup and test guards |
 | **F-13** | The flight computer and the ground-station bridge held independent copies of the modem settings and agreed only by coincidence | **High** | ✅ **Closed 2026-09-04 (cycle 2)** — both read `cansat/link_profile.hpp`; a test compares them field by field |
+| **F-14** | The C++ parser accepted `P-000`, and the Python and JavaScript parsers accepted `P- 7` and packet numbers beyond 32 bits — three parsers, three rules | **Medium** | ✅ **Closed 2026-09-04 (cycle 2)** — one rule in all three, pinned by `test-data/protocol-fixtures.tsv` |
 
 ---
 

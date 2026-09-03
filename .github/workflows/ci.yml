@@ -17,11 +17,23 @@ jobs:
         with:
           python-version: '3.12'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Compiler version
         run: g++ --version
 
+      # build_host.sh skips the web console suite when Node is absent. CI installs Node,
+      # so a skip here means the toolchain broke, not that the tests are optional.
       - name: Build and run the host test suites
-        run: bash tools/build_host.sh
+        run: |
+          set -o pipefail
+          bash tools/build_host.sh 2>&1 | tee host.log
+          if grep -q 'SKIPPED web console tests' host.log; then
+            echo "::error::web console tests were skipped in CI" >&2
+            exit 1
+          fi
 
   pico-syntax:
     name: Pico firmware syntax check

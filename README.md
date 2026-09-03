@@ -6,7 +6,7 @@
 and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml)
-[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-258%20assertions-1b5e20)](documentation/testing/test-plan.md)
+[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-324%20assertions-1b5e20)](documentation/testing/test-plan.md)
 [![Python tests](https://img.shields.io/badge/Python%20tests-37%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
@@ -28,7 +28,7 @@ and streams telemetry from power-on through recovery.**
 
 | Layer | State |
 |---|---|
-| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 328 automated checks on the host** |
+| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 429 automated checks on the host** |
 | 🟡 **Firmware drivers** | Written and compile-checked against SDK stubs — **never executed on real silicon** |
 | 🔴 **Hardware** | Components purchased. **No bring-up, no wiring, no power system, no measurement** |
 | 🔴 **Mechanical** | Structure, egg chamber and parachute **not started** — blocked on a rulebook contradiction |
@@ -388,11 +388,12 @@ bash tools/build_host.sh
 
 | Suite | Coverage | Result |
 |---|---|---|
-| `flight_tests` | 24 suites: packet format, parser, state machine, orientation, sensor math, calibration, faults, scheduler, block log, controller behaviour, link profile, LoRa airtime | ✅ **258 / 258** |
+| `flight_tests` | 25 suites: packet format, parser, shared protocol fixtures, state machine, orientation, sensor math, calibration, faults, scheduler, block log, controller behaviour, link profile, LoRa airtime | ✅ **324 / 324** |
 | `flight_smoke_test` | Boot, first three packets, GPS parse | ✅ Passed |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
-| Python (ground station) | Parser, validator, transport, health, end-to-end pipeline | ✅ **37 / 37** |
+| Python (ground station) | Parser, validator, transport, health, end-to-end pipeline, shared protocol fixtures | ✅ **42 / 42** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
+| Web console (Node) | Framing, parser, validator and link health, extracted from `index.html` | ✅ **30 / 30** |
 | Pico syntax | 10 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte

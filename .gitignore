@@ -7,3 +7,4 @@ venv/
 .vscode/
 *.log
 .claude/
+host.log

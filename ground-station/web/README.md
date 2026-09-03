@@ -7,7 +7,7 @@ for CanSat-2026 telemetry. Open it directly, or serve the folder.
 
 | Source | Use |
 |---|---|
-| **Demo** | replays a generated drone-lift mission (READY → FLIGHT → LANDED → RECOVERY) at 2 Hz; auto-starts, and deliberately injects one dropped packet and one duplicate so link health is exercised |
+| **Demo** | replays a generated drone-lift mission (READY → FLIGHT → LANDED → RECOVERY) at 2 Hz (the demo generator paces itself; the flight radio runs at 1 Hz, see [link-budget.md](../../documentation/design/link-budget.md)); auto-starts, and deliberately injects one dropped packet and one duplicate so link health is exercised |
 | **File…** | replays a packet file — plain newline packets, a `raw_packets.tsv` from the Python logger, or a framed `.bin` |
 | **Web Serial** | connects to the ground-station bridge Pico over USB (Chrome/Edge, HTTPS or `localhost`), decoding the `$len,crc,payload` framing live |
 
@@ -42,8 +42,25 @@ EWMA of instantaneous intervals, because a duplicate or a buffered burst arrivin
 same millisecond would otherwise report thousands of Hz and take about ten packets to
 settle.
 
-> [!NOTE]
-> These ports have **no automated tests**. If the packet format, the validation rules or
-> the framing change, this file must be updated by hand and checked in a browser.
+### Testing the ports
+
+The logic is bracketed by `// PORTABLE-CORE:BEGIN` and `// PORTABLE-CORE:END` markers in
+`index.html`. Everything between them is pure logic with no DOM or browser dependency, and
+`tests/console_core.test.mjs` extracts it verbatim and runs it under Node:
+
+```bash
+node --test ground-station/web/tests/console_core.test.mjs
+```
+
+`tools/build_host.sh` runs it too, whenever Node is available, and CI fails if it is
+skipped. The harness asserts the core never touches `document`, `window`, `matchMedia` or
+`localStorage` — keep presentation code below the END marker so the logic stays testable.
+
+Parser cases come from [`test-data/protocol-fixtures.tsv`](../../test-data/protocol-fixtures.tsv),
+the same file the C++ and Python suites read, so a divergence between the three parsers
+fails the build instead of appearing during a mission.
+
+Rendering is still verified by hand in a browser: there is no headless browser in the
+repository.
 
 `index.legacy.html` is the previous single-panel console, kept for reference only.

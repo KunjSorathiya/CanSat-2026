@@ -149,12 +149,16 @@ def parse_packet(packet: str, expected_team: Optional[str] = None) -> ParseResul
 
     if not fields[1].startswith("P-"):
         return ParseResult(error="invalid packet prefix")
-    try:
-        packet_number = int(fields[1][2:])
-    except ValueError:
+    # Digits only, no sign, no interior whitespace, and inside the transmitter's 32-bit
+    # counter. int() would accept " 7" and an arbitrarily large value; a parser that
+    # disagrees with the transmitter about what a packet number is cannot count loss
+    # correctly. The C++ and JavaScript parsers apply the identical rule.
+    digits = fields[1][2:]
+    if not digits.isdigit() or len(digits) > 10:
         return ParseResult(error="invalid packet number")
-    if packet_number < 1:
-        return ParseResult(error="packet number must be positive")
+    packet_number = int(digits)
+    if packet_number < 1 or packet_number > 0xFFFFFFFF:
+        return ParseResult(error="invalid packet number")
 
     if not fields[2].startswith("Ti-"):
         return ParseResult(error="invalid timestamp prefix")

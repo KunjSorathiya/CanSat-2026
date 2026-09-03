@@ -708,6 +708,11 @@ input[type=file] { display: none; }
 
 <script>
 "use strict";
+// PORTABLE-CORE:BEGIN
+/* Everything between the PORTABLE-CORE markers is pure logic with no DOM or browser
+   dependency, and is extracted verbatim by ground-station/web/tests/console_core.test.mjs
+   so these ports cannot silently drift from the C++ and Python implementations they
+   mirror. Keep DOM access, timers and browser APIs below the END marker. */
 /* ================================================================
    1. Framing (mirror of firmware/ground-station/src/framing.cpp)
    ================================================================ */
@@ -773,8 +778,13 @@ function parsePacket(str, team) {
   if (!TEAM_RE.test(f[0]) || f[0] === "CAN-Team-XX") return { error: "invalid team identifier" };
   if (team && f[0] !== team) return { error: "unexpected team identifier" };
   if (!f[1].startsWith("P-")) return { error: "invalid packet prefix" };
-  const pn = Number(f[1].slice(2));
-  if (!Number.isInteger(pn) || pn < 1) return { error: "invalid packet number" };
+  // Digits only, no sign, no interior whitespace, inside the transmitter's 32-bit counter.
+  // Number(" 7") is 7 and Number("99999999999") is a valid integer, so Number() alone
+  // would accept packets the C++ and Python parsers reject. All three apply this rule.
+  const pnText = f[1].slice(2);
+  if (!/^\d{1,10}$/.test(pnText)) return { error: "invalid packet number" };
+  const pn = Number(pnText);
+  if (pn < 1 || pn > 0xFFFFFFFF) return { error: "invalid packet number" };
   if (!f[2].startsWith("Ti-")) return { error: "invalid timestamp prefix" };
   const ts = f[2].slice(3);
   if (!TS_RE.test(ts)) return { error: "invalid timestamp" };
@@ -884,6 +894,8 @@ class LinkHealth {
   get age() { return this.lastRxAt === null ? null : performance.now() / 1000 - this.lastRxAt; }
   get lossPct() { const exp = this.packetsOk + this.missing; return exp <= 0 ? 0 : 100 * this.missing / exp; }
 }
+
+// PORTABLE-CORE:END
 
 /* ================================================================
    5. Demo mission generator (realistic drone-lift profile)

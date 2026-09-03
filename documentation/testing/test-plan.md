@@ -52,10 +52,11 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 24 suites across the whole flight core | ✅ **258 / 258 assertions** |
+| `flight_tests` | 25 suites across the whole flight core | ✅ **324 / 324 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 5 modules | ✅ **37 / 37 tests** |
+| Python ground station | 6 modules | ✅ **42 / 42 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **30 / 30 tests** |
 | Pico syntax check | 10 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `pico_hal`, `pico_radio`, `mpu6050`,
@@ -107,7 +108,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 24 suites, 258 assertions
+### `flight_tests` — 25 suites, 324 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -194,16 +195,17 @@ Three things exist in more than one language and must not drift:
 
 | Logic | Implementations | Guard |
 |---|---|---|
-| Packet format and parsing | [`telemetry.cpp`](../../firmware/common/src/telemetry.cpp), [`telemetry.py`](../../ground-station/software/src/telemetry.py), `index.html` | Both suites parse the same rulebook example packet and enforce identical precision rules |
+| Packet format and parsing | [`telemetry.cpp`](../../firmware/common/src/telemetry.cpp), [`telemetry.py`](../../ground-station/software/src/telemetry.py), `index.html` | All three read [`test-data/protocol-fixtures.tsv`](../../test-data/protocol-fixtures.tsv) — 32 packets, each with a recorded accept/reject verdict. A parser that disagrees fails the build |
 | CRC-16/CCITT framing | [`framing.cpp`](../../firmware/ground-station/src/framing.cpp), [`transport.py`](../../ground-station/software/src/transport.py), `index.html` | The same known-answer vector `0x29B1` is asserted in both suites |
 | Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Shared test packets; the web console is a direct port |
 | LoRa airtime model | [`lora_airtime.hpp`](../../firmware/common/include/cansat/lora_airtime.hpp), [`link_budget.py`](../../tools/link_budget.py) | Both are asserted against the same two published SX127x reference vectors (46.336 ms and 1155.072 ms) |
 | Radio modem parameters | [`link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp) — read by the vehicle *and* the bridge | `test_link_profile_is_shared_by_both_ends()` compares the two ends field by field; a mismatch is a silent, total link failure |
 
 > [!NOTE]
-> The web console's ports are **not** covered by an automated suite. If the packet format
-> or framing changes, `ground-station/web/index.html` must be updated by hand and checked
-> manually.
+> The web console's ports **are** covered, as of cycle 2. `ground-station/web/tests/console_core.test.mjs`
+> extracts the code between the `PORTABLE-CORE` markers straight out of `index.html` and
+> runs it under Node, and the harness fails if that code reaches for the DOM. Its parser
+> cases come from the same fixture file the other two suites read.
 
 ---
 
@@ -213,7 +215,7 @@ Three things exist in more than one language and must not drift:
 |---|---|---|
 | Pico HAL drivers | Need real I2C, SPI and UART peripherals | Medium — logic is thin, but register sequences are unverified |
 | SX1278 register driver | Needs the real modem | High — the register sequence is written from the datasheet and never executed |
-| Web console | No JS test harness in the repository | Medium — it is a port, and ports drift. Verified manually in a browser on 2026-09-04: demo mission ran to `RECOVERY`, rate steady at 2.00 Hz through the injected drop and duplicate, no console errors, both themes legible |
+| Web console **rendering** | No headless browser in the repository | Low — the logic is now tested under Node (30 tests); only the DOM layer is manual. Verified by hand in a browser on 2026-09-04: demo mission ran to `RECOVERY`, rate steady through the injected drop and duplicate, no console errors, both themes legible |
 | Tk dashboard | Needs a display | Low |
 | CMake build | No CMake toolchain on the development machine; the host script uses `g++` directly | Low — exercised by the CI `cmake-configure` job |
 | Timing under real load | Host tests use a synthetic clock | Medium — the 1 Hz airtime budget is arithmetic ([link-budget.md](../design/link-budget.md)); nothing has been measured on a radio |

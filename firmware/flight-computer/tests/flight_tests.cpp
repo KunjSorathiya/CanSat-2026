@@ -19,6 +19,7 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -797,12 +798,55 @@ void test_controller_sensor_plausibility() {
     CHECK(radio.packets.size() > before);
 }
 
+// The shared protocol fixtures. The same file drives the Python ground station and the
+// JavaScript web console, so all three parsers are held to one definition of a valid
+// packet. A ground station that disagrees with the transmitter miscounts packet loss.
+void test_shared_protocol_fixtures(const std::string& repo_root) {
+    const std::string path = repo_root + "/test-data/protocol-fixtures.tsv";
+    std::ifstream file(path);
+    CHECK(file.is_open());
+    if (!file.is_open()) {
+        std::cerr << "  could not open " << path
+                  << " (pass the repository root as argv[1])\n";
+        return;
+    }
+
+    int cases = 0;
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty() || line[0] == '#') continue;
+
+        const std::size_t first = line.find('\t');
+        const std::size_t second = line.find('\t', first + 1);
+        CHECK(first != std::string::npos && second != std::string::npos);
+        if (first == std::string::npos || second == std::string::npos) continue;
+
+        const std::string id = line.substr(0, first);
+        const std::string expect = line.substr(first + 1, second - first - 1);
+        const std::string packet = line.substr(second + 1);
+
+        const bool parsed = static_cast<bool>(cansat::parse_packet(packet));
+        const bool want = expect == "ok";
+        ++g_checks;
+        if (parsed != want) {
+            std::cerr << "FAIL fixture " << id << ": expected " << expect << ", got "
+                      << (parsed ? "ok" : "err") << "\n";
+            ++g_failures;
+        }
+        ++cases;
+    }
+    CHECK(cases >= 30);  // the whole fixture set, not a truncated read
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    const std::string repo_root = argc > 1 ? argv[1] : ".";
     test_telemetry_format_exact();
     test_packet_numbering_and_padding();
     test_parser_rejects_precision_and_order();
+    test_shared_protocol_fixtures(repo_root);
     test_mpu_scaling();
     test_bmp280_compensation_datasheet_vector();
     test_pressure_altitude();

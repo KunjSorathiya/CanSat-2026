@@ -495,7 +495,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, state machine, calibration, radio airtime | **Verified on host** — 24 C++ suites with 258 assertions, plus 70 Python tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, state machine, calibration, radio airtime | **Verified on host** — 25 C++ suites with 324 assertions, 75 Python tests and 30 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |

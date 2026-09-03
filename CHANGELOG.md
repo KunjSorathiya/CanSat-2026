@@ -45,6 +45,33 @@ are now single-sourced, computed, and enforced by the build.
 - **Three new C++ suites** — the airtime reference vectors, the airtime guard, and the
   shared-profile agreement between vehicle and bridge. Host total: **258 assertions**.
 
+### Fixed — three parsers disagreed about what a valid packet is
+
+Probing the C++, Python and JavaScript parsers with 32 packets found two real divergences:
+
+- **`P-000` was accepted by C++ and rejected by the other two.** The C++ formatter refuses
+  to emit packet number zero, so its own parser accepting one was incoherent.
+- **`P- 7` and `P-99999999999` were accepted by Python and JavaScript.** `int()` and
+  `Number()` both skip interior whitespace and have no 32-bit ceiling, so the ground
+  station would have accepted packet numbers the vehicle can never send.
+
+All three now apply one rule — digits only, no sign, no whitespace, 1 to 4294967295 — and
+the C++ parser no longer routes through `std::stoul`, which silently wraps `-1` to
+4294967295. A ground station that disagrees with its transmitter about packet numbers
+miscounts packet loss, which is the number an operator watches to judge the link.
+
+### Added — the web console is no longer untested (audit F-07)
+
+- **`ground-station/web/tests/console_core.test.mjs`** — 30 Node tests over the console's
+  framing, parser, validator and link health. The code is extracted verbatim from
+  `index.html` between new `PORTABLE-CORE` markers, so the tests exercise exactly what
+  ships. The harness also asserts that the core touches no DOM or browser API.
+- **`test-data/protocol-fixtures.tsv`** — 32 packets, each with a recorded accept/reject
+  verdict, read by all three parser implementations. A divergence now fails the build.
+- CI installs Node and fails if the web console suite is skipped.
+
+Host totals: **324 C++ assertions, 75 Python tests, 30 Node tests.**
+
 ### Removed
 
 - `ground-station/software/src/ui.py` — dead code superseded by `dashboard.py` (audit F-05).

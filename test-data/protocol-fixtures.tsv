@@ -1,0 +1,48 @@
+# CanSat 2026 — telemetry protocol parser fixtures
+#
+# One packet per line, read by all three parser implementations so they cannot silently
+# disagree about what a valid packet is:
+#
+#   firmware/common/src/telemetry.cpp        (C++, flight + shared library)
+#   ground-station/software/src/telemetry.py (Python, PC ground station)
+#   ground-station/web/index.html            (JavaScript, web console)
+#
+# A ground station that accepts a packet the transmitter would never send, or rejects one
+# it does send, miscounts packet loss — the number an operator uses to judge the link.
+#
+# Format: <id> TAB <expect: ok|err> TAB <packet>
+# Blank lines and lines starting with '#' are ignored. The packet may be empty.
+# Whitespace inside the packet is significant; do not reformat this file.
+#
+canonical	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+gps_and_diagnostics	ok	CAN-Team-01; P-002; Ti-00:00:00:500; A-0.0; Pr-101325.00; T-25.0; Ro-1.2; Pi--0.6; Ya-0.0; AX-0.10; AY-0.20; AZ-9.80; GP-Lat-18.000000; GP-Lon-73.000000; GP-Alt-20.0; MODE-READY; FAULTS-0;
+negative_values	ok	CAN-Team-07; P-010; Ti-00:01:02:003; A--12.5; Pr-98000.25; T--5.0; Ro--30.0; Pi--2.5; Ya--180.0; AX--1.00; AY--2.50; AZ--9.81;
+placeholder_team	err	CAN-Team-XX; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+missing_last_field	err	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20;
+altitude_no_decimal	err	CAN-Team-07; P-001; Ti-00:00:01:000; A-10; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+pressure_one_decimal	err	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.0; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+field_order_swapped	err	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; AX-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+timestamp_minutes_99	err	CAN-Team-07; P-001; Ti-00:99:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+timestamp_short_fields	err	CAN-Team-07; P-001; Ti-0:0:1:0; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+packet_number_zero	err	CAN-Team-07; P-000; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+packet_number_text	err	CAN-Team-07; P-abc; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+packet_number_large	ok	CAN-Team-07; P-99999; Ti-99:59:59:999; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+no_trailing_semicolon	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80
+empty	err	
+junk	err	hello world
+altitude_not_numeric	err	CAN-Team-07; P-001; Ti-00:00:01:000; A-abc.d; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+altitude_extra_decimal	err	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.00; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+unknown_optional_tag	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80; WHAT-42;
+negative_packet_number	err	CAN-Team-07; P--1; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+packet_number_overflow	err	CAN-Team-07; P-99999999999; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+packet_number_spaced	err	CAN-Team-07; P- 7; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+timestamp_hours_99	ok	CAN-Team-07; P-001; Ti-99:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+team_lowercase	err	can-team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+gps_out_of_range	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80; GP-Lat-999.000000; GP-Lon-999.000000; GP-Alt-20.0;
+extra_whitespace	ok	CAN-Team-07;  P-001;   Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+altitude_plus_sign	err	CAN-Team-07; P-001; Ti-00:00:01:000; A-+10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+altitude_scientific	err	CAN-Team-07; P-001; Ti-00:00:01:000; A-1e2.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+timestamp_ms_4_digits	err	CAN-Team-07; P-001; Ti-00:00:01:0000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+timestamp_seconds_60	err	CAN-Team-07; P-001; Ti-00:00:60:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+huge_altitude	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-999999.9; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;
+diagnostics_only	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80; MODE-FLIGHT; FAULTS-3; CAL-1; ARM-1;

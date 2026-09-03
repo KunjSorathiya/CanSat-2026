@@ -63,7 +63,7 @@ $CXX $CXXFLAGS ${INC[@]} \
 
 echo "== running C++ tests =="
 "$OUT/flight_smoke_test"
-"$OUT/flight_tests"
+"$OUT/flight_tests" "$ROOT"
 "$OUT/ground_station_tests"
 
 if command -v python >/dev/null 2>&1; then
@@ -72,6 +72,16 @@ if command -v python >/dev/null 2>&1; then
 
   echo "== running Python tooling tests =="
   ( cd "$ROOT" && python -m unittest discover -s tools/tests -p "test_*.py" )
+fi
+
+# The web console is a single self-contained HTML file with no build step. Its parser,
+# validator, framing and link-health logic are hand-ports, so they are extracted and tested
+# under Node when Node is available.
+if command -v node >/dev/null 2>&1; then
+  echo "== running web console tests =="
+  ( cd "$ROOT" && node --test ground-station/web/tests/console_core.test.mjs )
+else
+  echo "== SKIPPED web console tests (node not found) =="
 fi
 
 echo "ALL HOST BUILDS AND TESTS PASSED"
