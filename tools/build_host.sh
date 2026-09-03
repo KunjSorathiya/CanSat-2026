@@ -69,6 +69,9 @@ echo "== running C++ tests =="
 if command -v python >/dev/null 2>&1; then
   echo "== running Python ground-station tests =="
   ( cd "$ROOT" && python -m unittest discover -s ground-station/software/tests -p "test_*.py" -v )
+
+  echo "== running Python tooling tests =="
+  ( cd "$ROOT" && python -m unittest discover -s tools/tests -p "test_*.py" )
 fi
 
 echo "ALL HOST BUILDS AND TESTS PASSED"

@@ -6,7 +6,7 @@
 and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml)
-[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-189%20assertions-1b5e20)](documentation/testing/test-plan.md)
+[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-258%20assertions-1b5e20)](documentation/testing/test-plan.md)
 [![Python tests](https://img.shields.io/badge/Python%20tests-37%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
@@ -28,7 +28,7 @@ and streams telemetry from power-on through recovery.**
 
 | Layer | State |
 |---|---|
-| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 226 automated checks on the host** |
+| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 328 automated checks on the host** |
 | 🟡 **Firmware drivers** | Written and compile-checked against SDK stubs — **never executed on real silicon** |
 | 🔴 **Hardware** | Components purchased. **No bring-up, no wiring, no power system, no measurement** |
 | 🔴 **Mechanical** | Structure, egg chamber and parachute **not started** — blocked on a rulebook contradiction |
@@ -388,16 +388,18 @@ bash tools/build_host.sh
 
 | Suite | Coverage | Result |
 |---|---|---|
-| `flight_tests` | 21 suites: packet format, parser, state machine, orientation, sensor math, calibration, faults, scheduler, block log, controller behaviour | ✅ **189 / 189** |
+| `flight_tests` | 24 suites: packet format, parser, state machine, orientation, sensor math, calibration, faults, scheduler, block log, controller behaviour, link profile, LoRa airtime | ✅ **258 / 258** |
 | `flight_smoke_test` | Boot, first three packets, GPS parse | ✅ Passed |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
-| Python | Parser, validator, transport, health, end-to-end pipeline | ✅ **37 / 37** |
+| Python (ground station) | Parser, validator, transport, health, end-to-end pipeline | ✅ **37 / 37** |
+| Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
 | Pico syntax | 10 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
 for byte; the BMP280 compensation reproduces the datasheet reference vector; a boost before
 arming cannot trigger a launch; invalid mandatory data suppresses a packet without
-consuming its number; `crc16_ccitt("123456789") == 0x29B1`.
+consuming its number; `crc16_ccitt("123456789") == 0x29B1`; and the vehicle and the bridge
+are proven to configure the same radio modem.
 
 **What is not covered:** real sensors, the radio link, SD media, power behaviour, the
 mechanical system, and the web console's hand-ported logic.
@@ -423,7 +425,7 @@ requirement is satisfied in flight.
 | Gyroscope and accelerometer | MPU6050 driver + datasheet scaling, tested | 🟡 Implemented, hardware unverified |
 | Roll, pitch, yaw, X/Y/Z acceleration fields | Complementary filter; yaw is relative, no magnetometer | 🟡 Implemented; yaw compliance is an open question |
 | Continuous telemetry, power-on to recovery | Automatic; continues in every state including `FAULT` | 🟡 Implemented, unverified |
-| At least one packet per second | 2 Hz default; `validate_config()` enforces a 1000 ms ceiling | 🟡 Implemented, unverified |
+| At least one packet per second | 1 Hz default, chosen from measured packet size and LoRa airtime; `validate_config()` refuses any period the radio cannot sustain | 🟡 Implemented, radio unverified |
 | Correct team identifier in every packet | Formatter enforces it; `CAN-Team-XX` is rejected | 🟢 Implemented and enforced |
 | Required packet format, numbering from `P-001` | Byte-exact formatter, tested against the rulebook example | 🟢 Implemented and tested |
 | Sync words `0xA5` launch, `0xF3` test | `RadioMode` selects it; procedure documented | 🟡 Implemented, link unverified |
@@ -484,7 +486,7 @@ firmware/
 ground-station/
   software/            Python receive pipeline + tests
   web/                 single-file browser telemetry console
-tools/                 host build, Pico syntax check, SDK stubs
+tools/                 host build, Pico syntax check, LoRa link-budget calculator, SDK stubs
 documentation/
   requirements/        rulebook, requirement checklist, gates
   design/              architecture, protocol, wiring, electrical

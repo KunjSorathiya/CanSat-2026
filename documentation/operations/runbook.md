@@ -68,7 +68,7 @@ Other tunables worth reviewing before a flight, all in
 
 | Setting | Default | Review when |
 |---|---:|---|
-| `telemetry_period_ms` | 500 | Raising the rate; 1000 is the hard ceiling for the 1 Hz minimum |
+| `telemetry_period_ms` | 1000 | Raising the rate — but read [link-budget.md](../design/link-budget.md) first: 1000 ms is both the rulebook ceiling and roughly what the SF7/125 kHz modem sustains. `validate_config()` refuses a period the radio cannot deliver |
 | `reference_pressure_pa` | 101325 | Always — set it from a field barometer reading on the day |
 | `launch_accel_mps2` / `launch_altitude_gain_m` | 30 / 15 | After the first flight data exists |
 | `arming_delay_ms` | 3000 | If the pad procedure takes longer to settle |
@@ -244,7 +244,7 @@ Link health on the ground station:
 
 | Indicator | Healthy | Investigate |
 |---|---|---|
-| Rate | Steady at the configured rate, 2 Hz by default | Falling rate means range or power trouble |
+| Rate | Steady at the configured rate, 1 Hz by default | Falling rate means range or power trouble |
 | Loss % | Near zero | Rising loss means range, antenna or orientation |
 | CRC errors | Zero | Non-zero means transport corruption, not sensor trouble |
 | Missing | Zero | Gaps in numbering mean lost packets over the air |

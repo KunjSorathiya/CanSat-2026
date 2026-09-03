@@ -221,20 +221,36 @@ The following parameters are not specified in the supplied rulebook extract and 
 
 These parameters require competition confirmation, exact RA-02 documentation, and engineering testing.
 
+Because the rulebook does not fix them, the project selects them itself, in one place, and
+documents the reasoning: [`cansat/link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp)
+holds the single definition both the flight computer and the ground-station bridge read, and
+[link-budget.md](link-budget.md) shows the airtime arithmetic behind each value. Current
+selection: 433 MHz, SF7, 125 kHz, CR 4/5, 8-symbol preamble, CRC on, 17 dBm. All remain
+provisional until confirmed against the physical RA-02 and any organiser guidance.
+
 ## Packet-Rate Design
 
-The hard requirement is at least 1 packet per second. Candidate target rates are:
+The hard requirement is at least 1 packet per second. The achievable rate is set by LoRa
+airtime, which is computed in [link-budget.md](link-budget.md) rather than chosen. For the
+real ~190-byte packet on the selected SF7 / 125 kHz modem, one transmission occupies
+**318 ms** of channel time.
 
-| Candidate | Benefit | Risk/unknown | Decision |
+| Candidate | Airtime cost at SF7/125 kHz | Assessment | Decision |
 |---:|---|---|---|
-| 1 Hz | Meets the hard minimum with the lowest airtime demand | Less temporal resolution and less margin if a packet is lost | Minimum fallback, not target |
-| 2 Hz | Gives more data and modest loss tolerance while limiting airtime growth | Requires measured airtime, packet loss, and current | Recommended v0.1 target |
-| 5 Hz | Better temporal detail | May increase airtime, collisions/interference, current, and SD workload | Evaluate only after 2 Hz is stable |
-| 10 Hz | High temporal detail | Highest airtime and processing burden; may reduce reliability | Not recommended as initial target |
+| 1 Hz | ~32 % channel occupancy | Meets the rulebook minimum with room for radio recovery and retries | **Selected default** |
+| 2 Hz | ~64 % at 125 kHz; ~32 % at 250 kHz | Only viable by widening the bandwidth (costs ~3 dB sensitivity) or shortening the packet | Upgrade path, after a hardware range test |
+| 5 Hz | Exceeds the channel at any 125/250 kHz setting | Not achievable with this packet | Rejected |
+| 10 Hz and above | Exceeds the channel by a wide margin | Not achievable with this packet | Rejected |
 
-**Recommended target:** 2 packets per second, subject to radio airtime, packet-loss, sensor-update, SD-logging, and ground-station tests. The system must fall back to no less than 1 Hz under the final documented operating conditions; the exact fallback behavior is an implementation decision.
+**Selected rate:** 1 packet per second. This is the rulebook minimum and, at the chosen
+modem settings, the fastest rate the radio sustains with meaningful margin. The firmware
+enforces the choice: `validate_config()` recomputes the packet airtime at startup and
+refuses to run with a telemetry period the radio cannot deliver, so an over-optimistic
+setting fails on the pad instead of silently under-transmitting in flight.
 
-A higher rate is not automatically better. Stability, low packet loss, mandatory-field priority, interference behavior, power consumption, and official-ground-station compatibility take precedence.
+A higher rate is not automatically better. Stability, low packet loss, mandatory-field
+priority, interference behavior, power consumption, and official-ground-station
+compatibility take precedence.
 
 ## Ground Station Contract
 
@@ -300,7 +316,7 @@ Each test record must contain a requirement reference, method, expected result, 
 | P-001 initialization | Packet numbering starts at `P-001` | Cold-start and inspect first valid transmitted packet | First valid packet is `P-001` | Packet log |
 | Sequential numbering | Numbers increment sequentially | Analyze long packet sequence | No unexpected gaps, duplicates, or resets | Packet analysis report |
 | 1 Hz minimum | At least 1 packet/s | Measure timestamps and receive intervals under representative load | Rate never violates the documented test acceptance condition | Rate and loss log |
-| Higher-rate stability | 2 Hz target and optional higher rates | Test 2, 5, and 10 Hz candidates where practical | Chosen rate is stable, low-loss, and compatible with power/airtime | Comparison report |
+| Higher-rate stability | 1 Hz default; 2 Hz over a 250 kHz modem | Range-test both profiles and compare measured loss | Chosen rate is stable, low-loss, and compatible with power/airtime | Comparison report |
 | Corrupted packets | Mandatory corruption is detected | Inject malformed fields and corrupted frames | No telemetry point is produced; fault is classified | Parser test results |
 | Missing packets | Loss is detected | Drop packets in a controlled stream | Missing sequence is recorded separately from sensor faults | Ground-station log |
 | Invalid sensor fields | Sensor-invalid data is rejected | Simulate unavailable, stale, NaN, and initialization-failure states | No malformed mandatory packet is accepted | Fault-injection results |
@@ -316,7 +332,7 @@ Each test record must contain a requirement reference, method, expected result, 
 - Whether the Pico timer timestamp is accepted as the final mission timestamp and the exact epoch/rollover policy
 - Roll, pitch, and yaw sign convention and body-frame mounting definition
 - Yaw method and whether the current MPU6050-only hardware provides an acceptable field
-- Final packet rate; 2 Hz is the recommended initial target
+- Final packet rate; 1 Hz is the selected default and the airtime-supported choice
 - Spreading factor, bandwidth, coding rate, frequency, transmit power, preamble, CRC, and retry behavior
 - Packet counter policy when sensor data is invalid
 - Line termination and character encoding

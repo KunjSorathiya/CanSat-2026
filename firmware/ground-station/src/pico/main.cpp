@@ -1,3 +1,4 @@
+#include "cansat/link_profile.hpp"
 #include "cansat/sx1278.hpp"
 #include "ground/framing.hpp"
 
@@ -23,8 +24,8 @@ constexpr std::uint32_t PIN_CS = 17;
 constexpr std::uint32_t PIN_RESET = 20;
 constexpr std::uint32_t PIN_DIO0 = 21;
 
-// Switch to 0xA5 for the official launch configuration.
-constexpr std::uint8_t SYNC_WORD = 0xF3;  // rulebook: pre-launch testing
+// Switch to cansat::link::kOfficialSyncWord for the official launch configuration.
+constexpr std::uint8_t SYNC_WORD = cansat::link::kTestSyncWord;  // rulebook: pre-launch testing
 constexpr std::uint32_t STATUS_PERIOD_MS = 1000;
 constexpr std::uint8_t MAX_RADIO_FAILURES = 20;
 
@@ -75,6 +76,9 @@ int main() {
     hal.read_dio0 = radio_dio0;
     hal.millis = radio_millis;
 
+    // Every modem parameter defaults from cansat/link_profile.hpp, the same single
+    // definition the flight computer uses. The two ends must agree exactly: a mismatched
+    // spreading factor or bandwidth receives nothing and looks like dead hardware.
     cansat::Sx1278Settings settings;
     settings.sync_word = SYNC_WORD;
 

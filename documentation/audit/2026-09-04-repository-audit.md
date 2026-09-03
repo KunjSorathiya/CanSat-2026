@@ -183,13 +183,15 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 
 | ID | Finding | Severity | Why it is open |
 |---|---|---|---|
-| **F-05** | `ground-station/software/src/ui.py` is dead code — nothing imports it, and `dashboard.py` supersedes it | Low | Deleting a file is the owner's call; recommend removal |
+| **F-05** | ~~`ground-station/software/src/ui.py` is dead code~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — file removed |
 | **F-06** | `ground-station/web/index.legacy.html` (1081 lines) is superseded | Low | Kept intentionally for reference; now labelled as such in the web README |
 | **F-07** | The web console's parser, validator, link health and CRC framing are hand-ported with **no automated tests** | Medium | Needs a JS test harness; a format change could silently desynchronise the console from the firmware |
 | **F-08** | The CI `cmake-configure` job has never been executed | Low | No CMake toolchain on this machine; the job will prove itself on the first push |
 | **F-09** | The Pico HAL and SX1278 driver have never executed | High | Requires hardware; this is the project's central open risk, already tracked as gates 3–5 |
-| **F-10** | `radio.py` is a compatibility shim with no remaining callers | Low | Harmless; documented as a shim |
-| **F-11** | `.claude/` (local tool configuration, several hundred files) is untracked and **not** in `.gitignore` | Low | A `git add .` would commit it. Whether to ignore it is a repository-policy decision for the owner |
+| **F-10** | ~~`radio.py` is a compatibility shim with no remaining callers~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — file removed |
+| **F-11** | ~~`.claude/` (local tool configuration) is untracked and **not** in `.gitignore`~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — added to `.gitignore` |
+| **F-12** | The telemetry rate was set without reference to LoRa airtime: SF9/125 kHz gives 1004 ms per packet against a 500 ms schedule | **High** | ✅ **Closed 2026-09-04 (cycle 2)** — see [link-budget.md](../design/link-budget.md); profile moved to SF7 at 1 Hz, with compile-time, startup and test guards |
+| **F-13** | The flight computer and the ground-station bridge held independent copies of the modem settings and agreed only by coincidence | **High** | ✅ **Closed 2026-09-04 (cycle 2)** — both read `cansat/link_profile.hpp`; a test compares them field by field |
 
 ---
 
@@ -343,13 +345,13 @@ Legend: ✅ verified · 🟡 partially verified · ⬜ content-only review (no e
 | Claim | Source of truth | Result |
 |---|---|---|
 | 15 GPIO assignments | `BoardPins` in `config.hpp` | ✅ |
-| Telemetry 500 ms, sensor 100 ms, SD flush 2000 ms, health 1000 ms, battery 1000 ms | `Configuration` | ✅ |
+| Telemetry 1000 ms, sensor 100 ms, SD flush 2000 ms, health 1000 ms, battery 1000 ms | `Configuration` (telemetry was 500 ms; changed in cycle 2, see F-12) | ✅ |
 | Calibration: 80 samples, 20 s timeout, 2 °/s, 1.5 m/s² | `Configuration` | ✅ |
 | Launch: 30 m/s², 15 m, 300 ms hold, 3 s arming delay | `Configuration` | ✅ |
 | Landing: 3 s minimum flight, 2.5 m/s², 1.0 m/s, 3 s hold | `Configuration` | ✅ |
 | Post-impact window 5000 ms | `Configuration` | ✅ |
 | Plausibility: 30–115 kPa, −50…95 °C, 170 m/s², 2200 °/s | `Configuration` | ✅ |
-| Radio: 433 MHz, SF9, 125 kHz, CR 4/5, 17 dBm, preamble 8, CRC on | `RadioConfig` | ✅ |
+| Radio: 433 MHz, SF7, 125 kHz, CR 4/5, 17 dBm, preamble 8, CRC on | `link_profile.hpp` (was SF9 in `RadioConfig`; changed in cycle 2, see F-12) | ✅ |
 | Sync words `0xF3` / `0xA5` | `RadioConfig` | ✅ |
 | SD 10-failure cutoff, radio 5-failure threshold, 1000 ms back-off | `Configuration` | ✅ |
 | LED periods 900 / 400 / 100 / 250 / 60 ms | `Controller::update_led` | ✅ |

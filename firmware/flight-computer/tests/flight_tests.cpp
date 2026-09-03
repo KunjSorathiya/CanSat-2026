@@ -1,4 +1,7 @@
 // Comprehensive host test suite for the CanSat flight core. No hardware required.
+#include "cansat/link_profile.hpp"
+#include "cansat/lora_airtime.hpp"
+#include "cansat/sx1278.hpp"
 #include "cansat/telemetry.hpp"
 #include "flight/config.hpp"
 #include "flight/controller.hpp"
@@ -349,13 +352,151 @@ void test_config_validation() {
 
     c.team_id = "CAN-Team-07";
     CHECK(flight::validate_config(c, why));
+    CHECK(why.empty());
 
     c.telemetry_period_ms = 2000;  // slower than 1 Hz minimum
     CHECK(!flight::validate_config(c, why));
-    c.telemetry_period_ms = 500;
+    c.telemetry_period_ms = 1000;
 
     c.post_impact_transmission_ms = 3000;  // below rulebook 5 s
     CHECK(!flight::validate_config(c, why));
+    c.post_impact_transmission_ms = 5000;
+    CHECK(flight::validate_config(c, why));
+
+    c.orientation_alpha = 1.5;
+    CHECK(!flight::validate_config(c, why));
+    c.orientation_alpha = 0.98;
+
+    c.reference_pressure_pa = 0.0;
+    CHECK(!flight::validate_config(c, why));
+    c.reference_pressure_pa = 101325.0;
+    CHECK(flight::validate_config(c, why));
+}
+
+// The airtime guard. A telemetry period the radio cannot physically sustain must be
+// rejected on the pad rather than silently under-running in flight.
+void test_config_radio_airtime_guard() {
+    std::string why;
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+
+    // Default: SF7/125 kHz, 200-byte worst case, 1 Hz -> ~318 ms airtime, ~32 % duty.
+    CHECK(flight::validate_config(c, why));
+    CHECK(approx(flight::worst_case_airtime_ms(c), 317.7, 0.5));
+    CHECK(flight::channel_duty(c) < 0.35);
+
+    // The former default of SF9 puts one packet at ~1 s of airtime: not sustainable.
+    c.radio.spreading_factor = 9;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("airtime") != std::string::npos);
+    CHECK(flight::worst_case_airtime_ms(c) > 900.0);
+
+    // SF7 at 2 Hz over 125 kHz is also refused: 318 ms in a 500 ms slot is 64 % duty.
+    c.radio.spreading_factor = 7;
+    c.telemetry_period_ms = 500;
+    CHECK(!flight::validate_config(c, why));
+
+    // Doubling the bandwidth halves the airtime and makes 2 Hz legitimate.
+    c.radio.bandwidth_hz = 250000;
+    CHECK(flight::validate_config(c, why));
+    CHECK(flight::channel_duty(c) < 0.35);
+
+    // Parameter-range rejections.
+    flight::Configuration bad;
+    bad.team_id = "CAN-Team-07";
+    bad.radio.spreading_factor = 13;
+    CHECK(!flight::validate_config(bad, why));
+    bad.radio.spreading_factor = 7;
+    bad.radio.coding_rate = 9;
+    CHECK(!flight::validate_config(bad, why));
+    bad.radio.coding_rate = 5;
+    bad.radio.preamble_length = 4;
+    CHECK(!flight::validate_config(bad, why));
+    bad.radio.preamble_length = 8;
+    bad.worst_case_packet_bytes = 256;  // beyond the LoRa FIFO
+    CHECK(!flight::validate_config(bad, why));
+    bad.worst_case_packet_bytes = 200;
+    bad.max_channel_duty = 0.0;
+    CHECK(!flight::validate_config(bad, why));
+}
+
+// The vehicle and the bridge must configure the same modem. They agree only because both
+// default from cansat/link_profile.hpp; this test is what keeps that true.
+void test_link_profile_is_shared_by_both_ends() {
+    flight::Configuration flight_config;          // vehicle side
+    cansat::Sx1278Settings bridge_settings;       // ground-station bridge side (defaults)
+
+    CHECK(flight_config.radio.frequency_hz == bridge_settings.frequency_hz);
+    CHECK(flight_config.radio.spreading_factor == bridge_settings.spreading_factor);
+    CHECK(flight_config.radio.bandwidth_hz == bridge_settings.bandwidth_hz);
+    CHECK(flight_config.radio.coding_rate == bridge_settings.coding_rate);
+    CHECK(flight_config.radio.preamble_length == bridge_settings.preamble_length);
+    CHECK(flight_config.radio.enable_crc == bridge_settings.enable_crc);
+    CHECK(flight_config.radio.test_sync_word == bridge_settings.sync_word);
+
+    // The rulebook fixes only these two identities.
+    CHECK(flight_config.radio.test_sync_word == 0xF3);
+    CHECK(flight_config.radio.official_sync_word == 0xA5);
+    CHECK(flight::sync_word(flight_config) == 0xF3);
+    flight_config.radio_mode = flight::RadioMode::official;
+    CHECK(flight::sync_word(flight_config) == 0xA5);
+
+    // The profile's own arithmetic, checked at runtime as well as by its static_asserts.
+    CHECK(cansat::link::kChannelDuty <= cansat::link::kMaxChannelDuty);
+    CHECK(cansat::link::kTelemetryPeriodMs <= 1000);
+    CHECK(approx(cansat::link::kWorstCaseAirtimeMs,
+                 cansat::lora_time_on_air_ms(cansat::link::kWorstCasePacketBytes,
+                                             cansat::link::kModem),
+                 1e-9));
+}
+
+// Pins the C++ airtime model to the same published SX127x reference vectors as
+// tools/link_budget.py. If these drift apart, every rate decision built on them is wrong.
+void test_lora_airtime_reference_vectors() {
+    cansat::LoraModemParams p;
+    p.spreading_factor = 7;
+    p.bandwidth_hz = 125000;
+    p.coding_rate = 5;
+    p.preamble_symbols = 8;
+    CHECK(approx(cansat::lora_time_on_air_ms(13, p), 46.336, 1e-3));
+
+    p.spreading_factor = 12;
+    CHECK(approx(cansat::lora_time_on_air_ms(13, p), 1155.072, 1e-3));
+    CHECK(cansat::lora_uses_low_data_rate_optimize(p));  // 32.768 ms symbols
+
+    p.spreading_factor = 10;
+    CHECK(!cansat::lora_uses_low_data_rate_optimize(p));  // 8.192 ms symbols
+    CHECK(cansat::lora_payload_symbols(1, p) == 13);
+
+    // A short payload at a high spreading factor drives the formula negative; the model
+    // must clamp to the eight header symbols rather than wrapping.
+    p.spreading_factor = 12;
+    p.crc_enabled = false;
+    CHECK(cansat::lora_payload_symbols(0, p) >= 8);
+
+    // Airtime must be monotonic in payload length and fall as SF falls.
+    cansat::LoraModemParams q;
+    q.spreading_factor = 9;
+    double previous = 0.0;
+    for (std::size_t n = 0; n <= 200; n += 20) {
+        const double toa = cansat::lora_time_on_air_ms(n, q);
+        CHECK(toa >= previous);
+        previous = toa;
+    }
+    cansat::LoraModemParams slow = q;
+    slow.spreading_factor = 12;
+    CHECK(cansat::lora_time_on_air_ms(188, slow) > cansat::lora_time_on_air_ms(188, q));
+
+    // 30 Hz of full telemetry is not reachable on any standard setting — the project
+    // runs sensors fast and the radio at the rate the channel allows.
+    for (std::uint8_t sf = 7; sf <= 12; ++sf) {
+        for (std::uint32_t bw : {125000u, 250000u, 500000u}) {
+            cansat::LoraModemParams r;
+            r.spreading_factor = sf;
+            r.bandwidth_hz = bw;
+            CHECK(cansat::lora_max_rate_hz(188, r, 1.0) < 30.0);
+        }
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -447,6 +588,7 @@ void test_controller_sequence_and_degradation() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
     c.telemetry_period_ms = 500;
+    c.radio.bandwidth_hz = 250000;  // 2 Hz needs the wider modem (link-budget.md)
     flight::test::MockImu imu;
     flight::test::MockBarometer baro;
     flight::test::MockGps gps;
@@ -495,6 +637,7 @@ void test_controller_sensor_failure_suppresses_but_continues() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
     c.telemetry_period_ms = 500;
+    c.radio.bandwidth_hz = 250000;  // 2 Hz needs the wider modem (link-budget.md)
     c.sensor_stale_after_ms = 400;
     flight::test::MockImu imu;
     flight::test::MockBarometer baro;
@@ -524,6 +667,7 @@ static flight::Configuration fast_arm_config() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
     c.telemetry_period_ms = 500;
+    c.radio.bandwidth_hz = 250000;  // 2 Hz needs the wider modem (link-budget.md)
     c.sensor_period_ms = 100;
     c.launch_accel_mps2 = 30.0;
     c.launch_confirm_ms = 100;
@@ -625,6 +769,7 @@ void test_controller_sensor_plausibility() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
     c.telemetry_period_ms = 500;
+    c.radio.bandwidth_hz = 250000;  // 2 Hz needs the wider modem (link-budget.md)
     c.sensor_stale_after_ms = 100000;  // isolate the plausibility path from staleness
     flight::test::MockImu imu;
     flight::test::MockBarometer baro;
@@ -668,6 +813,9 @@ int main() {
     test_state_machine_full_mission();
     test_state_machine_fault_paths();
     test_config_validation();
+    test_config_radio_airtime_guard();
+    test_link_profile_is_shared_by_both_ends();
+    test_lora_airtime_reference_vectors();
     test_telemetry_builder();
     test_raw_block_log();
     test_controller_sequence_and_degradation();

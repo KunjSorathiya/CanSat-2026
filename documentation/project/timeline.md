@@ -73,10 +73,11 @@ timeline
 | Area | Delivered | Evidence |
 |---|---|---|
 | Telemetry protocol | Rulebook format, strict parser, precision rules, optional fields | [telemetry-protocol.md](../design/telemetry-protocol.md) |
-| Flight core | Controller, state machine, scheduler, orientation, calibration, faults, builder, block log, NMEA parser | 21 C++ suites, 189 assertions |
+| Flight core | Controller, state machine, scheduler, orientation, calibration, faults, builder, block log, NMEA parser, link profile and airtime guard | 24 C++ suites, 258 assertions |
 | Sensor drivers | MPU6050, BMP280, NEO-6M, microSD, SX1278 | Compile-checked against SDK stubs |
 | Ground bridge | Continuous RX, CRC framing, status lines, watchdog | Framing unit-tested |
 | Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI | 37 Python tests |
+| Tooling | LoRa time-on-air calculator used for the packet-rate decision | 33 Python tests |
 | Web console | Single-file console with demo, file replay and Web Serial | Manual use |
 | Documentation | Requirements, hardware, electrical, protocol, architecture, wiring, testing, operations | This directory |
 

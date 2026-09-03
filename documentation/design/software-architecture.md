@@ -181,7 +181,7 @@ flowchart TD
     F -- no --> H["run_calibration"]
     G --> H
     H --> I["feed_state_machine"]
-    I --> J{"telemetry task due? 500 ms"}
+    I --> J{"telemetry task due? 1000 ms"}
     J -- yes --> K["emit_telemetry"]
     J -- no --> L{"SD flush due? 2000 ms"}
     K --> L
@@ -455,7 +455,7 @@ packet file, or a live Web Serial connection to the bridge Pico.
 |---|---:|---|---|
 | Main tick | 5 ms | `main.cpp` | The loop is non-blocking; the delay only yields |
 | Sensor acquisition and orientation | 100 ms | `sensor_period_ms` | 10 Hz attitude update |
-| Telemetry packet | 500 ms | `telemetry_period_ms` | 2 Hz target; **1000 ms is the enforced ceiling** for the 1 Hz rulebook minimum |
+| Telemetry packet | 1000 ms | `telemetry_period_ms` | 1 Hz — the fastest the SF7/125 kHz modem sustains with duty margin. **1000 ms is also the enforced ceiling** for the rulebook minimum. See [link-budget.md](link-budget.md) |
 | SD flush | 2000 ms | `sd_flush_period_ms` | Appends happen per packet; this is the sync |
 | Battery sample | 1000 ms | `battery_period_ms` | |
 | Health refresh | 1000 ms | `health_period_ms` | |
@@ -495,7 +495,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, state machine, calibration | **Verified on host** — 21 C++ suites with 189 assertions, plus 37 Python tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, state machine, calibration, radio airtime | **Verified on host** — 24 C++ suites with 258 assertions, plus 70 Python tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |

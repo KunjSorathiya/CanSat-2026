@@ -8,6 +8,51 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 2)
+
+Radio reality check. The telemetry rate was never derived from the radio's actual
+capability, and the two ends of the link kept separate copies of the modem settings. Both
+are now single-sourced, computed, and enforced by the build.
+
+### Fixed — the telemetry rate could not have been met
+
+- **The configured 2 Hz was physically impossible.** At the previous provisional default of
+  SF9 / 125 kHz, one real telemetry packet (188 bytes measured, 200 budgeted) occupies
+  **1004 ms** of LoRa airtime. The scheduler was set to a 500 ms period, so the vehicle
+  would have transmitted at roughly 1 Hz — below the rulebook minimum once any retry or
+  recovery was needed — while every document claimed 2 Hz. Changed to **SF7 / 125 kHz at a
+  1000 ms period**: 318 ms airtime, ~32 % channel occupancy, full margin for recovery. The
+  arithmetic, the range-margin justification and the 2 Hz upgrade path are in
+  [link-budget.md](documentation/design/link-budget.md).
+- **The flight computer and the ground-station bridge could silently disagree on the
+  modem.** The bridge built `Sx1278Settings` from struct defaults while the vehicle used
+  `RadioConfig`; they matched only by coincidence, and changing one would have produced a
+  dead link indistinguishable from broken hardware. Both now read one definition,
+  `cansat/link_profile.hpp`, and a test compares them field by field.
+
+### Added
+
+- **`cansat/lora_airtime.hpp`** — `constexpr` Semtech SX1276/78 time-on-air model. Pinned
+  to two published reference vectors (46.336 ms and 1155.072 ms).
+- **`cansat/link_profile.hpp`** — the single radio link profile, with `static_assert`s that
+  refuse to compile a profile whose worst-case packet cannot be transmitted on schedule.
+- **`tools/link_budget.py`** — design-time airtime and rate-feasibility calculator with a
+  spreading-factor sweep, plus **33 tests** in `tools/tests/`, now run by
+  `tools/build_host.sh`.
+- **Startup airtime guard** — `validate_config()` recomputes the packet airtime for the
+  runtime configuration and refuses an impossible telemetry period, naming the airtime, the
+  minimum viable period and the design document. It also range-checks every modem parameter.
+- **Three new C++ suites** — the airtime reference vectors, the airtime guard, and the
+  shared-profile agreement between vehicle and bridge. Host total: **258 assertions**.
+
+### Removed
+
+- `ground-station/software/src/ui.py` — dead code superseded by `dashboard.py` (audit F-05).
+- `ground-station/software/src/radio.py` — compatibility shim with no callers (audit F-10).
+- `.claude/` (local tool configuration) is now git-ignored (audit F-11).
+
+---
+
 ## [Unreleased] — 2026-09-04
 
 Working tree, not yet committed. The software layer went from "planned" to "implemented

@@ -310,9 +310,11 @@ Two open items:
 - **Never power a LoRa module without its antenna attached.** Transmitting into an open
   connector can damage the output stage.
 
-Radio parameters — 433 MHz, SF9, 125 kHz bandwidth, coding rate 4/5, 17 dBm, CRC on — are
-provisional engineering defaults in `RadioConfig`. Only the sync words are fixed by the
-rulebook: **`0xF3` for testing, `0xA5` for the official launch.**
+Radio parameters — 433 MHz, **SF7**, 125 kHz bandwidth, coding rate 4/5, 17 dBm, CRC on — live
+in one place, [`cansat/link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp),
+read by both the vehicle and the ground-station bridge. The spreading factor is set by
+airtime, not preference: see [link-budget.md](link-budget.md). Only the sync words are fixed
+by the rulebook: **`0xF3` for testing, `0xA5` for the official launch.**
 
 ---
 

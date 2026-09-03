@@ -15,6 +15,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | Know what is built and what is next | [Project Timeline](project/timeline.md) |
 | Run the ground station or a launch | [Operations Runbook](operations/runbook.md) |
 | Know what is tested | [Test Plan](testing/test-plan.md) |
+| Understand why telemetry runs at 1 Hz | [Link Budget](design/link-budget.md) |
 | See what changed recently | [Changelog](../CHANGELOG.md) |
 | Check the project against its own claims | [Repository Audit](audit/2026-09-04-repository-audit.md) |
 
@@ -37,6 +38,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | [telemetry-protocol.md](design/telemetry-protocol.md) | Wire format, field precision, validation policy, radio configuration, ground-station contract |
 | [wiring.md](design/wiring.md) | Signal wiring for both Picos, pin table, bus-sharing rules, power tree, bring-up order |
 | [electrical-architecture.md](design/electrical-architecture.md) | Power topology, regulation analysis, grounding, decoupling, power budget, electrical risks |
+| [link-budget.md](design/link-budget.md) | LoRa airtime arithmetic, the spreading-factor and packet-rate decision, range margin, and the guards that enforce them |
 
 ## Hardware
 

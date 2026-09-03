@@ -3,21 +3,22 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "cansat/link_profile.hpp"
+
 namespace cansat {
 
-// Radio parameters shared by the flight computer and the ground-station bridge. Only the
-// sync words are fixed by the competition rulebook; every other value is a provisional
-// engineering default and must be confirmed against the RA-02 carrier and competition
-// guidance before flight.
+// Radio parameters shared by the flight computer and the ground-station bridge. Every
+// default comes from the single link profile in `cansat/link_profile.hpp` so that the two
+// ends of the link cannot drift apart — a modem mismatch is a silent, total link failure.
 struct Sx1278Settings {
-    std::uint32_t frequency_hz = 433000000;
-    std::int8_t tx_power_dbm = 17;      // 2..17 via PA_BOOST, up to 20 with PA_DAC
-    std::uint8_t spreading_factor = 9;  // 6..12
-    std::uint32_t bandwidth_hz = 125000;
-    std::uint8_t coding_rate = 5;       // 5..8  => 4/5 .. 4/8
-    std::uint16_t preamble_length = 8;
-    bool enable_crc = true;
-    std::uint8_t sync_word = 0xF3;      // rulebook: test = 0xF3, official = 0xA5
+    std::uint32_t frequency_hz = link::kFrequencyHz;
+    std::int8_t tx_power_dbm = link::kTxPowerDbm;  // 2..17 via PA_BOOST, up to 20 with PA_DAC
+    std::uint8_t spreading_factor = link::kSpreadingFactor;  // 6..12
+    std::uint32_t bandwidth_hz = link::kBandwidthHz;
+    std::uint8_t coding_rate = link::kCodingRate;  // 5..8  => 4/5 .. 4/8
+    std::uint16_t preamble_length = link::kPreambleSymbols;
+    bool enable_crc = link::kEnableCrc;
+    std::uint8_t sync_word = link::kTestSyncWord;  // rulebook: test = 0xF3, official = 0xA5
 };
 
 // Hardware bindings the driver needs. Supplied by the platform (Pico SDK on the vehicle,

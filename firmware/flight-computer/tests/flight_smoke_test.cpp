@@ -19,9 +19,11 @@ int main() {
     assert(controller.initialize());
     assert(board.led_on);
     assert(radio.sync_word_ == 0xF3);
+    // Default telemetry period is 1000 ms: the radio cannot sustain faster with the
+    // default SF7/125 kHz modem (documentation/design/link-budget.md).
     controller.poll(0);
-    controller.poll(500);
     controller.poll(1000);
+    controller.poll(2000);
     assert(radio.packets.size() == 3);
     assert(radio.packets.front().find("CAN-Team-01; P-001; Ti-00:00:00:000;") == 0);
     assert(radio.packets.back().find("P-003") != std::string::npos);

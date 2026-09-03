@@ -52,9 +52,10 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 21 suites across the whole flight core | ✅ **189 / 189 assertions** |
+| `flight_tests` | 24 suites across the whole flight core | ✅ **258 / 258 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 5 modules | ✅ **37 / 37 tests** |
+| Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Pico syntax check | 10 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `pico_hal`, `pico_radio`, `mpu6050`,
@@ -106,7 +107,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 21 suites, 189 assertions
+### `flight_tests` — 24 suites, 258 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -196,6 +197,8 @@ Three things exist in more than one language and must not drift:
 | Packet format and parsing | [`telemetry.cpp`](../../firmware/common/src/telemetry.cpp), [`telemetry.py`](../../ground-station/software/src/telemetry.py), `index.html` | Both suites parse the same rulebook example packet and enforce identical precision rules |
 | CRC-16/CCITT framing | [`framing.cpp`](../../firmware/ground-station/src/framing.cpp), [`transport.py`](../../ground-station/software/src/transport.py), `index.html` | The same known-answer vector `0x29B1` is asserted in both suites |
 | Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Shared test packets; the web console is a direct port |
+| LoRa airtime model | [`lora_airtime.hpp`](../../firmware/common/include/cansat/lora_airtime.hpp), [`link_budget.py`](../../tools/link_budget.py) | Both are asserted against the same two published SX127x reference vectors (46.336 ms and 1155.072 ms) |
+| Radio modem parameters | [`link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp) — read by the vehicle *and* the bridge | `test_link_profile_is_shared_by_both_ends()` compares the two ends field by field; a mismatch is a silent, total link failure |
 
 > [!NOTE]
 > The web console's ports are **not** covered by an automated suite. If the packet format
@@ -213,7 +216,7 @@ Three things exist in more than one language and must not drift:
 | Web console | No JS test harness in the repository | Medium — it is a port, and ports drift. Verified manually in a browser on 2026-09-04: demo mission ran to `RECOVERY`, rate steady at 2.00 Hz through the injected drop and duplicate, no console errors, both themes legible |
 | Tk dashboard | Needs a display | Low |
 | CMake build | No CMake toolchain on the development machine; the host script uses `g++` directly | Low — exercised by the CI `cmake-configure` job |
-| Timing under real load | Host tests use a synthetic clock | Medium — the 2 Hz budget is untested on hardware |
+| Timing under real load | Host tests use a synthetic clock | Medium — the 1 Hz airtime budget is arithmetic ([link-budget.md](../design/link-budget.md)); nothing has been measured on a radio |
 
 ---
 
@@ -232,10 +235,10 @@ Sequence follows the [bring-up order](../design/wiring.md#bring-up-order).
 | 6 | GPS | Raw NMEA received; fix acquired outdoors; checksum errors near zero | ⬜ |
 | 7 | RA-02 identity | Chip version register reads back correctly over SPI | ⬜ |
 | 8 | Bench link | Packets received end to end at sync word `0xF3` | ⬜ |
-| 9 | Range test | Acceptable loss at the expected launch distance, antenna as flown | ⬜ |
+| 9 | Range test | Acceptable loss at the expected launch distance, antenna as flown; log RSSI, SNR and loss against distance to validate [link-budget.md](../design/link-budget.md) | ⬜ |
 | 10 | microSD alone | Block read and write on its own supply | ⬜ |
 | 11 | Shared SPI | Radio and SD both work with the other present; MISO releases correctly | ⬜ |
-| 12 | Packet rate | Sustained 2 Hz with no gaps in numbering | ⬜ |
+| 12 | Packet rate | Sustained 1 Hz with no gaps in numbering; measured airtime within 10 % of the computed 318 ms | ⬜ |
 | 13 | Battery power | Current draw measured; no brownout during a transmit peak | ⬜ |
 | 14 | Battery endurance | Runtime from full charge to cutoff, measured | ⬜ |
 | 15 | Watchdog recovery | Forced hang reboots and telemetry resumes automatically | ⬜ |

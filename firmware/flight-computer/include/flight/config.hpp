@@ -1,7 +1,11 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
+
+#include "cansat/link_profile.hpp"
+#include "cansat/lora_airtime.hpp"
 
 namespace flight {
 
@@ -34,16 +38,22 @@ enum class FaultSeverity { warning, error, critical };
 // Centralised radio parameters. Only the sync words are fixed by the rulebook; every
 // other LoRa parameter below is a provisional engineering default and must be confirmed
 // against the RA-02 carrier and competition guidance before flight.
+//
+// The spreading factor is NOT a free choice: a ~190-byte telemetry packet takes 943 ms of
+// airtime at SF9/125 kHz, which cannot meet the 1 Hz rulebook minimum with any margin. SF7
+// brings the same packet to 302 ms (~30 % channel occupancy at 1 Hz). `validate_config()`
+// recomputes this from `cansat/lora_airtime.hpp` and refuses an impossible combination —
+// see documentation/design/link-budget.md.
 struct RadioConfig {
-    std::uint32_t frequency_hz = 433000000;  // PROVISIONAL: 433 MHz band, exact channel TBD
-    std::int8_t tx_power_dbm = 17;            // PROVISIONAL
-    std::uint8_t spreading_factor = 9;        // PROVISIONAL (SF7..SF12)
-    std::uint32_t bandwidth_hz = 125000;      // PROVISIONAL
-    std::uint8_t coding_rate = 5;             // PROVISIONAL denominator 4/5..4/8 -> 5..8
-    std::uint16_t preamble_length = 8;        // PROVISIONAL
-    bool enable_crc = true;                   // PROVISIONAL
-    std::uint8_t test_sync_word = 0xF3;       // rulebook: pre-launch testing
-    std::uint8_t official_sync_word = 0xA5;   // rulebook: official launch
+    std::uint32_t frequency_hz = cansat::link::kFrequencyHz;
+    std::int8_t tx_power_dbm = cansat::link::kTxPowerDbm;
+    std::uint8_t spreading_factor = cansat::link::kSpreadingFactor;  // 6..12
+    std::uint32_t bandwidth_hz = cansat::link::kBandwidthHz;
+    std::uint8_t coding_rate = cansat::link::kCodingRate;  // denominator 4/5..4/8 -> 5..8
+    std::uint16_t preamble_length = cansat::link::kPreambleSymbols;
+    bool enable_crc = cansat::link::kEnableCrc;
+    std::uint8_t test_sync_word = cansat::link::kTestSyncWord;
+    std::uint8_t official_sync_word = cansat::link::kOfficialSyncWord;
 };
 
 struct Configuration {
@@ -53,8 +63,15 @@ struct Configuration {
     std::string team_id = "CAN-Team-XX";
 
     // ---- Scheduling (milliseconds) -----------------------------------------
-    std::uint32_t telemetry_period_ms = 500;  // 2 Hz target; hard cap 1000 (1 Hz minimum)
-    std::uint32_t sensor_period_ms = 100;     // sensor acquisition + orientation update
+    // Radio and sensor rates are deliberately decoupled. Sensors and the state estimator
+    // run fast enough for flight dynamics; the radio runs as fast as its airtime allows.
+    //
+    // 1000 ms = 1 Hz, the rulebook minimum, at ~32 % channel occupancy with the default
+    // SF7/125 kHz modem. 2 Hz is only reachable with a wider bandwidth or a shorter
+    // packet — validate_config() rejects the combinations that are not physically
+    // achievable rather than letting the scheduler silently under-run.
+    std::uint32_t telemetry_period_ms = cansat::link::kTelemetryPeriodMs;  // cap 1000
+    std::uint32_t sensor_period_ms = 100;      // sensor acquisition + orientation update
     std::uint32_t sd_flush_period_ms = 2000;
     std::uint32_t health_period_ms = 1000;
     std::uint32_t battery_period_ms = 1000;
@@ -65,9 +82,17 @@ struct Configuration {
     std::uint32_t radio_recovery_backoff_ms = 1000;   // spacing between bounded re-init attempts
     std::uint8_t radio_max_consecutive_failures = 5;  // TX failures before a radio fault + re-init
 
+    // Airtime budget. `worst_case_packet_bytes` is the longest packet the builder can emit
+    // (team id + 12 mandatory fields + GPS + diagnostics measures 188 bytes; 200 leaves
+    // headroom for a longer team id and a five-digit packet number). `max_channel_duty` is
+    // the largest fraction of the channel one packet per telemetry period may occupy —
+    // the rest is margin for radio recovery, retries and the receiver's own timing.
+    std::size_t worst_case_packet_bytes = cansat::link::kWorstCasePacketBytes;
+    double max_channel_duty = cansat::link::kMaxChannelDuty;
+
     // Legacy flat aliases kept for older call sites / tests.
-    std::uint8_t test_sync_word = 0xF3;
-    std::uint8_t official_sync_word = 0xA5;
+    std::uint8_t test_sync_word = cansat::link::kTestSyncWord;
+    std::uint8_t official_sync_word = cansat::link::kOfficialSyncWord;
 
     // ---- Sensor validity -------------------------------------------------------
     std::uint32_t sensor_stale_after_ms = 2000;
@@ -146,6 +171,29 @@ inline float battery_divider_ratio(const Configuration& config) {
     if (config.battery_divider_ratio > 0.0f) return config.battery_divider_ratio;
     if (config.battery_adc_scale > 0.0f) return config.battery_adc_scale;
     return 0.0f;
+}
+
+// The configured modem, in the shared airtime model's terms.
+inline cansat::LoraModemParams modem_params(const Configuration& config) {
+    cansat::LoraModemParams p;
+    p.spreading_factor = config.radio.spreading_factor;
+    p.bandwidth_hz = config.radio.bandwidth_hz;
+    p.coding_rate = config.radio.coding_rate;
+    p.preamble_symbols = config.radio.preamble_length;
+    p.explicit_header = true;
+    p.crc_enabled = config.radio.enable_crc;
+    return p;
+}
+
+// Airtime of the longest packet this configuration can transmit, in milliseconds.
+inline double worst_case_airtime_ms(const Configuration& config) {
+    return cansat::lora_time_on_air_ms(config.worst_case_packet_bytes, modem_params(config));
+}
+
+// Fraction of the channel the telemetry schedule occupies (1.0 = continuously talking).
+inline double channel_duty(const Configuration& config) {
+    return cansat::lora_channel_duty(config.worst_case_packet_bytes, modem_params(config),
+                                     config.telemetry_period_ms);
 }
 
 // Cheap sanity check for a configuration before the mission loop starts. Returns false
