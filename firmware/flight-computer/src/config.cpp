@@ -51,6 +51,27 @@ bool validate_config(const Configuration& config, std::string& why) {
         why = "baro_standby_ms must be non-negative";
         return false;
     }
+    if (config.loop_tick_ms == 0) {
+        why = "loop_tick_ms must be non-zero";
+        return false;
+    }
+    // The GPS is drained once per loop tick from a hardware FIFO that keeps filling. A tick
+    // longer than the FIFO takes to fill loses NMEA bytes before anything reads them, which
+    // shows up as truncated sentences and checksum errors rather than as an obvious fault.
+    // Half the fill time leaves margin for a late tick.
+    const double fifo_ms = uart_fifo_fill_ms(config.gps_baud, config.gps_uart_fifo_bytes);
+    if (fifo_ms > 0.0 && static_cast<double>(config.loop_tick_ms) > fifo_ms / 2.0) {
+        why = "loop_tick_ms " + std::to_string(config.loop_tick_ms) +
+              " is too slow to drain the GPS UART: its " +
+              std::to_string(config.gps_uart_fifo_bytes) + "-byte FIFO fills in " +
+              to_int_string(fifo_ms) + " ms at " + std::to_string(config.gps_baud) +
+              " baud (see documentation/design/sensor-rates.md)";
+        return false;
+    }
+    if (config.sensor_period_ms < config.loop_tick_ms) {
+        why = "sensor_period_ms cannot be shorter than loop_tick_ms";
+        return false;
+    }
     if (config.post_impact_transmission_ms < 5000) {
         why = "post_impact_transmission_ms must be >= 5000 (rulebook post-impact minimum)";
         return false;

@@ -77,6 +77,14 @@ struct Configuration {
     // the IMU at 200 Hz. validate_config() refuses a period the barometer cannot keep up
     // with, because re-reading an unchanged conversion reads as zero climb rate.
     std::uint32_t sensor_period_ms = 33;       // sensor acquisition + orientation update
+    // How long main() sleeps between poll() calls. Two independent limits bound it:
+    //
+    //  * it sets the scheduling jitter on every task above (2 ms is under 6 % of the 33 ms
+    //    sensor tick), and
+    //  * the GPS is drained once per tick from the RP2040's 32-byte UART FIFO. At 9600
+    //    baud, 8N1, that FIFO fills in 33 ms — so a tick at or above that silently loses
+    //    NMEA bytes and truncates sentences. validate_config() enforces the margin.
+    std::uint32_t loop_tick_ms = 2;
     std::uint32_t sd_flush_period_ms = 2000;
     std::uint32_t health_period_ms = 1000;
     std::uint32_t battery_period_ms = 1000;
@@ -182,6 +190,10 @@ struct Configuration {
     // ---- SD logging -------------------------------------------------------
     std::uint8_t sd_max_failures = 10;    // consecutive write failures before SD logging is disabled
 
+    // ---- GPS ---------------------------------------------------------------
+    std::uint32_t gps_baud = 9600;          // NEO-6M default
+    std::uint32_t gps_uart_fifo_bytes = 32; // RP2040 UART FIFO depth
+
     // ---- GPS optional-field precision (rulebook unspecified) --------------
     int gps_latlon_decimals = 6;
     int gps_alt_decimals = 1;
@@ -202,6 +214,15 @@ inline float battery_divider_ratio(const Configuration& config) {
     if (config.battery_divider_ratio > 0.0f) return config.battery_divider_ratio;
     if (config.battery_adc_scale > 0.0f) return config.battery_adc_scale;
     return 0.0f;
+}
+
+// Time to fill the RP2040's UART FIFO at the GPS baud rate, in milliseconds. The GPS is
+// drained once per loop tick, so the tick must stay comfortably below this or NMEA bytes
+// are lost before anything reads them.
+inline constexpr double uart_fifo_fill_ms(std::uint32_t baud, std::uint32_t fifo_bytes = 32) {
+    if (baud == 0) return 0.0;
+    // 8N1 framing: 10 bits on the wire per byte.
+    return 1000.0 * static_cast<double>(fifo_bytes) * 10.0 / static_cast<double>(baud);
 }
 
 // The configured modem, in the shared airtime model's terms.

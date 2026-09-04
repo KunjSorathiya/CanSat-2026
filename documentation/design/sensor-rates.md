@@ -32,7 +32,7 @@ is tied to it. Each stage runs at the rate its own physics allows:
 
 | Stage | Rate | Bounded by | Configured by |
 |---|---:|---|---|
-| Main loop tick | 500 Hz (2 ms) | Nothing — the loop is non-blocking | `main.cpp` |
+| Main loop tick | 500 Hz (2 ms) | Scheduling jitter, and the GPS UART FIFO | `loop_tick_ms` |
 | Sensor acquisition, orientation, altitude rate | **30 Hz** (33 ms) | Barometer conversion time | `sensor_period_ms` |
 | Mission state machine | 30 Hz, fed each acquisition | — | — |
 | Battery, health | 1 Hz | Nothing meaningful changes faster | `battery_period_ms`, `health_period_ms` |
@@ -149,9 +149,29 @@ the claim here is that the work is bounded and small, not that a figure was obse
 
 ## Loop scheduling
 
-The main loop is non-blocking and yields for 2 ms per tick. The shortest scheduled task is
-the 33 ms acquisition, so the tick sets the scheduling jitter: **up to 2 ms, under 6 % of
-the acquisition period.** The previous 5 ms tick would have been 15 %.
+The main loop is non-blocking and yields for `loop_tick_ms` — **2 ms** — per tick. Two
+independent limits bound that number from above, and the second is easy to miss:
+
+**1. Scheduling jitter.** The shortest scheduled task is the 33 ms acquisition, so the tick
+sets the jitter on every task: 2 ms is **under 6 %** of the acquisition period. The previous
+5 ms tick would have been 15 %.
+
+**2. The GPS UART FIFO.** The GPS is drained once per tick, and the RP2040's UART FIFO is
+**32 bytes deep**. At 9600 baud, 8N1 — ten bits on the wire per byte — that FIFO fills in:
+
+```text
+32 bytes × 10 bits ÷ 9600 baud = 33.3 ms
+```
+
+A tick at or beyond that silently loses NMEA bytes *before anything reads them*. The symptom
+is not an obvious fault: it is truncated sentences, rising checksum errors, and a GPS that
+seems unreliable for no visible reason. `validate_config()` therefore refuses a tick above
+**half** the fill time, leaving margin for a late tick. At 2 ms the margin is 16×.
+
+This limit tightens if the GPS is ever reconfigured to a faster baud rate: at 115200 baud the
+FIFO fills in 2.8 ms, and only a 1 ms tick would pass. Both `gps_baud` and
+`gps_uart_fifo_bytes` are configuration fields so the check follows the hardware rather than
+a comment.
 
 `PeriodicTask` re-anchors after a stall rather than firing a catch-up burst, so a long tick
 delays one acquisition instead of triggering several back to back.
@@ -160,7 +180,7 @@ delays one acquisition instead of triggering several back to back.
 
 | Layer | What it prevents |
 |---|---|
-| `validate_config()` | An acquisition period shorter than the barometer's worst-case conversion time |
+| `validate_config()` | An acquisition period shorter than the barometer's worst-case conversion time, and a loop tick too slow to drain the GPS UART before its FIFO overflows |
 | Controller pressure-change check | A stalled or slow barometer biasing vertical speed toward zero |
 | `test_sensor_timing_model()` | The timing model drifting from the datasheet's published presets |
 | `test_config_sensor_rate_guard()` | The default configuration silently becoming unachievable |

@@ -52,13 +52,13 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 37 suites across the whole flight core | ✅ **546 / 546 assertions** |
+| `flight_tests` | 38 suites across the whole flight core | ✅ **557 / 557 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 8 modules | ✅ **80 / 80 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, rulebook constants | ✅ **56 / 56 claims** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants | ✅ **61 / 61 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **30 / 30 tests** |
 | Pico syntax check | 10 translation units | ✅ All OK |
 
@@ -111,7 +111,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 37 suites, 546 assertions
+### `flight_tests` — 38 suites, 557 assertions
 
 | Suite | What it proves |
 |---|---|

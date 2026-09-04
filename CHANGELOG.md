@@ -8,6 +8,33 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 21)
+
+### Fixed — the loop tick had a second upper bound nobody had written down
+
+The 2 ms main-loop tick was chosen for scheduling jitter. It has a second, harder limit that
+existed only as an accident of the number happening to be small enough: **the GPS is drained
+once per tick from a 32-byte hardware FIFO that keeps filling.** At 9600 baud, 8N1, that FIFO
+fills in **33.3 ms** — so a tick at or beyond that loses NMEA bytes before anything reads
+them. The symptom would not look like a timing bug: truncated sentences, rising checksum
+errors, and a GPS that seems unreliable for no visible reason.
+
+Someone raising the tick to 50 ms to save power would have hit it, with nothing in the code
+or the documents to warn them.
+
+- `loop_tick_ms` is now a configuration field rather than a literal in `main()`.
+- `validate_config()` refuses a tick above **half** the FIFO fill time, and refuses one
+  slower than the sensor period.
+- `gps_baud` and `gps_uart_fifo_bytes` are configuration too, so the check follows the
+  hardware: at 115200 baud the FIFO fills in 2.8 ms and only a 1 ms tick passes.
+- The constraint is written up in [sensor-rates.md](documentation/design/sensor-rates.md)
+  with the arithmetic, and `check_doc_claims.py` now verifies the documents quote the same
+  fill time the formula produces.
+
+Eleven new assertions, and the documented-claim count rises to 61.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 20)
 
 ### Added — the bring-up record

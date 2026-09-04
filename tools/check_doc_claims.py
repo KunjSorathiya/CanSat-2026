@@ -123,8 +123,25 @@ def main() -> int:
     bridge_main = read("firmware/ground-station/src/pico/main.cpp")
     checker.check("flight watchdog is 2000 ms", "watchdog_enable(2000" in flight_main)
     checker.check("bridge watchdog is 3000 ms", "watchdog_enable(3000" in bridge_main)
-    checker.check("flight loop ticks every 2 ms", "tick_delay_ms(2)" in flight_main)
-    checker.check("architecture states the 2 ms tick", "2 ms tick" in architecture)
+    # The tick is configuration now, and main() passes it through rather than hard-coding it.
+    tick_ms = constant(config, "loop_tick_ms")
+    checker.check("config: 2 ms loop tick", tick_ms == 2, str(tick_ms))
+    checker.check("flight main uses the configured tick",
+                  "tick_delay_ms(config.loop_tick_ms)" in flight_main)
+    checker.check(f"architecture states the {tick_ms} ms tick",
+                  f"{tick_ms} ms tick" in architecture or f"| {tick_ms} ms |" in architecture)
+
+    # The tick must stay under half the GPS UART FIFO fill time, and the documents that
+    # explain why must quote the same number the formula produces.
+    gps_baud = constant(config, "gps_baud")
+    fifo_bytes = constant(config, "gps_uart_fifo_bytes")
+    fifo_ms = 1000.0 * (fifo_bytes or 32) * 10.0 / (gps_baud or 9600)
+    checker.check("config: GPS at 9600 baud", gps_baud == 9600, str(gps_baud))
+    checker.check("config: 32-byte UART FIFO", fifo_bytes == 32, str(fifo_bytes))
+    checker.check(f"loop tick is under half the {fifo_ms:.1f} ms FIFO fill time",
+                  (tick_ms or 0) <= fifo_ms / 2.0)
+    checker.check(f"sensor-rates.md quotes the {fifo_ms:.1f} ms FIFO fill time",
+                  f"{fifo_ms:.1f} ms" in sensor_rates, f"{fifo_ms:.1f}")
 
     # ---- GPIO map: the documented pin table must match the firmware ------------------
     pins = {

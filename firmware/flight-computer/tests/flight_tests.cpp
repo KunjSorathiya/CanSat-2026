@@ -717,6 +717,47 @@ void test_calibration_rejects_a_steady_rotation_as_bias() {
     CHECK(approx(spinning.result().gyro_bias_dps[2], 1.0, 0.01));
 }
 
+// The loop tick is bounded from above by hardware nobody thinks about: the GPS UART's
+// FIFO keeps filling whether or not the loop reads it.
+void test_loop_tick_is_bounded_by_the_gps_uart_fifo() {
+    std::string why;
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+
+    // 32 bytes at 9600 baud, 8N1, is 33.3 ms of data.
+    CHECK(approx(flight::uart_fifo_fill_ms(9600, 32), 33.333, 0.01));
+    CHECK(approx(flight::uart_fifo_fill_ms(38400, 32), 8.333, 0.01));
+    CHECK(flight::uart_fifo_fill_ms(0, 32) == 0.0);  // no baud, no constraint
+
+    // The default 2 ms tick has 16x margin.
+    CHECK(c.loop_tick_ms == 2);
+    CHECK(flight::validate_config(c, why));
+
+    // A tick beyond half the fill time is refused: NMEA bytes would be lost before
+    // anything read them, showing up as checksum errors rather than an obvious fault.
+    c.loop_tick_ms = 20;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("GPS UART") != std::string::npos);
+
+    // A faster GPS link tightens the limit, and the same tick is then refused sooner.
+    flight::Configuration fast;
+    fast.team_id = "CAN-Team-07";
+    fast.gps_baud = 115200;   // 2.8 ms to fill
+    fast.loop_tick_ms = 5;
+    CHECK(!flight::validate_config(fast, why));
+    fast.loop_tick_ms = 1;
+    CHECK(flight::validate_config(fast, why));
+
+    // Zero is meaningless, and a tick slower than the sensor period cannot schedule it.
+    flight::Configuration bad;
+    bad.team_id = "CAN-Team-07";
+    bad.loop_tick_ms = 0;
+    CHECK(!flight::validate_config(bad, why));
+    bad.loop_tick_ms = 10;
+    bad.sensor_period_ms = 5;
+    CHECK(!flight::validate_config(bad, why));
+}
+
 // The sensor timing model, pinned to the BMP280 datasheet's own published presets.
 void test_sensor_timing_model() {
     using flight::sensors::BaroFilter;
@@ -1414,6 +1455,7 @@ int main(int argc, char** argv) {
     test_gps_coordinate_validation();
     test_orientation_blends_across_the_wrap();
     test_calibration_rejects_a_steady_rotation_as_bias();
+    test_loop_tick_is_bounded_by_the_gps_uart_fifo();
     test_sensor_timing_model();
     test_config_sensor_rate_guard();
     test_controller_ignores_repeated_barometer_samples();

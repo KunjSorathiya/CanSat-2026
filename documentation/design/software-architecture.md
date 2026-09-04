@@ -462,7 +462,7 @@ packet file, or a live Web Serial connection to the bridge Pico.
 
 | Activity | Period | Configured by | Note |
 |---|---:|---|---|
-| Main tick | 2 ms | `main.cpp` | The loop is non-blocking; the delay only yields. Sets scheduling jitter to under 6 % of the 33 ms acquisition period |
+| Main tick | 2 ms | `loop_tick_ms` | The loop is non-blocking; the delay only yields. Bounded above twice over: it sets scheduling jitter (under 6 % of the 33 ms acquisition period) **and** it must drain the GPS UART before its 32-byte FIFO fills, which at 9600 baud takes 33 ms. `validate_config()` enforces both |
 | Sensor acquisition and orientation | 33 ms | `sensor_period_ms` | 30 Hz attitude and altitude-rate update; bounded by the barometer, see [sensor-rates.md](sensor-rates.md) |
 | Telemetry packet | 1000 ms | `telemetry_period_ms` | 1 Hz — the fastest the SF7/125 kHz modem sustains with duty margin. **1000 ms is also the enforced ceiling** for the rulebook minimum. See [link-budget.md](link-budget.md) |
 | SD flush | 2000 ms | `sd_flush_period_ms` | Appends happen per packet; this is the sync |

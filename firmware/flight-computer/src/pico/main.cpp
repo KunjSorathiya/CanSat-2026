@@ -83,9 +83,9 @@ int main() {
 #ifdef PICO_BUILD
         watchdog_update();
 #endif
-        // 2 ms: the loop is non-blocking, and the shortest scheduled task is the 33 ms
-        // sensor tick, so the tick sets the scheduling jitter. 2 ms keeps that under 6 %.
-        tick_delay_ms(2);
+        // The tick is configuration, not a literal: validate_config() checks it against
+        // both the sensor period and the GPS UART FIFO drain time.
+        tick_delay_ms(config.loop_tick_ms);
     }
 
     return 0;
