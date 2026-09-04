@@ -1,8 +1,12 @@
 #include "ground/framing.hpp"
 
 #include <cassert>
+#include <fstream>
 #include <iostream>
+#include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -111,15 +115,104 @@ void test_known_crc_vector() {
     CHECK(ground::crc16_ccitt(std::string("123456789")) == 0x29B1);
 }
 
+// The shared framing fixtures. The PC ground station and the web console replay the same
+// file through their own decoders. Three implementations of one wire format disagreeing is
+// a ground station that drops frames the bridge sent, or accepts frames it did not -- and
+// they did disagree, on how to classify an oversized length field, until this file existed.
+std::string from_hex(const std::string& hex) {
+    std::string out;
+    out.reserve(hex.size() / 2);
+    for (std::size_t i = 0; i + 1 < hex.size(); i += 2) {
+        out.push_back(static_cast<char>(std::stoi(hex.substr(i, 2), nullptr, 16)));
+    }
+    return out;
+}
+
+std::vector<std::string> split(const std::string& text, char sep) {
+    std::vector<std::string> parts;
+    std::string current;
+    for (char c : text) {
+        if (c == sep) { parts.push_back(current); current.clear(); }
+        else { current.push_back(c); }
+    }
+    parts.push_back(current);
+    return parts;
+}
+
+void test_shared_framing_fixtures(const std::string& repo_root) {
+    const std::string path = repo_root + "/test-data/framing-cases.tsv";
+    std::ifstream file(path);
+    CHECK(file.is_open());
+    if (!file.is_open()) {
+        std::cerr << "  could not open " << path
+                  << " (pass the repository root as argv[1])\n";
+        return;
+    }
+
+    int cases = 0;
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty() || line[0] == '#') continue;
+
+        const std::vector<std::string> cols = split(line, '\t');
+        CHECK(cols.size() == 4);
+        if (cols.size() != 4) continue;
+        const std::string& name = cols[0];
+        const std::string stream = from_hex(cols[1]);
+
+        std::vector<std::pair<std::string, std::string>> expected;
+        if (!cols[2].empty()) {
+            for (const std::string& item : split(cols[2], ',')) {
+                const std::size_t colon = item.find(':');
+                CHECK(colon != std::string::npos);
+                if (colon == std::string::npos) continue;
+                expected.emplace_back(item.substr(0, colon), from_hex(item.substr(colon + 1)));
+            }
+        }
+
+        std::map<std::string, unsigned long> totals;
+        for (const std::string& part : split(cols[3], ';')) {
+            const std::size_t eq = part.find('=');
+            if (eq == std::string::npos) continue;
+            totals[part.substr(0, eq)] = std::stoul(part.substr(eq + 1));
+        }
+
+        ground::FrameReader reader;
+        std::vector<std::pair<std::string, std::string>> got;
+        for (char c : stream) {
+            std::string out;
+            const auto status = reader.feed(c, out);
+            if (status == ground::FrameReader::Status::ok) got.emplace_back("ok", out);
+            else if (status == ground::FrameReader::Status::crc_error) got.emplace_back("crc", out);
+        }
+
+        ++cases;
+        if (got != expected) {
+            std::cerr << "FAIL framing fixture " << name << ": expected " << expected.size()
+                      << " event(s), got " << got.size() << "\n";
+            ++failures;
+            continue;
+        }
+        CHECK(reader.frames_ok() == totals["frames_ok"]);
+        CHECK(reader.crc_errors() == totals["crc_errors"]);
+        CHECK(reader.resyncs() == totals["resyncs"]);
+        CHECK(reader.overflows() == totals["overflows"]);
+    }
+    CHECK(cases >= 12);
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    const std::string repo_root = argc > 1 ? argv[1] : ".";
     test_roundtrip();
     test_crc_detects_corruption();
     test_resync_after_garbage();
     test_a_truncated_header_does_not_swallow_the_next_frame();
     test_payload_with_newline_survives();
     test_known_crc_vector();
+    test_shared_framing_fixtures(repo_root);
     if (failures == 0) {
         std::cout << "ground framing tests passed\n";
         return 0;

@@ -338,6 +338,26 @@ def main() -> int:
     console_html = read("ground-station/web/index.html")
     checker.check("the web console unescapes a raw-log line before replaying it",
                   "unescapeRaw(line.split" in console_html)
+
+    # Three decoders, one wire format. The fixture only means anything while all three
+    # read it.
+    framing = read("test-data/framing-cases.tsv")
+    framing_rows = [ln for ln in framing.splitlines()
+                    if ln.strip() and not ln.startswith("#")]
+    for reader in ("firmware/ground-station/tests/framing_test.cpp",
+                   "ground-station/software/tests/test_transport.py",
+                   "ground-station/web/tests/console_core.test.mjs"):
+        checker.check(f"{reader} reads the shared framing cases",
+                      "framing-cases.tsv" in read(reader))
+    checker.check(f"test-plan.md states {len(framing_rows)} framing cases",
+                  f"{len(framing_rows)} byte streams" in test_plan, str(len(framing_rows)))
+    # An oversized length is an overflow in all three, not a resync in two of them.
+    for impl, needle in (
+            ("firmware/ground-station/src/framing.cpp", "++overflows_"),
+            ("ground-station/software/src/transport.py", "self.overflows += 1"),
+            ("ground-station/web/index.html", "this.overflows++")):
+        checker.check(f"{impl} counts an oversized length as an overflow",
+                      needle in read(impl))
     checker.check(f"test-plan.md states {len(scenario_names)} validator scenarios, "
                   f"{len(scenario_rows)} packets",
                   f"{len(scenario_names)} scenarios" in test_plan

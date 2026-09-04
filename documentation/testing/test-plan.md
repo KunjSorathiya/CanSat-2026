@@ -87,10 +87,10 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **111 / 111 tests** |
+| Python ground station | 8 modules | ✅ **114 / 114 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **149 / 149 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **46 / 46 tests** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **156 / 156 claims** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **49 / 49 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
@@ -257,12 +257,17 @@ regression on its own; the first packet of a session is never a restart; multipl
 are each counted; a restart clears both structures; and the duplicate window is bounded so
 a long flight cannot grow it without limit, while still catching recent repeats.
 
-### `test_transport.py` — 17 tests
+### `test_transport.py` — 20 tests
 
 Framing: round-trip, CRC error reporting, the known CRC vector, resync after noise, a torn
 header that must not swallow the frame behind it, a truncated length field, frames split
 across chunks, status-frame detection, and a stuck link that must not grow the buffer
 without bound. Transports: framed and plain file replay, and framed loopback.
+
+Three more read [`test-data/framing-cases.tsv`](../../test-data/framing-cases.tsv), the
+fixture `framing.cpp` and the web console read too: every case decodes to its recorded
+events and counters, and the same stream split at every single byte decodes identically —
+a serial port splits wherever it likes.
 
 Five more cover replaying a raw log this ground station wrote — the file the runbook's
 post-flight step replays. A logged line replays as the packet it recorded, a logged status
@@ -340,7 +345,7 @@ Three things exist in more than one language and must not drift:
 | Logic | Implementations | Guard |
 |---|---|---|
 | Packet format and parsing | [`telemetry.cpp`](../../firmware/common/src/telemetry.cpp), [`telemetry.py`](../../ground-station/software/src/telemetry.py), `index.html` | All three read [`test-data/protocol-fixtures.tsv`](../../test-data/protocol-fixtures.tsv) — 32 packets, each with a recorded accept/reject verdict. A parser that disagrees fails the build |
-| CRC-16/CCITT framing | [`framing.cpp`](../../firmware/ground-station/src/framing.cpp), [`transport.py`](../../ground-station/software/src/transport.py), `index.html` | The same known-answer vector `0x29B1` is asserted in both suites |
+| CRC-16/CCITT framing | [`framing.cpp`](../../firmware/ground-station/src/framing.cpp), [`transport.py`](../../ground-station/software/src/transport.py), `index.html` | All three read [`test-data/framing-cases.tsv`](../../test-data/framing-cases.tsv) — 14 byte streams with the exact events and counters each must produce, including every recovery path: a torn header, a truncated length, a `$` inside a CRC field, an oversized length. The known-answer vector `0x29B1` is asserted on top of it |
 | Raw-log escaping | [`logger.py`](../../ground-station/software/src/logger.py), `index.html` | Both read [`test-data/raw-log-escapes.tsv`](../../test-data/raw-log-escapes.tsv) — 16 cases including a literal backslash before `t`, the one an unescaper a character out of step reads as a tab. The console replays raw logs, so a disagreement here invents payloads the vehicle never sent |
 | Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Both read [`test-data/validator-scenarios.tsv`](../../test-data/validator-scenarios.tsv) — 11 scenarios, 29 packets, each with the verdict the validator must reach: gaps, duplicates, out-of-order arrivals, a vehicle reboot and the corrupted `P-001` that is not one, wrong team, clock regression and an implausible fix. A validator that disagrees fails the build |
 | LoRa airtime model | [`lora_airtime.hpp`](../../firmware/common/include/cansat/lora_airtime.hpp), [`link_budget.py`](../../tools/link_budget.py) | Both are asserted against the same two published SX127x reference vectors (46.336 ms and 1155.072 ms) |

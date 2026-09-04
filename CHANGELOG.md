@@ -55,6 +55,39 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — three frame decoders disagreed about what a broken frame is
+
+The parser, the validator and the raw-log escaping each now read one fixture file. The
+framing did not, and checking the last unshared pair found the divergence it was hiding.
+
+All three decoders agreed on what a *valid* frame is. On an **oversized length field** —
+what a corrupted length byte looks like — the C++ reference counted an `overflow` and
+returned a distinct status, while Python and JavaScript counted a generic `resync` and had
+no overflow counter at all. The same corruption, three ways, depending on which end an
+operator was reading.
+
+Resolved toward the richer diagnosis rather than the common one: a length no frame on this
+link can have means a corrupted header or a sender configured for frames this receiver will
+never accept, and that is worth naming. Both other decoders gained the counter.
+
+**`test-data/framing-cases.tsv` now pins all of it** — 14 byte streams with the exact
+events and counters each decoder must produce, and every recovery path the format has: a
+torn header, a truncated length, a `$` arriving inside a CRC field, an oversized length, a
+frame arriving immediately after a CRC error. Each suite also replays every stream **split
+at every single byte**, because a serial port splits wherever it likes.
+
+The C++ suite gained a repository-root argument to read it, the way `flight_tests` already
+had, and both `build_host.sh` and CTest pass it. Run without it the suite says so and fails
+rather than quietly checking nothing — which was confirmed by running it from another
+directory.
+
+Reverting the Python counter to its old behaviour fails two of the new tests. That was run
+before the fixture was kept.
+
+With this, **every pair of implementations named in the cross-implementation table is held
+to a shared fixture**: packet format, validation semantics, raw-log escaping, and now
+framing. What is left in that table is single-definition code, where drift is not possible.
+
 ### Fixed — the web console replayed raw logs without unescaping them
 
 Driving the console's DOM half in a browser — the half no suite covers — led to its file

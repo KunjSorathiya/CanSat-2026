@@ -63,6 +63,11 @@ class FrameDecoder:
         self.frames_ok = 0
         self.crc_errors = 0
         self.resyncs = 0
+        # A length field larger than any frame this link can carry is its own diagnosis:
+        # either the header was corrupted, or the sender is configured for frames this
+        # receiver will never accept. Counting it as a generic resync loses that. The C++
+        # reference decoder has always separated the two; these two had not.
+        self.overflows = 0
 
     def feed(self, chunk: bytes) -> Iterator[Frame]:
         for byte in chunk:
@@ -107,7 +112,7 @@ class FrameDecoder:
             elif ch == b"," and self._len_text:
                 self._expected = int(self._len_text)
                 if self._expected > self.MAX_PAYLOAD:
-                    self.resyncs += 1
+                    self.overflows += 1
                     self._reset()
                 else:
                     self._state = "crc"

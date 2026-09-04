@@ -96,7 +96,7 @@ log "$OUT/flight_smoke_test"
 log "$OUT/flight_tests" "$ROOT"
 log "$OUT/sx1278_tests"
 log "$OUT/sd_card_tests"
-log "$OUT/ground_station_tests"
+log "$OUT/ground_station_tests" "$ROOT"
 
 HAVE_PYTHON=0
 if command -v python >/dev/null 2>&1; then

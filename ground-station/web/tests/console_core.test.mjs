@@ -154,7 +154,10 @@ test("an oversized length field is rejected rather than buffered", () => {
   const decoder = new M.FrameDecoder();
   const frames = [...decoder.feed([...new TextEncoder().encode("$99999,ffff,")])];
   assert.equal(frames.length, 0);
-  assert.ok(decoder.resyncs > 0);
+  // Counted as an overflow, not a generic resync: a length no frame on this link can have
+  // means a corrupted header or a misconfigured sender, and that is worth saying.
+  assert.equal(decoder.overflows, 1);
+  assert.equal(decoder.resyncs, 0);
 });
 
 test("a UTF-8 payload survives the round trip", () => {
@@ -583,4 +586,66 @@ test("a malformed escape is left exactly as it was found", () => {
   assert.equal(M.unescapeRaw("\\q"), "\\q");
   assert.equal(M.unescapeRaw("\\xZZ"), "\\xZZ");
   assert.equal(M.unescapeRaw("\\x4"), "\\x4");
+});
+
+/* The framing fixtures, shared with framing.cpp and transport.py. */
+const FRAMING = join(REPO_ROOT, "test-data", "framing-cases.tsv");
+
+function hexToBytes(hex) {
+  return Uint8Array.from(hex.match(/../g) ?? [], b => parseInt(b, 16));
+}
+
+function loadFramingCases() {
+  const cases = [];
+  for (const rawLine of readFileSync(FRAMING, "utf8").split("\n")) {
+    const line = rawLine.replace(/\r$/, "");
+    if (!line.trim() || line.startsWith("#")) continue;
+    const [name, streamHex, events, counters] = line.split("\t");
+    const expected = events
+      ? events.split(",").map(item => {
+          const [kind, payloadHex] = item.split(":");
+          return { kind, payload: new TextDecoder().decode(hexToBytes(payloadHex ?? "")) };
+        })
+      : [];
+    const totals = Object.fromEntries(
+      counters.split(";").map(part => { const [k, v] = part.split("="); return [k, Number(v)]; }));
+    cases.push({ name, stream: hexToBytes(streamHex), expected, totals });
+  }
+  return cases;
+}
+
+const FRAMING_CASES = loadFramingCases();
+
+test("the framing fixture file is present and complete", () => {
+  assert.ok(FRAMING_CASES.length >= 12);
+  assert.ok(FRAMING_CASES.some(c => c.name === "oversized_length_is_an_overflow"));
+});
+
+test("every framing case decodes to its recorded events and counters", () => {
+  for (const c of FRAMING_CASES) {
+    const decoder = new M.FrameDecoder();
+    const got = [...decoder.feed(c.stream)].map(f => ({
+      kind: f.crcOk ? "ok" : "crc", payload: f.payload,
+    }));
+    assert.deepEqual(got, c.expected, c.name);
+    assert.equal(decoder.framesOk, c.totals.frames_ok, `${c.name} frames_ok`);
+    assert.equal(decoder.crcErrors, c.totals.crc_errors, `${c.name} crc_errors`);
+    assert.equal(decoder.resyncs, c.totals.resyncs, `${c.name} resyncs`);
+    assert.equal(decoder.overflows, c.totals.overflows, `${c.name} overflows`);
+  }
+});
+
+test("a framing stream split at every byte decodes identically", () => {
+  // A serial port splits wherever it likes; the decoder is incremental for that reason.
+  for (const c of FRAMING_CASES) {
+    const decoder = new M.FrameDecoder();
+    const got = [];
+    for (const byte of c.stream) {
+      for (const f of decoder.feed([byte])) {
+        got.push({ kind: f.crcOk ? "ok" : "crc", payload: f.payload });
+      }
+    }
+    assert.deepEqual(got, c.expected, c.name);
+    assert.equal(decoder.overflows, c.totals.overflows, `${c.name} overflows`);
+  }
 });

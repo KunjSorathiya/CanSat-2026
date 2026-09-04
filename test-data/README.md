@@ -7,6 +7,7 @@ implementation on purpose.
 |---|---|---|
 | [`protocol-fixtures.tsv`](protocol-fixtures.tsv) | the C++, Python and JavaScript **parsers** | Every packet with a recorded accept/reject verdict. A parser that disagrees fails the build |
 | [`validator-scenarios.tsv`](validator-scenarios.tsv) | the Python and JavaScript **validators** | Packet sequences with the verdict the validator must reach: gaps, duplicates, reboots, wrong team, clock regressions, implausible fixes |
+| [`framing-cases.tsv`](framing-cases.tsv) | the C++, Python and JavaScript **frame decoders** | Byte streams with the exact frames and counters each must produce, including every recovery path |
 | [`raw-log-escapes.tsv`](raw-log-escapes.tsv) | the Python **logger** and the JavaScript **console** | Escaped/plain pairs for the raw log's four escape rules, plain text stored as hex because it contains tabs and newlines |
 | [`sample-mission.txt`](sample-mission.txt) | anyone following the documentation | A replayable mission, so every documented `replay` command runs against a file that exists |
 

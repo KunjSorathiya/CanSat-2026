@@ -163,7 +163,7 @@ class RawLogReplayTests(unittest.TestCase):
         # A corrupted payload can contain a tab; the log escapes it so one record stays one
         # line. Replay has to undo exactly that, or the payload comes back different from
         # the one the vehicle sent.
-        corrupted = "CAN-Team-07;\tP-001;\ raw"
+        corrupted = "CAN-Team-07;\tP-001;" + chr(92) + " raw"
         line = "2026-09-05T02:11:05.000000+00:00\t" + escape_raw(corrupted)
         self.assertEqual([f.payload for f in self._replay([line])], [corrupted])
 
@@ -175,3 +175,62 @@ class RawLogReplayTests(unittest.TestCase):
         line = f"2026-09-05T02:11:03.123456+00:00\t{self.PACKET}"
         frames = self._replay([line], raw_log=False)
         self.assertEqual(frames[0].payload, line)
+
+
+class SharedFramingFixtureTests(unittest.TestCase):
+    """Every framing case, as this decoder sees it.
+
+    Three implementations decode this link. They agreed on what a valid frame is and not on
+    what a broken one is, so the same corruption produced different diagnostics depending on
+    which end an operator was reading. One file now settles it.
+    """
+
+    FIXTURES = Path(__file__).parents[3] / "test-data" / "framing-cases.tsv"
+
+    def _cases(self):
+        cases = []
+        for line in self.FIXTURES.read_text(encoding="utf-8").splitlines():
+            if not line.strip() or line.startswith("#"):
+                continue
+            name, stream_hex, events, counters = line.split("\t")
+            expected = []
+            if events:
+                for item in events.split(","):
+                    kind, payload_hex = item.split(":")
+                    expected.append((kind, bytes.fromhex(payload_hex)))
+            totals = dict(part.split("=") for part in counters.split(";"))
+            cases.append((name, bytes.fromhex(stream_hex), expected,
+                          {k: int(v) for k, v in totals.items()}))
+        return cases
+
+    def test_the_fixture_file_is_present_and_complete(self):
+        cases = self._cases()
+        self.assertGreaterEqual(len(cases), 12)
+        names = {name for name, _, _, _ in cases}
+        self.assertIn("oversized_length_is_an_overflow", names)
+
+    def test_every_case_decodes_to_its_recorded_events_and_counters(self):
+        for name, stream, expected, totals in self._cases():
+            with self.subTest(case=name):
+                decoder = FrameDecoder()
+                frames = list(decoder.feed(stream))
+                got = [("ok" if f.crc_ok else "crc", f.payload.encode("utf-8"))
+                       for f in frames]
+                self.assertEqual(got, expected, name)
+                self.assertEqual(decoder.frames_ok, totals["frames_ok"], name)
+                self.assertEqual(decoder.crc_errors, totals["crc_errors"], name)
+                self.assertEqual(decoder.resyncs, totals["resyncs"], name)
+                self.assertEqual(decoder.overflows, totals["overflows"], name)
+
+    def test_a_stream_split_at_every_byte_decodes_identically(self):
+        # The decoder is fed by a serial port, which splits wherever it likes.
+        for name, stream, expected, totals in self._cases():
+            with self.subTest(case=name):
+                decoder = FrameDecoder()
+                frames = []
+                for index in range(len(stream)):
+                    frames.extend(decoder.feed(stream[index:index + 1]))
+                got = [("ok" if f.crc_ok else "crc", f.payload.encode("utf-8"))
+                       for f in frames]
+                self.assertEqual(got, expected, name)
+                self.assertEqual(decoder.overflows, totals["overflows"], name)

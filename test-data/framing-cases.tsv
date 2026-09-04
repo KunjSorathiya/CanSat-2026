@@ -1,0 +1,36 @@
+# CanSat 2026 - serial framing fixtures
+#
+# The link between the bridge Pico and the PC is "$<len>,<crc16>,<payload>\n". Three
+# implementations decode it, and a disagreement means the ground station drops frames the
+# bridge sent or accepts frames it did not:
+#
+#   firmware/ground-station/src/framing.cpp    (C++ reference)
+#   ground-station/software/src/transport.py   (PC ground station)
+#   ground-station/web/index.html              (web console)
+#
+# They already agreed on what a valid frame is. They did not agree on what a broken one is:
+# an oversized length field was an "overflow" in C++ and a generic "resync" in the other
+# two, so the same corruption produced different diagnostics depending on which end an
+# operator was reading. This file settles that, and every other recovery rule with it.
+#
+# Format: <id> TAB <input bytes, hex> TAB <expected events> TAB <expected counters>
+#
+# Events are comma-separated "<kind>:<payload hex>", in order, where kind is ok or crc.
+# An empty field means the decoder must produce nothing. Counters are the decoder's totals
+# after the whole input has been fed, and they are exact: a decoder that reaches the right
+# frames by the wrong route still fails.
+#
+single_frame	2431392c323466342c43414e2d5465616d2d30373b20502d3030313b0a	ok:43414e2d5465616d2d30373b20502d3030313b	frames_ok=1;crc_errors=0;resyncs=0;overflows=0
+two_frames_back_to_back	2431392c323466342c43414e2d5465616d2d30373b20502d3030313b0a2431392c323466342c43414e2d5465616d2d30373b20502d3030313b0a	ok:43414e2d5465616d2d30373b20502d3030313b,ok:43414e2d5465616d2d30373b20502d3030313b	frames_ok=2;crc_errors=0;resyncs=0;overflows=0
+status_frame_is_recognised	2432372c303661372c2373746174653d525820726164696f3d312073796e633d307846330a	ok:2373746174653d525820726164696f3d312073796e633d30784633	frames_ok=1;crc_errors=0;resyncs=0;overflows=0
+zero_length_payload	24302c666666662c0a	ok:	frames_ok=1;crc_errors=0;resyncs=0;overflows=0
+utf8_payload_survives	2431382c303438332c616c7469747564652035206d20c2b1206f6b0a	ok:616c7469747564652035206d20c2b1206f6b	frames_ok=1;crc_errors=0;resyncs=0;overflows=0
+corrupted_payload_is_a_crc_error	2431392c323466342c43414e2d5465616d2d30373b20502d3030303b0a	crc:43414e2d5465616d2d30373b20502d3030303b	frames_ok=0;crc_errors=1;resyncs=0;overflows=0
+leading_noise_is_skipped	67617262616765206279746573202431392c323466342c43414e2d5465616d2d30373b20502d3030313b0a	ok:43414e2d5465616d2d30373b20502d3030313b	frames_ok=1;crc_errors=0;resyncs=0;overflows=0
+truncated_header_does_not_swallow_the_next_frame	2431322431392c323466342c43414e2d5465616d2d30373b20502d3030313b0a	ok:43414e2d5465616d2d30373b20502d3030313b	frames_ok=1;crc_errors=0;resyncs=1;overflows=0
+truncated_length_does_not_swallow_the_next_frame	242431392c323466342c43414e2d5465616d2d30373b20502d3030313b0a	ok:43414e2d5465616d2d30373b20502d3030313b	frames_ok=1;crc_errors=0;resyncs=1;overflows=0
+oversized_length_is_an_overflow	2439393939392c666666662c		frames_ok=0;crc_errors=0;resyncs=0;overflows=1
+absurd_length_digits_resync	24313233343536372c		frames_ok=0;crc_errors=0;resyncs=1;overflows=0
+non_hex_in_crc_resyncs	24352c7a7a7a7a2c68656c6c6f		frames_ok=0;crc_errors=0;resyncs=1;overflows=0
+dollar_in_crc_restarts_the_header	24352c61622431392c323466342c43414e2d5465616d2d30373b20502d3030313b0a	ok:43414e2d5465616d2d30373b20502d3030313b	frames_ok=1;crc_errors=0;resyncs=1;overflows=0
+frame_after_a_crc_error_still_decodes	2431392c323466342c43414e2d5465616d2d30373b20502d3030303b0a2431392c323466342c43414e2d5465616d2d30373b20502d3030313b0a	crc:43414e2d5465616d2d30373b20502d3030303b,ok:43414e2d5465616d2d30373b20502d3030313b	frames_ok=1;crc_errors=1;resyncs=0;overflows=0

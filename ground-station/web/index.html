@@ -735,7 +735,11 @@ function frameEncode(str) {
   return new TextEncoder().encode(head).reduce((a, c) => (a.push(c), a), []).concat([...p], [10]);
 }
 class FrameDecoder {
-  constructor() { this.reset(); this.framesOk = 0; this.crcErrors = 0; this.resyncs = 0; }
+  constructor() { this.reset(); this.framesOk = 0; this.crcErrors = 0; this.resyncs = 0;
+    /* A length larger than any frame this link can carry is its own diagnosis: a corrupted
+       header, or a sender configured for frames this receiver will never accept. Counting it
+       as a generic resync loses that. Mirrors framing.cpp and transport.py. */
+    this.overflows = 0; }
   reset() { this.state = "idle"; this.len = ""; this.crc = ""; this.payload = []; this.expected = 0; }
   *feed(bytes) {
     for (const byte of bytes) { const f = this._byte(byte); if (f) yield f; }
@@ -753,7 +757,7 @@ class FrameDecoder {
     if (this.state === "idle") { if (ch === "$") { this.reset(); this.state = "len"; } return null; }
     if (this.state === "len") {
       if (ch >= "0" && ch <= "9") { this.len += ch; if (this.len.length > 6) { this.resyncs++; this.reset(); } }
-      else if (ch === "," && this.len) { this.expected = +this.len; if (this.expected > 512) { this.resyncs++; this.reset(); } else this.state = "crc"; }
+      else if (ch === "," && this.len) { this.expected = +this.len; if (this.expected > 512) { this.overflows++; this.reset(); } else this.state = "crc"; }
       else if (ch === "$") { this.resyncs++; this.len = ""; }
       else { this.resyncs++; this.reset(); }
       return null;
