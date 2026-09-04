@@ -84,24 +84,28 @@ $CXX $CXXFLAGS ${INC[@]} \
   "$ROOT/firmware/ground-station/tests/framing_test.cpp" \
   -o "$OUT/ground_station_tests"
 
-echo "== running C++ tests =="
-"$OUT/flight_smoke_test"
-"$OUT/flight_tests" "$ROOT"
-"$OUT/sx1278_tests"
-"$OUT/sd_card_tests"
-"$OUT/ground_station_tests"
+# Every suite's own count of what it ran is written here as well as to the console, so
+# tools/check_doc_claims.py can hold the documented figures to what the suites report.
+# Without this the counts in the test plan and the README drift the moment a test is added.
+LOG="$OUT/test-output.log"
+: > "$LOG"
+log() { "$@" 2>&1 | tee -a "$LOG"; }
 
+echo "== running C++ tests =="
+log "$OUT/flight_smoke_test"
+log "$OUT/flight_tests" "$ROOT"
+log "$OUT/sx1278_tests"
+log "$OUT/sd_card_tests"
+log "$OUT/ground_station_tests"
+
+HAVE_PYTHON=0
 if command -v python >/dev/null 2>&1; then
+  HAVE_PYTHON=1
   echo "== running Python ground-station tests =="
-  ( cd "$ROOT" && python -m unittest discover -s ground-station/software/tests -p "test_*.py" -v )
+  ( cd "$ROOT" && log python -m unittest discover -s ground-station/software/tests -p "test_*.py" -v )
 
   echo "== running Python tooling tests =="
-  ( cd "$ROOT" && python -m unittest discover -s tools/tests -p "test_*.py" )
-
-  # Documentation drifts silently: a constant changes and the prose quoting it does not.
-  # A wrong pin number or telemetry rate in a document is a defect like any other.
-  echo "== checking documented claims against the source =="
-  ( cd "$ROOT" && python tools/check_doc_claims.py | tail -1 )
+  ( cd "$ROOT" && log python -m unittest discover -s tools/tests -p "test_*.py" )
 fi
 
 # The web console is a single self-contained HTML file with no build step. Its parser,
@@ -109,9 +113,18 @@ fi
 # under Node when Node is available.
 if command -v node >/dev/null 2>&1; then
   echo "== running web console tests =="
-  ( cd "$ROOT" && node --test ground-station/web/tests/console_core.test.mjs )
+  ( cd "$ROOT" && log node --test ground-station/web/tests/console_core.test.mjs )
 else
   echo "== SKIPPED web console tests (node not found) =="
+fi
+
+# Documentation drifts silently: a constant changes and the prose quoting it does not.
+# A wrong pin number or telemetry rate in a document is a defect like any other. This runs
+# last because it also reads the log every suite above just wrote, and holds the documented
+# test counts to the counts the suites actually reported on this run.
+if [ "$HAVE_PYTHON" -eq 1 ]; then
+  echo "== checking documented claims against the source =="
+  ( cd "$ROOT" && python tools/check_doc_claims.py | tail -1 )
 fi
 
 echo "ALL HOST BUILDS AND TESTS PASSED"

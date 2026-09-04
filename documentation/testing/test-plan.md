@@ -83,14 +83,14 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 41 suites across the whole flight core | ✅ **676 / 676 assertions** |
+| `flight_tests` | 57 suites across the whole flight core | ✅ **3547 / 3547 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **93 / 93 tests** |
+| Python ground station | 8 modules | ✅ **98 / 98 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants | ✅ **61 / 61 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **36 / 36 tests** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **82 / 82 claims** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **37 / 37 tests** |
 | Pico syntax check | 10 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `pico_hal`, `pico_radio`, `mpu9250`,
@@ -142,13 +142,14 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 41 suites, 676 assertions
+### `flight_tests` — 57 suites, 3547 assertions
 
 | Suite | What it proves |
 |---|---|
 | `test_telemetry_format_exact` | The emitted packet matches the rulebook format byte for byte, including field order, separators and decimal places |
 | `test_packet_numbering_and_padding` | Numbering starts at `P-001`, increments sequentially, and zero-pads to three digits |
 | `test_parser_rejects_precision_and_order` | Wrong decimal precision, wrong field order and malformed fields are all rejected |
+| `test_shared_protocol_fixtures` | Every packet in `test-data/protocol-fixtures.tsv` parses to the verdict the fixture file records — the same file the Python and Node parsers read, so the three implementations cannot silently disagree |
 | `test_imu_scaling` | Raw MPU-9250 counts convert to m/s² and °/s using datasheet sensitivities for every full-scale range, and the on-die temperature uses the MPU-9250's transfer function rather than the MPU-6050's |
 | `test_magnetometer_conversions` | AK8963 quantisation at 14 and 16 bits, the fuse-ROM per-axis sensitivity adjustment, and hard/soft-iron correction — including that an invalid calibration is not applied at all |
 | `test_magnetometer_axes_are_rotated_into_the_body_frame` | The AK8963 die is mounted rotated inside the MPU-9250 package; the mapping into the body frame swaps X and Y and inverts Z, preserves field magnitude, and is its own inverse |

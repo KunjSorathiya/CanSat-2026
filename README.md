@@ -6,7 +6,7 @@
 and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml)
-[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-1351%20assertions-1b5e20)](documentation/testing/test-plan.md)
+[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-4222%20assertions-1b5e20)](documentation/testing/test-plan.md)
 [![Python tests](https://img.shields.io/badge/Python%20tests-37%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)

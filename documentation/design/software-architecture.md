@@ -532,7 +532,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 43 C++ suites with 676 assertions, plus the LoRa driver (94) and the microSD driver (581) against simulated devices, 126 Python tests including an end-to-end trace, and 36 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 57 C++ suites with 3547 assertions, plus the LoRa driver (94) and the microSD driver (581) against simulated devices, 131 Python tests including an end-to-end trace, and 37 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |

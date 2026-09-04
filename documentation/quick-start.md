@@ -124,7 +124,7 @@ bash tools/build_host.sh
 
 This compiles the shared telemetry library, the whole flight core, the ground-station
 framing library and every host test, runs them, then runs the Python and Node suites.
-Expect **1351 C++ assertions, 126 Python tests and 36 Node tests, all passing, with zero
+Expect **4222 C++ assertions, 131 Python tests and 37 Node tests, all passing, with zero
 compiler warnings.**
 
 ```bash

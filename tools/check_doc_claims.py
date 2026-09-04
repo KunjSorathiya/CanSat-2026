@@ -40,6 +40,35 @@ def decimal(source: str, name: str) -> float | None:
     return float(match.group(1)) if match else None
 
 
+def suite_counts() -> dict[str, int] | None:
+    """Read what each suite reported from the log tools/build_host.sh just wrote.
+
+    Assertion totals cannot be counted statically -- a table-driven test runs one CHECK
+    many times -- so the only honest source for them is the suites' own output.
+    """
+    log_path = REPO_ROOT / "build" / "host" / "test-output.log"
+    if not log_path.exists():
+        return None
+    log = log_path.read_text(encoding="utf-8", errors="replace")
+
+    counts: dict[str, int] = {}
+    # Each C++ suite prints its assertion total, then a line naming itself.
+    for total, name in re.findall(r"(\d+)/\d+ checks passed\s*\n(\S+)", log):
+        key = {"flight_tests": "flight_tests", "sx1278": "sx1278", "sd_card": "sd_card"}.get(name)
+        if key:
+            counts[key] = int(total)
+    # unittest prints "Ran N tests" once per discovery run: ground station first, tooling second.
+    ran = [int(n) for n in re.findall(r"^Ran (\d+) tests?", log, re.MULTILINE)]
+    if len(ran) >= 2:
+        counts["python_ground"], counts["python_tools"] = ran[0], ran[1]
+    node = re.search(r"^\D*pass (\d+)$", log, re.MULTILINE)
+    if node:
+        counts["node"] = int(node.group(1))
+
+    required = {"flight_tests", "sx1278", "sd_card", "python_ground", "python_tools", "node"}
+    return counts if required <= counts.keys() else None
+
+
 class Checker:
     def __init__(self) -> None:
         self.results: list[tuple[str, bool, str]] = []
@@ -175,11 +204,81 @@ def main() -> int:
         checker.check(f"wiring.md lists GP{expected} for `{name}`",
                       f"| GP{expected} |" in wiring and f"`{name}`" in wiring)
 
+    # ---- the size of the test suites, as the suites themselves report it ------------
+    # These counts appear in the README badge, the quick start and the test plan, and they
+    # are exactly the kind of figure that is true on the day it is written and wrong a week
+    # later. tools/build_host.sh writes what every suite reported to build/host/test-output.log
+    # on the run that precedes this check, so the documents are held to the current numbers
+    # rather than to remembered ones.
+    test_plan = read("documentation/testing/test-plan.md")
+    readme = read("README.md")
+    quick_start = read("documentation/quick-start.md")
+    timeline = read("documentation/project/timeline.md")
+
+    # Every suite main() calls must have a row explaining what it proves. A test nobody
+    # documented is a test nobody can tell you the purpose of when it fails.
+    flight_test_source = read("firmware/flight-computer/tests/flight_tests.cpp")
+    main_body = flight_test_source[flight_test_source.index("int main("):]
+    suites = re.findall(r"^\s{4}(test_[a-z0-9_]+)\(", main_body, re.MULTILINE)
+    documented = set(re.findall(r"^\| `(test_[a-z0-9_]+)`", test_plan, re.MULTILINE))
+    undocumented = [name for name in suites if name not in documented]
+    checker.check(f"every one of the {len(suites)} flight_tests suites has a test-plan row",
+                  not undocumented, ", ".join(undocumented))
+    checker.check(f"test-plan.md states {len(suites)} flight_tests suites",
+                  f"{len(suites)} suites" in test_plan, str(len(suites)))
+
+    counts = suite_counts()
+    if counts is None:
+        # The log is written by tools/build_host.sh immediately before this script runs.
+        # Outside that script there is nothing to compare against, and inventing a number
+        # would be worse than saying so.
+        checker.check("test counts checked against build/host/test-output.log", True,
+                      "log absent -- run tools/build_host.sh")
+    else:
+        cpp_total = counts["flight_tests"] + counts["sx1278"] + counts["sd_card"]
+        for suite in ("flight_tests", "sx1278", "sd_card"):
+            n = counts[suite]
+            checker.check(f"test-plan.md states {suite} ran {n} assertions",
+                          f"**{n} / {n} assertions**" in test_plan, str(n))
+        for suite, label in (("python_ground", "Python ground station"),
+                             ("python_tools", "Python tooling")):
+            n = counts[suite]
+            checker.check(f"test-plan.md states {label} ran {n} tests",
+                          f"**{n} / {n} tests**" in test_plan, str(n))
+        node = counts["node"]
+        checker.check(f"test-plan.md states the web console ran {node} tests",
+                      f"**{node} / {node} tests**" in test_plan, str(node))
+        checker.check(f"timeline.md states the {node} web console tests",
+                      f"{node} Node tests" in timeline, str(node))
+        checker.check(f"README badge states {cpp_total} C++ assertions",
+                      f"C%2B%2B%20tests-{cpp_total}%20assertions" in readme, str(cpp_total))
+        python_total = counts["python_ground"] + counts["python_tools"]
+        checker.check(f"quick-start.md states {cpp_total} C++ assertions",
+                      f"**{cpp_total} C++ assertions" in quick_start, str(cpp_total))
+        checker.check(f"quick-start.md states {python_total} Python tests",
+                      f"{python_total} Python tests" in quick_start, str(python_total))
+        checker.check(f"quick-start.md states {node} Node tests",
+                      f"{node} Node tests" in quick_start, str(node))
+        checker.check(f"software-architecture.md states {counts['flight_tests']} flight-core assertions",
+                      f"{len(suites)} C++ suites with {counts['flight_tests']} assertions" in architecture,
+                      str(counts["flight_tests"]))
+        checker.check(f"software-architecture.md states {python_total} Python and {node} Node tests",
+                      f"{python_total} Python tests" in architecture and f"{node} Node tests" in architecture)
+
     # ---- rulebook constants that must never drift -----------------------------------
     checker.check("post-impact window is at least the rulebook's 5 s",
                   (constant(config, "post_impact_transmission_ms") or 0) >= 5000)
     checker.check("telemetry period never exceeds the 1 Hz rulebook minimum",
                   (period_ms or 0) <= 1000)
+
+    # Last, and counting itself: the number of claims this script checks is itself a figure
+    # the test plan quotes, so adding a check here without updating that row fails here.
+    # Only on a full run, though -- without the suite log a dozen checks are skipped, and
+    # the quoted total is the full-run one, not the short-run one.
+    if counts is not None:
+        claim_total = len(checker.results) + 1
+        checker.check(f"test-plan.md states the {claim_total} claims this script checks",
+                      f"**{claim_total} / {claim_total} claims**" in test_plan, str(claim_total))
 
     return checker.report()
 

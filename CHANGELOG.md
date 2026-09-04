@@ -55,6 +55,38 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — the documented test counts were four runs out of date, and nothing was checking them
+
+Every figure below was true when it was written and had quietly stopped being true. The
+README badge advertised 1351 C++ assertions against an actual 4222; the test plan described
+41 flight-core suites where the source calls 57, and one of them — `test_shared_protocol_fixtures`,
+the suite that holds the C++, Python and Node parsers to a single fixture file — had no row
+at all.
+
+| Claim | Documented | Actual |
+|---|---:|---:|
+| C++ assertions (README badge, quick start) | 1351 | **4222** |
+| `flight_tests` suites / assertions | 41 / 676 | **57 / 3547** |
+| Python tests | 126 | **131** |
+| Node tests | 30 / 36 | **37** |
+| Claims checked by `check_doc_claims.py` | 61 | **82** |
+
+**The counts are now a build gate, not a promise.** `tools/build_host.sh` tees what every
+suite reports about itself to `build/host/test-output.log`, and `tools/check_doc_claims.py`
+reads that log and holds the README, the quick start, the test plan, the architecture
+document and the timeline to those numbers. Assertion totals cannot be counted statically —
+a table-driven test runs one `CHECK` many times — so the only honest source for them is the
+suites' own output on the run that just happened.
+
+Two structural changes follow from that. The doc-claims check moved to the end of
+`build_host.sh`, after the Node suite, because it now reads a log the Node suite writes to.
+And every suite `flight_tests` calls must have a row in the test plan explaining what it
+proves, which is what surfaced the missing one: a test nobody documented is a test nobody
+can explain when it fails.
+
+Run standalone, without the log, the script skips the count checks and reports 69/69 rather
+than inventing a number.
+
 ### Added — Gate 6 on the diagnostic, with the destructive half behind a prompt
 
 `cansat_bringup_firmware` now brings up the microSD reader — the item
