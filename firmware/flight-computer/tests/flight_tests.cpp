@@ -922,6 +922,50 @@ bool feed_nmea(flight::NmeaParser& parser, const std::string& sentence) {
 
 // A checksum-valid sentence can still carry an impossible position. Those must not reach
 // telemetry: the vehicle should transmit no fix rather than a wrong one.
+void test_a_hemisphere_from_the_wrong_axis_is_rejected() {
+    // A sentence can pass its checksum and still carry a hemisphere character that does
+    // not belong to the field it is in. Accepting all four on both axes read a latitude
+    // marked 'E' as northern, and one marked 'W' as southern -- a position on the wrong
+    // side of the equator, produced from a sentence that was already saying something had
+    // gone wrong.
+    flight::NmeaParser parser;
+    const auto feed = [&parser](const char* body) {
+        std::uint8_t checksum = 0;
+        for (const char* p = body + 1; *p != '\0'; ++p) checksum ^= static_cast<std::uint8_t>(*p);
+        char line[128];
+        std::snprintf(line, sizeof(line), "%s*%02X\r\n", body, static_cast<unsigned>(checksum));
+        bool applied = false;
+        for (const char* p = line; *p != '\0'; ++p) applied = parser.consume(*p) || applied;
+        return applied;
+    };
+
+    // A good fix first, so a rejection afterwards is visibly a rejection and not an
+    // absence of data.
+    CHECK(feed("$GPGGA,120000.00,2110.0000,N,07246.9980,E,1,08,1.0,15.0,M,0.0,M,,"));
+    CHECK(parser.latest().valid);
+    const double good_lat = parser.latest().latitude;
+    CHECK(good_lat > 21.0 && good_lat < 21.2);
+
+    // Latitude carrying a longitude hemisphere: rejected, and the fix is dropped rather
+    // than left standing at its previous value.
+    CHECK(!feed("$GPGGA,120001.00,2110.0000,E,07246.9980,E,1,08,1.0,15.0,M,0.0,M,,"));
+    CHECK(!parser.latest().valid);
+
+    // The same for a longitude carrying a latitude hemisphere.
+    CHECK(!feed("$GPGGA,120002.00,2110.0000,N,07246.9980,N,1,08,1.0,15.0,M,0.0,M,,"));
+    CHECK(!parser.latest().valid);
+
+    // And in RMC, which carries the ground track the yaw cross-check uses.
+    CHECK(!feed("$GPRMC,120003.00,A,2110.0000,W,07246.9980,E,0.5,90.0,050926,,,A"));
+    CHECK(!parser.latest().valid);
+
+    // A correct sentence still parses after all of that.
+    CHECK(feed("$GPGGA,120004.00,2110.0000,S,07246.9980,W,1,08,1.0,15.0,M,0.0,M,,"));
+    CHECK(parser.latest().valid);
+    CHECK(parser.latest().latitude < 0.0);   // S
+    CHECK(parser.latest().longitude < 0.0);  // W
+}
+
 void test_gps_coordinate_validation() {
     // Southern and western hemispheres must come back negative.
     flight::NmeaParser sw;
@@ -2455,6 +2499,7 @@ int main(int argc, char** argv) {
     test_a_value_too_wide_to_format_invalidates_the_packet();
     test_controller_drops_optional_fields_before_overrunning_the_budget();
     test_gps_coordinate_validation();
+    test_a_hemisphere_from_the_wrong_axis_is_rejected();
     test_orientation_survives_the_wrap_and_the_poles();
     test_calibration_rejects_a_steady_rotation_as_bias();
     test_fault_severity_never_falls_while_active();

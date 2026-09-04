@@ -55,6 +55,33 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — a latitude marked `W` was read as a southern one
+
+`parse_coordinate()` handles both NMEA coordinate fields, and accepted any of `N`, `S`, `E`
+or `W` on either of them. The caller always knows which axis it is asking about, and the
+function was not told.
+
+So a latitude field carrying `E` parsed as a northern latitude, and one carrying `W` parsed
+as a **southern** one — the fix placed on the wrong side of the equator, from a sentence
+that was already saying something had gone wrong with it. The same in reverse for a
+longitude marked `N` or `S`.
+
+The checksum catches most corruption, and this is what is left when it does not: a single
+character wrong in a field the checksum was computed over before the fault, or a receiver
+emitting a malformed sentence. The parser's own comment already said a hemisphere it cannot
+account for must be rejected rather than assumed; it just did not know enough to tell.
+
+Each axis is now given the two characters it accepts. `test_a_hemisphere_from_the_wrong_axis_is_rejected`
+covers all four wrong-axis combinations, in `GGA` and in `RMC`, and checks that a rejected
+sentence drops the fix rather than leaving the previous one standing. Against the old
+parser it fails on every one of them.
+
+Read in the same pass and found correct, with no change needed: the BMP280 compensation
+against the Bosch 64-bit reference path, the IMU and AK8963 scaling constants, the
+barometric altitude formula, the startup calibrator's stationary test and its separation of
+"not shaking" from "not turning", the magnetometer bounding-box calibration and its
+divide-by-zero guard, and the mission state machine's launch, landing and arming logic.
+
 ### Fixed — the estimator could claim a magnetic heading it never computed
 
 Reading `orientation.cpp` line by line found one path where the vehicle's own rule -- never
