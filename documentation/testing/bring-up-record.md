@@ -57,6 +57,8 @@ pass/fail matrix is in [test-plan.md](test-plan.md#hardware-test-plan). This doc
 | 1.1 | Status LED blink, `READY` unarmed | 900 ms on, 900 ms off — **1800 ms full cycle** | **0.56 Hz** | Stopwatch over 10 **full cycles**, divide by 10; or the meter's `Hz` range on GP14 | | |
 | 1.2 | Status LED blink, `READY` armed | 400 ms on, 400 ms off — **800 ms full cycle** | **1.25 Hz** | Same, after the arming delay | | |
 | 1.3 | Status LED blink, `FLIGHT` | 100 ms on, 100 ms off — **200 ms full cycle** | **5 Hz** | Same | | |
+| 1.3a | Status LED blink, `LANDED` / `RECOVERY` | 250 ms on, 250 ms off — **500 ms full cycle** | **2 Hz** | Same, after a landing is declared | | |
+| 1.3b | Status LED blink, `FAULT` | 60 ms on, 60 ms off — **120 ms full cycle** | **8.3 Hz** | Same, with a mandatory sensor disconnected so the state machine latches `FAULT` | | |
 | 1.4 | USB serial enumerates | Appears as a serial port | — | Device manager / `ls /dev/tty*` | **Yes.** Both Picos enumerate; the ground bridge came up as `COM4`, and the port appears and disappears with the cable | ✅ 2026-09-05 / KS |
 | 1.5 | Boot to first telemetry attempt | < 1 s | — | Log timestamps from power-on | **Deferred — not measurable at this gate.** See the note below | — |
 | 1.6 | Bridge status cadence, no radio attached | 1000 ms (`STATUS_PERIOD_MS`) | 1 Hz | Watch the `#state=RX` line in a serial monitor | **1 Hz, steady, no gaps** over a continuous run | ✅ 2026-09-05 / KS |

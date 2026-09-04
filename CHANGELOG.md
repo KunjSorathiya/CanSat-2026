@@ -55,6 +55,23 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Added — the numbers an operator reads off the vehicle are now gated too
+
+The status LED is the only thing the vehicle can say with no radio and no serial cable, and
+both the bring-up record and the runbook tell an operator which blink rate means what. All
+five cadences live in one `switch` in `controller.cpp`, and nothing connected the two. The
+same was true of the calibration gates the runbook quotes on its "Calibration never reaches
+`CAL-1`" page — the numbers someone reads while standing over a vehicle on the pad,
+wondering whether the part is faulty or the table is vibrating.
+
+Ten more checks: every LED cadence and its full cycle, and the stillness, acceleration,
+sample-count and timeout gates. **145 claims now**, up from 66 at the start of this cycle.
+
+The bring-up record also gained the two LED states it never listed — `LANDED`/`RECOVERY` at
+250 ms and `FAULT` at 60 ms. `FAULT` is the one an operator most needs to recognise, and it
+was the one state with a distinct cadence and no row to write it down in. That makes 79
+rows, 18 of them measured.
+
 ### Fixed — every documented command now runs, starting with the file none of them had
 
 Four documents tell a reader to run `python src/main.py replay packets.txt`. **There is no

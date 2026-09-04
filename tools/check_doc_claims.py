@@ -273,7 +273,7 @@ def main() -> int:
     # bring-up record is the only source: a row with a verdict is measured, a blank one is
     # not, and the README quotes the two totals rather than an impression of them.
     bring_up = read("documentation/testing/bring-up-record.md")
-    bring_up_rows = re.findall(r"^\| \d+\.\d+ \|.*$", bring_up, re.MULTILINE)
+    bring_up_rows = re.findall(r"^\| \d+\.\d+[a-z]? \|.*$", bring_up, re.MULTILINE)
     measured = [r for r in bring_up_rows if "✅" in r or "⚠" in r or "❌" in r]
     checker.check(f"README states {len(measured)} of {len(bring_up_rows)} bring-up rows measured",
                   f"{len(measured)} of {len(bring_up_rows)} recorded measurements" in readme,
@@ -352,6 +352,51 @@ def main() -> int:
                 "ground-station/software/README.md"):
         checker.check(f"{doc} replays a file that exists",
                       "packets.txt" not in read(doc))
+
+    # The status LED is the only thing the vehicle can say without a radio or a serial
+    # cable, and both the bring-up record and the runbook tell an operator which blink rate
+    # means what. Those cadences live in one switch in controller.cpp.
+    controller = read("firmware/flight-computer/src/controller.cpp")
+    body = controller[controller.index("void Controller::update_led"):]
+    body = body[:body.index("board_.set_status_led(on);")]
+    armed = re.search(r"is_armed\(mission_ms\) \? (\d+) : (\d+)", body)
+    flight = re.search(r"case MissionState::flight:\s*\n\s*period = (\d+);", body)
+    recovery = re.search(r"case MissionState::recovery:\s*\n\s*period = (\d+);", body)
+    fault = re.search(r"case MissionState::fault:\s*\n\s*period = (\d+);", body)
+    runbook = read("documentation/operations/runbook.md")
+    cadences = [
+        ("READY armed", armed.group(1) if armed else None, bring_up),
+        ("READY unarmed", armed.group(2) if armed else None, bring_up),
+        ("FLIGHT", flight.group(1) if flight else None, bring_up),
+        ("LANDED/RECOVERY", recovery.group(1) if recovery else None, bring_up),
+        ("FAULT", fault.group(1) if fault else None, bring_up),
+    ]
+    for label, half, doc in cadences:
+        checker.check(f"bring-up-record.md states the {label} LED cadence ({half} ms)",
+                      half is not None
+                      and f"{half} ms on, {half} ms off" in doc
+                      and f"**{2 * int(half)} ms full cycle**" in doc,
+                      str(half))
+    checker.check(f"runbook.md states the FAULT blink rate ({fault.group(1) if fault else '?'} ms)",
+                  bool(fault) and f"{fault.group(1)} ms)" in runbook,
+                  fault.group(1) if fault else "?")
+
+    # The runbook's troubleshooting pages quote the calibration gates an operator is
+    # standing over on the pad, wondering why CAL-1 has not appeared. Wrong numbers there
+    # send someone hunting a fault that is not there.
+    still_samples = constant(config, "calib_samples")
+    calib_timeout = constant(config, "calib_timeout_ms")
+    still_dps = decimal(config, "calib_gyro_still_dps")
+    accel_tol = decimal(config, "calib_accel_tol_mps2")
+    checker.check(f"runbook.md states the {still_dps} dps stillness gate",
+                  f"{still_dps:g} °/s" in runbook, str(still_dps))
+    checker.check(f"runbook.md states the {accel_tol} m/s2 acceleration gate",
+                  f"{accel_tol:g} m/s²" in runbook, str(accel_tol))
+    checker.check(f"runbook.md states the {still_samples}-sample calibration window",
+                  f"over {still_samples} samples" in runbook, str(still_samples))
+    checker.check(f"runbook.md states the {calib_timeout} ms calibration timeout",
+                  f"After {calib_timeout // 1000} s it resolves best-effort" in runbook,
+                  str(calib_timeout))
 
     counts = suite_counts()
     if counts is None:

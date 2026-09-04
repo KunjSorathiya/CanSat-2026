@@ -30,7 +30,7 @@ and streams telemetry from power-on through recovery.**
 |---|---|
 | 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 4395 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
 | 🟡 **Firmware drivers** | The IMU, barometer, GPS and radio drivers **have run on real silicon** and their numbers are recorded. The microSD driver and the flight image as a whole have not |
-| 🟠 **Hardware** | Bring-up under way: **18 of 77 recorded measurements taken** — the bare Pico, the IMU and barometer, the GPS, the radio's airtime, and the bench identification that found the IMU is a six-axis part. **Power is untouched** — no regulator selected, no switch, no divider, nothing measured |
+| 🟠 **Hardware** | Bring-up under way: **18 of 79 recorded measurements taken** — the bare Pico, the IMU and barometer, the GPS, the radio's airtime, and the bench identification that found the IMU is a six-axis part. **Power is untouched** — no regulator selected, no switch, no divider, nothing measured |
 | 🔴 **Mechanical** | Structure, egg chamber and parachute **not started** — blocked on a rulebook contradiction |
 
 > [!IMPORTANT]
@@ -406,7 +406,7 @@ bash tools/build_host.sh
 | Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **107 / 107** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
 | Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **42 / 42** |
-| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **135 / 135** |
+| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **145 / 145** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
