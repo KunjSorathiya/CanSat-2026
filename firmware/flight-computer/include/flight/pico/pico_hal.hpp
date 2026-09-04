@@ -99,6 +99,10 @@ public:
     bool high_capacity() const { return card_.high_capacity(); }
     std::uint32_t boot_count() const { return log_.boot_count(); }
     std::uint32_t record_count() const { return log_.record_count(); }
+    // A record too long for one 512-byte block is cut. The log is evidence, so a cut
+    // record has to be visible as one -- and it was counted by RawBlockLog and read by
+    // nothing, which is the same as not counting it.
+    std::uint32_t truncated_records() const { return log_.truncated_records(); }
 
 private:
     pico::SdCard card_;

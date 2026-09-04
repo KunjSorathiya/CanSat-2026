@@ -83,7 +83,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 58 suites across the whole flight core | ✅ **3557 / 3557 assertions** |
+| `flight_tests` | 59 suites across the whole flight core | ✅ **3560 / 3560 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
@@ -142,7 +142,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 58 suites, 3557 assertions
+### `flight_tests` — 59 suites, 3560 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -169,6 +169,7 @@ flowchart LR
 | `test_state_machine_fault_paths` | `FAULT` is reachable from every operational state and does not stop telemetry |
 | `test_config_validation` | The `CAN-Team-XX` placeholder, a telemetry period over 1000 ms, and a post-impact window under 5000 ms are all rejected |
 | `test_telemetry_builder` | Snapshot to record to packet, optional GPS ordering, suppression on invalid mandatory data |
+| `test_the_widest_sd_row_still_fits_one_block` | The widest SD row the builder can produce — every column at its legitimate maximum, plus a packet at the airtime budget's cap — fits one 512-byte block, so raising that cap fails the build instead of silently cutting the flight log |
 | `test_raw_block_log` | Header round-trip, append, resume after a simulated reset, boot counting, full-region behaviour |
 | `test_controller_sequence_and_degradation` | Sequential packets under normal operation, and continued operation when a peripheral fails |
 | `test_controller_sensor_failure_suppresses_but_continues` | Invalid mandatory data suppresses the packet without consuming a number and without stopping the loop |

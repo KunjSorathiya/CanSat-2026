@@ -386,6 +386,7 @@ computed airtime that has never been observed.
 | 6.4 | Records written per telemetry packet | 2 (record + header) | Count blocks after N packets | | |
 | 6.5 | Log survives a power cut | Resumes at the right block, no data lost | Pull power mid-flight-test, reboot, read back | | |
 | 6.6 | Boot count increments | +1 per power session | `boot_count()` | | |
+| 6.6a | Records cut to fit a block | **0** — the widest possible row is 402 bytes against a 511-byte limit, 109 to spare | `truncated_records()`, reported by `cansat_bringup_firmware` at 6.6 | | |
 | 6.7 | Records recovered after impact | All up to the last write | Read the card after a drop test | | |
 
 > 6.5 is the one to do deliberately and more than once, at different moments — the log's

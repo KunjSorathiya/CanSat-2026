@@ -1601,6 +1601,59 @@ struct MemBlocks {
     }
 };
 
+void test_the_widest_sd_row_still_fits_one_block() {
+    // The onboard log writes one CSV row per 512-byte block, and RawBlockLog cuts anything
+    // longer. A cut row is a corrupted record in the file that exists precisely so the
+    // flight survives losing the radio, so the row must be bounded by construction rather
+    // than by the values a mission happens to produce.
+    //
+    // The row is metadata plus the whole packet, and the packet is already capped at
+    // cansat::link::kWorstCasePacketBytes. What this pins is the metadata: whatever the
+    // rest of the row costs, it plus that cap has to fit in one block. Raising the packet
+    // budget for airtime reasons then fails here instead of silently shortening the log.
+    flight::Configuration config;
+    config.team_id = "CAN-Team-07";
+    flight::TelemetryBuilder builder(config);
+
+    flight::SensorSnapshot snapshot;
+    snapshot.imu_valid = snapshot.baro_valid = snapshot.orientation_valid = true;
+    // Values at the wide end of what the plausibility gates admit, so every numeric column
+    // is as long as it can legitimately be, and negative so each carries a sign.
+    snapshot.altitude_m = -1234.5;
+    snapshot.pressure_pa = -123456.78;
+    snapshot.temperature_c = -123.4;
+    snapshot.roll_deg = -179.9;
+    snapshot.pitch_deg = -179.9;
+    snapshot.yaw_deg = -359.9;
+    snapshot.ax_mps2 = -299.99;
+    snapshot.ay_mps2 = -299.99;
+    snapshot.az_mps2 = -299.99;
+    snapshot.gps.valid = true;
+    snapshot.gps.latitude = -179.999999;
+    snapshot.gps.longitude = -179.999999;
+    snapshot.gps.altitude = -9999.9;
+
+    // The longest state name, the largest counters, and a mission clock at the widest the
+    // field can hold.
+    const auto built = builder.build(4294967295u, 359999999u, snapshot);
+    CHECK(built.has_value());
+    if (!built) return;
+
+    const std::string row =
+        builder.sd_line(*built, flight::MissionState::self_test, 4294967295u);
+
+    // The metadata around the packet, which is what this test actually bounds.
+    CHECK(row.size() >= built->packet.size());
+    const std::size_t overhead = row.size() - built->packet.size();
+    const std::size_t widest = overhead + cansat::link::kWorstCasePacketBytes;
+
+    CHECK(widest <= flight::RawBlockLog::kMaxRecordBytes);
+    if (widest > flight::RawBlockLog::kMaxRecordBytes) {
+        std::cerr << "  widest possible SD row is " << widest << " bytes, and one block "
+                  << "holds " << flight::RawBlockLog::kMaxRecordBytes << "\n";
+    }
+}
+
 void test_raw_block_log() {
     MemBlocks mem(8);
     flight::RawBlockLog::Io io;
@@ -2380,6 +2433,7 @@ int main(int argc, char** argv) {
     test_lora_airtime_reference_vectors();
     test_telemetry_builder();
     test_sd_log_row_matches_its_header();
+    test_the_widest_sd_row_still_fits_one_block();
     test_raw_block_log();
     test_raw_block_log_survives_a_torn_header_write();
     test_controller_sequence_and_degradation();

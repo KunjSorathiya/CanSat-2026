@@ -55,6 +55,37 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — the flight log counted its own cut records and told nobody
+
+`RawBlockLog` writes one record per 512-byte block and cuts anything longer. It counts
+those cuts in `truncated_records()`, under a comment that says *"Never silent: the flight
+log is evidence, and a shortened record should be visible as such."*
+
+Nothing read it. The counter was incremented, asserted in one test, and exposed to no
+health snapshot, no diagnostic and no operator — which is the same as not counting it. The
+onboard log is what a flight has left when the radio does not work, and a cut row in it
+would have looked exactly like a complete one.
+
+`PicoSdLogger` now exposes it and `cansat_bringup_firmware` prints it at Gate 6.6, beside
+the boot count, with the zero case spelled out rather than left as a bare number.
+
+**And the reason it should stay zero is now pinned.** `test_the_widest_sd_row_still_fits_one_block`
+builds the widest row the builder can produce — every column at its legitimate maximum,
+negative so each carries a sign, the longest state name, both counters at `4294967295` —
+and holds *its metadata plus the packet budget's cap* to one block:
+
+| | bytes |
+|---|---:|
+| Row metadata around the packet | 147 |
+| `kWorstCasePacketBytes` | 255 |
+| **Widest possible record** | **402** |
+| One block holds | 511 |
+| **Margin** | **109** |
+
+So truncation is not reachable today. The value of the test is the day someone raises the
+packet budget for airtime reasons: that now fails the build here, instead of quietly
+shortening every long row in the flight log. Bring-up row 6.6a records the expected zero.
+
 ### Added — the numbers an operator reads off the vehicle are now gated too
 
 The status LED is the only thing the vehicle can say with no radio and no serial cable, and

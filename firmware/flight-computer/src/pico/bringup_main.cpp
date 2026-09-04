@@ -574,6 +574,11 @@ void report_sd() {
                 static_cast<unsigned long>(logger.boot_count()),
                 static_cast<unsigned long>(logger.record_count()),
                 logger.high_capacity() ? "block-addressed" : "byte-addressed");
+    const unsigned long truncated =
+        static_cast<unsigned long>(logger.truncated_records());
+    std::printf("   truncated = %lu%s\n", truncated,
+                truncated == 0 ? "  (no record was cut)"
+                               : "  <-- RECORDS WERE CUT: rows longer than 511 bytes");
     std::printf("   Power-cycle and re-run: boot_count must increase by exactly one.\n");
 }
 
