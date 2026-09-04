@@ -374,6 +374,14 @@ Sixteen enumerated codes in a fixed-size array — no allocation, and constant c
 regardless of mission length. Faults carry severity, occurrence count, and first and last
 timestamps. `clear()` marks recovery but keeps the history.
 
+**Severity is monotonic while a fault is active.** The controller escalates some faults —
+`imu_init` is reported as an *error*, then as *critical* once it is clear no compliant
+packet can ever be produced — so `report()` honours an escalation but refuses a downgrade
+until the fault is cleared. Without that rule a later routine report at the lower severity
+would silently demote a fault that still applied, and `has_critical()` would stop seeing it.
+`total_occurrences()` saturates rather than wrapping, because a count that reads as a small
+number after wrapping is worse than one that stops at the maximum.
+
 | Code | Severity | Raised when | Effect |
 |---|---|---|---|
 | `config_invalid` | critical | `validate_config()` fails | FAULT; no compliant telemetry is possible |

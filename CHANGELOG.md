@@ -8,6 +8,30 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 29)
+
+### Documentation — the test plan and the defect register caught up with the code
+
+An audit of the documentation against the source, prompted by a review of six earlier
+findings. All six were confirmed fixed in code with named regression tests that run —
+the loop tick bounded by the GPS UART FIFO, battery voltage that says whether it is
+scaled, the ADC channel derived from the configured pin, the bounded vertical-speed hold,
+the steady-descent landing case, and monotonic fault severity. What had drifted was the
+writing about them.
+
+* `documentation/testing/test-plan.md` listed 24 of the 41 `flight_tests` suites and gave
+  the count as 43. All 41 are now listed, in the order the runner invokes them, and a
+  parity check confirms the table and the runner name exactly the same set.
+* The fault model in `software-architecture.md` described severity, occurrence counts and
+  timestamps but never stated the rule that severity cannot fall while a fault is active —
+  the whole point of the cycle-25 fix. It says so now, with the reason.
+* The defect register had no entry for that fix. It is recorded as **F-42**, with its
+  actual closure cycle and a note that the register entry came later.
+
+No code changed in this cycle.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 28)
 
 ### Fixed — a silent GPS no longer transmits its last position as a live one

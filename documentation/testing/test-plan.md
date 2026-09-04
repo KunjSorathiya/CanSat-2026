@@ -52,7 +52,7 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 43 suites across the whole flight core | ✅ **676 / 676 assertions** |
+| `flight_tests` | 41 suites across the whole flight core | ✅ **676 / 676 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
@@ -111,7 +111,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 43 suites, 676 assertions
+### `flight_tests` — 41 suites, 676 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -123,8 +123,6 @@ flowchart LR
 | `test_pressure_altitude` | The barometric formula produces the expected altitude for known pressures |
 | `test_orientation_levels_and_yaw` | Roll and pitch converge from the gravity vector; yaw integrates body rate and wraps correctly |
 | `test_gps_parser` | GGA and RMC parsing, checksum validation, fix and no-fix handling, malformed sentence rejection |
-| `test_a_frozen_gps_fix_is_not_reported_as_a_live_position` | A receiver that stops talking has its fix aged out of telemetry and raises `gps_unavailable`, instead of repeating the last position it saw for the rest of the flight |
-| `test_config_rejects_a_gps_timeout_faster_than_the_receiver` | A fix timeout shorter than one NEO-6M navigation period is refused, so a live fix cannot expire between its own updates |
 | `test_scheduler` | Fires at most once per period, and re-anchors after a stall instead of firing a catch-up burst |
 | `test_fault_manager` | Report, clear, occurrence counting, severity escalation, critical latching |
 | `test_state_machine_full_mission` | The full `INIT` to `RECOVERY` path with realistic inputs, including the 5 s post-impact window |
@@ -135,6 +133,27 @@ flowchart LR
 | `test_controller_sequence_and_degradation` | Sequential packets under normal operation, and continued operation when a peripheral fails |
 | `test_controller_sensor_failure_suppresses_but_continues` | Invalid mandatory data suppresses the packet without consuming a number and without stopping the loop |
 | `test_controller_launch_detection` | `READY` to `FLIGHT` on a sustained boost or climb once armed |
+
+| `test_imu_range_bits_match_their_sensitivities` | The full-scale range written to the IMU and the scale used to convert its output agree. A mismatch multiplies every acceleration by two, four or eight and the data still looks plausible |
+| `test_config_radio_airtime_guard` | A telemetry period the radio cannot physically sustain is rejected on the pad rather than silently under-running in flight |
+| `test_formatter_and_parser_agree_at_the_edges` | The formatter never emits a packet this library's own parser rejects, at every boundary value |
+| `test_controller_drops_optional_fields_before_overrunning_the_budget` | An over-long packet sheds its optional fields in rulebook priority order instead of being truncated by the radio into something the ground station can only read as corruption |
+| `test_gps_coordinate_validation` | A checksum-valid sentence carrying an impossible position is rejected: the vehicle transmits no fix rather than a wrong one |
+| `test_orientation_blends_across_the_wrap` | The complementary filter blends angles correctly across the ±180° seam, which a tumbling CanSat crosses on every rotation |
+| `test_calibration_rejects_a_steady_rotation_as_bias` | A vehicle turning at a constant rate on the pad is steady by variance alone; the gate refuses to subtract that real body rate as gyro bias for the whole flight |
+| `test_fault_severity_never_falls_while_active` | Severity is monotonic while a fault is active — escalation is honoured, a later routine report at a lower severity cannot downgrade a fault that still applies, and clearing genuinely resets it |
+| `test_landing_is_not_declared_during_a_steady_descent` | A steady parachute descent reads as 1 g, indistinguishable from resting on the ground; only the vertical rate separates them, and it does |
+| `test_battery_voltage_reports_whether_it_is_scaled` | Battery reporting says which voltage it is showing, so an operator reading 1.6 V off a 3.7 V cell knows it is an unscaled ADC pin voltage before reacting to it |
+| `test_loop_tick_is_bounded_by_the_gps_uart_fifo` | A loop tick too slow to drain the GPS UART before its 32-byte FIFO fills is rejected by `validate_config()` |
+| `test_sensor_timing_model` | The BMP280 and MPU-6050 timing model, pinned to the datasheets' own published presets |
+| `test_config_sensor_rate_guard` | The configured acquisition rate is one the sensors can actually feed at their configured oversampling |
+| `test_controller_ignores_repeated_barometer_samples` | A barometer returning the same conversion twice does not read as zero climb rate |
+| `test_lora_airtime_reference_vectors` | The C++ airtime model matches the same published SX127x reference vectors as `tools/link_budget.py`, so the two cannot drift apart |
+| `test_sd_log_row_matches_its_header` | Every SD log row has exactly as many columns as the header, with or without a GPS fix, so scripts that index columns by position stay correct |
+| `test_raw_block_log_survives_a_torn_header_write` | Two alternating header copies mean a power failure during a header write always leaves one valid resume point, instead of sending the next boot back over the flight it just recorded |
+| `test_a_frozen_gps_fix_is_not_reported_as_a_live_position` | A receiver that stops talking has its fix aged out of telemetry and raises `gps_unavailable`, instead of repeating the last position it saw for the rest of the flight |
+| `test_config_rejects_a_gps_timeout_faster_than_the_receiver` | A fix timeout shorter than one NEO-6M navigation period is refused, so a live fix cannot expire between its own updates |
+| `test_link_profile_is_shared_by_both_ends` | The vehicle and the bridge read the same modem parameters field by field, so the two ends cannot be configured apart — a mismatch is a silent, total link failure |
 | `test_controller_arming_lockout_blocks_early_boost` | A boost before the arming delay cannot trigger a false launch |
 | `test_startup_calibrator_stationary_and_moving` | A still vehicle calibrates cleanly; a moving one resolves best-effort with the barometric reference only |
 | `test_controller_sensor_plausibility` | Readings outside datasheet bounds are rejected and the previous value is dropped |

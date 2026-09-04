@@ -16,20 +16,20 @@ configuration under `.claude/`)
 > preserved as the record of that run.
 >
 > **Pass 2** was a deeper engineering review of the same software, and it found
-> substantially more — thirty further defects, F-12 to F-41, including several that
+> substantially more — thirty-one further defects, F-12 to F-42, including several that
 > would have produced a failed or mis-recorded flight. The headline: the telemetry rate the
 > project had chosen was one the radio physically could not deliver. Findings F-12 onward,
 > the [second-pass summary](#second-pass-summary) and the file-by-file rows marked with a
 > cycle number are from that pass.
 
-**Verdict:** ✅ **Pass. 34 defects found and fixed across both passes; the remaining open
+**Verdict:** ✅ **Pass. 35 defects found and fixed across both passes; the remaining open
 items all require hardware.**
 
 ---
 
 ## Second-pass summary
 
-Thirty findings, all fixed, all with regression tests. Grouped by what they would have
+Thirty-one findings, all fixed, all with regression tests. Grouped by what they would have
 cost:
 
 | Would have caused | Findings |
@@ -263,6 +263,7 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-39** | The Pico GPS adapter opened its UART at a hard-coded 9600 baud while `config.gps_baud` existed and `validate_config()` sized the flight loop's tick against it. Changing the configured rate would have moved the guard without moving the hardware, leaving the loop validated against a baud rate the UART was not using | Medium | ✅ **Closed 2026-09-04 (cycle 28)** — the adapter takes the rate from the configuration it is validated against |
 | **F-40** | The GPS was polled on the raw boot clock while every other sensor was polled on the mission clock, putting two different time bases in one health structure and making any age computed from it wrong | Low | ✅ **Closed 2026-09-04 (cycle 28)** — all sensors are polled on the mission clock |
 | **F-41** | In all three frame decoders a `$` arriving inside a corrupt header was discarded as part of the resync. That byte is the start of the *next* frame, so one corrupted header cost two packets instead of one | Low | ✅ **Closed 2026-09-04 (cycle 28)** — the header restarts on the `$` in `framing.cpp`, `transport.py` and the web console; regression tests in all three |
+| **F-42** | `FaultManager::report()` overwrote the stored severity on every call, so a fault escalated to *critical* would have been silently downgraded by the next routine report at a lower severity, and `has_critical()` would have stopped seeing a fault that still applied. The mission's own critical-fault decision reads specific codes rather than `has_critical()`, so flight behaviour was never affected — but a diagnostic that can lie is worth fixing before something starts relying on it | Low | ✅ **Closed 2026-09-04 (cycle 25)** — severity is monotonic while a fault is active, and `total_occurrences()` saturates rather than wrapping. Recorded in this register in cycle 29, having been fixed and tested in cycle 25 |
 
 ---
 
