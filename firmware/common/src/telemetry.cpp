@@ -20,9 +20,13 @@ std::string number(double value, int precision) {
     char buffer[64];
     const int written = std::snprintf(buffer, sizeof(buffer), "%.*f", precision, value);
     if (written <= 0) return std::string();
-    return std::string(buffer, static_cast<std::size_t>(written < static_cast<int>(sizeof(buffer))
-                                                            ? written
-                                                            : sizeof(buffer) - 1));
+    // A finite double can still be far too wide for this buffer: "%.2f" of 1e300 is over
+    // three hundred characters. The old code returned the first 63 of them, which is a
+    // digit string with no decimal point -- a corrupted reading that looks like a reading.
+    // An empty field is rejected by every parser in this project, so a value that cannot
+    // be represented produces an invalid packet rather than a plausible wrong one.
+    if (written >= static_cast<int>(sizeof(buffer))) return std::string();
+    return std::string(buffer, static_cast<std::size_t>(written));
 }
 
 bool finite(double value) { return std::isfinite(value); }

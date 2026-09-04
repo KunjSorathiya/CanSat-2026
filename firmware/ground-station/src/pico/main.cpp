@@ -153,7 +153,14 @@ int main() {
         const std::uint32_t now = radio_millis(nullptr);
         if (now - last_status >= STATUS_PERIOD_MS) {
             last_status = now;
-            char line[128];
+            // 160 rather than 128: the worst case this format can produce is 121
+            // characters -- both counters at 4294967295, and an SNR that is whatever
+            // float the radio last returned, which formats to 42 characters at its most
+            // negative. That fits 128 with seven bytes to spare, which is not enough
+            // margin for the next field somebody adds. snprintf would truncate rather
+            // than overflow, but a silently truncated status line is a field that
+            // vanishes exactly when the link is misbehaving.
+            char line[160];
             // The sync word is reported, not assumed. The rulebook uses one word for
             // testing and another for the launch, and the switch is a reflash of both
             // ends; a display that states which word is in use from a compiled-in

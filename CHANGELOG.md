@@ -55,6 +55,36 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — a number too wide to format became a number, not an error
+
+`number()` formats every mandatory telemetry field into a 64-byte buffer. Values are
+finite-checked first, but finite is not the same as representable: `"%.2f"` of `1e300` is
+over three hundred characters, and the formatter returned the first 63 of them. That is a
+long digit string with no decimal point — a corrupted reading wearing the shape of a
+reading.
+
+Both the old and the new behaviour end in a rejected packet, because every parser in this
+project is precision-strict. The difference is what the packet carries on the way there:
+`Pr-;`, a field that says nothing, rather than `Pr-1000000000000…`, a field that says
+something false. Anything downstream that logs the raw payload — and this project logs every
+raw payload, deliberately — keeps the honest one.
+
+No sensor can reach these values; the plausibility checks would suppress them long before.
+This is the class of defect that only appears when something else has already gone wrong,
+which is exactly when a log has to be trustworthy.
+
+`test_a_value_too_wide_to_format_invalidates_the_packet` covers it, and was confirmed to
+fail against the previous formatter before the fix was kept.
+
+### Changed — the bridge status buffer, sized for the field after next
+
+The status line's worst case is 121 characters: both counters at `4294967295`, and an SNR
+that is whatever float the radio last returned, which formats to 42 characters at its most
+negative. That fits the old 128-byte buffer with seven bytes to spare — enough today, and
+not enough for the next field somebody adds. `snprintf` truncates rather than overflows, but
+a truncated status line is a field that silently vanishes exactly when the link is
+misbehaving. The buffer is 160 now, with the arithmetic written down beside it.
+
 ### Fixed — the design documents caught up with F-1, and a rule now keeps them there
 
 The hardware documents recorded the six-axis IMU the day it was identified. The design

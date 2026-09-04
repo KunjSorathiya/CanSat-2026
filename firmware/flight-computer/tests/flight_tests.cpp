@@ -753,6 +753,40 @@ void test_config_radio_airtime_guard() {
 }
 
 // The formatter must never emit a packet this library's own parser rejects.
+void test_a_value_too_wide_to_format_invalidates_the_packet() {
+    // Every mandatory field is finite-checked before formatting, but finite is not the
+    // same as representable: "%.2f" of 1e300 is over three hundred characters. The
+    // formatter used to return the first 63 of them -- a long digit string with no
+    // decimal point, which is a corrupted reading wearing the shape of a reading. Both
+    // behaviours end in a rejected packet, so the difference only shows in what the
+    // packet carries: a field that says nothing, rather than one that says something
+    // false.
+    cansat::TelemetryRecord r = make_valid_record();
+    r.pressure_pa = 1e300;
+    const auto packet = cansat::format_packet(r);
+    CHECK(packet.has_value());
+    if (packet) {
+        CHECK(packet->find("; Pr-;") != std::string::npos);
+        CHECK(packet->find("Pr-1000000") == std::string::npos);
+        CHECK(!cansat::parse_packet(*packet));
+    }
+
+    r.pressure_pa = -1e300;
+    const auto negative = cansat::format_packet(r);
+    CHECK(negative.has_value());
+    if (negative) {
+        CHECK(negative->find("; Pr-;") != std::string::npos);
+        CHECK(!cansat::parse_packet(*negative));
+    }
+
+    // A pressure a barometer could actually report still formats and still round-trips.
+    r.pressure_pa = 101325.25;
+    const auto ordinary = cansat::format_packet(r);
+    CHECK(ordinary.has_value());
+    CHECK(ordinary->find("Pr-101325.25;") != std::string::npos);
+    CHECK(cansat::parse_packet(*ordinary));
+}
+
 void test_formatter_and_parser_agree_at_the_edges() {
     // Timestamp: the hour field is two digits, so it wraps at 100 hours rather than
     // widening. Anything else produces a packet every ground station rejects.
@@ -2328,6 +2362,7 @@ int main(int argc, char** argv) {
     test_config_validation();
     test_config_radio_airtime_guard();
     test_formatter_and_parser_agree_at_the_edges();
+    test_a_value_too_wide_to_format_invalidates_the_packet();
     test_controller_drops_optional_fields_before_overrunning_the_budget();
     test_gps_coordinate_validation();
     test_orientation_survives_the_wrap_and_the_poles();
