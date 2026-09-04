@@ -153,12 +153,28 @@ confident wrong number.
 | 3.2 | Stationary acceleration magnitude | 9.81 m/s². **Firmware gate is ±1.5** (`calib_accel_tol_mps2`); a healthy part at rest should be an order of magnitude tighter | `calib_accel_tol_mps2` | Read 100 samples, take the mean | **9.8675 m/s², sd 0.0092**, 100 of 100 samples valid. +0.06 against true g — under 1 % scale error | ✅ 2026-09-05 / KS |
 | 3.3 | Stationary gyro bias, per axis | Within ±25 dps, typically < 5 | `calib_max_gyro_bias_dps` | Mean of 100 still samples | **X −3.3878, Y +0.9079, Z −0.4720 dps.** All inside ±25, and inside the datasheet's ±5 zero-rate figure. Startup calibration removes these | ✅ 2026-09-05 / KS |
 | 3.4 | Gyro noise, per axis | < 2 dps standard deviation | `calib_gyro_still_dps` | Standard deviation of the same samples | **X 0.0984, Y 0.0964, Z 0.1424 dps sd.** Fourteen to twenty times inside the limit — a quiet part | ✅ 2026-09-05 / KS |
-| 3.5 | Barometer output rate | **83 Hz** typical | [sensor-rates.md](../design/sensor-rates.md) | Poll continuously; count changed pressure values per second | | |
+| 3.5 | Barometer output rate | **83 Hz** typical, 72 Hz worst case | [sensor-rates.md](../design/sensor-rates.md) | Count falling edges of `STATUS.measuring` (0xF3 bit 3); **not** changed values — see the note | **≥44 Hz**, by changed-value counting, which undercounts. Re-take with the edge-counting method | ⚠️ 2026-09-05 / KS — lower bound only, and already 1.5× the 30 Hz it must beat |
 | 3.6 | Pressure vs a local reference | Within a few hundred Pa | — | Compare with a weather station or second barometer | | |
-| 3.7 | Achieved acquisition rate | **30 Hz** (33 ms period) | `sensor_period_ms` | Log mission time between sensor ticks | | |
-| 3.8 | Acquisition jitter | < 6 % of the period (2 ms) | 2 ms loop tick | Standard deviation of the same intervals | | |
+| 3.7 | Achieved acquisition rate | **30 Hz** (33 ms period) | `sensor_period_ms` | Log mission time between sensor ticks | **33.289 ms mean → 30.04 Hz**, over 150 ticks | ✅ 2026-09-05 / KS |
+| 3.8 | Acquisition jitter | < 6 % of the period (2 ms) | 2 ms loop tick | Standard deviation of the same intervals | **0.453 ms sd** against a 1.98 ms limit — 4.4× inside. Sensor read cost **0.282 ms mean, 0.328 ms worst**, i.e. under 1 % of the period (barometer only; the IMU was not wired for this run) | ✅ 2026-09-05 / KS |
 | 3.9 | Calibration settle time | Within `calib_samples` at 30 Hz ≈ 2.7 s | `startup_calibration.cpp` | Time from power-on to `CAL-1` in telemetry | | |
 | 3.10 | I2C bus utilisation | ~1.6 % at 30 Hz | [sensor-rates.md](../design/sensor-rates.md) | Scope SCL, measure active time per second | | |
+
+> **3.5 needs re-taking, and the fault was in the method, not the sensor.** The first
+> measurement counted *changed* pressure values and got 44 Hz against a predicted 83. That
+> undercounts: with the IIR filter at x16 the BMP280 deliberately moves its output slowly, so
+> consecutive conversions frequently produce the **same** compensated value. Counting distinct
+> values measures how often the reading moves, not how often the part converts — a different
+> question from the one this row asks.
+>
+> The diagnostic now also counts falling edges of **`STATUS.measuring`** (register `0xF3`,
+> bit 3). Every 1 → 0 transition is one completed conversion whether or not the result
+> changed, which is the output rate as the datasheet defines it. Re-run and record method B.
+>
+> **Either way the design constraint is already met.** Even the 44 Hz lower bound is 1.5×
+> the 30 Hz acquisition rate, so the concern below — a barometer slower than the loop — does
+> not arise. The margin is smaller than the predicted 2.8×, and that is worth knowing before
+> anyone raises `sensor_period_ms`.
 
 > 3.5 and 3.7 are the two that matter most. If the barometer is slower than the loop, the
 > vertical-speed estimate degrades — the firmware detects and handles it, but the

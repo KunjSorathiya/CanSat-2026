@@ -55,6 +55,35 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — 3.5 was measuring the wrong thing, and reported 44 Hz for it
+
+The first run of the barometer rate test returned 44 Hz against a predicted 83, which looked
+like a sensor finding. It was a method finding.
+
+Counting *changed* pressure values undercounts on this part. With the IIR filter at x16 the
+BMP280 deliberately moves its output slowly, so consecutive conversions frequently produce
+the **same** compensated value. Distinct-value counting therefore measures how often the
+reading moves, not how often the part converts — a different question from the one 3.5 asks,
+and the wrong one.
+
+The diagnostic now also counts falling edges of **`STATUS.measuring`** (register `0xF3`, bit
+3). Each 1 → 0 transition is one completed conversion whether or not the result changed,
+which is the output rate as the datasheet defines it. Both methods are printed, with A
+labelled a lower bound.
+
+**The design constraint was never in danger.** Even 44 Hz is 1.5× the 30 Hz acquisition rate,
+so the failure mode `sensor-rates.md` worries about — a barometer slower than the loop — does
+not arise. But the margin may be smaller than the predicted 2.8×, and that is worth knowing
+before anyone raises `sensor_period_ms`.
+
+### Verified — Gate 3 timing, on hardware
+
+- **3.7** mean interval **33.289 ms → 30.04 Hz** over 150 ticks, against a configured 33 ms.
+- **3.8** interval sd **0.453 ms** against a 1.98 ms limit — 4.4× inside.
+- Sensor read cost **0.282 ms mean, 0.328 ms worst**: under 1 % of the period. That is the
+  number that bounds the flight loop, and it has an enormous amount of room. Measured with
+  the barometer only, so it will rise once the IMU shares the bus.
+
 ### Added — the diagnostic now covers the rate rows and Gate 4
 
 `cansat_bringup_firmware` gains four measurements it could not take before:

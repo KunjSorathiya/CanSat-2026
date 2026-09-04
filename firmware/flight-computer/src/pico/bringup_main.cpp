@@ -86,13 +86,16 @@ bool read_reg8(std::uint8_t addr, std::uint8_t reg, std::uint8_t& out) {
 // only reliable difference from outside is this register. Receiving inspection C.4.1
 // identified the delivered part by measuring its package, which is evidence but not proof.
 // This is the proof.
-void report_baro_identity() {
+// Returns the address the barometer answered at, or 0 if none did.
+std::uint8_t report_baro_identity() {
     std::printf("\n-- Barometer identity (register 0xD0) --\n");
     int answered = 0;
+    std::uint8_t found = 0;
     for (const std::uint8_t addr : {0x76, 0x77}) {
         std::uint8_t id = 0;
         if (!read_reg8(addr, 0xD0, id)) continue;
         ++answered;
+        found = addr;
         const char* part = id == 0x58   ? "BMP280 - matches the BOM and the telemetry format"
                            : id == 0x60 ? "BME280 - HAS HUMIDITY, which the packet format has no field for"
                                         : "unrecognised - do not proceed on this part";
@@ -109,6 +112,7 @@ void report_baro_identity() {
                     "   Expected if the BMP280 is not wired - this image is happy to run\n"
                     "   with one sensor at a time.\n");
     }
+    return found;
 }
 
 void report_imu_identity(const flight::PicoImu& imu) {
@@ -220,32 +224,71 @@ void stationary_statistics(flight::PicoImu& imu, const flight::Configuration& co
 // only honest way to measure it from the outside - polling faster than the part converts
 // returns the same bytes again, and counting reads instead of changes would report the
 // poll rate and call it the output rate.
-void barometer_output_rate(flight::PicoBarometer& baro) {
+void barometer_output_rate(flight::PicoBarometer& baro, std::uint8_t baro_addr) {
     std::printf("\n-- 3.5 Barometer output rate --\n");
     constexpr std::uint32_t kWindowMs = 2000;
-    const std::uint64_t start = now_ms();
-    double last_pa = -1.0;
-    int changes = 0, reads = 0;
-    while (now_ms() - start < kWindowMs) {
-        flight::BaroSample b;
-        if (baro.read(b, now_ms()) && b.valid) {
-            ++reads;
-            if (b.pressure_pa != last_pa) {
-                ++changes;
-                last_pa = b.pressure_pa;
+    const double secs = static_cast<double>(kWindowMs) / 1000.0;
+
+    // Method A: count changed compensated values. Simple, and it undercounts - see below.
+    {
+        const std::uint64_t start = now_ms();
+        double last_pa = -1.0;
+        int changes = 0, reads = 0;
+        while (now_ms() - start < kWindowMs) {
+            flight::BaroSample b;
+            if (baro.read(b, now_ms()) && b.valid) {
+                ++reads;
+                if (b.pressure_pa != last_pa) {
+                    ++changes;
+                    last_pa = b.pressure_pa;
+                }
             }
         }
+        std::printf("   A: polled %d times in %.1f s (%.0f Hz poll rate)\n", reads, secs,
+                    reads / secs);
+        std::printf("   A: distinct values %d -> %.1f Hz  **LOWER BOUND ONLY**\n", changes,
+                    changes / secs);
     }
-    const double secs = static_cast<double>(kWindowMs) / 1000.0;
-    std::printf("   polled %d times in %.1f s (%.0f Hz poll rate)\n", reads, secs,
-                reads / secs);
-    std::printf("   distinct values: %d  ->  output rate %.1f Hz  (predicted 83 Hz)\n",
-                changes, changes / secs);
-    if (reads > 0 && changes >= reads - 1) {
-        std::printf("   NOTE: nearly every poll changed, so the sensor is at least this\n"
-                    "   fast and this figure is a lower bound, not a measurement. Poll\n"
-                    "   faster than the part converts to see the real ceiling.\n");
+
+    // Method B: count falling edges of STATUS.measuring (register 0xF3, bit 3). Each
+    // 1 -> 0 transition is one completed conversion, whether or not the result differs
+    // from the last one. This is the actual output rate.
+    //
+    // Method A cannot see that. With the IIR filter at x16 the part deliberately changes
+    // its output slowly, so consecutive conversions frequently produce the *same*
+    // compensated value - and counting distinct values then reports how often the reading
+    // moves, not how often the sensor converts. The two are different questions and only
+    // B answers the one 3.5 asks.
+    {
+        constexpr std::uint8_t kStatusReg = 0xF3;
+        constexpr std::uint8_t kMeasuringBit = 0x08;
+        const std::uint64_t start = now_ms();
+        int completions = 0, polls = 0;
+        bool was_measuring = false;
+        bool ok = true;
+        while (now_ms() - start < kWindowMs) {
+            std::uint8_t status = 0;
+            if (!read_reg8(baro_addr, kStatusReg, status)) {
+                ok = false;
+                break;
+            }
+            ++polls;
+            const bool measuring = (status & kMeasuringBit) != 0;
+            if (was_measuring && !measuring) ++completions;
+            was_measuring = measuring;
+        }
+        if (!ok) {
+            std::printf("   B: STATUS register unreadable - falling back on A\n");
+            return;
+        }
+        std::printf("   B: STATUS.measuring falling edges %d -> **%.1f Hz**  (predicted 83 Hz)\n",
+                    completions, completions / secs);
+        std::printf("      status polled %d times (%.0f Hz) - must be well above the\n"
+                    "      output rate or completions are missed between polls\n",
+                    polls, polls / secs);
     }
+    std::printf("   What matters for the design is the margin over the 30 Hz acquisition\n"
+                "   rate in sensor-rates.md, not the agreement with 83 Hz.\n");
 }
 
 // 3.7 and 3.8 measure a paced loop, not the flight controller's scheduler. What this
@@ -389,7 +432,7 @@ int main() {
     // pass-through bridge and does not answer the outside bus until BYPASS_EN is set.
     // Scanning twice makes that visible rather than something to take on trust.
     scan_i2c("before IMU init - AK8963 at 0x0C should NOT appear");
-    report_baro_identity();
+    const std::uint8_t baro_addr = report_baro_identity();
 
     const flight::Configuration config;
     flight::PicoImu imu(config);
@@ -407,7 +450,7 @@ int main() {
     }
 
     if (imu_ok) stationary_statistics(imu, config);
-    if (baro_ok) barometer_output_rate(baro);
+    if (baro_ok && baro_addr != 0) barometer_output_rate(baro, baro_addr);
     if (imu_ok || baro_ok) acquisition_rate(imu, baro, config, imu_ok, baro_ok);
 
     // GPS last: it is the only subsystem here whose supply is still unverified (C.5.5),
