@@ -540,7 +540,7 @@ why. Complete this section before anything else touches SPI0.
 | C.9.3 | Single- or double-sided | Visual | **Single-sided.** Copper pads on one face only; the reverse is bare laminate carrying the coordinate silkscreen | Photo 2026-09-04 |
 | C.9.4 | Pad pattern: isolated pads, strips, or bus rails | Visual | **Individually isolated round pads** — no strips, no linked rows. One row of elongated pads along each of the top and bottom edges | Photo 2026-09-04 |
 | C.9.5 | Adjacent pads are isolated | Meter | **Isolated.** Adjacent pads read open, both horizontally and vertically. **The elongated edge rows are isolated pad-to-pad as well** — they are not a bus | Meter 2026-09-05 / KS |
-| C.9.6 | Board thickness and mounting holes | Ruler, visual | **Four corner mounting holes.** Thickness not measurable from a photograph | Photo 2026-09-04 |
+| C.9.6 | Board thickness and mounting holes | Ruler, visual | **Four corner mounting holes. Thickness 1.6 mm**, measured on the delivered board | Photo 2026-09-04; **measured 2026-09-05 / KS** |
 
 > C.9.3 and C.9.4 together decide how the vehicle is built: **every connection is a wire.**
 > Isolated pads on a single-sided board give no power or ground rails, so a 3.3 V and a GND
@@ -555,6 +555,11 @@ why. Complete this section before anything else touches SPI0.
 >
 > The coordinate grid is worth using. Record each module's corner pad as, say, `F-12` in the
 > assembly notes, and the layout survives being taken apart.
+>
+> **1.6 mm is the standard FR-4 thickness**, which is the convenient answer: ordinary M2 or
+> M3 standoffs, spacers and nylon hardware are all dimensioned around it, and the mass
+> budget can use the usual figure for a 100 × 100 mm single-sided board rather than an
+> estimate. **C.9.6 was the last blank row in Part C.**
 
 > C.9.4 changes how the vehicle is laid out — strip board and isolated-pad board are wired
 > quite differently — so record it before planning placement.
