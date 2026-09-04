@@ -182,7 +182,7 @@ confident wrong number.
 > vertical-speed estimate degrades — the firmware detects and handles it, but the
 > configuration should be corrected rather than relied on to degrade gracefully.
 
-> **Rows 3.1–3.5, 3.7, 3.8, 4.1–4.3 and 8.8 are taken with `cansat_bringup_firmware`**, a separate image
+> **Rows 3.1–3.5, 3.7, 3.8, 4.1–4.3, 5.1–5.3 and 8.8 are taken with `cansat_bringup_firmware`**, a separate image
 > that prints over USB. The flight firmware speaks only over LoRa, so a vehicle with no radio
 > attached produces nothing to read — that is why this gate had no observable until the
 > diagnostic existed. Flash it exactly like the flight image, open the port at any baud rate,
@@ -266,9 +266,39 @@ confident wrong number.
 **The most valuable gate in this document.** Everything about the telemetry rate rests on
 computed airtime that has never been observed.
 
+> ⚠️ **Never transmit without the antenna connected.** An open RF port reflects the whole
+> output back into the power amplifier, and this is the one action in bring-up that can
+> destroy a module rather than merely fail. The chain is antenna → SMA joint → 10 cm pigtail
+> → u.FL, and [C.7.4](../hardware/receiving-inspection.md#c7--antenna-and-ipex-cable) confirmed
+> it mates with no adapter.
+>
+> `cansat_bringup_firmware` enforces this: it reads the version register unprompted, but
+> **will not transmit until someone presses `t`**, after printing the warning. Skipping the
+> prompt leaves 5.2 and 5.3 open rather than risking the part.
+>
+> **Rows 5.1–5.3 need only one radio.** 5.1 is a register read over SPI; 5.2 and 5.3 time
+> five transmits each and compare the mean against `lora_time_on_air_ms()` — the same model
+> the link budget and the build-time `static_assert` use, called at run time so the two
+> cannot drift apart. Measured time includes FIFO fill, mode changes and the DIO0 round trip,
+> so it should sit slightly **above** the prediction; well above means the driver is waiting
+> on something it should not be.
+>
+> Everything from 5.4 down needs both radios and the ground station.
+>
+> **Wiring for Gate 5**, from `BoardPins` — the RA-02's supply pin is third from the end with
+> `GND` either side, so mark pin 1 before connecting anything:
+>
+> ```text
+> Pico 3V3  pin 36  ──  3.3V        Pico GP17 pin 22  ──  NSS
+> Pico GND  pin 38  ──  GND         Pico GP20 pin 26  ──  RST
+> Pico GP18 pin 24  ──  SCK         Pico GP21 pin 27  ──  DIO0
+> Pico GP19 pin 25  ──  MOSI
+> Pico GP16 pin 21  ──  MISO
+> ```
+
 | # | Quantity | Predicted | Source | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|---|
-| 5.1 | RA-02 version register | 0x12 | `sx1278.cpp` | Read register 0x42 over SPI | | |
+| 5.1 | RA-02 version register | 0x12 | `sx1278.cpp` | Read register 0x42 over SPI — `cansat_bringup_firmware` reports it | | |
 | 5.2 | Airtime, 206-byte packet, SF7/125 kHz | **328 ms** | [link-budget.md](../design/link-budget.md) | Scope DIO0, TX start to TxDone | | |
 | 5.3 | Airtime, full 255-byte packet | **400 ms** | Same | Same, with a padded packet | | |
 | 5.4 | Achieved telemetry rate | **1.00 Hz** | `telemetry_period_ms` | Packet numbers per second at the ground station | | |

@@ -55,6 +55,26 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Added — Gate 5 on the diagnostic, with the transmit tests behind a prompt
+
+`cansat_bringup_firmware` now reads the RA-02's version register and can time its airtime.
+
+- **5.1** reads register `0x42` and interprets it. `0x12` is the SX1276/77/78 family; `0x00`
+  and `0xFF` are called out as **SPI failures rather than wrong answers**, because that is
+  what an unresponsive bus reads as and it is the difference between a wiring fault and a
+  dead modem.
+- **5.2 and 5.3** time five transmits each at 206 and 255 bytes and compare the mean against
+  `lora_time_on_air_ms()` — the same model the link budget and the build-time `static_assert`
+  use, called at run time so the diagnostic and the design cannot drift apart.
+
+**The transmit tests will not run without someone pressing `t`.** Transmitting into an
+unterminated port reflects the whole output back into the power amplifier, and this is the
+only action in the entire diagnostic that can destroy hardware rather than merely fail.
+Skipping the prompt leaves 5.2 and 5.3 open, which is the right trade.
+
+`PicoRadio` gains a `chip_version()` accessor, mirroring `PicoImu::who_am_i()` and for the
+same reason: the identity a part reports about itself is worth having on the bench.
+
 ### Verified — the GPS runs on 3.3 V, and C.5.5 is closed by operation
 
 The NEO-6M was powered from the Pico's own 3V3 output on 2026-09-05 and produced clean,
@@ -151,6 +171,14 @@ a 2 Hz poll would overrun it and lose sentences mid-line. That is the same reaso
 
 Any subset of the hardware may be connected — absent devices are reported and skipped, never
 fatal. That is what makes one-sensor-at-a-time bring-up practical without a breadboard.
+
+### Verified — the prototype board is 1.6 mm, and Part C is complete
+
+The last blank row. 1.6 mm is the standard FR-4 thickness, so ordinary M2 and M3 standoffs
+and spacers fit, and the mass budget can use the usual figure for a 100 × 100 mm
+single-sided board rather than an estimate.
+
+**Every row in Part C is now either measured or carries a written reason it could not be.**
 
 ### Verified — the barometer is a BMP280, and Part C's last four straps are closed
 

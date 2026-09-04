@@ -18,6 +18,9 @@
 #include "flight/interfaces.hpp"
 #include "flight/pico/pico_hal.hpp"
 
+#include "cansat/link_profile.hpp"
+#include "cansat/lora_airtime.hpp"
+
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 #include "hardware/uart.h"
@@ -25,8 +28,10 @@
 #include "pico/stdlib.h"
 
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <string>
 
 namespace {
 
@@ -384,6 +389,89 @@ void gps_raw_echo(const flight::Configuration& config, std::uint32_t seconds) {
     }
 }
 
+// ---- Gate 5 ------------------------------------------------------------------
+//
+// Timing a transmit measures airtime plus the driver's overhead: FIFO fill, mode changes
+// and the DIO0 round trip. The predicted figure comes from lora_time_on_air_ms() rather
+// than a literal, so this comparison cannot drift away from the model the link budget and
+// the build-time static_assert both use.
+void radio_airtime(flight::PicoRadio& radio, std::size_t bytes, const char* label) {
+    constexpr int kBursts = 5;
+    const std::string payload(bytes, 'A');
+    const double predicted = cansat::lora_time_on_air_ms(bytes, cansat::link::kModem);
+
+    double sum = 0.0;
+    int sent = 0;
+    for (int i = 0; i < kBursts; ++i) {
+        const std::uint64_t t0 = to_us_since_boot(get_absolute_time());
+        const bool ok = radio.transmit(payload);
+        const std::uint64_t t1 = to_us_since_boot(get_absolute_time());
+        if (ok) {
+            sum += static_cast<double>(t1 - t0) / 1000.0;
+            ++sent;
+        }
+        sleep_ms(200);
+    }
+    if (sent == 0) {
+        std::printf("   %s: every transmit FAILED - no TxDone from DIO0\n", label);
+        return;
+    }
+    const double mean = sum / sent;
+    std::printf("   %s: %.1f ms measured, %.1f ms predicted (%+.1f ms), %d/%d sent\n", label,
+                mean, predicted, mean - predicted, sent, kBursts);
+}
+
+void report_radio(const flight::Configuration& config) {
+    std::printf("\n-- 5.1 Radio identity --\n");
+    flight::PicoRadio radio(config);
+    const bool ok = radio.initialize(cansat::link::kTestSyncWord);
+    std::printf("   init: %s, sync word 0x%02X (test - the launch word is 0x%02X)\n",
+                ok ? "ok" : "FAILED", cansat::link::kTestSyncWord,
+                cansat::link::kOfficialSyncWord);
+    const std::uint8_t v = radio.chip_version();
+    std::printf("   version register 0x42 = 0x%02X  ", v);
+    if (v == 0x12) {
+        std::printf("SX1276/77/78 family - correct\n");
+    } else if (v == 0x00 || v == 0xFF) {
+        std::printf("**the SPI transaction failed, not the modem.**\n"
+                    "   0x00 and 0xFF are what an unresponsive bus reads as. Check NSS on\n"
+                    "   GP%d, SCK GP%d, MOSI GP%d, MISO GP%d, and that the module has 3.3 V.\n",
+                    flight::BoardPins::lora_cs, flight::BoardPins::spi_sck,
+                    flight::BoardPins::spi_mosi, flight::BoardPins::spi_miso);
+    } else {
+        std::printf("unexpected - the modem answered, but not as an SX127x\n");
+    }
+    if (!ok || v != 0x12) return;
+
+    // Transmitting into an unterminated port reflects the whole output back into the power
+    // amplifier. This is the one action in this diagnostic that can damage hardware, so it
+    // is not run without someone saying so.
+    std::printf("\n-- 5.2 / 5.3 Airtime --\n");
+    std::printf("   ***  DO NOT RUN THIS WITHOUT THE ANTENNA CONNECTED.  ***\n");
+    std::printf("   Transmitting into an open port reflects the output back into the PA\n");
+    std::printf("   and can destroy it. The chain is antenna -> SMA -> pigtail -> u.FL.\n");
+    std::printf("\n   Antenna fitted? Press 't' within 20 s to transmit. Anything else skips.\n");
+
+    const std::uint64_t deadline = now_ms() + 20000;
+    int key = -1;
+    while (now_ms() < deadline) {
+        key = getchar_timeout_us(0);
+        if (key != PICO_ERROR_TIMEOUT) break;
+        sleep_ms(50);
+    }
+    if (key != 't' && key != 'T') {
+        std::printf("   skipped. 5.2 and 5.3 stay open - re-run with the antenna fitted.\n");
+        return;
+    }
+
+    std::printf("   transmitting...\n");
+    radio_airtime(radio, 206, "5.2  206-byte packet");
+    radio_airtime(radio, 255, "5.3  255-byte packet");
+    std::printf("   Measured time includes FIFO fill, mode changes and the DIO0 round\n"
+                "   trip, so it should sit slightly above the predicted airtime. Well\n"
+                "   above means the driver is waiting on something it should not be.\n");
+}
+
 void gps_status(flight::PicoGps& gps, std::uint64_t boot_fix_ms) {
     cansat::GpsData d;
     const bool have = gps.latest(d) && d.valid;
@@ -455,6 +543,8 @@ int main() {
 
     // GPS last: it is the only subsystem here whose supply is still unverified (C.5.5),
     // so everything that can be measured without it is already on the record by now.
+    report_radio(config);
+
     gps_raw_echo(config, 5);
     flight::PicoGps gps(config);
     const bool gps_ok = gps.initialize();

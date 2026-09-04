@@ -72,6 +72,11 @@ public:
     bool transmit(const std::string& packet) override;
     bool healthy() const override { return healthy_; }
 
+    // Version register 0x42, read during begin(). 0x12 is the SX1276/77/78 family; a 0x00
+    // or 0xFF means the SPI transaction itself failed rather than the modem answering
+    // wrongly. Worth reporting on the bench, like the IMU's WHO_AM_I.
+    std::uint8_t chip_version() const { return radio_.chip_version(); }
+
 private:
     Configuration config_;
     cansat::Sx1278 radio_;
