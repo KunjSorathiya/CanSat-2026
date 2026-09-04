@@ -55,6 +55,45 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — the web console replayed raw logs without unescaping them
+
+Driving the console's DOM half in a browser — the half no suite covers — led to its file
+replay, and to the same defect the Python replay had, one layer along.
+
+The console already stripped a raw-log line's receipt timestamp. It never undid the
+escaping. `logger.py` turns tab, CR, LF and backslash into two-character escapes and every
+other control character into `\xNN`, which is what keeps one record on one line; replayed
+without reversing that, a payload containing a tab comes back carrying a literal backslash
+and a `t`. **The records this matters for are the corrupted ones — which is what a forensic
+replay is for.**
+
+`unescapeRaw()` joins the console's portable core, mirroring `unescape_raw()`, and the
+replay path uses it. `check_doc_claims.py` checks the console actually calls it, not merely
+that it owns a function that could.
+
+**And the two implementations are now held to one file.** `test-data/raw-log-escapes.tsv`
+carries 16 cases — every rule, alone and together, plus the two the scheme actually turns
+on:
+
+| Escaped | Means | Not |
+|---|---|---|
+| `\\there` | a backslash, then `there` | a tab, then `here` |
+| `\\x41suffix` | a backslash, then `x41suffix` | `Asuffix` |
+
+An unescaper a single character out of step reads the left column as the right one — and
+invents a payload the vehicle never sent, while trying to recover one. The plain text is
+stored as hex, because it is allowed to contain tabs and newlines: the same reason the log
+escapes it in the first place.
+
+Malformed escapes are covered too, and pass through unchanged rather than being guessed at.
+A truncated `\x4` at the end of a line is corruption in a forensic record; keeping it
+verbatim keeps the evidence.
+
+Also checked in the browser, with no defect found: the console survives every packet shape
+the parser accepts — mandatory-only, full GPS, both yaw references, all four diagnostic
+tags, an unknown optional field — with no exception and no wrong field. The `—` shown for
+the sync word before the bridge reports one behaves as designed.
+
 ### Fixed — a dashboard row that could only ever say `n/a`
 
 Sweeping for the same shape as the cut-record counter — values computed and surfaced
