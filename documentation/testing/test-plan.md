@@ -52,7 +52,7 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 32 suites across the whole flight core | ✅ **464 / 464 assertions** |
+| `flight_tests` | 33 suites across the whole flight core | ✅ **506 / 506 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
@@ -110,7 +110,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 32 suites, 464 assertions
+### `flight_tests` — 33 suites, 506 assertions
 
 | Suite | What it proves |
 |---|---|

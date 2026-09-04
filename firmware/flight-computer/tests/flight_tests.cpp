@@ -126,6 +126,69 @@ void test_mpu_scaling() {
     CHECK(approx(mpu_temperature_c(0), 36.53, 1e-6));
 }
 
+// The range written to the IMU and the scale used to convert its output must agree. A
+// mismatch multiplies every acceleration by two, four or eight, and the data still looks
+// entirely plausible — which is what makes it worth a dedicated test.
+void test_imu_range_bits_match_their_sensitivities() {
+    using namespace flight::sensors;
+
+    struct Row {
+        AccelRange range;
+        std::uint8_t bits;
+        double lsb_per_g;
+        double full_scale_g;
+    };
+    const Row accel_rows[] = {
+        {AccelRange::g2, 0x00, 16384.0, 2.0},
+        {AccelRange::g4, 0x08, 8192.0, 4.0},
+        {AccelRange::g8, 0x10, 4096.0, 8.0},
+        {AccelRange::g16, 0x18, 2048.0, 16.0},
+    };
+    for (const Row& row : accel_rows) {
+        CHECK(accel_range_bits(row.range) == row.bits);
+        CHECK(approx(accel_lsb_per_g(row.range), row.lsb_per_g, 1e-9));
+        // Full scale must land at the 16-bit limit: 32768 counts = full-scale g.
+        CHECK(approx(row.lsb_per_g * row.full_scale_g, 32768.0, 1.0));
+        // And the conversion must return that full scale in m/s^2 at the limit.
+        const ImuScales scales = imu_scales(row.range, GyroRange::dps2000);
+        CHECK(approx(accel_raw_to_mps2(32767, scales),
+                     row.full_scale_g * kStandardGravity, 0.01));
+    }
+
+    struct GyroRow {
+        GyroRange range;
+        std::uint8_t bits;
+        double lsb_per_dps;
+        double full_scale_dps;
+    };
+    const GyroRow gyro_rows[] = {
+        {GyroRange::dps250, 0x00, 131.0, 250.0},
+        {GyroRange::dps500, 0x08, 65.5, 500.0},
+        {GyroRange::dps1000, 0x10, 32.8, 1000.0},
+        {GyroRange::dps2000, 0x18, 16.4, 2000.0},
+    };
+    for (const GyroRow& row : gyro_rows) {
+        CHECK(gyro_range_bits(row.range) == row.bits);
+        CHECK(approx(gyro_lsb_per_dps(row.range), row.lsb_per_dps, 1e-9));
+        // The datasheet's gyro sensitivities are rounded to three or four significant
+        // figures, so full scale lands within a couple of degrees per second of nominal
+        // rather than exactly on it.
+        CHECK(approx(row.lsb_per_dps * row.full_scale_dps, 32768.0, 40.0));
+        const ImuScales scales = imu_scales(AccelRange::g16, row.range);
+        CHECK(approx(gyro_raw_to_dps(32767, scales), row.full_scale_dps, 3.0));
+    }
+
+    // The bits occupy FS_SEL / AFS_SEL (bits 4:3) and nothing else.
+    for (const Row& row : accel_rows) CHECK((accel_range_bits(row.range) & ~0x18) == 0);
+    for (const GyroRow& row : gyro_rows) CHECK((gyro_range_bits(row.range) & ~0x18) == 0);
+
+    // The flight configuration's own choice: +-16 g and +-2000 dps, so launch
+    // acceleration and spin cannot clip. The plausibility gates must sit outside them.
+    flight::Configuration config;
+    CHECK(config.accel_clip_mps2 > 16.0 * kStandardGravity);
+    CHECK(config.gyro_clip_dps > 2000.0);
+}
+
 void test_bmp280_compensation_datasheet_vector() {
     flight::sensors::Bmp280Calib c;
     c.dig_T1 = 27504; c.dig_T2 = 26435; c.dig_T3 = -1000;
@@ -1168,6 +1231,7 @@ int main(int argc, char** argv) {
     test_parser_rejects_precision_and_order();
     test_shared_protocol_fixtures(repo_root);
     test_mpu_scaling();
+    test_imu_range_bits_match_their_sensitivities();
     test_bmp280_compensation_datasheet_vector();
     test_pressure_altitude();
     test_orientation_levels_and_yaw();

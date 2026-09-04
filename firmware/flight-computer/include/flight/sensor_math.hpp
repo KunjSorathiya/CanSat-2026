@@ -22,6 +22,30 @@ double gyro_lsb_per_dps(GyroRange range);
 
 ImuScales imu_scales(AccelRange accel, GyroRange gyro);
 
+// ACCEL_CONFIG / GYRO_CONFIG full-scale select bits (register map, registers 27 and 28).
+// These live beside the sensitivities on purpose: the range written to the sensor and the
+// scale used to convert its output must come from the same enum, or every acceleration is
+// wrong by a factor of two, four or eight and nothing in the data looks obviously broken.
+constexpr std::uint8_t accel_range_bits(AccelRange range) {
+    switch (range) {
+        case AccelRange::g2: return 0x00;
+        case AccelRange::g4: return 0x08;
+        case AccelRange::g8: return 0x10;
+        case AccelRange::g16: return 0x18;
+    }
+    return 0x18;
+}
+
+constexpr std::uint8_t gyro_range_bits(GyroRange range) {
+    switch (range) {
+        case GyroRange::dps250: return 0x00;
+        case GyroRange::dps500: return 0x08;
+        case GyroRange::dps1000: return 0x10;
+        case GyroRange::dps2000: return 0x18;
+    }
+    return 0x18;
+}
+
 double accel_raw_to_mps2(std::int16_t raw, const ImuScales& scales);
 double gyro_raw_to_dps(std::int16_t raw, const ImuScales& scales);
 

@@ -8,6 +8,25 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 11)
+
+### Changed — the IMU's range encoding is now testable
+
+`accel_fs_bits()` and `gyro_fs_bits()` lived inside the MPU6050 driver's `PICO_BUILD`
+block, invisible to host tests. They now sit in `sensor_math.hpp` beside the sensitivities
+they have to agree with, as `accel_range_bits()` / `gyro_range_bits()`.
+
+The failure they guard against is quiet: if the range written to the sensor and the scale
+used to convert its output ever disagree, every acceleration is out by a factor of two,
+four or eight — and the numbers still look entirely plausible. 42 new assertions check each
+range's bits against the register map, each sensitivity against the datasheet, that full
+scale lands at the 16-bit limit, and that the flight configuration's plausibility gates sit
+outside the configured full scale.
+
+Host total: **1307 automated checks.**
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 10)
 
 The microSD reader is the project's documented highest-risk integration item, and its

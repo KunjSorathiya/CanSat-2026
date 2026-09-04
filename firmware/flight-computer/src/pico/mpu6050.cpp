@@ -23,24 +23,6 @@ constexpr std::uint8_t REG_WHO_AM_I = 0x75;
 #ifdef PICO_BUILD
 
 namespace {
-std::uint8_t accel_fs_bits(sensors::AccelRange r) {
-    switch (r) {
-        case sensors::AccelRange::g2: return 0x00;
-        case sensors::AccelRange::g4: return 0x08;
-        case sensors::AccelRange::g8: return 0x10;
-        case sensors::AccelRange::g16: return 0x18;
-    }
-    return 0x18;
-}
-std::uint8_t gyro_fs_bits(sensors::GyroRange r) {
-    switch (r) {
-        case sensors::GyroRange::dps250: return 0x00;
-        case sensors::GyroRange::dps500: return 0x08;
-        case sensors::GyroRange::dps1000: return 0x10;
-        case sensors::GyroRange::dps2000: return 0x18;
-    }
-    return 0x18;
-}
 bool write_reg(i2c_inst_t* bus, std::uint8_t addr, std::uint8_t reg, std::uint8_t value) {
     const std::uint8_t buf[2] = {reg, value};
     return i2c_write_blocking(bus, addr, buf, 2, false) == 2;
@@ -67,9 +49,9 @@ bool Mpu6050::begin(i2c_bus_t bus, const Options& options) {
     sleep_ms(50);
     if (!write_reg(bus_, options_.address, REG_SMPLRT_DIV, options_.sample_rate_div)) return false;
     if (!write_reg(bus_, options_.address, REG_CONFIG, options_.dlpf)) return false;
-    if (!write_reg(bus_, options_.address, REG_GYRO_CONFIG, gyro_fs_bits(options_.gyro_range)))
+    if (!write_reg(bus_, options_.address, REG_GYRO_CONFIG, sensors::gyro_range_bits(options_.gyro_range)))
         return false;
-    if (!write_reg(bus_, options_.address, REG_ACCEL_CONFIG, accel_fs_bits(options_.accel_range)))
+    if (!write_reg(bus_, options_.address, REG_ACCEL_CONFIG, sensors::accel_range_bits(options_.accel_range)))
         return false;
 
     ok_ = true;
