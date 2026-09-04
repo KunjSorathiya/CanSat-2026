@@ -375,6 +375,29 @@ J1 (opposite row, reading from the same end)
 > 3.3 V. **Do not assume this one runs from the 3.3 V rail.** Identify the regulator, or
 > measure the module supply and the UART idle level, before it is wired to the Pico.
 >
+> **The supplier listing says "Supply voltage: 3.3 V". That does not close this row**, and it
+> is recorded in [product-pages](product-pages/README.md) as procurement information rather
+> than here as an observation. The same order's listings have now been contradicted four
+> times, most sharply on 2026-09-05 when the module sold, silkscreened and die-marked as an
+> MPU-9250 answered `WHO_AM_I` as an MPU-6500. **This document's first page says a row filled
+> in from the supplier page is exactly the failure it exists to prevent.**
+>
+> **It does, however, make the module safe to try at 3.3 V**, which is a different claim and
+> worth stating because it unblocks Gate 4:
+>
+> - The u-blox NEO-6M itself is a **2.7–3.6 V** part. Whatever the carrier's regulator is
+>   for, the module behind it is native 3.3 V.
+> - **The risk is asymmetric.** Feeding 3.3 V to a board that wanted 5 V produces a module
+>   that does not start or browns out — it does not damage anything. Feeding 5 V to a 3.3 V
+>   board destroys it. Only the harmless direction is being proposed.
+> - **Its TX cannot exceed its own supply**, so a module powered at 3.3 V cannot present the
+>   Pico's GP13 with more than 3.3 V. There is no path to a damaged Pico here.
+>
+> So the test is: power it from the Pico's 3V3, watch for NMEA. Sentences arriving settles the
+> question by observation. **Silence is a real result too** — if the carrier's regulator has
+> meaningful dropout, 3.3 V in could leave the module near its 2.7 V floor, and the symptom
+> would be flaky or absent output rather than clean failure. Record whichever happens.
+>
 > C.5.7 explains a behaviour worth expecting: the backup cell holds almanac and time across
 > power cycles, so the *first* cold fix after delivery will be far slower than every fix
 > after it. Bring-up row 4.2 should be taken on a genuinely cold receiver, then repeated.
