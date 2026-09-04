@@ -19,6 +19,7 @@ class SequenceReport:
     missing: int = 0          # packets skipped since the previous number
     duplicate: bool = False
     out_of_order: bool = False
+    restarted: bool = False   # the vehicle rebooted and its counter began again
     notes: list[str] = field(default_factory=list)
 
 
@@ -33,6 +34,7 @@ class ValidationStats:
     wrong_team: int = 0
     timestamp_regressions: int = 0
     gps_rejected: int = 0
+    restarts: int = 0
 
 
 class StreamValidator:
@@ -50,6 +52,16 @@ class StreamValidator:
     def reset(self) -> None:
         self.__init__(self.expected_team, self.gps_lat_range, self.gps_lon_range)
 
+    def _is_vehicle_restart(self, number: int, timestamp_ms: int) -> bool:
+        """True when the stream looks like the vehicle rebooted rather than misbehaved."""
+        if self._last_number is None or self._last_timestamp_ms is None:
+            return False
+        if number != 1:
+            return False               # a restart always begins at P-001
+        if self._last_number <= 1:
+            return False               # nothing to restart from
+        return timestamp_ms < self._last_timestamp_ms
+
     def check(self, record: TelemetryRecord) -> SequenceReport:
         report = SequenceReport()
         self.stats.received += 1
@@ -62,6 +74,25 @@ class StreamValidator:
             return report
 
         number = record.packet_number
+
+        # The vehicle can reboot mid-mission: its watchdog is designed to, and the firmware
+        # records the reboot and resumes transmitting. Its packet counter then restarts at
+        # P-001 and its mission clock at zero. Without recognising that, every packet for
+        # the rest of the flight would be reported as a duplicate and out of order, and the
+        # loss statistics -- the numbers an operator uses to judge the link -- would be
+        # meaningless from that point on, exactly when they matter most.
+        #
+        # Both signals are required. A counter restart alone could be a corrupted packet
+        # number; a clock regression alone could be a timestamp glitch. Together they are
+        # the vehicle starting over.
+        if self._is_vehicle_restart(number, record.timestamp_ms):
+            self._seen_numbers.clear()
+            self._last_number = None
+            self._last_timestamp_ms = None
+            self.stats.restarts += 1
+            report.restarted = True
+            report.notes.append(f"vehicle restart: counter back to P-{number:03d}")
+
         if number in self._seen_numbers:
             report.duplicate = True
             report.notes.append(f"duplicate P-{number:03d}")

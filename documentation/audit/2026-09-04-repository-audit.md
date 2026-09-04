@@ -16,20 +16,20 @@ configuration under `.claude/`)
 > preserved as the record of that run.
 >
 > **Pass 2** was a deeper engineering review of the same software, and it found
-> substantially more — twenty-four further defects, F-12 to F-35, including several that
+> substantially more — twenty-five further defects, F-12 to F-36, including several that
 > would have produced a failed or mis-recorded flight. The headline: the telemetry rate the
 > project had chosen was one the radio physically could not deliver. Findings F-12 onward,
 > the [second-pass summary](#second-pass-summary) and the file-by-file rows marked with a
 > cycle number are from that pass.
 
-**Verdict:** ✅ **Pass. 28 defects found and fixed across both passes; the remaining open
+**Verdict:** ✅ **Pass. 29 defects found and fixed across both passes; the remaining open
 items all require hardware.**
 
 ---
 
 ## Second-pass summary
 
-Twenty-four findings, all fixed, all with regression tests. Grouped by what they would have
+Twenty-five findings, all fixed, all with regression tests. Grouped by what they would have
 cost:
 
 | Would have caused | Findings |
@@ -257,6 +257,7 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-33** | The loop tick had a second upper bound nobody had written down: the GPS is drained once per tick from a 32-byte UART FIFO that fills in 33 ms at 9600 baud | Medium | ✅ **Closed 2026-09-04 (cycle 21)** — `loop_tick_ms` is configuration, and `validate_config()` enforces both bounds |
 | **F-34** | Reported battery voltage could not be told apart from a raw ADC pin voltage, and the ADC channel was hard-coded while the pin was configurable | Low | ✅ **Closed 2026-09-04 (cycle 22)** — `battery_voltage_is_scaled` in the health snapshot; channel derived from the pin |
 | **F-35** | The vertical-speed hold introduced in cycle 4 was unbounded, so a quiet or frozen barometer would have held a descent rate for ever — and the landing detector, which requires under 1 m/s, would never have fired | **Medium** | ✅ **Closed 2026-09-04 (cycle 23)** — bounded by `altitude_rate_hold_ms`; both the brief stall and the long one are tested |
+| **F-36** | After a watchdog reboot — a path the firmware explicitly supports — the ground station would have marked every remaining packet of the flight as a duplicate and out of order, making the loss statistics meaningless | **High** | ✅ **Closed 2026-09-04 (cycle 26)** — restart detection requiring both a counter reset and a clock regression, in `validator.py` and the web console; surfaced in all three interfaces |
 
 ---
 

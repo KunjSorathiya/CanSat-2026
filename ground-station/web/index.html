@@ -553,6 +553,7 @@ input[type=file] { display: none; }
           <dt>RSSI</dt><dd id="lh-rssi" title="Received signal strength reported by the bridge radio">&mdash;</dd>
           <dt>SNR</dt><dd id="lh-snr" title="Signal-to-noise ratio reported by the bridge radio">&mdash;</dd>
           <dt>Bridge drops</dt><dd id="lh-dropped" title="Frames the bridge discarded because no host was listening">0</dd>
+          <dt>Vehicle restarts</dt><dd id="lh-restarts" title="Times the vehicle rebooted and its packet counter began again">0</dd>
         </dl>
         <canvas class="rate-spark" id="rate-spark" role="img" aria-label="Packet rate over the last 60 samples"></canvas>
       </div>
@@ -822,11 +823,23 @@ function parsePacket(str, team) {
 class StreamValidator {
   constructor(team) {
     this.team = team || null;
-    this.stats = { received: 0, accepted: 0, rejected: 0, missing: 0, duplicates: 0, outOfOrder: 0, wrongTeam: 0, tsReg: 0, gpsRej: 0 };
+    this.stats = { received: 0, accepted: 0, rejected: 0, missing: 0, duplicates: 0, outOfOrder: 0, wrongTeam: 0, tsReg: 0, gpsRej: 0, restarts: 0 };
     this._last = null; this._seen = new Set(); this._lastTs = null;
   }
+  /* The vehicle can reboot mid-mission: its watchdog is designed to, and the firmware
+     records the reboot and resumes transmitting. Its packet counter then restarts at
+     P-001 and its mission clock at zero. Without recognising that, every packet for the
+     rest of the flight reads as a duplicate and out of order, and the loss statistics --
+     the numbers an operator judges the link by -- become meaningless from that point on.
+     Both signals are required: a counter restart alone could be a corrupted number, a
+     clock regression alone a timestamp glitch. Mirrors validator.py. */
+  _isVehicleRestart(n, ts) {
+    if (this._last === null || this._lastTs === null) return false;
+    if (n !== 1 || this._last <= 1) return false;
+    return ts < this._lastTs;
+  }
   check(rec) {
-    const r = { accepted: true, missing: 0, duplicate: false, outOfOrder: false, notes: [] };
+    const r = { accepted: true, missing: 0, duplicate: false, outOfOrder: false, restarted: false, notes: [] };
     this.stats.received++;
     const pad = n => String(n).padStart(3, "0");
     if (this.team && rec.team_id !== this.team) {
@@ -834,6 +847,11 @@ class StreamValidator {
       this.stats.wrongTeam++; this.stats.rejected++; return r;
     }
     const n = rec.packet_number;
+    if (this._isVehicleRestart(n, rec.timestamp_ms)) {
+      this._seen.clear(); this._last = null; this._lastTs = null;
+      this.stats.restarts++; r.restarted = true;
+      r.notes.push("vehicle restart: counter back to P-" + pad(n));
+    }
     if (this._seen.has(n)) { r.duplicate = true; r.notes.push("duplicate P-" + pad(n)); this.stats.duplicates++; }
     else if (this._last !== null) {
       if (n <= this._last) { r.outOfOrder = true; r.notes.push("out of order"); this.stats.outOfOrder++; }
@@ -2224,6 +2242,8 @@ function render(force) {
   }
   setStat($("#lh-dropped"), bridge.dropped, bridge.dropped ? "warnv" : "",
           bridge.dropped ? "i-warn" : "");
+  const restarts = validator ? validator.stats.restarts : 0;
+  setStat($("#lh-restarts"), restarts, restarts ? "warnv" : "", restarts ? "i-warn" : "");
 
   // quality expressed as a bar count first, colour second
   const bars = !c ? 0 : health.lossPct < 2 ? 4 : health.lossPct < 8 ? 3 : health.lossPct < 20 ? 2 : 1;

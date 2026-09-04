@@ -250,6 +250,7 @@ Link health on the ground station:
 | CRC errors | Zero | Non-zero means transport corruption, not sensor trouble |
 | Missing | Zero | Gaps in numbering mean lost packets over the air |
 | Duplicates | Zero | Duplicates suggest a receiver or bridge problem |
+| Vehicle restarts | Zero | Non-zero means the vehicle rebooted mid-mission — its watchdog fired, or it browned out. Telemetry resumes automatically and packet numbering starts again from `P-001`; the ground station recognises this and keeps counting cleanly. Check `FAULTS` for `watchdog_reboot`, and investigate power |
 | RSSI | Falls as range grows; roughly −60 dBm close in | Below about −105 dBm the link is running out of headroom, **before** loss appears; below −115 dBm expect packets to start dropping |
 | SNR | Positive on a healthy link | Negative SNR means the signal is near the demodulator's floor. It is the earliest warning available |
 | Bridge drops | Zero | Non-zero means the PC application was not reading; the bridge kept running and discarded output rather than blocking |

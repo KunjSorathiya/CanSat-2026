@@ -53,6 +53,10 @@ def _run_live(args: argparse.Namespace) -> int:
                 time.sleep(2.0)
                 snap = station.snapshot()
                 print(snap["link"])
+                validation = snap.get("validation", {})
+                if validation.get("restarts"):
+                    print("  VEHICLE RESTARTED {restarts} time(s) — packet numbering "
+                          "began again".format(**validation))
                 bridge = snap.get("bridge", {})
                 if bridge:
                     print("  bridge: radio={radio} rssi={rssi} snr={snr} dropped={dropped}"

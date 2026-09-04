@@ -8,6 +8,37 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 26)
+
+### Fixed — a vehicle reboot made the ground station's statistics meaningless
+
+The vehicle's watchdog is **designed** to reboot it: the firmware records the reboot as a
+fault and resumes transmitting automatically, and that path has its own tests. What nobody
+had followed through was what the ground station does next.
+
+After a reboot the vehicle's packet counter restarts at `P-001` and its mission clock at
+zero. The validator, seeing numbers it had already recorded, would have marked **every
+remaining packet of the flight** as a duplicate *and* out of order — and the loss
+statistics, the numbers an operator judges the link by, would have been meaningless from
+that point on. Exactly when they matter most, because the vehicle has just rebooted.
+
+The validator now recognises a restart and resets its sequence state cleanly. Both signals
+are required — the counter back at `P-001` **and** the mission clock going backwards —
+because a counter restart alone could be a corrupted packet number and a clock regression
+alone a timestamp glitch; either on its own would let one bad packet reset the ground
+station's whole view of the stream.
+
+Fixed identically in `validator.py` and the web console. Ten tests: the reboot itself, that
+loss counting still works afterwards, that a real duplicate is still a duplicate, that
+neither signal alone triggers it, that the first packet of a session never counts, and that
+multiple reboots are each counted.
+
+The count is now visible in all three interfaces — a **Vehicle restarts** row in the web
+console and the dashboard's new Stream validation panel, and a `VEHICLE RESTARTED` line in
+the headless CLI — and the runbook says what to do about it.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 25)
 
 ### Fixed — a fault's severity could quietly fall while it was still active

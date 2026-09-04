@@ -44,6 +44,14 @@ _NUMERIC_FIELDS = [
     ("battery", "Battery (V)"),
 ]
 
+_VALIDATION_FIELDS = [
+    ("missing", "Missing"),
+    ("duplicates", "Duplicates"),
+    ("out_of_order", "Out of order"),
+    ("wrong_team", "Wrong team"),
+    ("restarts", "Vehicle restarts"),
+]
+
 _LINK_FIELDS = [
     ("connected", "Connected"),
     ("rate_hz", "Rate (Hz)"),
@@ -106,6 +114,11 @@ class Dashboard:
 
         right = ttk.Frame(outer)
         right.pack(side="left", fill="both", expand=True, padx=(10, 0))
+
+        validation = ttk.LabelFrame(left, text="Stream validation", padding=6)
+        validation.pack(fill="x", pady=(6, 0))
+        for i, (key, label) in enumerate(_VALIDATION_FIELDS):
+            self._add_row(validation, f"val.{key}", label, i)
 
         bridge = ttk.LabelFrame(left, text="Bridge radio", padding=6)
         bridge.pack(fill="x", pady=(6, 0))
@@ -176,6 +189,10 @@ class Dashboard:
                         "mode", "fault_count"):
                 value = tele.get(key)
                 self._vars[f"tele.{key}"].set("--" if value is None else str(value))
+        validation_stats = snap.get("validation", {})
+        for key, _ in _VALIDATION_FIELDS:
+            self._vars[f"val.{key}"].set(str(validation_stats.get(key, "--")))
+
         logging_state = snap.get("logging", {})
         if isinstance(logging_state, dict):
             errors = logging_state.get("write_errors", 0)

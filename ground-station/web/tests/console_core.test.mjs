@@ -268,6 +268,43 @@ test("a backwards timestamp is noted without discarding the packet", () => {
   assert.equal(v.stats.tsReg, 1);
 });
 
+test("a vehicle reboot is recognised, not read as a stream of duplicates", () => {
+  // The watchdog is designed to reboot the vehicle. Its counter then restarts at P-001 and
+  // its mission clock at zero; without recognising that, every later packet reads as a
+  // duplicate and the loss statistics become meaningless.
+  const v = new M.StreamValidator("CAN-Team-07");
+  for (let n = 1; n <= 20; n++) v.check(record(n));
+
+  const restart = v.check(record(1, 0));
+  assert.equal(restart.restarted, true);
+  assert.equal(restart.duplicate, false);
+  assert.equal(restart.outOfOrder, false);
+  assert.equal(v.stats.restarts, 1);
+
+  for (let n = 2; n <= 10; n++) {
+    const after = v.check(record(n));
+    assert.equal(after.duplicate, false, `P-${n} after restart`);
+    assert.equal(after.outOfOrder, false, `P-${n} after restart`);
+  }
+  assert.equal(v.stats.duplicates, 0);
+});
+
+test("a corrupted P-001 without a clock regression is still a duplicate", () => {
+  // Both signals are required, or one bad packet would reset the console's whole view.
+  const v = new M.StreamValidator("CAN-Team-07");
+  for (let n = 1; n <= 10; n++) v.check(record(n));
+  const spurious = v.check(record(1, 99000));
+  assert.equal(spurious.restarted, false);
+  assert.equal(spurious.duplicate, true);
+  assert.equal(v.stats.restarts, 0);
+});
+
+test("the first packet of a session is never a restart", () => {
+  const v = new M.StreamValidator("CAN-Team-07");
+  assert.equal(v.check(record(1, 0)).restarted, false);
+  assert.equal(v.stats.restarts, 0);
+});
+
 test("an implausible GPS fix is flagged but the packet is kept", () => {
   const v = new M.StreamValidator("CAN-Team-07");
   const r = v.check({ ...record(1), gps_lat: 999, gps_lon: 999 });
