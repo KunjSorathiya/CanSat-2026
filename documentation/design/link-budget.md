@@ -246,20 +246,34 @@ Three layers, so an impossible configuration cannot reach the pad:
 
 ## What is not verified
 
-Nothing in this document has been measured on hardware. Specifically:
+The airtime half is now measured. Everything about propagation still is not:
 
 | Claim | Status |
 |---|---|
-| Airtime formula | Verified against two published reference vectors, in two languages |
-| 399.6 ms worst-case airtime | Computed, never measured on a radio |
+| Airtime formula | Verified against two published reference vectors, in two languages, **and against a radio on 2026-09-05** |
+| 399.6 ms worst-case airtime | **MEASURED: 406.9 ms** on the delivered RA-02, mean of five transmits — 1.8 % over prediction, in the direction the driver's overhead explains |
 | Sensitivity figures | Datasheet typicals, not measured for the RA-02 carrier |
 | Range margin | Free-space calculation; no field test has been run |
 | Packet loss at 1 Hz | Unknown — requires a range test |
 | Regulatory duty-cycle limits at 433 MHz | **Open question**: local regulations and any competition-imposed limit are unconfirmed |
 | Exact channel frequency | **Open question for the organisers** |
 
+**What the airtime measurement settles.** A 206-byte packet took **333.7 ms** against 327.9
+predicted, and a 255-byte one **406.9 ms** against 399.6 — both about 1.7 % over, with the
+excess growing slightly with payload, which is what filling a larger FIFO over SPI looks
+like. The model this document computes from, `lora_time_on_air_ms()`, is therefore sound on
+the real modem and not merely self-consistent.
+
+That matters more than the two numbers. **The 1 Hz telemetry rate, the SF7 choice, the
+channel-occupancy figures and the build-time `static_assert` that refuses a profile which
+cannot meet 1 Hz all rest on this one function.** It has now been checked against a radio.
+
+Channel occupancy follows directly: **33.4 % typical and 40.7 % worst case**, against the
+~33 % and 40 % predicted.
+
 The first field test to run is a static range test at the chosen profile, logging RSSI, SNR
-and packet loss against distance. Until then, every number here is arithmetic.
+and packet loss against distance. Sensitivity, range margin and packet loss remain pure
+arithmetic until then — **airtime was the only part of this document a bench could settle.**
 
 ---
 

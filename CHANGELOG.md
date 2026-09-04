@@ -55,6 +55,32 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Verified — the airtime model holds on a real radio, to within 1.8 %
+
+The RA-02 answered `0x12` on the version register, and then transmitted.
+
+| Row | Predicted | Measured | |
+|---|---:|---:|---|
+| 5.2 · 206-byte packet | 327.9 ms | **333.7 ms** | +1.7 % |
+| 5.3 · 255-byte packet | 399.6 ms | **406.9 ms** | +1.8 % |
+| 5.5 · channel occupancy | ~33 % / 40 % | **33.4 % / 40.7 %** | |
+
+Five of five sent in both cases, no TxDone timeouts. The excess grows slightly with payload,
+which is what filling a larger FIFO over SPI looks like — overhead in the only direction it
+can move.
+
+**This is the most load-bearing number in the repository.** The 1 Hz telemetry rate, the SF7
+spreading-factor choice, the channel-occupancy budget and the build-time `static_assert` that
+refuses a profile which cannot meet 1 Hz all rest on `lora_time_on_air_ms()`. Until today that
+function was verified only against published reference vectors — rigorous, but
+self-consistent. It has now been asked of a radio, and `link-budget.md` loses its
+"never measured on a radio" entry.
+
+**An unplanned Gate 2 data point came free.** Ten transmits at +17 dBm ran off the Pico's own
+3V3 regulator with no reset and no USB dropout. That is not the flight power tree, which still
+has no regulator chosen, but it says the RA-02's transmit transient does not brown out a
+300 mA-class source — useful when sizing one.
+
 ### Added — Gate 5 on the diagnostic, with the transmit tests behind a prompt
 
 `cansat_bringup_firmware` now reads the RA-02's version register and can time its airtime.

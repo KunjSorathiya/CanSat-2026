@@ -266,6 +266,22 @@ confident wrong number.
 **The most valuable gate in this document.** Everything about the telemetry rate rests on
 computed airtime that has never been observed.
 
+> **Taken 2026-09-05: 5.1, 5.2, 5.3 and 5.5 all pass, on the vehicle Pico's own 3.3 V rail.**
+> The airtime model this project computes everything from is now checked against a radio and
+> agrees to within 1.8 %, with the excess growing slightly with payload — which is what
+> filling a larger FIFO over SPI looks like, and is the direction overhead has to move.
+>
+> **That is the most load-bearing number in the repository.** The 1 Hz telemetry rate, the SF7
+> choice, the channel-occupancy budget and the build-time `static_assert` that refuses a
+> profile which cannot meet 1 Hz all rest on `lora_time_on_air_ms()`. It was previously
+> verified only against published reference vectors — self-consistent arithmetic. It has now
+> been asked of hardware.
+>
+> **An unplanned Gate 2 data point came free.** Ten transmits at +17 dBm ran off the Pico's
+> own 3V3 regulator with no reset and no USB dropout. That is not the flight power tree — a
+> regulator is still unchosen — but it says the RA-02's transmit transient does not brown out
+> a 300 mA-class source, which is useful when sizing one.
+
 > ⚠️ **Never transmit without the antenna connected.** An open RF port reflects the whole
 > output back into the power amplifier, and this is the one action in bring-up that can
 > destroy a module rather than merely fail. The chain is antenna → SMA joint → 10 cm pigtail
@@ -298,11 +314,11 @@ computed airtime that has never been observed.
 
 | # | Quantity | Predicted | Source | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|---|
-| 5.1 | RA-02 version register | 0x12 | `sx1278.cpp` | Read register 0x42 over SPI — `cansat_bringup_firmware` reports it | | |
-| 5.2 | Airtime, 206-byte packet, SF7/125 kHz | **328 ms** | [link-budget.md](../design/link-budget.md) | Scope DIO0, TX start to TxDone | | |
-| 5.3 | Airtime, full 255-byte packet | **400 ms** | Same | Same, with a padded packet | | |
+| 5.1 | RA-02 version register | 0x12 | `sx1278.cpp` | Read register 0x42 over SPI — `cansat_bringup_firmware` reports it | **0x12** | ✅ 2026-09-05 / KS |
+| 5.2 | Airtime, 206-byte packet, SF7/125 kHz | **328 ms** | [link-budget.md](../design/link-budget.md) | Scope DIO0, TX start to TxDone | **333.7 ms**, mean of 5, all 5 sent. +5.7 ms (1.7 %) over the 327.9 ms model | ✅ 2026-09-05 / KS |
+| 5.3 | Airtime, full 255-byte packet | **400 ms** | Same | Same, with a padded packet | **406.9 ms**, mean of 5, all 5 sent. +7.3 ms (1.8 %) over the 399.6 ms model | ✅ 2026-09-05 / KS |
 | 5.4 | Achieved telemetry rate | **1.00 Hz** | `telemetry_period_ms` | Packet numbers per second at the ground station | | |
-| 5.5 | Channel occupancy at 1 Hz | ~33 % typical, 40 % worst case | [link-budget.md](../design/link-budget.md) | 5.2 ÷ 1000 ms | | |
+| 5.5 | Channel occupancy at 1 Hz | ~33 % typical, 40 % worst case | [link-budget.md](../design/link-budget.md) | 5.2 ÷ 1000 ms | **33.4 % typical, 40.7 % worst case**, from the measured airtimes | ✅ 2026-09-05 / KS |
 | 5.6 | RSSI at 10 m | −28 dBm free-space | [link-budget.md](../design/link-budget.md) | Bridge status line | | |
 | 5.7 | RSSI at 100 m | −48 dBm free-space | Same | Same | | |
 | 5.8 | RSSI at 500 m | −62 dBm free-space | Same | Same | | |
