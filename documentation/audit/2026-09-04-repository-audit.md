@@ -204,6 +204,9 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-23** | The unframed serial reader accumulated an unbounded partial line if no newline ever arrived | Low | ✅ **Closed 2026-09-04 (cycle 8)** — capped at 4096 bytes and counted as a resync |
 | **F-24** | The radio reported RSSI using the Semtech high-frequency offset (−157 dBm), but the RA-02 is a 433 MHz module on the low-frequency port, whose offset is −164 dBm — every reading was 7 dB optimistic | **Medium** | ✅ **Closed 2026-09-04 (cycle 9)** — offset selected from the configured frequency; RSSI is the number a range test depends on |
 | **F-25** | The transmit wait polled SPI in a tight loop for the whole transmission — hundreds of milliseconds of needless traffic on the bus the SD card shares | Low | ✅ **Closed 2026-09-04 (cycle 9)** — yields 1 ms between polls |
+| **F-26** | The microSD driver deselected the card without the extra clock the SD specification requires, so the card could keep driving MISO — corrupting the **radio's** next transaction on the shared SPI0 bus | **High** | ✅ **Closed 2026-09-04 (cycle 10)** — every path, including failures, releases the bus properly |
+| **F-27** | `write_block()` issued CMD24 without waiting for a card still programming the previous block, which ignores commands while busy | **Medium** | ✅ **Closed 2026-09-04 (cycle 10)** — waits for ready first |
+| **F-28** | SD transfers assumed the SPI clock was still whatever initialisation left, on a bus the radio shares and can reconfigure | Low | ✅ **Closed 2026-09-04 (cycle 10)** — each transfer sets its own rate |
 
 ---
 
@@ -270,7 +273,7 @@ Legend: ✅ verified · 🟡 partially verified · ⬜ content-only review (no e
 | `pico/mpu6050.cpp` | 123 | Uses verified scaling from `sensor_math` | 🟡 Syntax only |
 | `pico/bmp280.cpp` | 122 | Uses verified compensation from `sensor_math` | 🟡 Syntax only |
 | `pico/neo6m.cpp` | 50 | Feeds the tested `NmeaParser` | 🟡 Syntax only |
-| `pico/sd_card.cpp` | 191 | Raw block access, no filesystem | 🟡 Syntax only |
+| `pico/sd_card.cpp` | 253 | Raw block access, no filesystem; command sequence executed against a simulated card (581 assertions) since cycle 10 | 🟡 Never run on real media |
 | `pico/sd_logger.cpp` | 64 | Wraps the tested `RawBlockLog` | 🟡 Syntax only |
 | `pico/pico_radio.cpp` | 97 | Wraps the SX1278 driver | 🟡 Syntax only |
 | `include/flight/pico/*.hpp` (6 files) | 251 | Interfaces consistent; `pico_types.hpp` used by four headers | ✅ Reviewed |

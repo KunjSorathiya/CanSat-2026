@@ -8,6 +8,46 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 10)
+
+The microSD reader is the project's documented highest-risk integration item, and its
+driver had never executed anywhere. It now runs against a simulated card.
+
+### Fixed — the card could keep driving the shared SPI bus
+
+After each transaction the driver deselected the card but did not clock the extra byte the
+SD specification requires before the card releases DO. SPI0 is shared with the radio, so a
+card still driving MISO corrupts the **radio's** next transaction — a fault that presents as
+a dead radio rather than a dead card, on a bus whose sharing is already flagged as a
+hardware risk. Every path now releases the bus properly, including every failure path.
+
+### Fixed — a busy card could swallow a write command
+
+`write_block()` issued CMD24 without first waiting for the card to finish programming the
+previous block. A card still busy ignores commands. It now waits for ready first.
+
+### Fixed — SD transfers assumed nobody else had touched the bus clock
+
+The driver set the SPI baud rate once during initialisation. The radio shares the bus and
+may change it. Each read and write now sets the rate it needs.
+
+### Added
+
+- **`firmware/flight-computer/tests/sd_card_test.cpp`** — 581 assertions against a card
+  model built from the SD Physical Layer specification: the CMD0/CMD8/ACMD41/CMD58
+  initialisation sequence, the 74-clock requirement, the 400 kHz init limit and the speed-up
+  afterwards, **SDHC block addressing versus SDSC byte addressing** (a classic silent
+  corruption bug), block round trips, bus release after every transaction, dead cards,
+  cards that never finish initialising, missing data tokens, rejected writes, CMD13 status
+  errors, and v1 cards where CMD8 is illegal.
+- `sd_card.cpp` refactored behind an `SdCardHal` callback struct, mirroring the SX1278
+  driver, so it builds and runs on the host. The vehicle entry point is unchanged.
+- `sd_card_tests` in `tools/build_host.sh` and CMake/CTest.
+
+Host total: **1265 automated checks.**
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 9)
 
 The LoRa driver was the largest piece of never-executed code in the repository. It reaches

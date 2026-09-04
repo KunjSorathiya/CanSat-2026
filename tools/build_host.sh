@@ -60,6 +60,12 @@ echo "== compiling sx1278_tests =="
 # shellcheck disable=SC2068
 $CXX $CXXFLAGS ${INC[@]}   "$ROOT/firmware/common/src/sx1278.cpp"   "$ROOT/firmware/common/tests/sx1278_test.cpp"   -o "$OUT/sx1278_tests"
 
+echo "== compiling sd_card_tests =="
+# The microSD driver also reaches hardware through a callback struct, so its command
+# sequence runs against a simulated card built from the SD SPI-mode specification.
+# shellcheck disable=SC2068
+$CXX $CXXFLAGS ${INC[@]}   "$ROOT/firmware/flight-computer/src/pico/sd_card.cpp"   "$ROOT/firmware/flight-computer/tests/sd_card_test.cpp"   -o "$OUT/sd_card_tests"
+
 echo "== compiling ground_station_tests =="
 # shellcheck disable=SC2068
 $CXX $CXXFLAGS ${INC[@]} \
@@ -71,6 +77,7 @@ echo "== running C++ tests =="
 "$OUT/flight_smoke_test"
 "$OUT/flight_tests" "$ROOT"
 "$OUT/sx1278_tests"
+"$OUT/sd_card_tests"
 "$OUT/ground_station_tests"
 
 if command -v python >/dev/null 2>&1; then

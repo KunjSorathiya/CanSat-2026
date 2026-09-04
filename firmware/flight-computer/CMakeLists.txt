@@ -74,3 +74,11 @@ target_link_libraries(flight_tests PRIVATE flight_core)
 target_compile_options(flight_tests PRIVATE -Wall -Wextra -Wpedantic)
 # flight_tests reads test-data/protocol-fixtures.tsv, so it needs the repository root.
 add_test(NAME flight_tests COMMAND flight_tests "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+
+# The microSD driver's command sequence, against a simulated card. sd_card.cpp compiles
+# for the host too: without PICO_BUILD it carries no SDK dependency.
+add_executable(sd_card_tests tests/sd_card_test.cpp src/pico/sd_card.cpp)
+target_include_directories(sd_card_tests PRIVATE include tests)
+target_link_libraries(sd_card_tests PRIVATE flight_core)
+target_compile_options(sd_card_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME sd_card_tests COMMAND sd_card_tests)

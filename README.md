@@ -28,7 +28,7 @@ and streams telemetry from power-on through recovery.**
 
 | Layer | State |
 |---|---|
-| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 684 automated checks on the host** |
+| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 1265 automated checks on the host** |
 | 🟡 **Firmware drivers** | Written and compile-checked against SDK stubs — **never executed on real silicon** |
 | 🔴 **Hardware** | Components purchased. **No bring-up, no wiring, no power system, no measurement** |
 | 🔴 **Mechanical** | Structure, egg chamber and parachute **not started** — blocked on a rulebook contradiction |
@@ -395,6 +395,7 @@ bash tools/build_host.sh
 | `flight_tests` | 32 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math and timing, calibration, faults, scheduler, block log, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **464 / 464** |
 | `flight_smoke_test` | Boot, first three packets, GPS parse | ✅ Passed |
 | `sx1278_tests` | LoRa driver register sequence, TX timeout, RX and CRC handling, RSSI conversion, against a fake register bank | ✅ **94 / 94** |
+| `sd_card_tests` | microSD init sequence, SDHC vs SDSC addressing, block round trip, bus release, timeouts and write-error paths, against a simulated card | ✅ **581 / 581** |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
 | Python (ground station) | Parser, validator, transport, health, logging robustness, end-to-end pipeline, shared protocol fixtures | ✅ **63 / 63** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
