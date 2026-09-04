@@ -56,6 +56,16 @@ _LINK_FIELDS = [
     ("seconds_since_rx", "Since last RX (s)"),
 ]
 
+# The bridge reports the radio's own view of the link once a second. RSSI is what warns an
+# operator that a link is running out of headroom while packet loss is still zero.
+_BRIDGE_FIELDS = [
+    ("radio", "Radio"),
+    ("rssi", "RSSI (dBm)"),
+    ("snr", "SNR (dB)"),
+    ("frames", "Frames"),
+    ("dropped", "Dropped (no host)"),
+]
+
 _MAX_POINTS = 600
 
 
@@ -96,6 +106,11 @@ class Dashboard:
 
         right = ttk.Frame(outer)
         right.pack(side="left", fill="both", expand=True, padx=(10, 0))
+
+        bridge = ttk.LabelFrame(left, text="Bridge radio", padding=6)
+        bridge.pack(fill="x", pady=(6, 0))
+        for i, (key, label) in enumerate(_BRIDGE_FIELDS):
+            self._add_row(bridge, f"bridge.{key}", label, i)
 
         # Logging health. A ground station that is receiving but not recording looks
         # perfectly healthy everywhere else, so it gets its own line.
@@ -170,8 +185,10 @@ class Dashboard:
             else:
                 self._vars["log.status"].set("recording")
 
-        bridge = snap.get("bridge", {})
-        self._vars["tele.battery"].set(str(bridge.get("battery", "n/a")))
+        bridge_status = snap.get("bridge", {})
+        for key, _ in _BRIDGE_FIELDS:
+            self._vars[f"bridge.{key}"].set(str(bridge_status.get(key, "--")))
+        self._vars["tele.battery"].set(str(bridge_status.get("battery", "n/a")))
         self._vars["latest_raw"].set(str(snap.get("latest_raw", "--")) or "--")
 
         self._plot.update(self._t, self._series)

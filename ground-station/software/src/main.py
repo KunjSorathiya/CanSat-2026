@@ -53,6 +53,13 @@ def _run_live(args: argparse.Namespace) -> int:
                 time.sleep(2.0)
                 snap = station.snapshot()
                 print(snap["link"])
+                bridge = snap.get("bridge", {})
+                if bridge:
+                    print("  bridge: radio={radio} rssi={rssi} snr={snr} dropped={dropped}"
+                          .format(radio=bridge.get("radio", "?"),
+                                  rssi=bridge.get("rssi", "?"),
+                                  snr=bridge.get("snr", "?"),
+                                  dropped=bridge.get("dropped", "0")))
                 logging_state = snap.get("logging", {})
                 if logging_state.get("write_errors"):
                     print("  LOGGING FAULT: {write_errors} error(s), last: {last_error}"

@@ -8,6 +8,31 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 18)
+
+### Added — the operator can now see the link degrading before it fails
+
+The bridge has always reported the radio's own RSSI and SNR in its status line, once a
+second. **Nothing displayed them.** Every indicator the operator had — rate, loss, missing
+packets — only moves once packets are already being lost; RSSI and SNR are the only ones
+that degrade while loss is still zero, which makes them the numbers that matter during a
+range test and during descent.
+
+They now appear in all three interfaces, with thresholds drawn from the SX1278's own
+demodulator limits:
+
+- **Web console** — RSSI, SNR and the bridge's dropped-frame count in the Link health
+  panel, amber below −105 dBm or negative SNR, red below −115 dBm.
+- **Tk dashboard** — a Bridge radio panel: radio state, RSSI, SNR, frames, drops.
+- **Headless CLI** — a `bridge:` line alongside the link summary.
+
+The runbook now says what each reading means and what to do about it.
+
+Four tests cover the parsing, including a negative SNR, the `#radio=lost` line, and that a
+status frame is never counted as telemetry.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 17)
 
 ### Added — documentation drift now fails the build

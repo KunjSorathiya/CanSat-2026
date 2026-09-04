@@ -135,3 +135,46 @@ class _FailingPath:
 
     def __fspath__(self):
         return str(self._real)
+
+
+class BridgeStatusTests(unittest.TestCase):
+    """The bridge's radio report is what warns an operator before a link fails."""
+
+    def _station_with_status(self, line):
+        transport = LoopbackTransport()
+        with tempfile.TemporaryDirectory() as tmp:
+            station = GroundStation(transport, expected_team=TEAM, log_dir=tmp)
+            transport.push_packet(line)
+            transport.stop()
+            station.run_forever()
+            return station.snapshot()["bridge"]
+
+    def test_the_radio_report_is_parsed_into_the_snapshot(self):
+        bridge = self._station_with_status(
+            "#state=RX radio=1 frames=42 dropped=3 rssi=-97 snr=9.5")
+        self.assertEqual(bridge["radio"], "1")
+        self.assertEqual(bridge["frames"], "42")
+        self.assertEqual(bridge["dropped"], "3")
+        self.assertEqual(bridge["rssi"], "-97")
+        self.assertEqual(bridge["snr"], "9.5")
+
+    def test_a_negative_snr_survives_parsing(self):
+        bridge = self._station_with_status("#state=RX radio=1 rssi=-121 snr=-7.5")
+        self.assertEqual(bridge["rssi"], "-121")
+        self.assertEqual(bridge["snr"], "-7.5")
+
+    def test_a_radio_loss_line_is_recorded(self):
+        bridge = self._station_with_status("#radio=lost")
+        self.assertEqual(bridge["radio"], "lost")
+
+    def test_status_lines_are_not_counted_as_telemetry(self):
+        transport = LoopbackTransport()
+        with tempfile.TemporaryDirectory() as tmp:
+            station = GroundStation(transport, expected_team=TEAM, log_dir=tmp)
+            transport.push_packet("#state=RX radio=1 rssi=-90 snr=8.0")
+            transport.push_packet(packet(1))
+            transport.stop()
+            station.run_forever()
+            link = station.health.snapshot()
+            self.assertEqual(link["status_frames"], 1)
+            self.assertEqual(link["packets_ok"], 1)

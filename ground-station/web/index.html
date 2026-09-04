@@ -550,6 +550,9 @@ input[type=file] { display: none; }
           <dt>CRC errors</dt><dd id="lh-crc">0</dd>
           <dt>Packet loss</dt><dd id="lh-loss">0.0 %</dd>
           <dt>Since last RX</dt><dd id="lh-age">&mdash;</dd>
+          <dt>RSSI</dt><dd id="lh-rssi" title="Received signal strength reported by the bridge radio">&mdash;</dd>
+          <dt>SNR</dt><dd id="lh-snr" title="Signal-to-noise ratio reported by the bridge radio">&mdash;</dd>
+          <dt>Bridge drops</dt><dd id="lh-dropped" title="Frames the bridge discarded because no host was listening">0</dd>
         </dl>
         <canvas class="rate-spark" id="rate-spark" role="img" aria-label="Packet rate over the last 60 samples"></canvas>
       </div>
@@ -1197,11 +1200,23 @@ async function connectSerial() {
   })();
   toast("Connected to ground-station bridge");
 }
+// The bridge reports the radio's own view of the link once a second. RSSI is the number
+// that warns an operator a link is about to fail, while packet loss is still zero — so it
+// is worth showing even though the packets are, for the moment, arriving fine.
+const bridge = { rssi: null, snr: null, dropped: 0 };
+
 function applyBridgeStatus(line) {
-  const m = /battery=([\d.]+)/.exec(line);
-  if (m) { /* reserved: bridge battery telemetry */ }
-  const s = /radio=([01])/.exec(line);
-  if (s) $("#kv-sync").textContent = (s[1] === "1" ? "LINK · " : "DOWN · ") + $("#kv-sync").textContent.split("· ").pop();
+  const radio = /radio=([01])/.exec(line);
+  if (radio) {
+    $("#kv-sync").textContent = (radio[1] === "1" ? "LINK · " : "DOWN · ") +
+                                $("#kv-sync").textContent.split("· ").pop();
+  }
+  const rssi = /rssi=(-?\d+)/.exec(line);
+  if (rssi) bridge.rssi = Number(rssi[1]);
+  const snr = /snr=(-?[\d.]+)/.exec(line);
+  if (snr) bridge.snr = Number(snr[1]);
+  const dropped = /dropped=(\d+)/.exec(line);
+  if (dropped) bridge.dropped = Number(dropped[1]);
 }
 
 /* ================================================================
@@ -2189,6 +2204,26 @@ function render(force) {
   setStat($("#lh-crc"), health.crcErrors, health.crcErrors ? "critv" : "", health.crcErrors ? "i-warn" : "");
   setStat($("#lh-loss"), health.lossPct.toFixed(1) + " %", health.lossPct > 5 ? "warnv" : "", health.lossPct > 5 ? "i-warn" : "");
   $("#lh-age").textContent = age === null ? "—" : age.toFixed(1) + " s";
+
+  // Radio-level signal quality, straight from the bridge. Thresholds are the SX1278's own
+  // demodulator limits: below about -120 dBm, or an SNR under the spreading factor's
+  // margin, the link is running out of headroom whether or not packets are still arriving.
+  if (bridge.rssi === null) {
+    $("#lh-rssi").textContent = "—";
+  } else {
+    setStat($("#lh-rssi"), bridge.rssi + " dBm",
+            bridge.rssi < -115 ? "critv" : bridge.rssi < -105 ? "warnv" : "",
+            bridge.rssi < -105 ? "i-warn" : "");
+  }
+  if (bridge.snr === null) {
+    $("#lh-snr").textContent = "—";
+  } else {
+    setStat($("#lh-snr"), bridge.snr.toFixed(1) + " dB",
+            bridge.snr < -7 ? "critv" : bridge.snr < 0 ? "warnv" : "",
+            bridge.snr < 0 ? "i-warn" : "");
+  }
+  setStat($("#lh-dropped"), bridge.dropped, bridge.dropped ? "warnv" : "",
+          bridge.dropped ? "i-warn" : "");
 
   // quality expressed as a bar count first, colour second
   const bars = !c ? 0 : health.lossPct < 2 ? 4 : health.lossPct < 8 ? 3 : health.lossPct < 20 ? 2 : 1;

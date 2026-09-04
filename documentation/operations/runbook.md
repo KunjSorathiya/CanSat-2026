@@ -250,6 +250,15 @@ Link health on the ground station:
 | CRC errors | Zero | Non-zero means transport corruption, not sensor trouble |
 | Missing | Zero | Gaps in numbering mean lost packets over the air |
 | Duplicates | Zero | Duplicates suggest a receiver or bridge problem |
+| RSSI | Falls as range grows; roughly −60 dBm close in | Below about −105 dBm the link is running out of headroom, **before** loss appears; below −115 dBm expect packets to start dropping |
+| SNR | Positive on a healthy link | Negative SNR means the signal is near the demodulator's floor. It is the earliest warning available |
+| Bridge drops | Zero | Non-zero means the PC application was not reading; the bridge kept running and discarded output rather than blocking |
+
+> [!TIP]
+> **RSSI and SNR come from the bridge radio, not from the packets.** They are the only
+> indicators that degrade *before* packets start disappearing, which makes them the numbers
+> to watch during a range test and during descent. They appear in the web console's Link
+> health panel, the Tk dashboard's Bridge radio panel, and the headless CLI's `bridge:` line.
 
 ---
 

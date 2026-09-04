@@ -18,7 +18,9 @@ for CanSat-2026 telemetry. Open it directly, or serve the folder.
 - **Mission** — state, mission clock, state ladder, team, packet number, calibration,
   armed status, active faults, sync word
 - **Link health** — rate, packets OK, missing, duplicates, CRC errors, loss percentage,
-  time since last packet, and a rate sparkline
+  time since last packet, a rate sparkline, and the bridge radio's own **RSSI**, **SNR** and
+  dropped-frame count. RSSI is what warns you a link is running out of headroom while
+  packet loss is still zero
 - **Flight view · 3D** — orbit / chase / top / profile views of the trajectory, with
   ascent and descent tracks and a filtered ground track
 - **Flight profile** — altitude, vertical speed, pressure and temperature against time,
