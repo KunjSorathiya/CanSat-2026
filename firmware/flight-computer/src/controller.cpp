@@ -444,6 +444,7 @@ void Controller::sample_battery(std::uint64_t mission_ms) {
     const float ratio = battery_divider_ratio(config_);
     const float voltage = ratio > 0.0f ? raw * ratio : raw;
     health_.battery_voltage = voltage;
+    health_.battery_voltage_is_scaled = ratio > 0.0f;
 
     if (config_.battery_low_voltage > 0.0f && ratio > 0.0f) {
         if (voltage < config_.battery_low_voltage) {

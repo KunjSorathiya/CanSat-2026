@@ -26,6 +26,10 @@ struct HealthSnapshot {
     bool armed = false;              // launch detection is enabled
     bool watchdog_reboot = false;   // this power session began with a watchdog reset
     float battery_voltage = 0.0f;
+    // False while `battery_divider_ratio` is unset: the value above is then the raw ADC
+    // pin voltage, not the cell voltage. An operator reading "1.6 V" off a 3.7 V cell
+    // needs to know which of the two they are looking at.
+    bool battery_voltage_is_scaled = false;
     double altitude_agl_m = 0.0;      // above the power-on ground baseline
     double altitude_rate_mps = 0.0;   // filtered vertical speed, positive is climbing
     double gyro_bias_dps[3] = {0.0, 0.0, 0.0};

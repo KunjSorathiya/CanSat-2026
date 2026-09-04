@@ -127,7 +127,10 @@ void PicoBoardIo::set_status_led(bool on) {
 
 float PicoBoardIo::battery_voltage() const {
     ensure_adc();
-    adc_select_input(0);  // ADC0 == GPIO26
+    // Derive the ADC channel from the pin rather than hard-coding 0: GP26/27/28 are ADC
+    // 0/1/2, and a change to BoardPins::battery_adc must not leave this reading a
+    // different pin than the one that was wired.
+    adc_select_input(static_cast<std::uint32_t>(BoardPins::battery_adc - 26));
     const std::uint16_t raw = adc_read();
     const float counts = config_.battery_adc_max_counts == 0 ? 4095.0f : config_.battery_adc_max_counts;
     return static_cast<float>(raw) * config_.battery_adc_ref_v / counts;  // raw pin voltage

@@ -8,6 +8,29 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 22)
+
+### Fixed — battery telemetry could not be told apart from a pin voltage
+
+While `battery_divider_ratio` is unset — which it is, because the divider has not been
+built — the firmware reports the raw ADC pin voltage. That is the right behaviour: an
+invented ratio would produce a confident wrong number. But nothing said which of the two
+the reported value was, so an operator reading **1.6 V** off a 3.7 V cell had no way to know
+whether the cell was flat or the scaling was simply absent.
+
+`HealthSnapshot` now carries `battery_voltage_is_scaled`. The low-battery fault already
+stayed disabled without a ratio, since a pin reading cannot judge a cell; that is now
+covered by a test rather than by inspection.
+
+### Fixed — the ADC channel was hard-coded while the pin was configurable
+
+`battery_voltage()` called `adc_select_input(0)` while the pin came from
+`BoardPins::battery_adc`. They agree today — GP26 is ADC0 — but moving the pin to GP27 or
+GP28 would have left the code reading a different pin than the one wired, and the reading
+would have looked plausible. The channel is now derived from the pin.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 21)
 
 ### Fixed — the loop tick had a second upper bound nobody had written down

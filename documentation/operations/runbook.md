@@ -73,7 +73,7 @@ Other tunables worth reviewing before a flight, all in
 | `reference_pressure_pa` | 101325 | Always — set it from a field barometer reading on the day |
 | `launch_accel_mps2` / `launch_altitude_gain_m` | 30 / 15 | After the first flight data exists |
 | `arming_delay_ms` | 3000 | If the pad procedure takes longer to settle |
-| `battery_divider_ratio` | 0 (disabled) | Only after the divider is built and measured |
+| `battery_divider_ratio` | 0 (disabled) | Only after the divider is built and measured. **While it is 0 the reported battery voltage is the raw ADC pin voltage, not the cell voltage** — `battery_voltage_is_scaled` in the health snapshot says which you are looking at, and the low-battery fault stays disabled because a pin reading cannot judge a cell |
 
 ---
 

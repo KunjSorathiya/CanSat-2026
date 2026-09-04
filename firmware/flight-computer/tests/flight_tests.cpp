@@ -717,6 +717,52 @@ void test_calibration_rejects_a_steady_rotation_as_bias() {
     CHECK(approx(spinning.result().gyro_bias_dps[2], 1.0, 0.01));
 }
 
+// Battery reporting has to be honest about which voltage it is showing. With no divider
+// measured, the number is the ADC pin voltage, and an operator reading 1.6 V off a 3.7 V
+// cell needs to know that before reacting to it.
+void test_battery_voltage_reports_whether_it_is_scaled() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    c.battery_period_ms = 10;
+    c.health_period_ms = 10;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    board.pin_voltage = 1.65f;  // half of a 3.3 V reference: a plausible divider output
+
+    flight::Controller unscaled(c, imu, baro, gps, radio, logger, board);
+    CHECK(unscaled.initialize());
+    unscaled.poll(0);
+    unscaled.poll(20);
+    // Divider unknown: the raw pin voltage is reported, and flagged as unscaled.
+    CHECK(approx(unscaled.health().battery_voltage, 1.65, 0.001));
+    CHECK(!unscaled.health().battery_voltage_is_scaled);
+    // A low-battery fault cannot be judged from a pin reading, so it stays clear.
+    CHECK(!unscaled.faults().active(flight::FaultCode::battery_low));
+
+    // With a measured divider, the same pin voltage becomes a cell voltage.
+    flight::Configuration scaled_config = c;
+    scaled_config.battery_divider_ratio = 2.0f;   // (R1 + R2) / R2
+    scaled_config.battery_low_voltage = 3.4f;
+    flight::Controller scaled(scaled_config, imu, baro, gps, radio, logger, board);
+    CHECK(scaled.initialize());
+    scaled.poll(0);
+    scaled.poll(20);
+    CHECK(approx(scaled.health().battery_voltage, 3.30, 0.001));
+    CHECK(scaled.health().battery_voltage_is_scaled);
+    CHECK(scaled.faults().active(flight::FaultCode::battery_low));  // 3.30 < 3.40
+
+    // A healthy cell clears the fault again.
+    board.pin_voltage = 2.0f;  // 4.0 V after scaling
+    scaled.poll(40);
+    scaled.poll(60);
+    CHECK(approx(scaled.health().battery_voltage, 4.0, 0.001));
+    CHECK(!scaled.faults().active(flight::FaultCode::battery_low));
+}
+
 // The loop tick is bounded from above by hardware nobody thinks about: the GPS UART's
 // FIFO keeps filling whether or not the loop reads it.
 void test_loop_tick_is_bounded_by_the_gps_uart_fifo() {
@@ -1455,6 +1501,7 @@ int main(int argc, char** argv) {
     test_gps_coordinate_validation();
     test_orientation_blends_across_the_wrap();
     test_calibration_rejects_a_steady_rotation_as_bias();
+    test_battery_voltage_reports_whether_it_is_scaled();
     test_loop_tick_is_bounded_by_the_gps_uart_fifo();
     test_sensor_timing_model();
     test_config_sensor_rate_guard();
