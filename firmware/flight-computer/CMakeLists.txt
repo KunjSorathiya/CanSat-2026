@@ -59,7 +59,8 @@ if (PICO_SDK_PATH OR DEFINED ENV{PICO_SDK_PATH})
     endif()
 endif()
 
-# Host tests.
+# Host tests. Skipped when cross-compiling — see the note in firmware/common/CMakeLists.txt.
+if (NOT CMAKE_CROSSCOMPILING)
 enable_testing()
 
 add_executable(flight_smoke_test tests/flight_smoke_test.cpp)
@@ -89,3 +90,5 @@ target_include_directories(sd_card_tests PRIVATE include tests)
 target_link_libraries(sd_card_tests PRIVATE flight_core)
 target_compile_options(sd_card_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME sd_card_tests COMMAND sd_card_tests)
+
+endif()

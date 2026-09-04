@@ -8,6 +8,84 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-05 (cycle 33)
+
+### Verified — headers fitted, and six Part C rows closed on the bench
+
+Headers were bought separately and soldered to both Picos, both sensor breakouts, the
+microSD reader, the GPS and the RA-02 carriers on 2026-09-04. Joints were inspected and
+adjacent-pin isolation checked before anything saw power. `F-6` is closed, and `C.1.5` now
+records both what arrived and what was done to it.
+
+- **Mounting the vehicle Pico flat to the prototype board is no longer available.** Both
+  Picos carry headers, so the height budget must accommodate the stack. Socketed against
+  soldered-through is still open, and it is a vibration question: a socket can walk loose
+  under launch loads.
+- **microSD supply confirmed direct (`C.6.9`).** The `3V3` header pin reaches exactly one
+  socket leg, `GND` a different single leg, nothing else responds. Nothing sits between the
+  header and the card, which is what the absent regulator implied and now no longer assumes.
+- **RF pigtail proved good (`C.7.6`, `C.7.7`).** Centre-to-centre and shield-to-shield both
+  continuous, centre-to-shield open at both ends. The radio will not be asked to drive a
+  shorted line.
+- **Battery characterised (`C.8.3`, `C.8.5`).** Red is positive, read on the meter rather
+  than taken from the insulation colour, and the pack is at **3.92 V** open-circuit — a
+  normal storage voltage, well clear of the ~3.0 V set-aside threshold.
+- **The prototype board has no rail anywhere (`C.9.5`).** Adjacent pads are isolated, and so
+  are the elongated pads along the top and bottom edges — the one place a ready-made bus
+  could have been hiding. Both the 3.3 V and GND runs are hand-built with no exceptions.
+
+`D.4` moves from "the least advanced of the four" to blocked on procurement rather than on
+measurement: a 1S balance charger and a mating JST-RCY pigtail are what stand between this
+pack and a powered test.
+
+### Recorded — a faulty multimeter, and the readings it produced
+
+The meter's resistance range is broken. It read ~51 Ω between *every* pair of pins on the
+MPU-9250 — including `FSYNC` to `GND`, which have no path between them — and 18 Ω across its
+own shorted probe tips, climbing steadily from zero on a fresh battery.
+
+Those numbers describe the instrument, not the board. **None of them are recorded in Part C,
+and the MPU-9250 is not implicated by them.** The episode is written into the Part A tools
+table instead, because an instrument that produces confident wrong numbers is a hazard to
+the record and the next person to pick this up deserves to know it happened.
+
+Continuity and DC volts were separately verified working and carried the six rows above.
+`C.3.6`/`C.3.7` and `C.4.5`/`C.4.6` — the AD0 and SDO straps — need a true resistance range
+and **stay blank**. They are not on the critical path: the Gate 3 bus scan answers the same
+question from the address a device actually replies at, which is better evidence than a
+strap measurement.
+
+### Fixed — the Pico cross-build configured host tests it could never link
+
+`cmake --build build/pico --parallel` has never worked. The host test executables —
+`flight_tests`, `sd_card_tests`, `sx1278_tests`, `ground_framing_test`, `flight_smoke_test`
+and `emit_mission` — were added to CMake unconditionally, so a tree configured with the Pico
+SDK built them with the ARM cross-compiler and failed at link with `undefined reference to
+_write`, `_sbrk`, `_getpid`. Those symbols are host syscalls; a bare-metal newlib has none.
+
+The firmware itself was never implicated. It was the tests being asked to run somewhere they
+were never meant to.
+
+- Every host-test block in `firmware/common`, `firmware/flight-computer` and
+  `firmware/ground-station` is now guarded with `if (NOT CMAKE_CROSSCOMPILING)`. The firmware
+  images are the only useful output of a cross configure.
+- Verified both ways from clean: the Pico tree configures and builds 221/221 with both
+  `.uf2` images produced, and `tools/build_host.sh` still passes 37/37.
+
+### Changed — the firmware build is executed, not just written
+
+`documentation/quick-start.md` section 15 moves from 🟡 to ✅. It now carries the invocation
+that actually produced the images — **SDK 2.3.0, arm-none-eabi-gcc 15.2.1, 2026-09-05** —
+including the PowerShell environment block, because the VS Code extension installs its
+toolchain under `%USERPROFILE%\.pico-sdk\` and puts none of it on `PATH`.
+
+Two traps are recorded there rather than left to be rediscovered: **`-G Ninja` is not optional
+on Windows**, and **the extension's `Import Pico Project` must not be run on this repository**
+— it rewrites project files, and this tree's `CMakeLists.txt` is hand-written to build the
+host tests and the firmware from one source tree.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 32)
 
 ### Changed — the IMU is now an MPU-9250, and the vehicle has a magnetometer

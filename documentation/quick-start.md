@@ -356,7 +356,7 @@ unidentified packet is a non-compliant packet.
 Edit [`firmware/flight-computer/src/pico/main.cpp`](../firmware/flight-computer/src/pico/main.cpp):
 
 ```cpp
-config.team_id = "CAN-Team-01";   // <-- your registered competition identifier
+config.team_id = "CAN-Team-25";   // <-- your registered competition identifier
 ```
 
 Also decide the radio mode. `RadioMode::test` uses sync word `0xF3`; the official launch
@@ -369,11 +369,32 @@ looks exactly like a dead radio.
 
 ## 15. Build the firmware
 
-🟡
+✅ Run on 2026-09-05 against SDK 2.3.0 and arm-none-eabi-gcc 15.2.1. Both images built.
 
 ```bash
-cmake -S . -B build/pico && cmake --build build/pico --parallel
+cmake -S . -B build/pico -G Ninja -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico
+cmake --build build/pico --parallel
 ```
+
+**Windows, using the VS Code extension's toolchain.** The extension installs everything under
+`%USERPROFILE%\.pico-sdk\` and does not put any of it on `PATH`, so set these in the shell
+first — this is the exact invocation that produced the images, in PowerShell:
+
+```bash
+$p = "$env:USERPROFILE\.pico-sdk"
+$env:PICO_SDK_PATH = "$p\sdk\2.3.0"
+$env:PICO_TOOLCHAIN_PATH = "$p\toolchain\15_2_Rel1"
+$env:Path = "$p\toolchain\15_2_Rel1\bin;$p\ninja\v1.13.2;$p\cmake\v4.3.4\bin;$env:Path"
+```
+
+`-G Ninja` is not optional on Windows: without it CMake picks whatever default generator it
+finds, which will not be the one the SDK expects.
+
+**Do not use the extension's `Import Pico Project` on this repository.** It rewrites project
+files, and this tree's [CMakeLists.txt](../CMakeLists.txt) is hand-written to build the host
+tests and the firmware from one source tree. To get the toolchain without touching the repo,
+create a throwaway project with `New Pico Project` in a folder outside it; the SDK download is
+shared.
 
 Two images appear only when the SDK is present:
 
@@ -436,7 +457,7 @@ outdoors with a clear view before concluding anything is broken.
 🟡 With both Picos flashed and the vehicle powered:
 
 ```bash
-cd ground-station/software && python src/main.py live --port COM5 --team CAN-Team-01
+cd ground-station/software && python src/main.py live --port COM5 --team CAN-Team-25
 ```
 
 Replace `COM5` with your bridge Pico's port (`/dev/ttyACM0` on Linux, `/dev/cu.usbmodem*`
