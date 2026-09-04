@@ -87,7 +87,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **102 / 102 tests** |
+| Python ground station | 8 modules | ✅ **107 / 107 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **129 / 129 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **42 / 42 tests** |
@@ -256,12 +256,18 @@ regression on its own; the first packet of a session is never a restart; multipl
 are each counted; a restart clears both structures; and the duplicate window is bounded so
 a long flight cannot grow it without limit, while still catching recent repeats.
 
-### `test_transport.py` — 12 tests
+### `test_transport.py` — 17 tests
 
 Framing: round-trip, CRC error reporting, the known CRC vector, resync after noise, a torn
 header that must not swallow the frame behind it, a truncated length field, frames split
 across chunks, status-frame detection, and a stuck link that must not grow the buffer
 without bound. Transports: framed and plain file replay, and framed loopback.
+
+Five more cover replaying a raw log this ground station wrote — the file the runbook's
+post-flight step replays. A logged line replays as the packet it recorded, a logged status
+line is still a status line, escaped control characters come back exactly, a plain file of
+packets is untouched, and the behaviour can be turned off for a file that legitimately
+begins with a date.
 
 ### `test_health.py` — 7 tests
 

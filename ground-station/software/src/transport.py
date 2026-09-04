@@ -15,9 +15,15 @@ Implementations:
 from __future__ import annotations
 
 import queue
+import re
 import time
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Optional
+
+# The raw log's escaping is defined in logger.py, and reversing it here by hand
+# would be a second copy of the same four rules -- exactly the drift this project
+# keeps eliminating everywhere else.
+from logger import unescape_raw
 
 
 # --------------------------------------------------------------------------- #
@@ -154,14 +160,39 @@ class Transport:
         pass
 
 
-class FileReplayTransport(Transport):
-    """Replays newline-delimited packets from a file (unframed 'raw' lines)."""
+# A raw-log line is "<ISO 8601 receipt time>	<escaped payload>". No telemetry packet
+# begins with a date, so a line in this shape is unambiguously one of ours.
+_RAW_LOG_LINE = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\t]*\t(.*)$")
 
-    def __init__(self, path: str, rate_hz: float = 0.0, framed: bool = False) -> None:
+
+class FileReplayTransport(Transport):
+    """Replays newline-delimited packets from a file (unframed 'raw' lines).
+
+    The file may also be a raw log this ground station wrote. That log is the forensic
+    record of a flight -- every line received, corrupted ones included -- so replaying it
+    is the natural way to re-run an analysis afterwards, and the runbook says to do exactly
+    that. Its lines carry a receipt timestamp and escaped control characters, both of which
+    are undone here; without that every line of a real flight log fails to parse.
+    """
+
+    def __init__(self, path: str, rate_hz: float = 0.0, framed: bool = False,
+                 raw_log: bool | None = None) -> None:
         self.path = path
         self.period = (1.0 / rate_hz) if rate_hz > 0 else 0.0
         self.framed = framed
+        # None auto-detects per line, which is safe because the two shapes cannot be
+        # confused. False forces the plain reading, for a file of packets that somehow
+        # begins with a date.
+        self.raw_log = raw_log
         self._decoder = FrameDecoder() if framed else None
+
+    def _payload(self, text: str) -> str:
+        if self.raw_log is False:
+            return text
+        match = _RAW_LOG_LINE.match(text)
+        if match is None:
+            return text
+        return unescape_raw(match.group(1))
 
     def frames(self) -> Iterator[Frame]:
         with open(self.path, "rb") as stream:
@@ -169,7 +200,7 @@ class FileReplayTransport(Transport):
                 if self._decoder is not None:
                     yield from self._decoder.feed(line)
                 else:
-                    text = line.decode("utf-8", errors="replace").strip()
+                    text = self._payload(line.decode("utf-8", errors="replace").strip())
                     if text:
                         kind = "status" if text.startswith("#") else "raw"
                         yield Frame(kind, text, True)

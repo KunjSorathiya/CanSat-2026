@@ -274,10 +274,14 @@ and pressure, each against time or packet number.
 
 1. Copy `logs/telemetry.csv` and `logs/raw_packets.tsv`, and the microSD log, to a safe
    location — work only on copies.
-2. Export a clean CSV if needed:
+2. Export a clean CSV if needed. `replay` reads the raw log directly — it recognises the
+   receipt timestamp and the escaping, so the file the flight produced is the file you
+   replay:
    ```bash
    python src/main.py replay logs/raw_packets.tsv --team CAN-Team-25 --export analysis/flight.csv
    ```
+   The summary line it prints (`received=… accepted=… rejected=…`) is worth reading before
+   the graphs: `received=0` means the file is not what the command thinks it is.
 3. Produce the three mandatory graphs.
 4. Optional analysis that scores additional credit: acceleration profile, orientation
    history, descent-rate derivation, packet-loss versus altitude, GPS ground track,

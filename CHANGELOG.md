@@ -55,6 +55,31 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — the runbook's post-flight replay produced nothing, silently
+
+Step 2 of post-flight analysis replays the raw log to export a clean CSV. The raw log is
+this ground station's forensic record: every line received, corrupted ones included, each
+written as `<receipt timestamp>` TAB `<escaped payload>`. `FileReplayTransport` fed each
+line to the parser whole — timestamp, tab and all — so every line of a real flight log was
+rejected before it reached the validator.
+
+Run against a log written by the real logger, the command reported:
+
+```
+received=0 accepted=0 rejected=0
+```
+
+Not an error, not a warning. Zero of everything, four hours after a launch, with the graphs
+still to produce.
+
+`FileReplayTransport` now recognises a raw-log line and undoes both transformations — the
+timestamp and the escaping, the latter through `logger.unescape_raw()` rather than a second
+copy of the same four rules. Detection is per line and unambiguous, because no telemetry
+packet begins with a date; `raw_log=False` forces the plain reading for a file that somehow
+does. The same log now replays as **`received=5 accepted=5 rejected=0`**.
+
+Five tests cover it, and the runbook says what `received=0` would mean if it ever came back.
+
 ### Added — the validator's two implementations now read one file
 
 The three parsers have read `test-data/protocol-fixtures.tsv` since cycle 2, so they cannot

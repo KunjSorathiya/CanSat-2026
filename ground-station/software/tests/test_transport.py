@@ -5,6 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
+from logger import escape_raw
 from transport import (
     FileReplayTransport,
     FrameDecoder,
@@ -128,3 +129,49 @@ class SerialBufferTests(unittest.TestCase):
                 resyncs += 1
         self.assertLessEqual(len(buf), cap)
         self.assertGreater(resyncs, 0)
+
+
+class RawLogReplayTests(unittest.TestCase):
+    """Replaying a raw log this ground station wrote.
+
+    The raw log is the forensic record of a flight, and the runbook's post-flight analysis
+    step replays it. Its lines carry a receipt timestamp and escaped control characters;
+    fed verbatim to the parser, every line of a real flight log is rejected.
+    """
+
+    PACKET = ("CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; "
+              "Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;")
+
+    def _replay(self, lines, **kw):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "raw_packets.tsv"
+            path.write_text("".join(f"{line}\n" for line in lines), encoding="utf-8")
+            return list(FileReplayTransport(str(path), **kw).frames())
+
+    def test_a_raw_log_line_replays_as_the_packet_it_recorded(self):
+        frames = self._replay([f"2026-09-05T02:11:03.123456+00:00\t{self.PACKET}"])
+        self.assertEqual([f.payload for f in frames], [self.PACKET])
+        self.assertEqual(frames[0].kind, "raw")
+
+    def test_a_status_line_in_the_raw_log_is_still_a_status_line(self):
+        frames = self._replay(
+            ["2026-09-05T02:11:04.000000+00:00\t#state=RX radio=1 sync=0xF3"])
+        self.assertEqual(frames[0].kind, "status")
+        self.assertEqual(frames[0].payload, "#state=RX radio=1 sync=0xF3")
+
+    def test_escaped_control_characters_are_restored(self):
+        # A corrupted payload can contain a tab; the log escapes it so one record stays one
+        # line. Replay has to undo exactly that, or the payload comes back different from
+        # the one the vehicle sent.
+        corrupted = "CAN-Team-07;\tP-001;\ raw"
+        line = "2026-09-05T02:11:05.000000+00:00\t" + escape_raw(corrupted)
+        self.assertEqual([f.payload for f in self._replay([line])], [corrupted])
+
+    def test_a_plain_packet_file_is_unchanged(self):
+        # The common case is still a file of bare packets, and it must not be touched.
+        self.assertEqual([f.payload for f in self._replay([self.PACKET])], [self.PACKET])
+
+    def test_the_raw_log_reading_can_be_turned_off(self):
+        line = f"2026-09-05T02:11:03.123456+00:00\t{self.PACKET}"
+        frames = self._replay([line], raw_log=False)
+        self.assertEqual(frames[0].payload, line)
