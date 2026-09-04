@@ -8,6 +8,42 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 31)
+
+### Fixed — a portability defect that only a non-Windows build could reveal
+
+The first Linux CI run failed in all three host jobs. The cause was not the toolchain: it
+was a genuine defect this project had no way to see.
+
+`std::uint64_t` is `unsigned long long` on Windows and `unsigned long` on 64-bit Linux.
+A range-`for` in `flight_tests.cpp` iterated a braced list mixing `ULL` literals with
+`std::uint64_t` values. On Windows both spellings name the same type, so the element type
+deduces cleanly. On Linux they are two types, and the deduction is ambiguous:
+
+```
+error: unable to deduce 'std::initializer_list<auto>&&' from
+       '{0, 1, 999, 3600000, last, (((long unsigned int)last) + 1), 1234567890}'
+note: deduced conflicting types for parameter 'auto'
+      ('long long unsigned int' and 'long unsigned int')
+```
+
+The list is now written as `std::initializer_list<std::uint64_t>`: the element type is
+stated rather than deduced, so there is nothing left to conflict. Both the failure and
+the fix were reproduced on Windows before pushing, by compiling the same construct
+against Linux's spelling of the type — the error message matched CI's exactly.
+
+Every other range-`for` over a braced list in the tree was checked; the rest use uniform
+literal types and are unaffected.
+
+### Changed — the strict warning gate blocks again
+
+It was made advisory in cycle 30 while the Linux failure was unexplained. The explanation
+turned out to be a real bug rather than a compiler disagreement, so the reason for the
+downgrade is gone and the gate is enforced again. A quality gate weakened to hide an
+unknown stops being a gate.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 30)
 
 ### Fixed — a 41 MB Windows CMake wheel was being tracked

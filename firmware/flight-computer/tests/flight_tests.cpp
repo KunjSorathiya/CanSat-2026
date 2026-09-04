@@ -20,7 +20,9 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <cstdint>
 #include <fstream>
+#include <initializer_list>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -505,8 +507,12 @@ void test_formatter_and_parser_agree_at_the_edges() {
 
     // Every timestamp the formatter can produce must survive its own parser.
     auto record = make_valid_record();
-    for (const std::uint64_t t : {0ULL, 1ULL, 999ULL, 3600000ULL, last, last + 1,
-                                  1234567890ULL}) {
+    // The list is typed rather than deduced. std::uint64_t is unsigned long long on
+    // Windows but unsigned long on 64-bit Linux, so a braced list mixing ULL literals
+    // with std::uint64_t values deduces two different types for the same element type
+    // and fails to compile there -- while looking perfectly correct here.
+    for (const std::uint64_t t : std::initializer_list<std::uint64_t>{
+             0, 1, 999, 3600000, last, last + 1, 1234567890}) {
         record.timestamp_ms = t;
         const auto packet = cansat::format_packet(record);
         CHECK(packet.has_value());

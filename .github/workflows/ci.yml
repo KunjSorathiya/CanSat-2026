@@ -7,11 +7,10 @@ name: CI
 #   1. Nothing is discarded. An earlier version of this workflow sent the strict-warning
 #      build to /dev/null -- a gate whose whole purpose is to surface a warning, throwing
 #      away the warning. A failure nobody can read costs another push to diagnose.
-#   2. The strict warning set is advisory until it has been observed passing on Linux.
-#      It is enforced on a compiler the developer can actually run; a different GCC on a
-#      runner may reasonably disagree, and a quality gate that fails on an unverified
-#      toolchain blocks work without telling anyone anything. It is reported on every run
-#      and becomes blocking once a green Linux run exists (see documentation/testing/).
+#   2. Every gate blocks. The strict warning set was briefly advisory while the first
+#      Linux failure was unexplained; that failure turned out to be a real portability
+#      defect, not a compiler disagreement, so the gate is enforced again. A quality gate
+#      weakened to hide an unknown stops being a gate.
 
 on:
   push:
@@ -66,11 +65,8 @@ jobs:
           if-no-files-found: warn
 
   strict-warnings:
-    name: Strict warning set (advisory)
+    name: Strict warning set
     runs-on: ubuntu-24.04
-    # Advisory until a green Linux run exists. The tree is clean under this set on the
-    # developer's GCC 15.2; this job establishes whether the runner's GCC agrees.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 

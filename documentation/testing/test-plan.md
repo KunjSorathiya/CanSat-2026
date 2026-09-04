@@ -51,25 +51,30 @@ strict warning set.
 
 Every result quoted in this document was measured on the development machine: Windows,
 MSYS2 GCC 15.2.0. Until 2026-09-04 the project had never been built on Linux at all --
-the CI workflow only reached `main` with the first full push, and its first run failed in
-two of the three jobs.
+the CI workflow only reached `main` with the first full push, and its first run failed.
 
-That failure is not yet diagnosed. What has been ruled out, by direct check rather than
-inspection: CMake configures cleanly and registers all five tests (verified against CMake
-4.4.3, the same major version the runner carries); every `#include` resolves with exact
-case; every file is stored LF in the index, with a `.gitattributes` now enforcing it;
-every source named by the build is committed; the test binaries pass when run from a
-foreign working directory, as CTest runs them; and no translation unit relies on a
-transitively included standard header. What remains untested is the runner's own
-toolchain -- a different GCC and a different C library -- which cannot be reproduced on
-the development machine.
+**The cause was a real portability defect, not a CI quirk.** `std::uint64_t` is
+`unsigned long long` on Windows but `unsigned long` on 64-bit Linux. A range-`for` over a
+braced list in `flight_tests.cpp` mixed `ULL` literals with `std::uint64_t` values; on
+Windows both spellings are the same type and the element type deduces cleanly, while on
+Linux they are different types and the deduction is ambiguous:
 
-The workflow is therefore written to report rather than to guess: no step discards its
-output, every job prints its tool versions, and the build logs and CTest results are
-uploaded as artifacts on failure as well as success. The strict warning set runs
-`continue-on-error` until it has been seen to pass on Linux once, because a gate that
-fails on an unverified toolchain blocks work without telling anyone why. **Make it
-blocking again as soon as a green Linux run exists.**
+```
+error: unable to deduce 'std::initializer_list<auto>&&' from
+       '{0, 1, 999, 3600000, last, (((long unsigned int)last) + 1), 1234567890}'
+note: deduced conflicting types for parameter 'auto'
+      ('long long unsigned int' and 'long unsigned int')
+```
+
+Every host job failed on it identically, which is why three jobs went red at once while
+the Pico syntax check -- which does not compile the tests -- stayed green. The list is now
+explicitly `std::initializer_list<std::uint64_t>`, so no deduction happens and no
+conflict is possible. The failure and the fix were both reproduced on Windows before the
+fix was pushed, by compiling the same construct against Linux's spelling of the type.
+
+This is the class of defect a single-platform project cannot see. It is also the reason
+the workflow keeps its logs: the diagnosis came entirely from the CI output, and the
+earlier version of this workflow discarded exactly the lines that named the error.
 
 ---
 
