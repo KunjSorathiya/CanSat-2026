@@ -922,13 +922,23 @@ void test_controller_ignores_repeated_barometer_samples() {
     const double climbing = ctrl.health().altitude_rate_mps;
     CHECK(climbing > 1.0);
 
-    // Now the barometer stalls: the same conversion is returned repeatedly. The rate must
-    // hold its last value rather than being dragged to zero by fake zero-length steps.
-    for (int i = 0; i < 20; ++i) {
+    // The loop briefly outruns the sensor: a couple of repeated conversions must not be
+    // treated as real samples, or the rate is dragged toward zero by fake zero-length steps.
+    t += 50;
+    ctrl.poll(t);
+    t += 50;
+    ctrl.poll(t);
+    CHECK(approx(ctrl.health().altitude_rate_mps, climbing, 1e-9));
+
+    // But an unchanged pressure for longer than the hold window means the vehicle has
+    // genuinely stopped moving. Holding the descent rate for ever would stop the landing
+    // detector from firing and leave the mission stuck in FLIGHT after it had landed.
+    for (int i = 0; i < 40; ++i) {
         t += 50;
         ctrl.poll(t);
     }
-    CHECK(approx(ctrl.health().altitude_rate_mps, climbing, 1e-9));
+    CHECK(std::fabs(ctrl.health().altitude_rate_mps) < 1.0);
+    CHECK(std::fabs(ctrl.health().altitude_rate_mps) < std::fabs(climbing));
 }
 
 // The vehicle and the bridge must configure the same modem. They agree only because both

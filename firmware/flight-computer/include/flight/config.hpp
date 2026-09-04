@@ -112,6 +112,14 @@ struct Configuration {
     // ---- Sensor validity -------------------------------------------------------
     std::uint32_t sensor_stale_after_ms = 2000;
 
+    // How long the vertical-speed estimate holds its value while the barometer reports an
+    // unchanged pressure. Over-sampling produces at most a sample or two of repeats — the
+    // barometer runs at 83 Hz against a 30 Hz loop — so a short hold rejects those false
+    // zeros. Beyond it, an unchanged pressure means the vehicle really is not moving
+    // vertically, and holding a stale descent rate would stop the landing detector from
+    // ever firing.
+    std::uint32_t altitude_rate_hold_ms = 200;
+
     // ---- Barometer configuration (BMP280 datasheet section 3.8, table 14) ------
     // osrs_t x1 + osrs_p x4 + IIR filter x16 is the datasheet's "handheld device,
     // dynamic" preset: 83 Hz output, low noise, and fast enough that 30 Hz sampling

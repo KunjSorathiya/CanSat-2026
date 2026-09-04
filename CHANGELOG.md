@@ -8,6 +8,33 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 23)
+
+### Fixed — the vertical-speed hold could have left the mission stuck in FLIGHT
+
+Cycle 4 stopped the vertical-speed estimate from being dragged to zero by repeated
+barometer readings. That fix held the estimate **indefinitely** while the pressure was
+unchanged — and an unchanged pressure means two opposite things:
+
+- for a sample or two, the loop outran the sensor, and holding is right;
+- for longer, the vehicle genuinely is not moving vertically.
+
+The landing detector requires `|vertical speed| < 1 m/s`. A rate held at its last descent
+value would therefore **never** let the mission leave `FLIGHT`: the vehicle would sit on the
+ground in the flight state, and the post-impact window would never begin. Telemetry would
+have continued throughout — the rulebook minimum was never at risk — but the mission state
+would have been wrong for the whole recovery.
+
+Real barometer noise would usually have masked this, which is what makes it worth fixing
+rather than relying on: a quiet sensor, a frozen one, or a stable day should not change
+whether the vehicle notices it has landed.
+
+The hold is now bounded by `altitude_rate_hold_ms` (200 ms, about six sensor periods), after
+which the estimate decays to zero. Both behaviours are tested: a brief stall holds, a long
+one settles.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 22)
 
 ### Fixed — battery telemetry could not be told apart from a pin voltage

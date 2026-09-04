@@ -126,6 +126,20 @@ Two independent protections, because this is a silent failure:
    the estimate holds its last value if the sensor stalls, slows or is reconfigured in the
    field. `test_controller_ignores_repeated_barometer_samples()` covers this.
 
+**The hold is bounded, and that matters as much as the hold itself.** An unchanged pressure
+means one of two things, and they need opposite responses:
+
+| Unchanged for | Means | Correct response |
+|---|---|---|
+| A sample or two | The loop outran the sensor | Hold the estimate |
+| Longer than `altitude_rate_hold_ms` (200 ms) | The vehicle genuinely is not moving vertically | Decay to zero |
+
+Getting the second case wrong is not a small error: the landing detector requires
+`|vertical speed| < 1 m/s`, so a rate held at its last descent value would **never** let the
+mission leave `FLIGHT` — it would sit in the flight state on the ground, and the post-impact
+window would never begin. Telemetry would continue regardless, but the mission state would
+be wrong for the rest of the recovery.
+
 ## Bus and CPU budget
 
 I2C0 runs at 400 kHz. Each transaction is roughly `(bytes + 2) × 9` bits including

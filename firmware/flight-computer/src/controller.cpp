@@ -240,6 +240,13 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
         // the vehicle is moving fastest. validate_config() also refuses a sampling period
         // shorter than the barometer's conversion time, but this stays correct even if the
         // sensor stalls, slows, or is reconfigured in the field.
+        //
+        // The hold is bounded. An unchanged pressure means one of two things, and they
+        // need opposite responses: for a sample or two it means the loop outran the
+        // sensor, and the estimate should hold. For longer than that it means the vehicle
+        // genuinely is not moving vertically — and holding a stale descent rate would stop
+        // the landing detector from ever firing, leaving the mission stuck in FLIGHT after
+        // it had already landed.
         const bool pressure_changed =
             last_altitude_ms_ == 0 || baro.pressure_pa != last_baro_pressure_pa_;
         if (last_altitude_ms_ != 0 && pressure_changed) {
@@ -248,6 +255,10 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
                 const double inst_rate = (agl - last_altitude_agl_m_) / dts;
                 altitude_rate_mps_ = 0.7 * altitude_rate_mps_ + 0.3 * inst_rate;
             }
+        } else if (last_altitude_ms_ != 0 &&
+                   mission_ms - last_altitude_ms_ > config_.altitude_rate_hold_ms) {
+            // Settled: the pressure has genuinely stopped moving, so the rate is zero.
+            altitude_rate_mps_ = 0.7 * altitude_rate_mps_;
         }
         if (pressure_changed) {
             last_altitude_agl_m_ = agl;

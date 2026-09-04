@@ -16,20 +16,20 @@ configuration under `.claude/`)
 > preserved as the record of that run.
 >
 > **Pass 2** was a deeper engineering review of the same software, and it found
-> substantially more — twenty-one further defects, F-12 to F-32, including several that
+> substantially more — twenty-four further defects, F-12 to F-35, including several that
 > would have produced a failed or mis-recorded flight. The headline: the telemetry rate the
 > project had chosen was one the radio physically could not deliver. Findings F-12 onward,
 > the [second-pass summary](#second-pass-summary) and the file-by-file rows marked with a
 > cycle number are from that pass.
 
-**Verdict:** ✅ **Pass. 25 defects found and fixed across both passes; the remaining open
+**Verdict:** ✅ **Pass. 28 defects found and fixed across both passes; the remaining open
 items all require hardware.**
 
 ---
 
 ## Second-pass summary
 
-Twenty-one findings, all fixed, all with regression tests. Grouped by what they would have
+Twenty-four findings, all fixed, all with regression tests. Grouped by what they would have
 cost:
 
 | Would have caused | Findings |
@@ -254,6 +254,9 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-30** | Startup calibration gated on gyro variance alone, so a vehicle turning at a constant rate on the pad passed as "still" and had its rotation subtracted as bias for the whole flight | **Medium** | ✅ **Closed 2026-09-04 (cycle 13)** — the mean is bounded at 25 deg/s, beyond the datasheet's zero-rate offset |
 | **F-31** | `RawBlockLog` kept one header block, rewritten after every record. A power failure during that write left no valid header, and the next boot would restart at the first record block — overwriting the entire flight just recorded | **High** | ✅ **Closed 2026-09-04 (cycle 14)** — two alternating header copies with sequence numbers and checksums; each is destroyed in turn by a test |
 | **F-32** | `<sstream>` and `<iomanip>` remained in the flight image after `<regex>` was removed for the same reason: an `ostringstream` per numeric field, once per second, for the whole flight | Medium | ✅ **Closed 2026-09-04 (cycle 15)** — replaced with `snprintf`; flight-core translation units referencing iostreams went 2 → 0 |
+| **F-33** | The loop tick had a second upper bound nobody had written down: the GPS is drained once per tick from a 32-byte UART FIFO that fills in 33 ms at 9600 baud | Medium | ✅ **Closed 2026-09-04 (cycle 21)** — `loop_tick_ms` is configuration, and `validate_config()` enforces both bounds |
+| **F-34** | Reported battery voltage could not be told apart from a raw ADC pin voltage, and the ADC channel was hard-coded while the pin was configurable | Low | ✅ **Closed 2026-09-04 (cycle 22)** — `battery_voltage_is_scaled` in the health snapshot; channel derived from the pin |
+| **F-35** | The vertical-speed hold introduced in cycle 4 was unbounded, so a quiet or frozen barometer would have held a descent rate for ever — and the landing detector, which requires under 1 m/s, would never have fired | **Medium** | ✅ **Closed 2026-09-04 (cycle 23)** — bounded by `altitude_rate_hold_ms`; both the brief stall and the long one are tested |
 
 ---
 
