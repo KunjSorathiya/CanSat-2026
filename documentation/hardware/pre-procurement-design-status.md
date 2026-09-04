@@ -21,7 +21,7 @@ The following facts are supported by the current documentation. `VERIFIED FROM D
 | Pico GPIO | Pico GPIO operates in the 3.3 V logic domain; GPIO limits must follow the Pico/RP2040 documentation | Raspberry Pi Pico datasheet | VERIFIED FROM DOCUMENTATION |
 | Pico power input | VSYS supports approximately 1.8 V to 5.5 V according to the accepted project interpretation of the Pico documentation | Raspberry Pi Pico documentation | VERIFIED FROM DOCUMENTATION |
 | Pico peripherals | I2C, SPI, UART, ADC, USB, and configurable GPIO resources are available | Raspberry Pi Pico datasheet | VERIFIED FROM DOCUMENTATION |
-| Battery identity | Orange 1S LiPo, Robu SKU 1125094, marked 3.7 V nominal, 1500 mAh, 25C | Confirmed project BOM and Robu product reference | VERIFIED FROM DOCUMENTATION |
+| Battery identity | **Pro-Range** 1S LiPo delivered against Robu SKU 1125094, labelled 3.7 V nominal, 1500 mAh, 25C. The BOM ordered an Orange pack; capacity, cell count, voltage and C-rating match, the brand does not | Receiving inspection of the delivered pack | VERIFIED FROM HARDWARE |
 | Battery full-charge assumption | Approximately 4.2 V when fully charged | Confirmed project power information | VERIFIED FROM DOCUMENTATION |
 | RA-02 identity | SX1278 RA-02 433 MHz module, Robu SKU 1150780, quantity 2 | Robu product reference | VERIFIED FROM DOCUMENTATION |
 | RA-02 IC scope | Semtech documentation describes SX1278 IC behavior, not necessarily the complete RA-02 carrier | Semtech SX127x documentation and compatibility analysis | VERIFIED FROM DOCUMENTATION |

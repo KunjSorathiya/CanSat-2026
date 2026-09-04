@@ -35,15 +35,22 @@ The ground-station power supply, switch, LED, wiring, and computer connection ar
 
 ## Power Source
 
-The onboard source is one Orange 1S LiPo battery:
+The onboard source is one 1S LiPo battery. The BOM ordered an Orange pack; **the pack that arrived is Pro-Range**, with the same capacity, cell count, nominal voltage and C-rating.
+
+From the delivered pack's label:
 
 - Nominal voltage: 3.7 V
-- Approximate full-charge voltage: 4.2 V
 - Discharge voltage: lower than nominal as the battery discharges; the usable lower limit is TBD
 - Capacity marking: 1500 mAh
 - C-rating marking: 25C
+- Main discharge lead: red 2-pin JST-RCY (BEC) style
+- Balance lead: white 2-pin JST-XH style
 
-The electrical design must treat the battery as a variable-voltage source. No battery life, safe cutoff voltage, charging current, protection method, or allowable load is assumed from the battery label alone.
+From the BOM rather than the pack:
+
+- Approximate full-charge voltage: 4.2 V
+
+The electrical design must treat the battery as a variable-voltage source. No battery life, safe cutoff voltage, charging current, protection method, or allowable load is assumed from the battery label alone - and in this case the label states none of them. **Neither lead mates with anything in this project, and no 1S charger was supplied or is on the BOM.**
 
 ## Recommended Preliminary Power Topology
 
