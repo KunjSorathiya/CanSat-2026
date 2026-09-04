@@ -23,6 +23,7 @@
 
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
+#include "hardware/spi.h"
 #include "hardware/uart.h"
 #include "pico/stdio_usb.h"
 #include "pico/stdlib.h"
@@ -472,6 +473,110 @@ void report_radio(const flight::Configuration& config) {
                 "   above means the driver is waiting on something it should not be.\n");
 }
 
+// ---- Gate 6 ------------------------------------------------------------------
+//
+// The highest-risk item in the BOM, per documentation/hardware/sd-module-analysis.md. The
+// delivered board has no regulator, no level shifter and nothing buffering MISO, so what
+// this section proves about the card is also what Gate 7 depends on.
+//
+// Initialisation and the card-type read are non-destructive. The write test is not, and it
+// is behind its own prompt for a different reason from the radio's: it cannot damage
+// hardware, but it destroys the filesystem.
+void report_sd() {
+    std::printf("\n-- 6.1 / 6.2 microSD --\n");
+    flight::pico::SdCard card;
+    const bool ok = card.begin(spi0, flight::BoardPins::sd_cs);
+    std::printf("   init (CMD0/CMD8/ACMD41/CMD58/CMD16): %s\n", ok ? "ok" : "FAILED");
+    if (!ok) {
+        std::printf("   Check CS on GP%d and that a card is actually seated - the holder is\n"
+                    "   friction-fit, so a card can sit in it without making contact.\n"
+                    "   Nothing on this module buffers MISO, and nothing shifts levels.\n",
+                    flight::BoardPins::sd_cs);
+        return;
+    }
+    std::printf("   6.2 card type: %s\n",
+                card.high_capacity() ? "SDHC/SDXC, block-addressed - as predicted"
+                                     : "SDSC, byte-addressed - NOT what Gate 6.2 expects");
+
+    std::printf("\n-- 6.3 Block write time --\n");
+    std::printf("   ***  THIS DESTROYS THE FILESYSTEM ON THE CARD.  ***\n");
+    std::printf("   The vehicle logs raw blocks with no filesystem, and the log starts at\n");
+    std::printf("   LBA 2048 - exactly where a FAT32 partition begins. After this the card\n");
+    std::printf("   will not mount on a PC until it is reformatted. That is by design, not\n");
+    std::printf("   a fault. No hardware is at risk; only the card's contents.\n");
+    std::printf("\n   Card expendable? Press 'w' within 20 s to write. Anything else skips.\n");
+
+    const std::uint64_t deadline = now_ms() + 20000;
+    int key = -1;
+    while (now_ms() < deadline) {
+        key = getchar_timeout_us(0);
+        if (key != PICO_ERROR_TIMEOUT) break;
+        sleep_ms(50);
+    }
+    if (key != 'w' && key != 'W') {
+        std::printf("   skipped. 6.3 stays open, and the card stays readable.\n");
+        return;
+    }
+
+    constexpr int kWrites = 100;
+    constexpr std::uint32_t kBaseLba = 2048;
+    std::uint8_t block[flight::pico::SdCard::kBlockSize];
+    for (std::size_t i = 0; i < sizeof(block); ++i) {
+        block[i] = static_cast<std::uint8_t>(i & 0xFF);
+    }
+
+    std::uint64_t total_us = 0, worst_us = 0;
+    int written = 0;
+    for (int i = 0; i < kWrites; ++i) {
+        block[0] = static_cast<std::uint8_t>(i);
+        const std::uint64_t t0 = to_us_since_boot(get_absolute_time());
+        const bool w = card.write_block(kBaseLba + static_cast<std::uint32_t>(i), block);
+        const std::uint64_t dt = to_us_since_boot(get_absolute_time()) - t0;
+        if (w) {
+            total_us += dt;
+            if (dt > worst_us) worst_us = dt;
+            ++written;
+        }
+    }
+    if (written == 0) {
+        std::printf("   every write FAILED.\n");
+        return;
+    }
+    std::printf("   %d/%d written. mean %.3f ms, worst %.3f ms\n", written, kWrites,
+                (total_us / static_cast<double>(written)) / 1000.0, worst_us / 1000.0);
+
+    // A write that reports success and does not land is the failure mode worth catching:
+    // the log would look healthy all the way to a card with nothing on it.
+    std::uint8_t check[flight::pico::SdCard::kBlockSize];
+    const bool read_ok = card.read_block(kBaseLba + kWrites - 1, check);
+    bool match = read_ok;
+    for (std::size_t i = 1; match && i < sizeof(check); ++i) {
+        if (check[i] != static_cast<std::uint8_t>(i & 0xFF)) match = false;
+    }
+    if (match && check[0] == static_cast<std::uint8_t>(kWrites - 1)) {
+        std::printf("   read-back of the last block matches - the writes landed\n");
+    } else {
+        std::printf("   READ-BACK MISMATCH. Writes reported success without landing,\n"
+                    "   which is worse than an honest failure. Do not fly this card.\n");
+    }
+
+    std::printf("\n   The write DURATION is measured; the write CURRENT is not, and it is\n"
+                "   what Gate 2 is waiting on. Firmware cannot see its own supply - put a\n"
+                "   meter in series with the module's 3V3 lead and repeat this test.\n");
+
+    std::printf("\n-- 6.6 Log boot count --\n");
+    flight::PicoSdLogger logger;
+    if (!logger.initialize()) {
+        std::printf("   logger init FAILED\n");
+        return;
+    }
+    std::printf("   boot_count = %lu, records = %lu, %s\n",
+                static_cast<unsigned long>(logger.boot_count()),
+                static_cast<unsigned long>(logger.record_count()),
+                logger.high_capacity() ? "block-addressed" : "byte-addressed");
+    std::printf("   Power-cycle and re-run: boot_count must increase by exactly one.\n");
+}
+
 void gps_status(flight::PicoGps& gps, std::uint64_t boot_fix_ms) {
     cansat::GpsData d;
     const bool have = gps.latest(d) && d.valid;
@@ -544,6 +649,7 @@ int main() {
     // GPS last: it is the only subsystem here whose supply is still unverified (C.5.5),
     // so everything that can be measured without it is already on the record by now.
     report_radio(config);
+    report_sd();
 
     gps_raw_echo(config, 5);
     flight::PicoGps gps(config);

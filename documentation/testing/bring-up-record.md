@@ -182,7 +182,7 @@ confident wrong number.
 > vertical-speed estimate degrades — the firmware detects and handles it, but the
 > configuration should be corrected rather than relied on to degrade gracefully.
 
-> **Rows 3.1–3.5, 3.7, 3.8, 4.1–4.3, 5.1–5.3 and 8.8 are taken with `cansat_bringup_firmware`**, a separate image
+> **Rows 3.1–3.5, 3.7, 3.8, 4.1–4.3, 5.1–5.3, 6.1–6.3, 6.6 and 8.8 are taken with `cansat_bringup_firmware`**, a separate image
 > that prints over USB. The flight firmware speaks only over LoRa, so a vehicle with no radio
 > attached produces nothing to read — that is why this gate had no observable until the
 > diagnostic existed. Flash it exactly like the flight image, open the port at any baud rate,
@@ -346,9 +346,39 @@ computed airtime that has never been observed.
 
 ## Gate 6 · Storage
 
+> ⚠️ **The write test destroys the filesystem on the card.** The vehicle logs raw 512-byte
+> blocks with no filesystem at all, and the log starts at **LBA 2048** — exactly where a
+> FAT32 partition begins on a card formatted the usual way. After any write test the card
+> will not mount on a PC until it is reformatted. **That is by design, not a fault**, and it
+> is the same layout the vehicle will use in flight.
+>
+> No hardware is at risk here — unlike the radio's antenna warning, the only casualty is the
+> card's contents. `cansat_bringup_firmware` still puts it behind a `w` prompt, because
+> destroying data silently is its own kind of failure. **6.1 and 6.2 run unprompted; they are
+> read-only.**
+>
+> **What Gate 2 needs from this gate is a current, and firmware cannot measure it.** The
+> diagnostic reports the write *duration*, which tells you how long the transient lasts. Its
+> magnitude needs a meter in series with the module's `3V3` lead, and it is the last number
+> standing between this project and a chosen regulator.
+>
+> **Wiring for Gate 6** — the microSD shares SCK, MOSI and MISO with the RA-02 and has its
+> own chip select, so this is the same bus with one more wire:
+>
+> ```text
+> Pico 3V3  pin 36  ──  3V3         Pico GP18 pin 24  ──  CLK
+> Pico GND  pin 38  ──  GND         Pico GP19 pin 25  ──  MOSI
+> Pico GP6  pin  9  ──  CS          Pico GP16 pin 21  ──  MISO
+> ```
+>
+> The module prints `CLK`, not `SCK`, and its header runs `GND MISO CLK MOSI CS 3V3` — ground
+> and supply at opposite ends, so a reversed header is a direct short across the rail. The
+> card holder is friction-fit with no positive retention, so a card can sit in it looking
+> seated without making contact.
+
 | # | Quantity | Predicted | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|
-| 6.1 | Card initialises | CMD0/CMD8/ACMD41 succeed | `sd_ok` in the health snapshot | | |
+| 6.1 | Card initialises | CMD0/CMD8/ACMD41 succeed | `sd_ok` in the health snapshot, or `cansat_bringup_firmware` | | |
 | 6.2 | Card type detected | SDHC (block-addressed) for any modern card | `high_capacity()` | | |
 | 6.3 | Single block write time | — | Time 100 `write_block` calls | | |
 | 6.4 | Records written per telemetry packet | 2 (record + header) | Count blocks after N packets | | |

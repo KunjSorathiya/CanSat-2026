@@ -93,6 +93,13 @@ public:
     bool flush() override;
     bool healthy() const override { return healthy_; }
 
+    // Reported on the bench, like the IMU's WHO_AM_I and the radio's version register.
+    // boot_count() is bring-up row 6.6 and is the cheapest evidence that the log survived
+    // a power cycle rather than being silently restarted.
+    bool high_capacity() const { return card_.high_capacity(); }
+    std::uint32_t boot_count() const { return log_.boot_count(); }
+    std::uint32_t record_count() const { return log_.record_count(); }
+
 private:
     pico::SdCard card_;
     RawBlockLog log_;

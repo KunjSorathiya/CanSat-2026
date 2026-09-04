@@ -55,6 +55,33 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Added — Gate 6 on the diagnostic, with the destructive half behind a prompt
+
+`cansat_bringup_firmware` now brings up the microSD reader — the item
+`sd-module-analysis.md` calls the highest-risk in the BOM.
+
+- **6.1** runs the full `CMD0/CMD8/ACMD41/CMD58/CMD16` sequence and reports it. On failure it
+  points at the friction-fit holder first, because a card can sit in that socket looking
+  seated without making contact.
+- **6.2** reports block- against byte-addressing from `high_capacity()`, which is what
+  settles SDHC rather than the capacity printed on the card.
+- **6.3** times 100 single-block writes, **then reads the last one back and compares it**.
+  A write that reports success without landing is the failure worth catching: the log would
+  look healthy all the way to a card with nothing on it.
+- **6.6** reports `boot_count()` and `record_count()` through two new `PicoSdLogger`
+  accessors, mirroring `PicoImu::who_am_i()` and `PicoRadio::chip_version()`.
+
+**The write test destroys the filesystem, and says so before it runs.** The log starts at
+LBA 2048 — exactly where a FAT32 partition begins — so afterwards the card will not mount on
+a PC until reformatted. That is the layout the vehicle flies; it is not a fault. No hardware
+is at risk, unlike the radio's antenna warning, but destroying data silently is its own kind
+of failure, so it sits behind a `w` prompt. 6.1 and 6.2 are read-only and run unprompted.
+
+**What Gate 2 still needs from Gate 6 is a current, and firmware cannot measure it.** The
+diagnostic reports write *duration*, which gives the transient's length. Its magnitude needs
+a meter in series with the module's `3V3` lead — and it is the last number standing between
+this project and a chosen regulator.
+
 ### Verified — the airtime model holds on a real radio, to within 1.8 %
 
 The RA-02 answered `0x12` on the version register, and then transmitted.
