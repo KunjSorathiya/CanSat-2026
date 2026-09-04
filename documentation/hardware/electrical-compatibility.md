@@ -21,7 +21,7 @@ Sources are separated by evidence level:
 | MPU-9250 module | 2846 | MPU-9250 IC VDD 2.375-3.46 V; breakout supply TBD | IC VLOGIC 1.71-3.46 V; breakout levels TBD | I2C/SPI at IC level; exposed breakout bus TBD | IC normal-mode current about 3.9 mA; breakout current TBD | Compatible in principle; board voltage and pull-ups must be verified | MANUFACTURER DOCUMENTED / PHYSICAL VERIFICATION REQUIRED | Breakout blocked |
 | NEO-6M GPS module | 11782 | NEO-6 receiver supply 2.7-3.6 V; breakout supply TBD | Receiver interface levels are documented; breakout levels TBD | UART documented for NEO-6; exposed board interface TBD | NEO-6 receiver current is about 37 mA; breakout current TBD | Compatible in principle; board regulator and UART levels must be verified | MANUFACTURER DOCUMENTED / PHYSICAL VERIFICATION REQUIRED | Breakout blocked |
 | GY-BMP280-3.3 | 835813 | BMP280 IC VDD 1.71-3.6 V; breakout supply TBD | IC VDDIO 1.2-3.6 V; breakout levels TBD | I2C/SPI at IC level; exposed breakout bus TBD | IC mode-dependent current; breakout current TBD | Compatible in principle; board wiring and pull-ups must be verified | MANUFACTURER DOCUMENTED / PHYSICAL VERIFICATION REQUIRED | Breakout blocked |
-| Micro SD reader | 11566 | 2.6-3.6 V, SPI | 3.3 V on a 3.3 V module; no shifting needed | GND, VCC, MISO, MOSI, SCK, CS | TBD; write transient unmeasured | Supply-compatible with the 3.3 V rail; MISO release on the shared bus still to confirm | VERIFIED FROM HARDWARE / current PHYSICAL VERIFICATION REQUIRED | Supply resolved; current and shared-bus behaviour open |
+| Micro SD reader | 11566 | Supply pin printed `3V3`; no regulator fitted; SPI | 3.3 V, unbuffered - **no level shifter is fitted, so a 3.3 V host is required** | GND, MISO, CLK, MOSI, CS, 3V3 | TBD; write transient unmeasured | Supply-compatible with the 3.3 V rail; **MISO release depends entirely on the card**, since nothing buffers it | VERIFIED FROM HARDWARE / current PHYSICAL VERIFICATION REQUIRED | Supply resolved; current and shared-bus behaviour open |
 | 1S 1500mAh 25C LiPo | 1125094 | 3.7 V nominal; approximately 4.2 V full charge; cutoff TBD | Not applicable | Battery connector and polarity TBD | Safe continuous and peak current TBD | Not a direct Pico peripheral supply until input path is verified | CONFIRMED / PHYSICAL VERIFICATION REQUIRED | Battery integration blocked |
 | 433 MHz antenna | 1121334 | Not applicable | Not applicable | RF connector type conflicting | RF power handling TBD | Not a digital Pico connection | ROBU DOCUMENTED / CONFIRMED conflict | RF connector blocked |
 | IPEX-to-SMA cable | 1674982 | Not applicable | Not applicable | IPEX1 to SMA female stated by product name | RF loss/power handling TBD | Not a digital Pico connection | CONFIRMED / PHYSICAL VERIFICATION REQUIRED | Connector mating blocked |
@@ -131,12 +131,21 @@ The purchased NEO-6M breakout's regulator, input range, UART logic levels, TX/RX
 
 The module received is:
 
-- Operating voltage: DC 2.6-3.6 V
+- Supply pin printed `3V3`, with **no voltage range printed anywhere on the board**
+- **No regulator**, in any package, on either face
+- **No level shifter** - no buffer, translator or transistor; no active component at all
+- Fitted passives: four resistors marked `103` (10 kOhm) and two unmarked capacitors
 - Interface: SPI
-- Pins: GND, VCC, MISO, MOSI, SCK, CS
+- Pins, in printed order: `GND  MISO  CLK  MOSI  CS  3V3`
+- Friction / slide-in card holder
 
-These are **VERIFIED FROM HARDWARE**. The supplier listing this section previously quoted
-said 4.5-5.5 V; the board in hand does not agree with it, and the board wins.
+These are **VERIFIED FROM HARDWARE**, from the photographs in
+[`photos/`](photos/). The supplier listing this section previously quoted said 4.5-5.5 V with
+an onboard regulator; the board in hand has neither, and the board wins.
+
+The *tolerated* supply range is deliberately not recorded: no source states one, and
+inventing a range from the module's class is what produced the 4.5-5.5 V figure in the first
+place. What is established is that the board wants 3.3 V and cannot step anything down.
 
 **Supply compatibility: resolved.** 3.3 V sits in the upper half of the module's range, so
 it runs from the vehicle's regulated rail with margin at both ends of a discharge curve. No
@@ -171,15 +180,15 @@ airframe, and close the power budget with a measured write transient.
            +-- MPU-9250 - board supply TBD
            +-- BMP280 - board supply TBD
            +-- GPS - board supply TBD
-           +-- SD reader - 2.6-3.6 V module, runs from the 3.3 V rail
+           +-- SD reader - 3.3 V board, no regulator, runs from the 3.3 V rail
 ```
 
 ### Conceptual Rail Assessment
 
 - The battery rail is variable, not a fixed 3.7 V rail.
 - A regulated 3.3 V rail is electrically plausible for verified 3.3 V-compatible peripheral boards, but it is not yet proven adequate for the total current or transient load.
-- The SD reader's 2.6-3.6 V range matches the planned 3.3 V rail, so it is one load on that rail like any other. Its **current** contribution, especially the write transient, is still unmeasured and is the open question for the regulator sizing.
-- The SD reader's signal pins are 3.3 V on a 3.3 V module, so no shifting is required. Its MISO behaviour when deselected still needs confirming, because SPI0 is shared with the RA-02.
+- The SD reader's `3V3` supply pin matches the planned 3.3 V rail, so it is one load on that rail like any other. Its **current** contribution, especially the write transient, is still unmeasured and is the open question for the regulator sizing.
+- The SD reader's signal pins are 3.3 V on a 3.3 V board, so no shifting is required - and none is fitted, which makes a 3.3 V host mandatory rather than merely convenient. Its MISO behaviour when deselected still needs confirming, and matters more than usual: **nothing on the board buffers the line**, so only the card releases it, and a card that does not corrupts the RA-02's next transaction on the shared SPI0 bus.
 - The RA-02, Pico supply path, GPS board, and sensor boards must not be connected directly to the LiPo until their exact board input limits are documented.
 - Known current consumers include the Pico, radio, sensors, GPS, SD reader, regulator losses, and LED branch. Actual typical and peak values remain TBD for the purchased boards.
 - Likely transient loads include RA-02 transmission, GPS startup/acquisition, SD-card initialization and writes, and Pico startup. This is an engineering risk, not a measured result.
@@ -279,7 +288,7 @@ No additional photographs are required before these checks are completed. Datash
 - Pico is a suitable 3.3 V-class controller in principle, subject to its documented input path and GPIO limits.
 - BMP280 and MPU-9250 IC interfaces and electrical domains are documented at chip level.
 - Semtech documents the SX1278 IC interface and operating limits at chip level.
-- The delivered SD reader is a 2.6-3.6 V SPI module and runs from the 3.3 V rail.
+- The delivered SD reader is a 3.3 V SPI board with no regulator and no level shifter, and runs from the 3.3 V rail.
 - The battery is a 3.7 V nominal, approximately 4.2 V full-charge 1S LiPo by project confirmation.
 
 ### Electrically Compatible in Principle

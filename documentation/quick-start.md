@@ -264,7 +264,7 @@ Three specific problems, all documented in
 
 The microSD reader used to be the third problem here — many of these breakouts state a
 4.5–5.5 V input and carry their own regulator and level shifters, which a 1S LiPo cannot
-feed. The module that arrived is not one of them: it is a 2.6–3.6 V SPI board and runs from
+feed. The module that arrived is not one of them: it is a 3.3 V SPI board with no regulator and no level shifter, and runs from
 the same 3.3 V rail as everything else. Its **current** draw during a write is still
 unmeasured, and shares a regulator with the radio.
 

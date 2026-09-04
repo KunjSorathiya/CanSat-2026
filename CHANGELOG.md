@@ -130,12 +130,71 @@ describe the board that arrived.
   claim a heading: `WHO_AM_I`, field magnitude on the assembled airframe, the calibration
   sweep, yaw drift either side of that calibration, and yaw against a known bearing.
 
+### Added — the delivered boards are photographed, and the photographs are transcribed
+
+Nineteen photographs of the delivered hardware are stored in
+`documentation/hardware/photos/`, named by SKU, and every board-level fact a camera can
+establish has been read off them into `receiving-inspection.md` Part C: silkscreen text,
+header order, component packages, fitted passives and physical fit.
+
+What that closed:
+
+- **The RA-02's header order**, transcribed from the board rather than assumed —
+  `GND GND 3.3V RST DIO0 DIO1 DIO2 DIO3` and `GND NSS MOSI MISO SCK DIO5 DIO4 GND`. Every
+  pin the GPIO map reserves for the radio exists, so its half of the map can be frozen. The
+  supply pin sits third from one end with `GND` either side of it, which is a one-pin offset
+  away from putting 3.3 V onto `RST`.
+- **The microSD reader has no regulator and no level shifter at all** — four 10 kΩ pull-ups
+  and two capacitors are its entire parts list, and its supply pin is printed `3V3`. The
+  power tree loses its second rail. It also loses its buffer: nothing but the card releases
+  MISO, which promotes bring-up row 7.4 from a precaution to the most important row in the
+  shared-bus gate.
+- **The IMU die is marked `MP92`**, so the delivered part is a real MPU-9250 rather than the
+  MPU-6500 that is frequently sold as one. `WHO_AM_I` remains the final word.
+- **The RF chain fits end to end** — antenna, pigtail and module mated with no adapter, in
+  `1150780-ra02-antenna-mated.jpg`. Assembly is unblocked.
+- **Module header pinouts** for all five breakouts are now in `wiring.md`, as printed.
+
+What it found:
+
+- The battery is **Pro-Range, not the Orange pack the BOM named**. Capacity, cell count,
+  voltage and C-rating match; the brand does not, and the label states no charge current and
+  no cutoff voltage.
+- The barometer is the shared-artwork `GY-BM ☐E/☐P 280` board with **neither variant box
+  legibly marked**, so BMP280 versus BME280 is unresolved — a `0x58`/`0x60` chip-ID read
+  settles it.
+- **No Pico headers, no microSD card and no 1S charger** were supplied, and none is on the
+  BOM. The charger is on the critical path.
+- The antenna's shell is female and the cable's male, which **agrees with the supplier
+  listing's gender and contradicts the BOM's**. SMA versus RP-SMA still turns on the centre
+  contacts, and neither mating face was photographed straight on.
+
+### Fixed — three documented values that a photograph does not support
+
+The microSD module's supply was recorded across four documents as "DC 2.6–3.6 V", marked
+`VERIFIED FROM HARDWARE`. The delivered board prints `3V3` on its supply pin and states no
+range anywhere; the range came from a generic listing for the module type, which is the same
+class of source that produced the 4.5–5.5 V claim it replaced. The board's 3.3 V identity is
+now derived from what is actually visible — a `3V3` pin and no regulator to step anything
+down — and the tolerated range is back to `TBD`.
+
+`sd-module-analysis.md` also listed the interface as `GND, VCC, MISO, MOSI, SCK, CS`. The
+delivered header reads `GND MISO CLK MOSI CS 3V3`: a different order, and `CLK` rather than
+`SCK`.
+
+The power-tree diagram in `wiring.md` referenced an `SDRAIL` node that had been deleted,
+which Mermaid renders as a stray empty box.
+
 ### Not done
 
-Nothing here has been run on hardware. The parts are in hand, but every claim in this entry
-is a claim about software behaviour verified by host tests. Axis orientation, magnetometer
-health, calibration quality and heading accuracy are bench measurements, and they are
-written up as bring-up gates rather than as results.
+Nothing here has been run on hardware. The parts are in hand and photographed, but a
+photograph establishes silkscreen text, component packages and physical fit — not voltages,
+strap directions, continuity or current. Every row in the receiving record that needs a meter
+is still blank, deliberately: the AD0 and SDO strap directions, battery polarity and
+open-circuit voltage, cable continuity, and the two unidentified SOT-23-5 regulators on the
+MPU-9250 and NEO-6M boards. Axis orientation, magnetometer health, calibration quality and
+heading accuracy remain bench measurements, written up as bring-up gates rather than as
+results.
 
 ---
 

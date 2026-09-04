@@ -8,8 +8,8 @@ source of truth in code; this page and
 
 > [!WARNING]
 > **This is a provisional signal map, not an approved schematic.** No wire in this
-> document has been built or measured. Every power connection is `TBD` until the exact
-> breakout variants are documented — see
+> document has been built or measured. The breakout variants are now identified and their
+> headers transcribed, but **no regulator is selected and no rail has been powered** — see
 > [electrical-compatibility.md](../hardware/electrical-compatibility.md) and
 > [pre-procurement-design-status.md](../hardware/pre-procurement-design-status.md).
 > Do not connect the LiPo to any module, or to GPIO26, on the basis of this page.
@@ -21,6 +21,7 @@ source of truth in code; this page and
 - [Flight computer](#flight-computer-signal-wiring)
 - [Ground station bridge](#ground-station-bridge-signal-wiring)
 - [Pin assignment table](#pin-assignment-table)
+- [Module header pinouts](#module-header-pinouts-as-printed)
 - [Bus sharing rules](#bus-sharing-rules)
 - [Power tree](#power-tree-provisional)
 - [Status LED and power indicator](#status-led-and-power-indicator)
@@ -181,6 +182,65 @@ card initialisation, UART0 at 9600 baud for the NEO-6M.
 
 ---
 
+## Module header pinouts, as printed
+
+Transcribed from the delivered boards on 2026-09-04, photographs in
+[`documentation/hardware/photos/`](../hardware/photos/). **These are silkscreen labels, not
+an interpretation of them** — where a board prints `CLK` this table says `CLK`, and where it
+names a pin two ways it says both.
+
+**SX1278 RA-02** — two rows of 8, read from the u.FL connector end:
+
+```text
+J2   GND   GND   3.3V   RST   DIO0   DIO1   DIO2   DIO3
+J1   GND   NSS   MOSI   MISO   SCK   DIO5   DIO4   GND
+```
+
+> The supply pin is **third from the end, with `GND` either side of it**. A one-pin offset
+> when the module is pressed into the prototype board puts 3.3 V onto `RST`, or ground onto
+> the rail. Mark pin 1 on the board before wiring.
+
+**MPU-9250 breakout** (`GY-6500 / GY-9250`, `V356`) — 10 pins:
+
+```text
+VCC   GND   SCL     SDA     EDA   ECL   AD0       INT   NCS   FSYNC
+                  (SCLK)  (SDI)                 (SDO)
+```
+
+> The underside names `SCL/SCLK`, `SDA/SDI` and `ADD/SDO` — the second name in each pair is
+> the SPI role. This project uses I2C, so `SCL`, `SDA` and `AD0` are the relevant names.
+> `EDA`/`ECL` are the auxiliary master bus and stay unconnected.
+
+**GY-BM(E/P)280** — 6 pins:
+
+```text
+VCC   GND   SCL   SDA   CSB   SDO
+```
+
+> Six pins, not the four of the I2C-only variant. `CSB` selects the interface and `SDO`
+> selects the address; both carry 10 kΩ straps whose direction is not yet read.
+
+**NEO-6M** (`GY-NEO6MV2`) — 4 pins:
+
+```text
+VCC   RX   TX   GND
+```
+
+> `RX` and `TX` name the **board's own** pins. The board's `TX` goes to the Pico's `RX` on
+> GP13, and the board's `RX` to the Pico's `TX` on GP12 — which is what the pin table says,
+> now confirmed against the silkscreen.
+
+**microSD reader** — 6 pins:
+
+```text
+GND   MISO   CLK   MOSI   CS   3V3
+```
+
+> `CLK`, not `SCK`. Ground and supply are at opposite ends, so a reversed header is a direct
+> short across the rail.
+
+---
+
 ## Bus sharing rules
 
 **I2C0 carries three devices, not two.** The MPU-9250's magnetometer is a separate AK8963
@@ -195,23 +255,38 @@ counts against the bus's capacitance and pull-up budget like any other.
 | BMP280 | `0x76` or `0x77` | SDO strap |
 
 All three are distinct whichever way the straps are fitted, so sharing the bus works — but
-only if one set of pull-ups dominates. Both breakouts commonly carry their own, and stacking
-them lowers the effective bus resistance. Confirm the addresses and the fitted pull-up
-values on the physical boards before wiring them together.
+only if the pull-ups behave. **Both delivered breakouts carry their own, and both are 10 kΩ:**
+five `103` resistors on the MPU-9250 board and four on the BMP280 board
+([receiving-inspection.md C.3.5 and C.4.4](../hardware/receiving-inspection.md#part-c--per-board-identification)).
+Two 10 kΩ pull-ups in parallel on each line is 5 kΩ — a legal bus, and a stiffer one than
+either board was designed around. It sinks roughly 0.66 mA per line when a device pulls low,
+which every part here can drive, but it is worth measuring rather than assuming.
+
+The **strap directions are still unread**: which way AD0 and SDO are pulled decides `0x68`
+versus `0x69` and `0x76` versus `0x77`, and no photograph shows it. The firmware and the
+bring-up record both currently expect `0x68` and `0x76`. Check the straps with a meter, or
+scan the bus, before treating those two addresses as facts.
 
 **SPI0 — RA-02 and microSD share clock, MOSI and MISO.** Two rules make this safe:
 
 1. Exactly one chip select may be asserted at a time. The RA-02 uses GP17 and the SD card
    uses GP6, and no code path drives both low.
-2. A deselected device must release MISO. Some microSD breakouts do not tri-state MISO
-   properly when deselected; if the RA-02 reads back garbage while a card is inserted,
-   this is the first thing to check.
+2. A deselected device must release MISO. **On the delivered reader, nothing but the card
+   itself does.** The board has no buffer and no translator — four 10 kΩ pull-ups and two
+   capacitors are its entire parts list — so a card that keeps driving MISO corrupts the
+   *radio's* next transaction, and the symptom looks like a dead radio. The pull-up defines
+   an undriven line; it cannot overcome a driven one. This is bring-up row 7.4, and it is
+   the most important row in the shared-bus gate.
 
-The SD reader received is a 2.6–3.6 V SPI module, so it runs from the same 3.3 V rail as
-everything else on the vehicle. An earlier revision of this document said the opposite —
-that the reader needed 4.5–5.5 V and a rail of its own — on the strength of a supplier
-listing. The board that arrived does not agree with the listing, which is precisely why
-this project photographs and inspects its boards before designing around them.
+The delivered reader's supply pin is printed `3V3` and it carries no regulator, so it runs
+from the same 3.3 V rail as everything else on the vehicle. An earlier revision of this
+document said the opposite — that the reader needed 4.5–5.5 V and a rail of its own — on the
+strength of a supplier listing. The board that arrived does not agree with the listing, which
+is precisely why this project photographs and inspects its boards before designing around
+them.
+
+Its header, in printed order, is **`GND  MISO  CLK  MOSI  CS  3V3`** — note `CLK`, not `SCK`,
+and note that the supply pin is at the opposite end from ground.
 
 What remains open for the reader is current, not voltage: an SD write transient is the
 largest short-duration load on this vehicle and it lands on the same regulator as a radio
@@ -239,30 +314,44 @@ flowchart TD
     CONV --> RAIL
     NODE --> PLED
 
-    RAIL -.-> LORA["RA-02"]
-    RAIL -.-> IMU["MPU-9250"]
-    RAIL -.-> BARO["BMP280"]
-    RAIL -.-> GPS["NEO-6M"]
-    RAIL -.-> SD["microSD reader · 2.6 to 3.6 V"]
-    SDRAIL -.-> SDM["microSD reader"]
+    RAIL -.-> LORA["RA-02 · 3.3 V only, verified"]
+    RAIL -.-> IMU["MPU-9250 · regulator fitted, range TBD"]
+    RAIL -.-> BARO["BMP280 · 3.3 V only, verified"]
+    RAIL -.-> GPS["NEO-6M · regulator fitted, range TBD"]
+    RAIL -.-> SDM["microSD reader · 3.3 V only, verified"]
 
     classDef tbd stroke-dasharray: 5 5,stroke-width:2px
-    class SW,CONV,RAIL,SDRAIL,PLED tbd
+    class SW,CONV,RAIL,PLED tbd
 ```
 
-Dashed boxes are undesigned. Three decisions block the whole tree:
+**The second rail is gone.** The delivered microSD reader has no regulator and no level
+shifter, and its supply pin is printed `3V3`. Every peripheral now sits on one 3.3 V rail.
+The supplier listing describing a 4.5–5.5 V input and an onboard regulator did not describe
+the board that arrived — see
+[receiving-inspection.md, finding F-3](../hardware/receiving-inspection.md#findings).
+
+Dashed boxes are undesigned. Two decisions still block the tree:
 
 1. **No regulator is selected.** The AMS1117-3.3 was assessed and rejected for direct 1S
    LiPo to 3.3 V regulation — a fully charged cell at about 4.2 V does not clear its
-   high-load dropout, and its 3.3 V output is below the SD reader's stated input range.
+   high-load dropout.
    See [electrical-architecture.md](electrical-architecture.md#ams1117-33-direct-regulation-assessment).
+   The requirement is simpler than it was — one rail, not two — but it is not yet met.
 2. **No ON/OFF switch and no power LED are in the BOM**, and both are mandatory
    competition items.
-3. **The peripheral supply for each module is unresolved** until the exact breakout
-   variants are documented.
+
+Three modules are verified 3.3 V-only. That removes the *supply* question for them and
+tightens a different one: **with no level shifter anywhere in the vehicle, 3.3 V is a
+requirement, not a convenience.** A 5 V feed onto this rail reaches the RA-02, the barometer
+and the microSD card directly.
+
+The MPU-9250 and NEO-6M each carry an unidentified SOT-23-5 regulator, so they may tolerate
+more than 3.3 V. Neither is a reason to give them more.
 
 The battery must be treated as a variable-voltage source across its discharge curve, never
-as a fixed 3.7 V supply.
+as a fixed 3.7 V supply. **Neither of the delivered pack's connectors mates with anything in
+this project** — a red JST-RCY main lead and a white 2-pin JST-XH balance lead — so the
+switched distribution node begins with a purchase.
 
 ---
 
@@ -318,13 +407,28 @@ RA-02 module  ->  IPEX (u.FL) connector
               ->  433 MHz antenna
 ```
 
-Two open items:
+**The chain has been assembled and fits.** Antenna, cable and module were mated hand-tight on
+2026-09-04 with no adapter — photograph
+[`1150780-ra02-antenna-mated.jpg`](../hardware/photos/1150780-ra02-antenna-mated.jpg). The
+RA-02's connector is a u.FL socket and the cable's is the matching IPEX-1 plug.
 
-- **Connector gender is unconfirmed.** The supplied BOM says SMA male while the observed
-  Robu listing for the antenna SKU says RP-SMA female. This must be checked against the
-  physical parts before assembly.
+Three notes:
+
+- **The connector nomenclature is still open, but assembly is not.** The antenna's shell is
+  female and the cable's is male, which agrees with the supplier listing's gender and
+  contradicts the BOM's "SMA male". Whether the pair is SMA or RP-SMA depends on the centre
+  contacts, which no photograph shows. This matters when a *replacement* antenna is ordered:
+  an RP-SMA antenna screws onto an SMA pigtail perfectly and connects nothing.
+- **The cable is a bulkhead part**, supplied with a nut and star washer, so it is meant to be
+  panel-mounted through the airframe wall. That mount is also the strain relief — plan the
+  hole rather than leaving the joint hanging on 10 cm of coax.
 - **Never power a LoRa module without its antenna attached.** Transmitting into an open
   connector can damage the output stage.
+
+The module's shield states `PA:+18dBm`, which is the module's PA capability rather than the
+configured output. What is actually transmitted comes from `link_profile.hpp` below. The two
+are not in conflict, but the 1 dB is worth knowing before a range measurement gets read as a
+link-budget failure.
 
 Radio parameters — 433 MHz, **SF7**, 125 kHz bandwidth, coding rate 4/5, 17 dBm, CRC on — live
 in one place, [`cansat/link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp),
@@ -358,16 +462,25 @@ results in [documentation/testing](../testing/).
 
 ## Open items before any wiring is built
 
-- [ ] Exact breakout variants documented for the RA-02, MPU-9250, NEO-6M, GY-BMP280-3.3 and the microSD reader
-- [ ] I2C addresses and fitted pull-up values confirmed on the physical boards
-- [x] microSD reader supply resolved: 2.6–3.6 V module, runs from the 3.3 V rail
+- [x] Exact breakout variants identified and photographed — [receiving-inspection.md](../hardware/receiving-inspection.md)
+- [x] Header pin order transcribed from every delivered board — [above](#module-header-pinouts-as-printed)
+- [x] microSD reader supply resolved: 3.3 V board, no regulator, no level shifter, one rail
+- [x] Antenna, cable and RA-02 shown to mate with no adapter
+- [x] Fitted pull-up values read: 10 kΩ on both I2C breakouts, 10 kΩ on the microSD reader
+- [ ] **I2C strap directions read** — AD0 and SDO decide `0x68`/`0x69` and `0x76`/`0x77`
+- [ ] **BMP280 confirmed against BME280** — die photograph or chip-ID read
+- [ ] MPU-9250 and NEO-6M regulators identified, so their input ranges are known
 - [ ] microSD write-transient current measured against the regulator's capability
 - [ ] microSD MISO tri-state behaviour confirmed on the shared SPI bus
 - [ ] Peripheral regulator selected, with a documented load budget
 - [ ] Manual ON/OFF switch selected and placed in the main battery feed
 - [ ] Power-LED branch designed so it lights immediately at power-on
 - [ ] Battery divider designed, built and measured before `battery_divider_ratio` is set
-- [ ] Antenna and cable connector genders physically verified
+- [ ] **Battery polarity confirmed with a meter**, and a mating connector obtained
+- [ ] **1S charger obtained** — none was supplied and none is on the BOM
+- [ ] Pico headers obtained, or the mounting decided without them
+- [ ] Antenna and cable centre contacts photographed, settling SMA against RP-SMA
+- [ ] 3.3 V and GND bus runs laid out on the single-sided prototype board before placement
 - [ ] Grounding, decoupling and cable-management plan recorded
 
 Related: [pico-gpio-map.md](../hardware/pico-gpio-map.md) ·

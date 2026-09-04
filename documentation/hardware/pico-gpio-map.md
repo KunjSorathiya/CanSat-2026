@@ -165,7 +165,7 @@ The RA-02 additionally receives:
 
 DIO0 is reserved because it is useful for receive-complete, transmit-complete, and other configured radio event handling. The exact event mapping depends on the final radio configuration and carrier-board availability.
 
-The SD reader is a 2.6-3.6 V SPI module, so its signals are 3.3 V like the Pico's and its supply comes from the same rail. What remains unresolved is its MISO release behaviour when deselected on the bus it shares with the RA-02, and its write-transient current. **GPIO assignment does not imply electrical approval.**
+The SD reader is a 3.3 V SPI board with no regulator and no level shifter, so its signals are 3.3 V like the Pico's and its supply comes from the same rail. Its header reads `GND MISO CLK MOSI CS 3V3` - note `CLK`, not `SCK`. What remains unresolved is its MISO release behaviour when deselected on the bus it shares with the RA-02, and its write-transient current. **GPIO assignment does not imply electrical approval.**
 
 **SPI result:** Shared SPI with separate CS lines is logically valid and preserves the second SPI controller for future use. Electrical bus operation remains provisional.
 
@@ -263,7 +263,7 @@ This pin map does not design the power circuit. The eventual power architecture 
 
 - The Pico supply input path remains subject to the electrical-compatibility review.
 - The RA-02 and sensor breakout supply and logic levels remain subject to physical verification.
-- The SD reader's 2.6-3.6 V range settles its supply, but not its behaviour on a shared SPI bus: confirm that it releases MISO when deselected before trusting it beside the RA-02.
+- The SD reader's `3V3` supply pin settles its supply, but not its behaviour on a shared SPI bus. **Nothing on the board buffers MISO**, so only the card releases it: confirm that release before trusting the reader beside the RA-02.
 - No regulator, level shifter, resistor, capacitor, or power wiring is selected here.
 - Power uncertainty can invalidate a physical connection, but it does not change the logical bus reservation by itself.
 

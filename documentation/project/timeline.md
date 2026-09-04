@@ -145,7 +145,7 @@ gantt
 
 - Photograph and identify every purchased breakout; record the exact variant
 - Confirm supply voltage, logic levels, regulators, level shifters, pull-ups and pinouts
-- ~~Resolve the microSD reader supply~~ — done: the delivered module is 2.6–3.6 V and runs from the 3.3 V rail. Measure its write-transient current against the regulator instead
+- ~~Resolve the microSD reader supply~~ — done: the delivered board has no regulator, its supply pin is printed `3V3`, and it runs from the 3.3 V rail. Measure its write-transient current against the regulator instead
 - Verify the antenna and IPEX cable connector genders
 - Follow the [bring-up order](../design/wiring.md#bring-up-order), one subsystem at a time
 
@@ -261,7 +261,7 @@ resolve.
 
 | Risk | Impact | Current mitigation |
 |---|---|---|
-| microSD write transient browns out the shared 3.3 V regulator | Loses onboard logging, or resets the flight computer | Supply voltage resolved (2.6–3.6 V module on the 3.3 V rail); the write transient is still unmeasured and shares a regulator with the radio. SD failure already degrades gracefully in firmware |
+| microSD write transient browns out the shared 3.3 V regulator | Loses onboard logging, or resets the flight computer | Supply voltage resolved (3.3 V board on the 3.3 V rail); the write transient is still unmeasured and shares a regulator with the radio. SD failure already degrades gracefully in firmware |
 | Magnetometer calibration never performed, or performed on a bare board | Yaw stays relative, or an absolute heading is claimed that is wrong by a constant | Calibration ships invalid and the vehicle reports `YR-G` until a real sweep is loaded; the sweep is a named bring-up gate |
 | No regulator selected | Blocks the whole power build | AMS1117-3.3 assessed and rejected with reasoning recorded; replacement still open |
 | Yaw may be judged non-compliant if a relative angle is not accepted | Mandatory field may be judged non-compliant | The MPU-9250's magnetometer makes an absolute magnetic yaw available once the airframe is calibrated; until then yaw is relative. Every packet declares which it is (`YR-M` / `YR-G`), so an absolute heading is never claimed without one |

@@ -57,13 +57,13 @@ The recommended architecture for evaluation is:
          -> peripheral power conversion - TBD
               -> verified 3.3 V peripheral rail - TBD
                    -> MPU-9250, BMP280, NEO-6M, RA-02, microSD reader
-                      (the microSD reader is a 2.6-3.6 V module: same rail, no second stage)
+                      (the microSD reader is a 3.3 V board: same rail, no second stage)
          -> power LED branch - TBD
 ```
 
 This is a topology recommendation, not an approved schematic. The Pico VSYS path is based on the official Raspberry Pi Pico documentation. The switch position, LED connection, protection elements, peripheral conversion, and rail implementation remain subject to review.
 
-The Pico's onboard regulator generates the 3.3 V rail for the RP2040 and GPIO. The Pico 3.3 V output must not be assumed capable of powering all external peripherals; that is a current question, and it is still open. It is no longer a voltage question for any load on this vehicle: the microSD reader received is a 2.6-3.6 V SPI module, so every peripheral runs from one 3.3 V rail and the separate reader rail that earlier revisions carried is removed from the design. See [sd-module-analysis.md](../hardware/sd-module-analysis.md).
+The Pico's onboard regulator generates the 3.3 V rail for the RP2040 and GPIO. The Pico 3.3 V output must not be assumed capable of powering all external peripherals; that is a current question, and it is still open. It is no longer a voltage question for any load on this vehicle: the microSD reader received has no regulator and a supply pin printed `3V3`, so every peripheral runs from one 3.3 V rail and the separate reader rail that earlier revisions carried is removed from the design. With no level shifter anywhere in the vehicle, that single rail being 3.3 V is a requirement rather than a convenience. See [sd-module-analysis.md](../hardware/sd-module-analysis.md).
 
 ## Battery Voltage Range
 
@@ -123,7 +123,7 @@ The planned AMS1117-3.3 module is rejected as the direct regulator from the 1S L
 - As the battery voltage falls, the regulator will lose regulation when the battery approaches 3.3 V plus the actual dropout. The usable battery capacity before the 3.3 V rail falls out of regulation cannot be calculated from the 1500 mAh label alone.
 - Linear-regulator loss is approximately `(Vin - 3.3 V) x load current`; heat therefore depends on the actual load and voltage difference. No thermal result is claimed.
 - Idealized conversion efficiency is approximately `3.3 V / Vin`, before regulator ground current and other losses. This does not establish system efficiency or battery life.
-- A 3.3 V output now suits every peripheral including the microSD reader, which is a 2.6-3.6 V module. That removes a constraint from the regulator choice; it does not rescue this regulator, whose dropout is the problem.
+- A 3.3 V output now suits every peripheral including the microSD reader, which is a 3.3 V board. That removes a constraint from the regulator choice; it does not rescue this regulator, whose dropout is the problem.
 
 **Decision:** Do not use the AMS1117-3.3 for direct 1S LiPo to 3.3 V regulation. A buck-boost or other suitable conversion architecture may be more appropriate for maintaining a regulated rail across the battery range, but no replacement regulator is selected here.
 

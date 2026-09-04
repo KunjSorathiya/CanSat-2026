@@ -28,7 +28,7 @@ The following facts are supported by the current documentation. `VERIFIED FROM D
 | MPU-9250 IC scope | InvenSense/TDK documentation describes the MPU-9250 IC; the Robu breakout circuit remains separate | MPU-9250 manufacturer documentation | VERIFIED FROM DOCUMENTATION |
 | BMP280 IC scope | Bosch documentation describes the BMP280 IC; the GY-BMP280-3.3 breakout circuit remains separate | Bosch BMP280 datasheet | VERIFIED FROM DOCUMENTATION |
 | GPS identity | NEO-6M GPS module with EPROM, Robu SKU 11782, quantity 1 | Confirmed project BOM and Robu reference | VERIFIED FROM DOCUMENTATION |
-| SD input | The delivered SKU 11566 is a 2.6-3.6 V SPI module | Receiving inspection of the board in hand | VERIFIED FROM HARDWARE |
+| SD input | The delivered SKU 11566 has a supply pin printed `3V3`, no regulator and no level shifter | Receiving inspection of the board in hand, [`photos/`](photos/) | VERIFIED FROM HARDWARE |
 | SD signal labels | Robu lists GND, VCC, MISO, MOSI, SCK, and CS | Supplied exact Robu product information | VERIFIED FROM DOCUMENTATION |
 | SD logic path | The Robu information does not establish level shifting, host logic voltage, MISO release behavior, or SD-card rail voltage | SD module analysis | VERIFIED FROM DOCUMENTATION |
 | Antenna identity | 433 MHz antenna, Robu SKU 1121334, quantity 2 | Confirmed BOM and Robu page | VERIFIED FROM DOCUMENTATION |
@@ -46,7 +46,7 @@ These decisions can be made before the components arrive. They are not physical 
 | Power Pico from switched LiPo through VSYS | The accepted Pico architecture uses VSYS within the documented input range | Battery protection, switch behavior, startup, and brownout testing | PROVISIONALLY ACCEPTED |
 | Do not use AMS1117-3.3 for direct 1S-to-3.3 V regulation | Its dropout/headroom requirement can exceed the fully charged 1S battery voltage | Final peripheral power-conversion decision remains open | PROVISIONALLY ACCEPTED |
 | Treat Pico 3.3 V output as RP2040/GPIO supply, not an automatic whole-system supply | External peripheral current and transients are not yet budgeted | Measured/documented peripheral loads | PROVISIONALLY ACCEPTED |
-| ~~Reserve a separate power path for the SD reader~~ | Withdrawn. The delivered module is 2.6-3.6 V and runs from the 3.3 V rail; the separate path existed only to satisfy a supplier-listed 4.5-5.5 V requirement the board does not have | None | WITHDRAWN, superseded by hardware |
+| ~~Reserve a separate power path for the SD reader~~ | Withdrawn. The delivered board carries no regulator and its supply pin is printed `3V3`, so it runs from the 3.3 V rail; the separate path existed only to satisfy a supplier-listed 4.5-5.5 V requirement the board does not have | None | WITHDRAWN, superseded by hardware |
 | Share I2C0 between MPU-9250 and BMP280 | Documented IC address options are logically distinct: MPU-9250 `0x68/0x69`, BMP280 `0x76/0x77` | Breakout I2C exposure, bus voltage, and pull-ups | PROVISIONALLY ACCEPTED |
 | Share SPI0 between RA-02 and SD | Shared SCK/MOSI/MISO with separate CS lines is resource-efficient | SD level shifting, MISO release, and carrier pinouts | PROVISIONALLY ACCEPTED |
 | Reserve separate CS lines | Prevents simultaneous selection on the shared SPI bus | Exact board CS labels | PROVISIONALLY ACCEPTED |
@@ -64,42 +64,56 @@ The current preliminary GPIO allocation is recorded in [pico-gpio-map.md](pico-g
 
 These items genuinely require the delivered boards, markings, photographs, schematics, or measurements. They do not prevent documentation-level planning, but they prevent electrical release.
 
+> **The parts arrived on 2026-09-04 and were photographed.** Items struck through below are
+> closed, with the observation recorded in [receiving-inspection.md](receiving-inspection.md)
+> and the photographs in [`photos/`](photos/). A fifth status now applies to them:
+>
+> - **VERIFIED FROM HARDWARE** - observed on the delivered board, with a photograph or a
+>   measurement behind it.
+>
+> Everything not struck through needs a meter or a powered rail. A photograph cannot show
+> continuity, a strap's direction, a voltage or a current, and nothing here has been inferred
+> from one.
+
 ### Micro SD Reader - SKU 11566
 
-- Confirm the actual board matches the Robu listing.
-- Identify all regulator, level-shifter, resistor, transistor, buffer, and controller markings.
-- Confirm whether the onboard regulator is present and what it supplies.
-- Determine SD-card rail voltage.
-- Determine the voltage at CS, SCK, MOSI, and MISO.
-- Determine whether signals are resistor shifted, transistor shifted, shifted by an IC, or directly connected.
-- Confirm MISO is released when CS is inactive.
+- ~~Confirm the actual board matches the Robu listing.~~ **It does not.** The listing describes a 4.5-5.5 V board with an onboard regulator; the delivered board has neither.
+- ~~Identify all regulator, level-shifter, resistor, transistor, buffer, and controller markings.~~ **There are none to identify** beyond four resistors marked `103` (10 kOhm) and two unmarked capacitors. No active component is fitted.
+- ~~Confirm whether the onboard regulator is present and what it supplies.~~ **Absent.**
+- Determine SD-card rail voltage. *(Meter: confirm the `3V3` pin reaches the socket's supply pad directly.)*
+- ~~Determine whether signals are resistor shifted, transistor shifted, shifted by an IC, or directly connected.~~ **Directly connected**, through track and a 10 kOhm pull-up.
+- Determine the voltage at CS, CLK, MOSI, and MISO. *(Meter, powered.)*
+- Confirm MISO is released when CS is inactive. **Now the most important row in the shared-bus gate**, since nothing on the board buffers it.
 - Measure startup, initialization, read, write, and peak current.
-- Identify existing and required decoupling.
+- Identify required decoupling. Two capacitors are fitted; their values are unread.
 
 ### RA-02 - SKU 1150780
 
-- Confirm header pin order and labels.
-- Confirm carrier supply range and logic levels.
-- Identify any onboard regulator or level shifter.
-- Confirm CS/NSS, RESET, DIO0, and optional DIO1 availability.
-- Confirm the antenna connector and RF matching arrangement.
+- ~~Confirm header pin order and labels.~~ **Transcribed.** J2 `GND GND 3.3V RST DIO0 DIO1 DIO2 DIO3`, J1 `GND NSS MOSI MISO SCK DIO5 DIO4 GND`, both read from the u.FL end.
+- Confirm carrier supply range and logic levels. The supply pin is printed `3.3V` with no range, and **no regulator or translator is fitted**, so the carrier passes the pin straight to the module. The module's own limits are still unread.
+- ~~Identify any onboard regulator or level shifter.~~ **Neither is fitted.** `C1` and `C2` are the only parts outside the shield.
+- ~~Confirm CS/NSS, RESET, DIO0, and optional DIO1 availability.~~ **All present**, with `DIO2`-`DIO5` also broken out.
+- ~~Confirm the antenna connector.~~ **u.FL / IPEX socket**, mated with the supplied cable. RF matching arrangement is inside the shield and remains unknown.
 - Measure idle, receive, startup, and transmit current on the actual carrier.
 
 ### Sensor and GPS Breakouts
 
-- Confirm board markings and revision for MPU-9250, BMP280, and NEO-6M boards.
-- Confirm exposed interfaces and pin labels.
-- Confirm onboard regulators, pull-ups, level shifting, and capacitors.
-- Confirm MPU-9250 INT exposure.
-- Confirm BMP280 I2C/SPI selection and SDO/address wiring.
-- Confirm GPS TX/RX arrangement and logic levels.
+- ~~Confirm board markings and revision.~~ **MPU-9250:** `GY-6500 / GY-9250`, `V356`, die marked `MP92`. **Barometer:** the shared `GY-BM E/P 280` artwork. **GPS:** `GY-NEO6MV2` with a `u-blox NEO-6M-0-001` module.
+- ~~Confirm exposed interfaces and pin labels.~~ **Transcribed for all three** - see [wiring.md](../design/wiring.md#module-header-pinouts-as-printed).
+- Confirm onboard regulators, pull-ups, level shifting, and capacitors. **Partly done:** the MPU-9250 and NEO-6M each carry an unidentified SOT-23-5 regulator; the barometer carries none; pull-ups are 10 kOhm on both I2C boards; no level shifting anywhere. **The two regulator part numbers are still unread, so two input ranges are still unknown.**
+- ~~Confirm MPU-9250 INT exposure.~~ **`INT` is on the header.**
+- **Resolve BMP280 against BME280.** The variant tick box is unmarked and the die text illegible. Blocking.
+- Confirm BMP280 SDO/address wiring and MPU-9250 AD0 strap direction. *(Meter - neither is visible.)*
+- ~~Confirm GPS TX/RX arrangement.~~ **4 pins, `VCC RX TX GND`**, naming the board's own pins. Logic levels still unmeasured.
 
 ### Battery and RF Hardware
 
-- Confirm battery label, connector, polarity, protection, and charging information.
-- Confirm antenna connector type, resolving SMA versus RP-SMA.
-- Confirm IPEX connector variant and mating with the RA-02.
-- Check connector retention and continuity before power or RF operation.
+- ~~Confirm battery label and connector.~~ **Pro-Range, not Orange**; `1 Cell 3.7V 25C`, 1500 mAh; red JST-RCY main lead and white 2-pin JST-XH balance lead, **neither of which mates with anything in this project**.
+- Confirm battery polarity. *(Meter. Lead colour is a convention, not evidence.)*
+- Confirm protection and charging information. **No protection board is visible, and the label states no charge current and no cutoff voltage.** No Pro-Range document has been located, and **no 1S charger was supplied or is on the BOM**.
+- **Resolve SMA versus RP-SMA.** The antenna shell is female and the cable's is male - agreeing with the supplier listing, contradicting the BOM - but neither centre contact was photographed. Open.
+- ~~Confirm IPEX connector variant and mating with the RA-02.~~ **IPEX-1 / u.FL, mated.**
+- Check connector retention and continuity before power or RF operation. *(Meter.)*
 
 ## 4. Procurement Checklist
 

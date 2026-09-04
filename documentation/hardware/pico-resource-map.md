@@ -121,7 +121,7 @@ The exact number and header availability of DIO pins on the RA-02 carrier are **
 - **CS:** Required dedicated selection resource for the SD reader.
 - **SCK, MOSI, MISO:** Shared SPI signals, subject to verification of the reader's host-side logic behavior.
 
-SKU 11566 as delivered is a 2.6-3.6 V SPI module, so it shares the 3.3 V rail and the Pico's signal levels. The remaining SPI0 question is behavioural rather than electrical: a reader that keeps driving MISO after its chip select is released corrupts the RA-02's next transaction, which presents as a dead radio rather than a dead card.
+SKU 11566 as delivered is a 3.3 V SPI board with no regulator and no level shifter, so it shares the 3.3 V rail and the Pico's signal levels - and requires them. The remaining SPI0 question is behavioural rather than electrical: a reader that keeps driving MISO after its chip select is released corrupts the RA-02's next transaction, which presents as a dead radio rather than a dead card.
 
 ### Shared Versus Separate SPI Controllers
 
@@ -281,7 +281,7 @@ The planned 3.3 V relationship is not automatically approved:
 - The RA-02 carrier supply remains TBD.
 - Sensor breakout supply and logic levels remain TBD.
 - The GPS breakout supply and logic levels remain TBD.
-- The SD reader is a 2.6-3.6 V SPI module on the 3.3 V rail; its MISO release behaviour on the shared bus remains unconfirmed.
+- The SD reader is a 3.3 V SPI board on the 3.3 V rail, with no buffer on MISO; its release behaviour on the shared bus remains unconfirmed, and depends entirely on the card.
 - The 3.3 V rail current and transient budget remains TBD.
 
 The power dependencies affect final electrical wiring, but they do not prevent this logical resource allocation.

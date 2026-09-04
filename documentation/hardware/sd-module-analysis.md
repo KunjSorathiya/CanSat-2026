@@ -16,14 +16,40 @@ This document previously concluded that the reader required a 4.5–5.5 V input,
 LiPo therefore could not drive it, and that a separate boost-derived rail might be needed.
 That conclusion came from a supplier listing.
 
-**The module received is a 3.3 V module: DC 2.6–3.6 V operating voltage, SPI interface.**
-It is powered from the same 3.3 V rail as the rest of the vehicle. There is no second rail,
-no boost converter, and no level shifting required for supply reasons.
+**The module received is a 3.3 V board.** What the delivered hardware actually shows, from
+[`11566-sd-reader-front.jpg`](photos/11566-sd-reader-front.jpg) and
+[`11566-sd-reader-back.jpg`](photos/11566-sd-reader-back.jpg):
+
+- The supply pin is printed **`3V3`**. No voltage *range* is printed anywhere on the board.
+- **No regulator** of any package, on either face.
+- **No level shifter** — no buffer, no translator, no transistors. The board has no active
+  component at all.
+- Its entire parts list is **four resistors marked `103` (10 kΩ)**, silkscreened `10K`, and
+  two unmarked capacitors.
+- Header, in printed order: **`GND  MISO  CLK  MOSI  CS  3V3`**.
+- Friction / slide-in card holder — no spring eject.
+
+It is therefore powered from the same 3.3 V rail as the rest of the vehicle. There is no
+second rail, no boost converter, and no level shifting.
+
+> The *tolerated supply range* is still `TBD`. The board is a 3.3 V board, but a range is a
+> property of the card and the tracks, and this board states none. Do not record a range here
+> that no source establishes — that is exactly the failure that produced the 4.5–5.5 V claim.
 
 Everything downstream of that changes: the power tree loses a branch, the regulator
-selection loses a constraint, and the bring-up sequence loses a gate. What does *not*
-change is the measurement work — current draw, decoupling and shared-bus behaviour are
-still unmeasured, and are still what stands between "identified" and "qualified".
+selection loses a constraint, and the bring-up sequence loses a gate. Two things get
+*harder*, and both follow from the missing translator:
+
+- **The host must be 3.3 V.** With a level shifter the module tolerated a 5 V host. Without
+  one, that is a requirement, and a stray 5 V feed reaches the card directly.
+- **Nothing buffers MISO.** Only the card releases the line when `CS` goes high. A card that
+  holds it corrupts the *radio's* next transaction on the shared bus, and the symptom
+  presents as a dead radio. The 10 kΩ pull-up defines an undriven line; it cannot overcome a
+  driven one.
+
+What does *not* change is the measurement work — current draw, decoupling and shared-bus
+behaviour are still unmeasured, and are still what stands between "identified" and
+"qualified".
 
 ## Evidence Classifications
 
@@ -40,7 +66,10 @@ still unmeasured, and are still what stands between "identified" and "qualified"
 | Product | Micro SD Card Reader Module | CONFIRMED project BOM |
 | Robu SKU | 11566 | CONFIRMED project BOM |
 | Quantity | 1 | CONFIRMED project BOM |
-| Operating voltage | DC 2.6–3.6 V | VERIFIED FROM HARDWARE, receiving inspection |
+| Supply pin marking | `3V3`; no range printed on the board | VERIFIED FROM HARDWARE, receiving inspection |
+| Onboard regulator | None, either face | VERIFIED FROM HARDWARE, receiving inspection |
+| Onboard level shifter | None; no active component on the board | VERIFIED FROM HARDWARE, receiving inspection |
+| Tolerated supply range | TBD — no source states one | PHYSICAL VERIFICATION REQUIRED |
 | Interface | SPI | VERIFIED FROM HARDWARE, receiving inspection |
 | Manufacturer | TBD | PHYSICAL VERIFICATION REQUIRED |
 | Exact board revision | TBD | PHYSICAL VERIFICATION REQUIRED |
@@ -50,22 +79,23 @@ still unmeasured, and are still what stands between "identified" and "qualified"
 
 | Property | Current value/status | Evidence level |
 |---|---|---|
-| Required VCC input | 2.6–3.6 V | VERIFIED FROM HARDWARE |
+| Required VCC input | 3.3 V. The pin is printed `3V3` and nothing on the board could step a higher voltage down | VERIFIED FROM HARDWARE |
 | Nominal supply used by this project | 3.3 V, the Pico's own regulated rail | CONFIRMED design decision |
-| SD-card supply voltage | 3.3 V; the card and the host share one rail on a 3.3 V module | INFERRED from the module's operating range |
-| Host logic voltage | 3.3 V, matching the Pico | INFERRED from the supply range |
-| Interface | GND, VCC, MISO, MOSI, SCK, CS | VERIFIED FROM HARDWARE |
-| Level shifting | Not required for a 3.3 V host on a 3.3 V module | INFERRED |
+| SD-card supply voltage | 3.3 V; with no regulator, the header pin is the card's rail | INFERRED from the absence of a regulator; confirm with a meter |
+| Host logic voltage | 3.3 V, matching the Pico. **Required, not merely convenient** | INFERRED from the absence of a level shifter |
+| Header, in printed order | `GND  MISO  CLK  MOSI  CS  3V3` | VERIFIED FROM HARDWARE |
+| Level shifting | **None fitted.** Host signals reach the card unbuffered | VERIFIED FROM HARDWARE |
+| Pull-ups | Four resistors marked `103` (10 kΩ), silkscreened `10K`. Which nets they serve: TBD | VERIFIED FROM HARDWARE (value); PHYSICAL VERIFICATION REQUIRED (nets) |
+| Decoupling | Two unmarked capacitors; values TBD | VERIFIED FROM HARDWARE (presence) |
+| Card retention | Friction / slide-in holder, no spring eject | VERIFIED FROM HARDWARE |
 | Typical current | TBD | PHYSICAL VERIFICATION REQUIRED |
 | Startup current | TBD | PHYSICAL VERIFICATION REQUIRED |
 | Write current and worst-case transient | TBD | PHYSICAL VERIFICATION REQUIRED |
-| Pull-ups | TBD | PHYSICAL VERIFICATION REQUIRED |
-| Decoupling | TBD | PHYSICAL VERIFICATION REQUIRED |
-| MISO behaviour with CS inactive | TBD | PHYSICAL VERIFICATION REQUIRED |
+| MISO behaviour with CS inactive | TBD — **and unbuffered, so it depends entirely on the card** | PHYSICAL VERIFICATION REQUIRED |
 
 ## Supply Architecture
 
-A 2.6–3.6 V module on a vehicle whose logic rail is 3.3 V is the simple case:
+A 3.3 V module with no regulator, on a vehicle whose logic rail is 3.3 V, is the simple case:
 
 ```text
 1S LiPo -> Pico VSYS -> Pico 3V3 regulator -> 3.3 V rail
@@ -77,8 +107,9 @@ A 2.6–3.6 V module on a vehicle whose logic rail is 3.3 V is the simple case:
                                                +-- microSD reader   <- 3.3 V, in range
 ```
 
-3.3 V sits in the upper half of the module's range, so the supply has margin at both ends
-of a discharge curve rather than being a boundary case.
+The module's own pin marking is `3V3`, so the rail and the requirement are the same number
+rather than a boundary case. What the board *tolerates* either side of that is unstated by
+any source and is not assumed here.
 
 The remaining supply question is not voltage but **current**. The Pico's onboard regulator
 also feeds the radio and three sensors, and an SD card's write transient is the largest
@@ -87,9 +118,12 @@ see [Current and Startup Behavior](#current-and-startup-behavior).
 
 ## Logic-Level Analysis
 
-With the module and the host both at 3.3 V, CS, SCK, MOSI and MISO are 3.3 V signals on
-both sides and no shifting is required. That is a conclusion from the supply range, and it
-is the ordinary arrangement for this class of module.
+With the module and the host both at 3.3 V, CS, CLK, MOSI and MISO are 3.3 V signals on both
+sides and no shifting is required — which is fortunate, because **the board fits none**. The
+host lines reach the card through nothing but track and a 10 kΩ pull-up.
+
+That makes 3.3 V a requirement rather than a convenience. There is no translator between a
+mistake and the card.
 
 Two things are still worth measuring on the bench before the vehicle is assembled, because
 they are board properties rather than voltage-domain properties:
@@ -99,8 +133,9 @@ they are board properties rather than voltage-domain properties:
   that presents as a dead radio, not a dead card. The driver already clocks an extra byte
   with CS high for exactly this reason (`firmware/flight-computer/src/pico/sd_card.cpp`),
   but the board's behaviour should be confirmed rather than assumed.
-- **Bus pull-ups.** Values and presence are unrecorded, and they interact with the shared
-  bus and with the RA-02's own pins.
+- **Bus pull-ups.** Four are fitted and all four are marked `103` (10 kΩ), silkscreened
+  `10K`. Which nets they serve is still unread, and they interact with the shared bus and
+  with the RA-02's own pins.
 
 ## Power-Source Compatibility
 
@@ -108,24 +143,24 @@ they are board properties rather than voltage-domain properties:
 
 **Decision: YES on voltage; current not yet qualified.**
 
-3.3 V is inside the module's 2.6–3.6 V range. This is the intended supply for the
-vehicle. What remains open is whether the Pico's regulator can carry the reader's write
+The module's supply pin is printed `3V3` and there is no regulator to step anything down, so
+the 3.3 V rail is exactly what it wants. This is the intended supply for the vehicle. What remains open is whether the Pico's regulator can carry the reader's write
 transient on top of the radio and the sensors, which is a measurement.
 
 ### 1S LiPo directly
 
 **Decision: NO.**
 
-Not because of the module — 3.7 V nominal is only just outside its 3.6 V maximum, and
-4.2 V fully charged is well outside it. A cell connected directly would overrun the
-module's stated maximum for most of its discharge curve. Use the regulated 3.3 V rail.
+A cell reaches about 4.2 V fully charged and sits near 3.7 V for most of its discharge, and
+with no regulator on the board that voltage would land on the card and on the unbuffered
+signal lines directly. Use the regulated 3.3 V rail.
 
 ### Pico VSYS
 
 **Decision: NO.**
 
-VSYS follows the battery, so it carries the same 4.2 V down to 3.0 V range as the cell
-itself and is above the module's 3.6 V maximum when the pack is charged.
+VSYS follows the battery, so it carries the same 4.2 V down to 3.0 V swing as the cell
+itself. A module with no regulator wants a regulated input, not a battery-tracking one.
 
 ### Separate rail or boost converter
 
@@ -193,8 +228,9 @@ the flight worth analysing afterwards.
 
 ## Integration Verdict
 
-**Voltage: resolved.** The module is a 2.6–3.6 V SPI board and runs from the vehicle's
-3.3 V rail alongside everything else.
+**Voltage: resolved.** The module is a 3.3 V SPI board with no regulator and no level
+shifter, and it runs from the vehicle's 3.3 V rail alongside everything else. The *range* it
+tolerates is still unstated by any source, and is deliberately not recorded here.
 
 **Remaining work is measurement, not specification:**
 
@@ -209,7 +245,7 @@ power budget is not closed.
 
 ## Related documents
 
-- [Receiving Inspection Record](receiving-inspection.md) — where the 2.6–3.6 V identification was recorded
+- [Receiving Inspection Record](receiving-inspection.md) — section C.6, where this board was identified from its photographs
 - [Hardware Reference](hardware.md) — the single hardware database
 - [Electrical Architecture](../design/electrical-architecture.md) — the power tree this simplifies
 - [Wiring](../design/wiring.md) — the bring-up order
