@@ -7,6 +7,7 @@ Transport-level problems (no packet, CRC failure) are tracked separately in
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -38,19 +39,37 @@ class ValidationStats:
 
 
 class StreamValidator:
+    # Duplicate detection remembers recently seen packet numbers. The window is bounded:
+    # an unbounded set would grow for as long as the station runs -- a range test or a
+    # bench session can be hours -- and a "duplicate" of a packet from two hours ago is not
+    # a useful thing to report anyway. At 1 Hz this covers over eight hours of flight.
+    SEEN_WINDOW = 32768
+
     def __init__(self, expected_team: Optional[str] = None,
                  gps_lat_range: tuple[float, float] = (-90.0, 90.0),
-                 gps_lon_range: tuple[float, float] = (-180.0, 180.0)) -> None:
+                 gps_lon_range: tuple[float, float] = (-180.0, 180.0),
+                 seen_window: Optional[int] = None) -> None:
         self.expected_team = expected_team
         self.gps_lat_range = gps_lat_range
         self.gps_lon_range = gps_lon_range
+        self.seen_window = seen_window or self.SEEN_WINDOW
         self.stats = ValidationStats()
         self._last_number: Optional[int] = None
         self._seen_numbers: set[int] = set()
+        self._seen_order: deque[int] = deque()
         self._last_timestamp_ms: Optional[int] = None
 
     def reset(self) -> None:
-        self.__init__(self.expected_team, self.gps_lat_range, self.gps_lon_range)
+        self.__init__(self.expected_team, self.gps_lat_range, self.gps_lon_range,
+                      self.seen_window)
+
+    def _remember(self, number: int) -> None:
+        if number in self._seen_numbers:
+            return
+        self._seen_numbers.add(number)
+        self._seen_order.append(number)
+        while len(self._seen_order) > self.seen_window:
+            self._seen_numbers.discard(self._seen_order.popleft())
 
     def _is_vehicle_restart(self, number: int, timestamp_ms: int) -> bool:
         """True when the stream looks like the vehicle rebooted rather than misbehaved."""
@@ -87,6 +106,7 @@ class StreamValidator:
         # the vehicle starting over.
         if self._is_vehicle_restart(number, record.timestamp_ms):
             self._seen_numbers.clear()
+            self._seen_order.clear()
             self._last_number = None
             self._last_timestamp_ms = None
             self.stats.restarts += 1
@@ -126,7 +146,7 @@ class StreamValidator:
                 report.notes.append("implausible GPS fix ignored")
                 self.stats.gps_rejected += 1
 
-        self._seen_numbers.add(number)
+        self._remember(number)
         if self._last_number is None or number > self._last_number:
             self._last_number = number
         self._last_timestamp_ms = ts

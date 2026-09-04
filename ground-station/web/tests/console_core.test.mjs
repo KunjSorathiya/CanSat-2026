@@ -268,6 +268,16 @@ test("a backwards timestamp is noted without discarding the packet", () => {
   assert.equal(v.stats.tsReg, 1);
 });
 
+test("duplicate detection is bounded, so a long session cannot grow without limit", () => {
+  const v = new M.StreamValidator("CAN-Team-07");
+  v.seenWindow = 100;
+  for (let n = 1; n <= 500; n++) v.check(record(n));
+  assert.ok(v._seen.size <= 100, `seen set grew to ${v._seen.size}`);
+  assert.ok(v._seenOrder.length <= 100);
+  // Recent numbers are still remembered.
+  assert.equal(v.check(record(500)).duplicate, true);
+});
+
 test("a vehicle reboot is recognised, not read as a stream of duplicates", () => {
   // The watchdog is designed to reboot the vehicle. Its counter then restarts at P-001 and
   // its mission clock at zero; without recognising that, every later packet reads as a

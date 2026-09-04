@@ -824,7 +824,17 @@ class StreamValidator {
   constructor(team) {
     this.team = team || null;
     this.stats = { received: 0, accepted: 0, rejected: 0, missing: 0, duplicates: 0, outOfOrder: 0, wrongTeam: 0, tsReg: 0, gpsRej: 0, restarts: 0 };
-    this._last = null; this._seen = new Set(); this._lastTs = null;
+    this._last = null; this._seen = new Set(); this._seenOrder = []; this._lastTs = null;
+    /* Bounded, for the same reason as validator.py: an unbounded set grows for as long as
+       the console is open -- a range test can be hours in a browser tab -- and a duplicate
+       of a packet from two hours ago is not worth reporting. At 1 Hz this is over eight
+       hours of flight. */
+    this.seenWindow = 32768;
+  }
+  _remember(n) {
+    if (this._seen.has(n)) return;
+    this._seen.add(n); this._seenOrder.push(n);
+    while (this._seenOrder.length > this.seenWindow) this._seen.delete(this._seenOrder.shift());
   }
   /* The vehicle can reboot mid-mission: its watchdog is designed to, and the firmware
      records the reboot and resumes transmitting. Its packet counter then restarts at
@@ -848,7 +858,7 @@ class StreamValidator {
     }
     const n = rec.packet_number;
     if (this._isVehicleRestart(n, rec.timestamp_ms)) {
-      this._seen.clear(); this._last = null; this._lastTs = null;
+      this._seen.clear(); this._seenOrder.length = 0; this._last = null; this._lastTs = null;
       this.stats.restarts++; r.restarted = true;
       r.notes.push("vehicle restart: counter back to P-" + pad(n));
     }
@@ -862,7 +872,7 @@ class StreamValidator {
       const ok = rec.gps_lat >= -90 && rec.gps_lat <= 90 && rec.gps_lon >= -180 && rec.gps_lon <= 180;
       if (!ok) { r.notes.push("implausible GPS fix ignored"); this.stats.gpsRej++; }
     }
-    this._seen.add(n);
+    this._remember(n);
     if (this._last === null || n > this._last) this._last = n;
     this._lastTs = rec.timestamp_ms;
     this.stats.accepted++;

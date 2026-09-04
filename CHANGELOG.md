@@ -8,6 +8,23 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 27)
+
+### Changed — duplicate detection is bounded
+
+The validator remembered every packet number it had ever seen, in a set that grew for as
+long as the ground station ran. A range test or a bench session is hours; the web console
+in particular may sit open in a browser tab all day. It was never going to exhaust a PC,
+but it was unbounded, and a "duplicate" of a packet from two hours ago is not a useful
+thing to report anyway.
+
+Both implementations now keep a bounded window of 32768 recent numbers — over eight hours
+of flight at 1 Hz — evicting the oldest as new ones arrive. A restart clears it entirely.
+Five tests cover the bound, that recent duplicates are still caught, and that the default
+window is long enough for any mission.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 26)
 
 ### Fixed — a vehicle reboot made the ground station's statistics meaningless

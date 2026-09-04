@@ -174,3 +174,45 @@ class VehicleRestartTests(unittest.TestCase):
             for n in range(1, 6):
                 validator.check(self._record(n, n * 1000))
         self.assertEqual(validator.stats.restarts, 2)
+
+
+class SeenWindowTests(unittest.TestCase):
+    """Duplicate detection must not grow without bound over a long session."""
+
+    def _record(self, number, timestamp_ms=1000):
+        packet = (f"CAN-Team-01; P-{number:03d}; "
+                  f"Ti-00:00:{timestamp_ms // 1000 % 60:02d}:{timestamp_ms % 1000:03d}; "
+                  "A-10.0; Pr-101325.00; "
+                  "T-25.0; Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;")
+        result = parse_packet(packet, "CAN-Team-01")
+        self.assertIsNotNone(result.record, result.error)
+        return result.record
+
+    def test_the_window_is_bounded(self):
+        validator = StreamValidator("CAN-Team-01", seen_window=100)
+        for n in range(1, 501):
+            validator.check(self._record(n))
+        self.assertLessEqual(len(validator._seen_numbers), 100)
+        self.assertLessEqual(len(validator._seen_order), 100)
+
+    def test_recent_duplicates_are_still_caught(self):
+        validator = StreamValidator("CAN-Team-01", seen_window=100)
+        for n in range(1, 51):
+            validator.check(self._record(n))
+        self.assertTrue(validator.check(self._record(50)).duplicate)
+        self.assertTrue(validator.check(self._record(1)).duplicate)
+
+    def test_the_default_window_covers_a_long_flight(self):
+        # At 1 Hz the default window is over eight hours, far beyond any mission.
+        self.assertGreaterEqual(StreamValidator.SEEN_WINDOW, 30000)
+
+    def test_a_restart_clears_both_structures(self):
+        validator = StreamValidator("CAN-Team-01", seen_window=100)
+        for n in range(1, 21):
+            validator.check(self._record(n))       # timestamps all 00:00:01:000
+        # A restart needs the clock to go backwards as well as the counter, so give the
+        # earlier packets a later mission time than the restarting one.
+        validator._last_timestamp_ms = 20000
+        self.assertTrue(validator.check(self._record(1, 0)).restarted)
+        self.assertEqual(len(validator._seen_numbers), 1)
+        self.assertEqual(len(validator._seen_order), 1)
