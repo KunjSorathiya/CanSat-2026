@@ -717,6 +717,66 @@ void test_calibration_rejects_a_steady_rotation_as_bias() {
     CHECK(approx(spinning.result().gyro_bias_dps[2], 1.0, 0.01));
 }
 
+// A steady parachute descent reads as 1 g on the accelerometer, indistinguishable from
+// sitting on the ground. Only the vertical rate separates them, so prove it does.
+void test_landing_is_not_declared_during_a_steady_descent() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    flight::StateMachine sm(c);
+
+    flight::DetectionInputs di;
+    di.self_test_ok = true;
+    di.sensors_ok = true;
+    di.armed = true;
+    sm.begin_self_test(0);
+    sm.update(0, di);                     // SELF_TEST -> READY
+    CHECK(sm.state() == flight::MissionState::ready);
+
+    // Launch.
+    di.accel_magnitude_mps2 = 40.0;
+    sm.update(1000, di);
+    sm.update(1400, di);
+    CHECK(sm.state() == flight::MissionState::flight);
+
+    // Steady descent under a parachute: 1 g, but moving down at 6 m/s. Sustained well past
+    // both the minimum flight time and the landing confirmation window.
+    di.accel_magnitude_mps2 = 9.80665;
+    di.altitude_rate_mps = -6.0;
+    di.altitude_agl_m = 200.0;
+    for (std::uint64_t t = 2000; t <= 30000; t += 500) {
+        sm.update(t, di);
+        CHECK(sm.state() == flight::MissionState::flight);
+    }
+
+    // Touchdown: same acceleration, but the vertical rate collapses.
+    di.altitude_rate_mps = 0.1;
+    di.altitude_agl_m = 0.5;
+    sm.update(30500, di);
+    CHECK(sm.state() == flight::MissionState::flight);   // still inside the 3 s window
+    sm.update(33600, di);
+    CHECK(sm.state() == flight::MissionState::landed);
+
+    // A momentary blip during descent must not start the landing timer over a real one.
+    flight::StateMachine sm2(c);
+    flight::DetectionInputs d2 = di;
+    d2.armed = true;
+    d2.self_test_ok = true;
+    d2.sensors_ok = true;
+    sm2.begin_self_test(0);
+    sm2.update(0, d2);
+    d2.accel_magnitude_mps2 = 40.0;
+    sm2.update(1000, d2);
+    sm2.update(1400, d2);
+    CHECK(sm2.state() == flight::MissionState::flight);
+    d2.accel_magnitude_mps2 = 9.80665;
+    for (std::uint64_t t = 5000; t <= 20000; t += 500) {
+        // Rate flickers below the threshold for a single sample every couple of seconds.
+        d2.altitude_rate_mps = (t % 2000 == 0) ? -0.2 : -6.0;
+        sm2.update(t, d2);
+    }
+    CHECK(sm2.state() == flight::MissionState::flight);
+}
+
 // Battery reporting has to be honest about which voltage it is showing. With no divider
 // measured, the number is the ADC pin voltage, and an operator reading 1.6 V off a 3.7 V
 // cell needs to know that before reacting to it.
@@ -1511,6 +1571,7 @@ int main(int argc, char** argv) {
     test_gps_coordinate_validation();
     test_orientation_blends_across_the_wrap();
     test_calibration_rejects_a_steady_rotation_as_bias();
+    test_landing_is_not_declared_during_a_steady_descent();
     test_battery_voltage_reports_whether_it_is_scaled();
     test_loop_tick_is_bounded_by_the_gps_uart_fifo();
     test_sensor_timing_model();

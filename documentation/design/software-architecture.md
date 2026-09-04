@@ -271,6 +271,26 @@ time. Anything the vehicle can still partly do keeps the mission running.
 `LANDED` holds for `post_impact_transmission_ms` (5000 ms, and `validate_config()` refuses
 to start below 5000) before `RECOVERY`, and telemetry never stops in either state.
 
+**Why landing detection cannot use the accelerometer alone.** A vehicle descending under a
+parachute at a steady rate has *no net acceleration*: the accelerometer reads about 1 g,
+exactly as it does sitting on the ground. `||a| − g| < 2.5 m/s²` is therefore satisfied
+throughout a normal descent, and on its own it would declare a landing seconds after the
+parachute opened.
+
+**The vertical rate is the only discriminator**, which is why so much care goes into it:
+
+- a real descent runs at several metres per second, far above the 1 m/s threshold;
+- the estimate is only updated when the barometer has genuinely produced a new reading, so
+  over-sampling cannot push it toward zero mid-descent;
+- but that hold is **bounded**, because an estimate frozen at a descent rate would prevent
+  the landing from ever being detected. See
+  [sensor-rates.md](sensor-rates.md#why-over-sampling-a-sensor-corrupts-vertical-speed).
+
+Both failure directions are survivable and neither breaks rulebook compliance — telemetry
+continues in every state — but they are wrong in different ways. A missed landing leaves
+the mission reporting `FLIGHT` on the ground; a false landing starts the post-impact window
+in mid-air. The 3 s confirmation window guards against a momentary reading of either kind.
+
 ### Startup calibration
 
 Runs while the vehicle sits on the pad, during `INIT`, `SELF_TEST` and `READY`.

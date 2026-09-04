@@ -65,6 +65,11 @@ void StateMachine::update(std::uint64_t now_ms, const DetectionInputs& in) {
             if (now_ms - entered_ms_ < config_.min_flight_ms) {
                 break;
             }
+            // A vehicle descending under a parachute at a steady rate has no net
+            // acceleration: the accelerometer reads about 1 g, exactly as it does on the
+            // ground. This test alone would declare a landing seconds after the parachute
+            // opened, so the vertical rate below is the real discriminator — see
+            // documentation/design/software-architecture.md.
             const double accel_error =
                 std::fabs(in.accel_magnitude_mps2 - sensors::kStandardGravity);
             const bool at_rest = accel_error < config_.landing_accel_epsilon_mps2 &&

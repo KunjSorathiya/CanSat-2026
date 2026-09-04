@@ -8,6 +8,28 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 24)
+
+### Added — the landing-detection reasoning, written down and tested
+
+A vehicle descending under a parachute at a steady rate has **no net acceleration**: the
+accelerometer reads about 1 g, exactly as it does sitting on the ground. The rest test
+`||a| − g| < 2.5 m/s²` is therefore satisfied throughout a normal descent, and on its own
+would declare a landing seconds after the parachute opened.
+
+The **vertical rate is the only discriminator** — which is why the last two cycles spent so
+much effort on it. That reasoning existed nowhere: not in the state machine, not in the
+architecture document. It is now in both, along with what each failure direction costs (a
+missed landing reports `FLIGHT` on the ground; a false one starts the post-impact window in
+mid-air; neither breaks rulebook compliance, because telemetry continues in every state).
+
+`test_landing_is_not_declared_during_a_steady_descent` flies a 28-second descent at 1 g and
+−6 m/s and asserts the mission stays in `FLIGHT` throughout, then touches down and asserts
+it reaches `LANDED` only after the confirmation window — and separately, that a rate
+flickering below the threshold for single samples never accumulates into a false landing.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 23)
 
 ### Fixed — the vertical-speed hold could have left the mission stuck in FLIGHT
