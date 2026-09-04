@@ -429,6 +429,42 @@ void test_orientation_yaw_is_disciplined_by_the_magnetometer() {
 
 // An uncalibrated magnetometer still stops yaw drifting, but the vehicle must not claim
 // the result is an absolute magnetic heading.
+void test_a_field_with_no_heading_in_it_is_not_seeded_as_one() {
+    // The magnitude gate admits any field between kEarthFieldMinUt and kEarthFieldMaxUt.
+    // A field of plausible strength pointing straight down the vehicle's up axis -- a
+    // magnetic pole, or a local vertical disturbance on the pad -- carries no horizontal
+    // component, so no heading can be recovered from it. The estimator used to seed yaw at
+    // zero in that case and then set magnetometer confidence to the threshold anyway,
+    // reporting an absolute magnetic heading of 0 deg that nothing had measured.
+    flight::OrientationEstimator estimator;
+
+    // Level, and a 50 uT field with nothing but a vertical component.
+    const double vertical_only[3] = {0.0, 0.0, 50.0};
+    estimator.update(0.0, 0.0, 9.81, 0.0, 0.0, 0.0,
+                     vertical_only[0], vertical_only[1], vertical_only[2], true, 0.033);
+    auto e = estimator.estimate();
+    CHECK(e.valid);
+    CHECK(!e.yaw_is_magnetic);   // the claim this test exists to prevent
+
+    // The same estimator, given a field that does carry a heading, earns the claim -- it
+    // takes kMagConfidenceRequired corrections, so the first sample alone is not enough
+    // once the seed no longer grants them.
+    flight::OrientationEstimator usable;
+    for (int i = 0; i < 10; ++i) {
+        usable.update(0.0, 0.0, 9.81, 0.0, 0.0, 0.0, 0.0, 30.0, 40.0, true, 0.033);
+    }
+    const auto good = usable.estimate();
+    CHECK(good.valid);
+    CHECK(good.yaw_is_magnetic);
+
+    // And an uncalibrated magnetometer still never claims one, however good the field.
+    flight::OrientationEstimator uncalibrated;
+    for (int i = 0; i < 10; ++i) {
+        uncalibrated.update(0.0, 0.0, 9.81, 0.0, 0.0, 0.0, 0.0, 30.0, 40.0, false, 0.033);
+    }
+    CHECK(!uncalibrated.estimate().yaw_is_magnetic);
+}
+
 void test_uncalibrated_magnetometer_does_not_claim_absolute_heading() {
     double ax, ay, az, mx, my, mz;
     body_gravity(0.0, 0.0, ax, ay, az);
@@ -2404,6 +2440,7 @@ int main(int argc, char** argv) {
     test_magnetic_yaw_is_tilt_compensated();
     test_orientation_yaw_is_disciplined_by_the_magnetometer();
     test_uncalibrated_magnetometer_does_not_claim_absolute_heading();
+    test_a_field_with_no_heading_in_it_is_not_seeded_as_one();
     test_orientation_rejects_an_implausible_field();
     test_orientation_ignores_the_accelerometer_under_high_g();
     test_orientation_rejects_unusable_input();

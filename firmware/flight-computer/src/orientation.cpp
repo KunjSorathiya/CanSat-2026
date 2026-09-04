@@ -113,14 +113,16 @@ bool OrientationEstimator::magnetic_yaw_deg(double ax, double ay, double az,
     return true;
 }
 
-void OrientationEstimator::seed(double ax, double ay, double az, const double* mag_ut) {
+bool OrientationEstimator::seed(double ax, double ay, double az, const double* mag_ut) {
     const double roll = std::atan2(ay, az);
     const double pitch = std::atan2(-ax, std::sqrt(ay * ay + az * az));
     double yaw = 0.0;
+    bool yaw_is_magnetic = false;
     if (mag_ut != nullptr) {
         double seeded_yaw = 0.0;
         if (magnetic_yaw_deg(ax, ay, az, mag_ut[0], mag_ut[1], mag_ut[2], seeded_yaw)) {
             yaw = seeded_yaw * kDegToRad;
+            yaw_is_magnetic = true;
         }
     }
 
@@ -133,6 +135,7 @@ void OrientationEstimator::seed(double ax, double ay, double az, const double* m
     q_[3] = sy * cp * cr - cy * sp * sr;
     bias_rad_[0] = bias_rad_[1] = bias_rad_[2] = 0.0;
     seeded_ = true;
+    return yaw_is_magnetic;
 }
 
 void OrientationEstimator::update(double ax, double ay, double az,
@@ -184,8 +187,12 @@ void OrientationEstimator::apply(double ax, double ay, double az,
         if (!accel_usable) {
             return;  // nothing yet defines which way is up
         }
-        seed(ax, ay, az, mag_usable ? mag : nullptr);
-        if (mag_usable) {
+        // Confidence is granted for a yaw the magnetometer actually produced, not merely
+        // for a field that passed the magnitude gate. A field with no horizontal component
+        // leaves yaw at zero, and a zero nobody measured must never be reported as an
+        // absolute heading.
+        const bool seeded_from_field = seed(ax, ay, az, mag_usable ? mag : nullptr);
+        if (seeded_from_field) {
             mag_confidence_ = kMagConfidenceRequired;
             mag_calibrated_ = mag_calibrated;
         }

@@ -83,7 +83,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 59 suites across the whole flight core | ✅ **3560 / 3560 assertions** |
+| `flight_tests` | 60 suites across the whole flight core | ✅ **3565 / 3565 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
@@ -142,7 +142,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 59 suites, 3560 assertions
+### `flight_tests` — 60 suites, 3565 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -158,6 +158,7 @@ flowchart LR
 | `test_orientation_levels_and_yaw` | The first accelerometer sample seeds roll and pitch directly rather than being filtered towards; yaw propagates on the gyroscope and is not claimed as magnetic |
 | `test_magnetic_yaw_is_tilt_compensated` | Tilt-compensated magnetic yaw recovered from fields synthesised at 54 known attitudes — the test that holds all three sensors to one coordinate frame |
 | `test_orientation_yaw_is_disciplined_by_the_magnetometer` | 20 s with a 3 °/s gyro bias: fused yaw holds the magnetic reference while a gyro-only estimate drifts more than 30° |
+| `test_a_field_with_no_heading_in_it_is_not_seeded_as_one` | A field of plausible strength with no horizontal component — a magnetic pole, or a vertical disturbance on the pad — carries no recoverable heading, so yaw falls back to zero and the estimator must not report that zero as magnetic |
 | `test_uncalibrated_magnetometer_does_not_claim_absolute_heading` | An uncalibrated magnetometer still stops yaw drifting, but `yaw_is_magnetic` stays false |
 | `test_orientation_rejects_an_implausible_field` | A field outside 20–70 µT is not the earth's, and does not steer the vehicle |
 | `test_orientation_ignores_the_accelerometer_under_high_g` | 6 g along +X for 100 updates does not tip the attitude solution towards the thrust axis |

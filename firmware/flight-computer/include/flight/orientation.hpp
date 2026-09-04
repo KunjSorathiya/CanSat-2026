@@ -105,7 +105,11 @@ private:
     void apply(double ax, double ay, double az,
                double gx, double gy, double gz,
                const double* mag_ut, bool mag_calibrated, double dt_s);
-    void seed(double ax, double ay, double az, const double* mag_ut);
+    // Returns whether yaw was seeded from the magnetometer. A field can pass the
+    // magnitude gate and still carry no recoverable heading -- pointing straight down a
+    // magnetic pole, or through a local vertical disturbance -- and yaw then falls back
+    // to zero. The caller must not treat that zero as a magnetic reference.
+    bool seed(double ax, double ay, double az, const double* mag_ut);
 
     Gains gains_{};
     double q_[4] = {1.0, 0.0, 0.0, 0.0};  // body -> level frame, w x y z

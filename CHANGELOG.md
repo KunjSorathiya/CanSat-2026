@@ -55,6 +55,42 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — the estimator could claim a magnetic heading it never computed
+
+Reading `orientation.cpp` line by line found one path where the vehicle's own rule -- never
+claim an absolute heading it has not earned -- did not hold.
+
+The magnetometer is admitted on **field strength**: anything between the earth-field bounds
+is usable. Recovering a *heading* from it needs something more, a horizontal component, and
+a field can have the first without the second -- pointing straight down at a magnetic pole,
+or through a local vertical disturbance, which on a launch field means a motor, a vehicle or
+a steel structure.
+
+`seed()` handled that correctly and silently: no heading recoverable, so yaw stays at zero.
+Its caller then set magnetometer confidence to the threshold **because the field passed the
+magnitude gate**, and with a calibrated magnetometer the next packet went out declaring
+`YR-M` — an absolute magnetic heading of 0 deg that nothing had measured, on a vehicle that
+was in fact pointing anywhere at all.
+
+`seed()` now reports whether it used the field, and confidence is granted only then. A
+degenerate field leaves the estimator on gyro-integrated yaw, declared `YR-G`, which is what
+it actually has.
+
+`test_a_field_with_no_heading_in_it_is_not_seeded_as_one` covers all three cases -- the
+vertical field claiming nothing, a good field earning the claim over the required run of
+corrections, and an uncalibrated magnetometer never earning it however good the field. It
+was confirmed to fail against the previous code before the fix was kept.
+
+Worth noting what this does *not* change today: the delivered IMU has no magnetometer at
+all, so this vehicle reports `YR-G` regardless. The defect was in the code that runs on a
+nine-axis part -- the part the project would buy if the organisers rule that an absolute
+yaw is required.
+
+The rest of the estimator was read against its own comments and found correct: the
+quaternion integration, the body-to-level rotation, the magnetometer reference construction
+that keeps a disturbance out of roll and pitch, the bias integrator's sign and clamp, and
+the compass-bearing conversion. No other change was needed.
+
 ### Added — the documented commands are a test suite now, and CI stops racing itself
 
 Two of this cycle's defects were found by typing documented commands in exactly the form
