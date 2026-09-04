@@ -164,7 +164,7 @@ confident wrong number.
 > vertical-speed estimate degrades — the firmware detects and handles it, but the
 > configuration should be corrected rather than relied on to degrade gracefully.
 
-> **Rows 3.1–3.4 and 8.8–8.10 are taken with `cansat_bringup_firmware`**, a separate image
+> **Rows 3.1–3.5, 3.7, 3.8, 4.1–4.3 and 8.8 are taken with `cansat_bringup_firmware`**, a separate image
 > that prints over USB. The flight firmware speaks only over LoRa, so a vehicle with no radio
 > attached produces nothing to read — that is why this gate had no observable until the
 > diagnostic existed. Flash it exactly like the flight image, open the port at any baud rate,
@@ -188,9 +188,27 @@ confident wrong number.
 >   OUT OF RANGE. The tolerances are read from the config at run time, so these can never
 >   drift away from what the firmware actually enforces.
 >
-> It drives the same `mpu9250.cpp` and `bmp280.cpp` the vehicle flies. A diagnostic built on
-> its own copy of the drivers can pass while the flight build fails, which is worse than
-> having no diagnostic at all.
+> - **the barometer's true output rate (3.5)** by counting *changed* pressure values rather
+>   than reads. Polling faster than the part converts returns the same bytes again, so
+>   counting reads would report the poll rate and call it the output rate.
+> - **acquisition interval and jitter (3.7, 3.8)**, plus the sensor read time inside each
+>   tick — which is the number that actually matters, being the part of the period the flight
+>   loop cannot spend on anything else. Measured on the diagnostic's own loop, not on
+>   `controller.cpp`'s scheduler: it **bounds** the flight loop rather than describing it.
+> - **five seconds of raw NMEA (4.1)**, echoed verbatim. That is deliberately not the
+>   parser's opinion: a wrong baud rate produces a steady stream of plausible-looking
+>   garbage, and only looking at the characters tells that apart from silence or from real
+>   sentences.
+> - **fix status, satellite count, time to first fix and checksum errors (4.2, 4.3)** in the
+>   live line, once the parser is running.
+>
+> **Any subset of the hardware may be connected.** Absent devices are reported and skipped,
+> never fatal — which is what makes one-sensor-at-a-time bring-up practical without a
+> breadboard.
+>
+> It drives the same `mpu9250.cpp`, `bmp280.cpp` and `neo6m.cpp` the vehicle flies. A
+> diagnostic built on its own copy of the drivers can pass while the flight build fails,
+> which is worse than having no diagnostic at all.
 >
 > **It is not flight software and is never linked into the flight image.** The launch build
 > carries no debug output, and no flag that could accidentally enable some.

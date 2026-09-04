@@ -20,6 +20,7 @@
 
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
+#include "hardware/uart.h"
 #include "pico/stdio_usb.h"
 #include "pico/stdlib.h"
 
@@ -212,6 +213,150 @@ void stationary_statistics(flight::PicoImu& imu, const flight::Configuration& co
     std::printf("   valid samples: %d of %d\n", n, kSamples);
 }
 
+// ---- Gate 3 rate rows -------------------------------------------------------
+//
+// 3.5 is a property of the sensor: how often the BMP280 actually publishes a new
+// conversion at the configured oversampling and filter. Counting *changed* values is the
+// only honest way to measure it from the outside - polling faster than the part converts
+// returns the same bytes again, and counting reads instead of changes would report the
+// poll rate and call it the output rate.
+void barometer_output_rate(flight::PicoBarometer& baro) {
+    std::printf("\n-- 3.5 Barometer output rate --\n");
+    constexpr std::uint32_t kWindowMs = 2000;
+    const std::uint64_t start = now_ms();
+    double last_pa = -1.0;
+    int changes = 0, reads = 0;
+    while (now_ms() - start < kWindowMs) {
+        flight::BaroSample b;
+        if (baro.read(b, now_ms()) && b.valid) {
+            ++reads;
+            if (b.pressure_pa != last_pa) {
+                ++changes;
+                last_pa = b.pressure_pa;
+            }
+        }
+    }
+    const double secs = static_cast<double>(kWindowMs) / 1000.0;
+    std::printf("   polled %d times in %.1f s (%.0f Hz poll rate)\n", reads, secs,
+                reads / secs);
+    std::printf("   distinct values: %d  ->  output rate %.1f Hz  (predicted 83 Hz)\n",
+                changes, changes / secs);
+    if (reads > 0 && changes >= reads - 1) {
+        std::printf("   NOTE: nearly every poll changed, so the sensor is at least this\n"
+                    "   fast and this figure is a lower bound, not a measurement. Poll\n"
+                    "   faster than the part converts to see the real ceiling.\n");
+    }
+}
+
+// 3.7 and 3.8 measure a paced loop, not the flight controller's scheduler. What this
+// bounds is real: if the sensors cannot be read inside the period, the flight loop cannot
+// hold it either. Reported as the diagnostic's own loop so nobody mistakes it for
+// controller.cpp's.
+void acquisition_rate(flight::PicoImu& imu, flight::PicoBarometer& baro,
+                      const flight::Configuration& config, bool imu_ok, bool baro_ok) {
+    std::printf("\n-- 3.7 / 3.8 Acquisition rate and jitter --\n");
+    constexpr int kTicks = 150;
+    const std::uint32_t period = config.sensor_period_ms;
+
+    std::uint64_t prev = now_ms();
+    double sum = 0.0, sum_sq = 0.0;
+    std::uint64_t worst_read_us = 0, read_us_sum = 0;
+    int n = 0;
+
+    for (int i = 0; i < kTicks; ++i) {
+        sleep_ms(period);
+        const std::uint64_t t = now_ms();
+
+        const std::uint64_t r0 = to_us_since_boot(get_absolute_time());
+        flight::ImuSample s;
+        flight::BaroSample b;
+        if (imu_ok) imu.read(s, t);
+        if (baro_ok) baro.read(b, t);
+        const std::uint64_t read_us = to_us_since_boot(get_absolute_time()) - r0;
+        read_us_sum += read_us;
+        if (read_us > worst_read_us) worst_read_us = read_us;
+
+        if (i > 0) {  // the first interval includes start-up, so drop it
+            const double dt = static_cast<double>(t - prev);
+            sum += dt;
+            sum_sq += dt * dt;
+            ++n;
+        }
+        prev = t;
+    }
+
+    const Stats s = finish(sum, sum_sq, n);
+    const double tolerance = 0.06 * static_cast<double>(period);
+    std::printf("   3.7  mean interval  = %7.3f ms   (configured %lu ms -> %.2f Hz)\n",
+                s.mean, static_cast<unsigned long>(period),
+                s.mean > 0.0 ? 1000.0 / s.mean : 0.0);
+    std::printf("   3.8  interval sd    = %7.3f ms   (limit %.2f ms, 6%% of the period)  %s\n",
+                s.sd, tolerance, s.sd <= tolerance ? "PASS" : "OUT OF RANGE");
+    std::printf("        sensor read     = %7.3f ms mean, %.3f ms worst\n",
+                (read_us_sum / static_cast<double>(kTicks)) / 1000.0,
+                worst_read_us / 1000.0);
+    std::printf("   The read time is the number that matters: it is the part of the\n"
+                "   period the flight loop cannot spend on anything else. Worst case\n"
+                "   must stay well inside %lu ms.\n", static_cast<unsigned long>(period));
+    std::printf("   Measured on this diagnostic's loop, NOT on controller.cpp's\n"
+                "   scheduler. It bounds the flight loop rather than describing it.\n");
+}
+
+// ---- Gate 4 ------------------------------------------------------------------
+//
+// 4.1 asks whether raw NMEA arrives at all. That is a question about bytes and baud rate,
+// so it is answered by echoing the UART verbatim rather than by anything the parser says:
+// a wrong baud rate produces a steady stream of plausible-looking garbage, and only
+// looking at the characters distinguishes that from silence or from real sentences.
+void gps_raw_echo(const flight::Configuration& config, std::uint32_t seconds) {
+    std::printf("\n-- 4.1 Raw NMEA, %lu s of whatever the UART carries --\n",
+                static_cast<unsigned long>(seconds));
+    std::printf("   Expect lines like $GPRMC / $GPGGA. Readable text means the baud rate\n"
+                "   is right. Mojibake means it is wrong. Nothing at all means the module\n"
+                "   is not talking - check its supply before its wiring.\n");
+    std::printf("   ----------------------------------------------------------\n");
+
+    uart_init(uart0, config.gps_baud);
+    gpio_set_function(flight::BoardPins::gps_tx, GPIO_FUNC_UART);
+    gpio_set_function(flight::BoardPins::gps_rx, GPIO_FUNC_UART);
+
+    const std::uint64_t deadline = now_ms() + seconds * 1000;
+    int bytes = 0;
+    while (now_ms() < deadline) {
+        if (uart_is_readable(uart0)) {
+            const char c = uart_getc(uart0);
+            std::putchar(c);
+            ++bytes;
+        }
+    }
+    std::printf("\n   ----------------------------------------------------------\n");
+    std::printf("   %d bytes in %lu s (%.0f bytes/s; 9600 baud carries ~960)\n", bytes,
+                static_cast<unsigned long>(seconds),
+                bytes / static_cast<double>(seconds));
+    if (bytes == 0) {
+        std::printf("   SILENCE. The module sent nothing. C.5.5 is the first suspect:\n"
+                    "   this board prints no supply range and its regulator is\n"
+                    "   unidentified, so 3.3 V may be leaving the NEO-6M below its\n"
+                    "   2.7 V floor. Check TX/RX are crossed before assuming a dead part.\n");
+    }
+}
+
+void gps_status(flight::PicoGps& gps, std::uint64_t boot_fix_ms) {
+    cansat::GpsData d;
+    const bool have = gps.latest(d) && d.valid;
+    std::printf("gps=");
+    if (have) {
+        std::printf("FIX sats=%2u lat=%10.6f lon=%11.6f alt=%7.1fm ", d.satellites,
+                    d.latitude, d.longitude, d.altitude);
+        if (boot_fix_ms > 0) {
+            std::printf("ttff=%lus ", static_cast<unsigned long>(boot_fix_ms / 1000));
+        }
+    } else {
+        std::printf("no-fix sats=%2u ", d.satellites);
+    }
+    std::printf("cksum_err=%lu ", static_cast<unsigned long>(gps.checksum_errors()));
+}
+
 }  // namespace
 
 int main() {
@@ -236,6 +381,9 @@ int main() {
     std::printf("   Pico GND  pin 38  ->  MPU-9250 GND, BMP280 GND\n");
     std::printf("   Pico GP%-2d pin  6  ->  MPU-9250 SDA, BMP280 SDA\n", flight::BoardPins::i2c_sda);
     std::printf("   Pico GP%-2d pin  7  ->  MPU-9250 SCL, BMP280 SCL\n", flight::BoardPins::i2c_scl);
+    std::printf("   Pico GP%-2d pin 16  ->  NEO-6M RX   (the labels cross)\n", flight::BoardPins::gps_tx);
+    std::printf("   Pico GP%-2d pin 17  <-  NEO-6M TX\n", flight::BoardPins::gps_rx);
+    std::printf("\nAny subset may be connected. Absent devices are reported, not fatal.\n");
 
     // Before the IMU is initialised the AK8963 is invisible: it sits behind the MPU's
     // pass-through bridge and does not answer the outside bus until BYPASS_EN is set.
@@ -259,10 +407,27 @@ int main() {
     }
 
     if (imu_ok) stationary_statistics(imu, config);
+    if (baro_ok) barometer_output_rate(baro);
+    if (imu_ok || baro_ok) acquisition_rate(imu, baro, config, imu_ok, baro_ok);
+
+    // GPS last: it is the only subsystem here whose supply is still unverified (C.5.5),
+    // so everything that can be measured without it is already on the record by now.
+    gps_raw_echo(config, 5);
+    flight::PicoGps gps(config);
+    const bool gps_ok = gps.initialize();
+    std::printf("   Parser: %s\n", gps_ok ? "started" : "FAILED to start");
+    std::uint64_t first_fix_ms = 0;
 
     std::printf("\n-- Live readings, 2 Hz. Ctrl-C or unplug to stop. --\n");
     while (true) {
         const std::uint64_t t = now_ms();
+        if (gps_ok) {
+            gps.poll(t);
+            if (first_fix_ms == 0) {
+                cansat::GpsData d;
+                if (gps.latest(d) && d.valid) first_fix_ms = t;
+            }
+        }
         flight::ImuSample s;
         flight::BaroSample b;
         const bool has_imu = imu_ok && imu.read(s, t) && s.valid;
@@ -282,12 +447,22 @@ int main() {
             std::printf("imu=--  ");
         }
         if (has_baro) {
-            std::printf("P=%9.2fPa T=%5.2fC alt=%7.2fm", b.pressure_pa, b.temperature_c,
+            std::printf("P=%9.2fPa T=%5.2fC alt=%7.2fm ", b.pressure_pa, b.temperature_c,
                         b.altitude_m);
         } else {
-            std::printf("baro=--");
+            std::printf("baro=-- ");
         }
+        if (gps_ok) gps_status(gps, first_fix_ms);
         std::printf("\n");
-        sleep_ms(500);
+
+        // The GPS UART must be drained faster than 2 Hz or the RP2040's 32-byte FIFO
+        // overruns and sentences are lost mid-line. Poll while waiting rather than
+        // sleeping through it - this is the same reasoning that sizes the flight loop's
+        // tick against gps_uart_fifo_bytes.
+        const std::uint64_t until = now_ms() + 500;
+        while (now_ms() < until) {
+            if (gps_ok) gps.poll(now_ms());
+            sleep_ms(5);
+        }
     }
 }

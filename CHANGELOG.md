@@ -55,6 +55,35 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Added — the diagnostic now covers the rate rows and Gate 4
+
+`cansat_bringup_firmware` gains four measurements it could not take before:
+
+- **3.5, barometer output rate**, by counting *changed* pressure values over a fixed window
+  rather than counting reads. Polling faster than the part converts returns the same bytes
+  again, so counting reads would report the poll rate and call it the output rate. When
+  nearly every poll changes, the figure is reported as a lower bound rather than a
+  measurement, because the sensor is then faster than the loop asking it.
+- **3.7 and 3.8, acquisition interval and jitter**, plus the sensor read time inside each
+  tick. The read time is the number that matters: it is the part of the period the flight
+  loop cannot spend on anything else. Reported explicitly as the diagnostic's own loop, not
+  `controller.cpp`'s scheduler — it bounds the flight loop rather than describing it.
+- **4.1, raw NMEA**, echoed verbatim for five seconds. Deliberately not the parser's opinion:
+  a wrong baud rate produces a steady stream of plausible-looking garbage, and only looking
+  at the characters distinguishes that from silence or from real sentences. Silence prints a
+  pointer to C.5.5 rather than to the wiring, because the unverified supply is the first
+  suspect on this board.
+- **4.2 and 4.3**, fix status, satellite count, time to first fix and NMEA checksum errors,
+  carried in the live line.
+
+The live loop now drains the GPS UART every 5 ms instead of sleeping through the half-second
+between prints. The RP2040's UART FIFO is 32 bytes and 9600 baud fills it in about 33 ms, so
+a 2 Hz poll would overrun it and lose sentences mid-line. That is the same reasoning
+`gps_uart_fifo_bytes` uses to size the flight loop's tick.
+
+Any subset of the hardware may be connected — absent devices are reported and skipped, never
+fatal. That is what makes one-sensor-at-a-time bring-up practical without a breadboard.
+
 ### Verified — the barometer is a BMP280, and Part C's last four straps are closed
 
 Chip ID register `0xD0` returned **`0x58`** on 2026-09-05: a BMP280, not a BME280. `F-4` is
