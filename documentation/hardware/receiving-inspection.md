@@ -366,14 +366,29 @@ J1 (opposite row, reading from the same end)
 | C.5.2 | Controller marking: NEO-6M and variant | Magnifier | `u-blox` `NEO-6M-0-001`, lot `1702`, serial `2422187473 8`, `0300 3`. Genuine u-blox label with data matrix | Photo 2026-09-04 |
 | C.5.3 | Pin labels and order: VCC, GND, TX, RX | Silkscreen | **4 pins, printed `VCC RX TX GND`** — `VCC` at one end, `GND` at the other, `RX` and `TX` between them in that order | Photo 2026-09-04 |
 | C.5.4 | Onboard regulator present? Part marking | Magnifier | **Yes** — one **SOT-23-class** package beside the header, **measured 1.4 × 2.6 mm** against this board's own 2.54 mm header pitch. **Marking still not legible.** The size rules out SOT-223 | Photo 2026-09-04 |
-| C.5.5 | Stated supply range on the silkscreen, if any | Silkscreen | **None printed.** The board states no voltage anywhere | Photo 2026-09-04 |
+| C.5.5 | Stated supply range on the silkscreen, if any | Silkscreen, **then operation** | **None printed** — the board states no voltage anywhere. **Answered by running it: the module works on 3.3 V from the Pico's 3V3 rail.** Clean NMEA at 9600 baud, and it acquired a satellite indoors, so the receiver and its antenna path are both live | Photo 2026-09-04; **operated 2026-09-05 / KS** |
 | C.5.6 | Antenna connector type; patch antenna supplied? | Visual | **u.FL / IPEX socket**, and the **active patch antenna is supplied and already mated** | Photo 2026-09-04 |
 | C.5.7 | Backup battery or supercapacitor present? | Visual | **Yes** — a coin cell on its side next to the module, plus a `24C32A` (`FT5N4D`) 8-pin EEPROM. This is the "with EPROM" the BOM named | Photo 2026-09-04 |
 
-> C.5.5 is the row to be careful about. The board prints no supply range, the regulator is
-> unidentified, and GY-NEO6MV2 boards exist in versions that want 5 V and versions happy on
-> 3.3 V. **Do not assume this one runs from the 3.3 V rail.** Identify the regulator, or
-> measure the module supply and the UART idle level, before it is wired to the Pico.
+> **C.5.5 is closed, and closed by observation rather than by the listing.** On 2026-09-05 the
+> module was powered from the Pico's own 3V3 output and produced clean, checksum-valid NMEA at
+> 9600 baud within seconds — `$GPRMC`, `$GPVTG`, `$GPGGA`, `$GPGSA`, `$GPGSV`, `$GPGLL`, one
+> full cycle per second. A module browning out below its 2.7 V floor does not emit
+> well-formed sentences at the right baud rate for minutes on end.
+>
+> **It also proved the antenna path**, which no supply test had to. Within five seconds
+> `$GPGSV,1,1,01,04,,,28` reported one satellite in view — PRN 04 at 28 dB-Hz — from indoors.
+> The receiver is not merely talking, it is hearing.
+>
+> **C.5.4 stays open and is now only a curiosity.** The regulator's part number is still
+> unread, so its rated input range is still unknown. That mattered when it decided whether the
+> module could be fed 3.3 V at all; it no longer does, because the module has been fed 3.3 V
+> and works. Identify it if a macro shot is ever taken, but nothing waits on it.
+>
+> **The vehicle now has exactly one supply question left, and it is not a voltage.** Every
+> module is confirmed 3.3 V: the RA-02 and microSD by inspection, the BMP280 by the absence of
+> a regulator, the IMU by operation, and the GPS by this. What Gate 2 still needs is current,
+> not volts.
 >
 > **The supplier listing says "Supply voltage: 3.3 V". That does not close this row**, and it
 > is recorded in [product-pages](product-pages/README.md) as procurement information rather

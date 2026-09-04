@@ -55,6 +55,32 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Verified — the GPS runs on 3.3 V, and C.5.5 is closed by operation
+
+The NEO-6M was powered from the Pico's own 3V3 output on 2026-09-05 and produced clean,
+well-formed NMEA at 9600 baud within seconds: `$GPRMC`, `$GPVTG`, `$GPGGA`, `$GPGSA`,
+`$GPGSV`, `$GPGLL`, one full cycle per second. A module browning out below its 2.7 V floor
+does not emit correct sentences at the right baud rate for minutes on end.
+
+**It proved the antenna path too**, which no supply test had to. Within five seconds
+`$GPGSV,1,1,01,04,,,28` reported one satellite in view — PRN 04 at 28 dB-Hz — from indoors.
+The receiver is not merely talking, it is hearing.
+
+`C.5.5` is closed **by observation, not by the listing** that claimed the same thing. `C.5.4`
+stays open and is now only a curiosity: the regulator's part number is still unread, but its
+rated input range only mattered while it decided whether the module could take 3.3 V at all.
+
+**Every module's supply is now confirmed 3.3 V** — the RA-02 and microSD by inspection, the
+BMP280 by the absence of a regulator, the IMU and GPS by operation. **What Gate 2 still needs
+is current, not volts.**
+
+Two smaller facts worth having: the receiver delivers **1 Hz, not the 5 Hz the listing
+advertised** — that is a capability reached by sending a UBX message, and nothing in this
+firmware sends one. And the line carries **164 B/s** against 960 B/s capacity, so the
+RP2040's 32-byte FIFO fills in roughly 195 ms rather than the ~33 ms `gps_uart_fifo_bytes`
+assumes at full line rate. The flight loop's tick has more room than the worst case it was
+sized against.
+
 ### Verified — the barometer runs at 83.0 Hz, exactly as computed
 
 `STATUS.measuring` falling edges: **166 in 2 s → 83.0 Hz**, against the 83.3 Hz

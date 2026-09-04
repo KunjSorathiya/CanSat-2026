@@ -237,11 +237,24 @@ confident wrong number.
 
 | # | Quantity | Predicted | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|
-| 4.1 | Raw NMEA arrives | Sentences at 9600 baud | Serial monitor on the UART | | |
-| 4.2 | Time to first fix, cold, outdoors | Minutes | Stopwatch from power-on to `GP-Lat` appearing | | |
-| 4.3 | NMEA checksum errors | ≈ 0 | `gps_checksum_errors` in the health snapshot | | |
+| 4.1 | Raw NMEA arrives | Sentences at 9600 baud | Serial monitor on the UART | **Yes.** `$GPRMC`, `$GPVTG`, `$GPGGA`, `$GPGSA`, `$GPGSV`, `$GPGLL` — one full cycle per second, well formed, at 9600 baud. **818 bytes in 5 s (164 B/s)** against the 960 B/s the line carries | ✅ 2026-09-05 / KS |
+| 4.2 | Time to first fix, cold, outdoors | Minutes | Stopwatch from power-on to `GP-Lat` appearing | Not yet taken — needs sky. **Indoors it reached one satellite in view within 5 s** (`$GPGSV,1,1,01,04,,,28`: PRN 04 at 28 dB-Hz), so the receiver and antenna path are live | |
+| 4.3 | NMEA checksum errors | ≈ 0 | `gps_checksum_errors` in the health snapshot | **0** over an 18 s indoor run. Re-check with a fix, when the sentences carry populated fields and get longer | ⚠️ 2026-09-05 / KS — provisional, taken without a fix |
 | 4.4 | Position accuracy | — | Compare with a known surveyed point or a phone | | |
 | 4.5 | Fix held while the radio transmits | No dropouts | Watch the fix flag through 50 transmissions | | |
+
+> **The receiver runs at 1 Hz, not the 5 Hz the supplier listing advertised.** Five complete
+> sentence cycles arrived in five seconds. 5 Hz is a NEO-6M *capability*, reached by sending it
+> a UBX configuration message; nothing in this firmware sends one, so 1 Hz is what the vehicle
+> gets. That is the receiver's default and is fine for a CanSat — but if anyone reconfigures
+> it, the `24C32A` EEPROM will remember the change across power cycles, which is a good way to
+> confuse the next person to test it.
+>
+> **The byte rate is a useful margin figure.** 164 B/s indoors with no fix, against the
+> 960 B/s a 9600 baud line carries. It will rise once sentences carry populated fields and
+> more satellites, but the RP2040's 32-byte FIFO is nowhere near pressure at this rate — it
+> fills in about 195 ms rather than the ~33 ms `gps_uart_fifo_bytes` assumes at full line
+> rate. The flight loop's tick has more room here than the worst case it was sized against.
 
 > 4.5 is worth its own row: the GPS and the radio have not shared a vehicle before, and RF
 > desensitisation of a GPS front end by a nearby 433 MHz transmitter is a real effect.

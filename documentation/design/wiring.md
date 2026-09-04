@@ -469,7 +469,8 @@ results in [documentation/testing](../testing/).
 - [x] Fitted pull-up values read: 10 kΩ on both I2C breakouts, 10 kΩ on the microSD reader
 - [ ] **I2C strap directions read** — AD0 and SDO decide `0x68`/`0x69` and `0x76`/`0x77`
 - [ ] **BMP280 confirmed against BME280** — die photograph or chip-ID read
-- [ ] MPU-9250 and NEO-6M regulators identified, so their input ranges are known
+- [x] **NEO-6M supply resolved by operation, 2026-09-05** — clean NMEA on the Pico's 3.3 V rail
+- [ ] MPU-9250 and NEO-6M regulator part numbers still unread — a curiosity now, not a blocker
 - [ ] microSD write-transient current measured against the regulator's capability
 - [ ] microSD MISO tri-state behaviour confirmed on the shared SPI bus
 - [ ] Peripheral regulator selected, with a documented load budget
