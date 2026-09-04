@@ -26,12 +26,15 @@ Verified from the delivered board, receiving inspection 2026-09-04:
 | Laminate marking | `DC-136 94V-0`; CE and FCC marks on the underside | VERIFIED FROM HARDWARE |
 | Pin labels | Full underside legend: `GP0`-`GP28`, `GP26_A0`/`GP27_A1`/`GP28_A2`, `ADC_VREF`, `AGND`, `VBUS`, `VSYS`, `3V3`, `3V3_EN`, `RUN`, `GND` | VERIFIED FROM HARDWARE |
 | Debug access | `SWCLK`/`GND`/`SWDIO` 3-pad row, plus test points `TP1`-`TP6` | VERIFIED FROM HARDWARE |
-| Headers | **Not fitted, and none supplied.** Through-holes and castellations bare | VERIFIED FROM HARDWARE |
+| Headers | **As delivered: not fitted, none supplied**, through-holes and castellations bare. **Fitted 2026-09-04** - bought separately and soldered to both Picos | VERIFIED FROM HARDWARE |
 | USB connector | Micro-B, intact | VERIFIED FROM HARDWARE |
 
-Headers are a purchase, not an observation: two 20-pin strips per Pico. The vehicle Pico may
-be better soldered flat to the prototype board than socketed - decide before assembly, since
-it changes the board's height budget.
+Headers were a purchase, not an observation: two 20-pin strips per Pico, bought separately and
+soldered on 2026-09-04. Both Picos now carry them, so mounting the vehicle Pico flat to the
+prototype board is no longer available and the height budget must carry the header stack.
+Whether its pins are socketed or passed through the prototype board and soldered directly is
+still open - a socket can walk loose under launch vibration, so anything socketed needs its
+own mechanical retention.
 
 The downloaded Raspberry Pi datasheet is the source for the Pico board pinout and power-input details. The following board-level items must be transcribed and checked against the purchased board before design:
 

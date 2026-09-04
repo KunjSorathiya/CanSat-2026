@@ -85,14 +85,27 @@ Not on the BOM, but Part C cannot be completed without them. Record what you act
 
 | Tool | Have it? | Notes |
 |---|---|---|
-| Multimeter with continuity | | Required for every polarity and continuity check below |
+| Multimeter with continuity | **Yes, the second one** | The original meter's resistance range is faulty — see the note below; its Ω readings are discarded. **A replacement was obtained 2026-09-05.** Short its probes and confirm ≤0.5 Ω, steady, before it is used for anything |
 | Magnifier or phone macro lens | | Required to read regulator and level-shifter markings |
-| Soldering iron and solder | | Headers arrive loose on most of these boards |
-| microSD card | **No** | Not on the BOM, and none is in the reader's bag in `11566-sd-reader-front.jpg`. Buy one |
+| Soldering iron and solder | **Yes** | Headers arrive loose on most of these boards. All headers fitted 2026-09-04 |
+| microSD card | **Yes, obtained 2026-09-05** | Not on the BOM, and none was in the reader's bag in `11566-sd-reader-front.jpg`. **Record its capacity and class here** — Gate 6.2 expects SDHC, block-addressed |
 | USB micro-B cable, data-capable | | For the Pico. A charge-only cable is a classic wasted afternoon |
-| 1S LiPo charger | | Not on the BOM. **Never charge a LiPo without one** |
+| 1S LiPo charger | **Yes, obtained 2026-09-05** | Not on the BOM. **Never charge a LiPo without one.** Record the model and its charge current once used |
 
 > Anything answered "no" here is a purchase to make today, not on the day it blocks work.
+
+> **The meter is part of the evidence chain, so its condition is recorded here too.** On
+> 2026-09-05 the resistance range produced ~51 Ω between *every* pair of pins on the
+> MPU-9250, including pins with no possible connection, and 18 Ω across its own shorted probe
+> tips — climbing steadily from zero, on a new battery. Those numbers described the
+> instrument, not the board, and **none of them are recorded in Part C.** The MPU-9250 is not
+> implicated by them.
+>
+> Continuity and DC volts were verified working and were used for [C.6.9](#c6--micro-sd-card-reader-sku-11566),
+> [C.7.6](#c7--antenna-and-ipex-cable), [C.7.7](#c7--antenna-and-ipex-cable),
+> [C.8.3](#c8--lipo-battery), [C.8.5](#c8--lipo-battery) and [C.9.5](#c9--prototype-pcb-quantity-2).
+> The two strap rows need a true resistance range and stay blank until a working meter exists.
+> **Before trusting any meter here, short its probes: it must read ≤0.5 Ω and hold steady.**
 
 ---
 
@@ -123,18 +136,34 @@ nothing.
 | B.4 | IPEX cable | Both ends, close-up of each connector | Partial | `1674982-ipex-sma-cable.jpg` — **neither centre contact resolvable**, see [F-5](#findings) |
 | B.5 | MPU-9250 | Front, back, regulator, pull-ups, AD0 strap | 2026-09-04 | `2846-mpu9250-front.jpg`, `2846-mpu9250-back.jpg` — regulator marking illegible |
 | B.6 | NEO-6M | Front, back, controller, regulator, antenna socket | 2026-09-04 | `11782-neo6m-front.jpg`, `11782-neo6m-back.jpg` — regulator marking illegible |
-| B.7 | GY-BMP280-3.3 | Front, back, regulator, SDO strap | 2026-09-04 | `835813-bmp280-front.jpg`, `835813-bmp280-back.jpg` — **die marking illegible**, see [F-4](#findings) |
+| B.7 | GY-BMP280-3.3 | Front, back, regulator, SDO strap | 2026-09-04 | `835813-bmp280-front.jpg`, `835813-bmp280-back.jpg` — die marking illegible, but the **package footprint is measurable** and identifies the part, see [F-4](#findings) |
 | B.8 | microSD reader | Front, back, **every** component marking | 2026-09-04 | `11566-sd-reader-front.jpg`, `11566-sd-reader-back.jpg` |
 | B.9 | LiPo | Full label, connector, both faces | 2026-09-04 | `1125094-lipo-front.jpg`, `1125094-lipo-back.jpg` |
 | B.10 | Prototype PCB | Front, back, copper pattern close-up | 2026-09-04 | `1031002-protoboard-front.jpg`, `1031002-protoboard-back.jpg` |
 
-Three re-shoots are outstanding, all of them macro shots the phone can take today:
+Two re-shoots are outstanding, both of them macro shots the phone can take today:
 
 1. **The antenna's mating face and the cable's SMA mating face, straight on.** Without them
    [D.2](#d2--antenna-sma-or-rp-sma) cannot be closed on nomenclature, only on fit.
-2. **The BMP280 die marking**, to settle BMP280 against BME280 ([C.4.1](#c4--gy-bmp280-33)).
-3. **The MPU-9250, NEO-6M and microSD regulator markings.** All three are SOT-23 parts whose
-   text is below this photograph's resolution.
+2. **The MPU-9250 and NEO-6M regulator markings.** Both are SOT-23 parts whose text is below
+   this photograph's resolution, and they are the only two supply questions the vehicle has
+   left.
+
+The third — **the BMP280 die marking** — has been struck off, but not because it was read.
+The die text is still illegible; the part was identified from its **package outline**
+instead, which this photograph does resolve. See [C.4.1](#c4--gy-bmp280-33).
+
+> **What "illegible" now means here.** Each remaining marking was re-examined at the file's
+> full 12 MP resolution, cropped to the bare package and enhanced (grayscale, autocontrast,
+> histogram equalisation, unsharp mask) before being called illegible. On the two regulators
+> there is no character-shaped structure to recover at all — the limit is the capture, not
+> the processing, and no amount of further work on **these files** will produce a part
+> number. A macro re-shoot is the only route.
+>
+> The antenna and cable are a **different failure, and an easier one to fix**: those files are
+> sharp, but both connectors are photographed side-on, so the bore is not in view at any
+> resolution. That is a framing problem, not a lens problem — the same phone, turned to face
+> the mating end, closes [C.7.1](#c7--antenna-and-ipex-cable) and [C.7.2](#c7--antenna-and-ipex-cable).
 
 ---
 
@@ -159,11 +188,15 @@ continuity range. Rows needing a live rail belong in the bring-up record instead
 | C.1.2 | Pin labels match the datasheet pinout | Compare board with datasheet | Yes — GP0–GP28, `GP26_A0`/`GP27_A1`/`GP28_A2`, `ADC_VREF`, `AGND` all printed on the underside | Photo 2026-09-04 |
 | C.1.3 | VSYS, VBUS, 3V3, 3V3_EN, RUN, GND present and undamaged | Visual | All six present and legible on the underside | Photo 2026-09-04 |
 | C.1.4 | Debug pads present | Visual | Yes — `SWCLK`, `GND`, `SWDIO` as a 3-pad row on the underside, plus `TP1`–`TP6` | Photo 2026-09-04 |
-| C.1.5 | Headers fitted, or to be soldered | Visual | **Not fitted, and no header strip in the photograph.** Plated through-holes and castellations bare | Photo 2026-09-04 |
+| C.1.5 | Headers fitted, or to be soldered | Visual | **As delivered: not fitted, none supplied**, through-holes and castellations bare. **Headers bought separately and soldered to both Picos on 2026-09-04**; joints inspected and adjacent-pin isolation checked before any power | Photo 2026-09-04; fitted 2026-09-04 / KS |
 | C.1.6 | USB connector condition | Visual | Micro-B, intact, no bent shell | Photo 2026-09-04 |
 
-> C.1.5 is a purchase, not an observation: two 20-pin strips per Pico, and the vehicle Pico
-> may be better soldered flat to the prototype board than socketed. Decide before assembly.
+> C.1.5 was a purchase, not an observation: two 20-pin strips per Pico. **Both Picos are now
+> headered**, which settles one half of the mounting question — soldering the vehicle Pico
+> flat to the prototype board, castellations down, is no longer an option. Whether its pins
+> are socketed or passed through the prototype board and soldered directly is still open, and
+> is a vibration decision: a socket can walk loose under launch loads, so anything socketed
+> needs mechanical retention of its own.
 >
 > This is a **Pico, not a Pico W** — no radio module, and the `DEBUG` pad row sits where the
 > W's antenna would be. Nothing in this project wants Wi-Fi, but it is worth having recorded.
@@ -215,8 +248,8 @@ J1 (opposite row, reading from the same end)
 | C.3.1 | Board marking, MPU-9250 breakout or other | Silkscreen | Front `MPU-9250/6500`; back `GY-6500  GY-9250` and `V356` | Photo 2026-09-04 |
 | C.3.2 | **IC marking on the die itself: MPU-9250, MPU-9255, or MPU-6500** | Magnifier | **`MP92`** / `163LA1` / `1719` on a 24-pin QFN. `MP92` is the MPU-9250 marking; an MPU-6500 reads `MP65` | Photo 2026-09-04 |
 | C.3.3 | Pin labels: VCC, GND, SCL, SDA, XDA, XCL, AD0, INT | Silkscreen | 10 pins. Front: `VCC GND SCL SDA EDA ECL AD0 INT NCS FSYNC`. Back names two of them dually: `SCL/SCLK`, `SDA/SDI`, `ADD/SDO` | Photo 2026-09-04 |
-| C.3.4 | Onboard regulator present? Part marking | Magnifier | **Yes** — one SOT-23-5 beside the `VCC` pin. **Marking not legible at this resolution** | Photo 2026-09-04 |
-| C.3.5 | Bus pull-ups fitted? Marked value | Magnifier | **Yes** — five resistors marked `103` (10 kΩ), grouped around the `SCL`/`SDA` and `AD0`/`INT`/`NCS` pins, plus unmarked capacitors | Photo 2026-09-04 |
+| C.3.4 | Onboard regulator present? Part marking | Magnifier | **Yes** — one **SOT-23-5** beside the `VCC` pin: three pads one side, two the other, counted at full sensor resolution. **Marking still not legible**, at any enhancement this photograph supports. The package class rules out SOT-223 | Photo 2026-09-04 |
+| C.3.5 | Bus pull-ups fitted? Marked value | Magnifier | **Yes** — five resistors marked `103` (10 kΩ), grouped around the `SCL`/`SDA` and `AD0`/`INT`/`NCS` pins, plus unmarked 0402 passives and one tantalum marked `C106` (**10 µF**) beside the regulator | Photo 2026-09-04 |
 | C.3.6 | AD0 strapped high or low as delivered | Continuity to VCC/GND | | |
 | C.3.7 | Expected I2C address implied by C.3.6 | `0x68` or `0x69` | | |
 | C.3.8 | INT exposed on the header | Visual | **Yes**, `INT` is on the header — GP7 in the pin map is real | Photo 2026-09-04 |
@@ -234,6 +267,14 @@ J1 (opposite row, reading from the same end)
 > same I2C0 pair. Two 10 kΩ pull-ups in parallel is 5 kΩ, which is still a legal bus but a
 > stiffer one than either board was designed around. Record the sink current at bring-up
 > before assuming it is harmless.
+>
+> Two of those five read `E0I` rather than `103`. **They are the same part, placed rotated
+> 180°** — `103` upside down is `E0I`. Do not record a phantom component from them.
+>
+> The `C106` tantalum is the regulator's bulk output capacitor, and it is worth knowing about
+> for a different reason than decoupling: **10 µF of tantalum across the LDO output is an
+> inrush load at switch-on**, on a rail that [C.3.4](#c3--mpu-9250) shows is fed from the
+> board's own regulator rather than straight from `VCC`.
 >
 > C.3.9 is recorded from the printed cross, and orientation read off a photograph is easy to
 > get wrong. Confirm it against the board in your hand before the airframe is built around it.
@@ -254,7 +295,7 @@ J1 (opposite row, reading from the same end)
 
 | # | Record | How | Value | Date/by |
 |---|---|---|---|---|
-| C.4.1 | Board marking; confirm BMP280, **not** BME280 | Silkscreen and die marking | **Unresolved.** Silkscreen is the shared `GY-BM ☐E/☐P 280` artwork with a tick box per variant; **neither box is legibly marked, and the die text is below this photograph's resolution**. See [F-4](#findings) | Photo 2026-09-04 |
+| C.4.1 | Board marking; confirm BMP280, **not** BME280 | Silkscreen, die marking, **package footprint** | **BMP280.** Silkscreen and die text both fail — shared `GY-BM ☐E/☐P 280` artwork with neither box legibly ticked, and a laser mark below this photograph's resolution. **The package outline settles it instead: 2.04 × 2.50 mm measured**, against 2.00 × 2.50 mm for a BMP280 and 2.50 × 2.50 mm for a BME280. See [F-4](#findings) | Photo 2026-09-04 |
 | C.4.2 | Pin count and labels: 4-pin I2C or 6-pin I2C/SPI | Silkscreen | **6 pins**, in order `VCC GND SCL SDA CSB SDO` — the I2C/SPI variant, not the 4-pin I2C-only board | Photo 2026-09-04 |
 | C.4.3 | Onboard regulator present? Part marking | Magnifier | **None.** The board carries only the sensor, four resistors and two capacitors — consistent with the 3.3 V-only `GY-BMP280-3.3` the BOM ordered | Photo 2026-09-04 |
 | C.4.4 | Bus pull-ups fitted? Marked value | Magnifier | **Yes** — four resistors marked `103` (10 kΩ) | Photo 2026-09-04 |
@@ -266,10 +307,23 @@ J1 (opposite row, reading from the same end)
 > source would destroy it. That is now a verified constraint rather than a hopeful reading of
 > the product name.
 >
-> C.4.1 stays open, and it matters more than it looks. A BME280 answers chip-ID `0x60` where
-> a BMP280 answers `0x58`, and it also reports humidity the telemetry format has no field
-> for. Either re-shoot the die at macro range, or read the chip-ID register at bring-up and
-> record it here. **Do not resolve this row from the product name.**
+> C.4.1 was closed by measuring the part rather than by reading it, because the two candidates
+> differ in **shape** and not only in text. Both are LGA-8 under a metal lid, but a BMP280 is
+> **2.00 × 2.50 mm** and a BME280 is **2.50 × 2.50 mm** — one rectangular, one square.
+>
+> The method, so the number can be re-checked or overturned: in `835813-bmp280-front.jpg` the
+> six header pads set an in-frame scale of **89.6 px per 2.54 mm, i.e. 35.3 px/mm**, taken
+> across the whole pad 1 → pad 6 span so one mis-centred pad cannot move it. The sensor's lid
+> fills a 78 × 93 px bounding box; the board lies about 4° off axis, and un-rotating that box
+> gives a true **71.9 × 88.1 px = 2.04 × 2.50 mm**. The aspect ratio alone — **0.82**, and
+> free of any scale assumption — already separates a BMP280's 0.80 from a BME280's 1.00; the
+> absolute figures then agree to 2 %. The short side would have to be wrong by 16 px, several
+> times the edge blur, for this part to be a BME280.
+>
+> **This is still a measurement from a photograph, not a register read.** A BME280 answers
+> chip-ID `0x60` where a BMP280 answers `0x58`, and it also reports humidity that the
+> telemetry format has no field for. Read the chip ID at bring-up and record it here; that,
+> not this paragraph, is the final word. **Do not resolve this row from the product name.**
 
 > C.4.6 must agree with the `0x76` that the wiring and bring-up documents assume. If the
 > board straps SDO high, either the strap or the document changes — decide deliberately and
@@ -282,7 +336,7 @@ J1 (opposite row, reading from the same end)
 | C.5.1 | Board marking and revision | Silkscreen | `GY-NEO6MV2` | Photo 2026-09-04 |
 | C.5.2 | Controller marking: NEO-6M and variant | Magnifier | `u-blox` `NEO-6M-0-001`, lot `1702`, serial `2422187473 8`, `0300 3`. Genuine u-blox label with data matrix | Photo 2026-09-04 |
 | C.5.3 | Pin labels and order: VCC, GND, TX, RX | Silkscreen | **4 pins, printed `VCC RX TX GND`** — `VCC` at one end, `GND` at the other, `RX` and `TX` between them in that order | Photo 2026-09-04 |
-| C.5.4 | Onboard regulator present? Part marking | Magnifier | **Yes** — one SOT-23-5 beside the header. **Marking not legible at this resolution** | Photo 2026-09-04 |
+| C.5.4 | Onboard regulator present? Part marking | Magnifier | **Yes** — one **SOT-23-class** package beside the header, **measured 1.4 × 2.6 mm** against this board's own 2.54 mm header pitch. **Marking still not legible.** The size rules out SOT-223 | Photo 2026-09-04 |
 | C.5.5 | Stated supply range on the silkscreen, if any | Silkscreen | **None printed.** The board states no voltage anywhere | Photo 2026-09-04 |
 | C.5.6 | Antenna connector type; patch antenna supplied? | Visual | **u.FL / IPEX socket**, and the **active patch antenna is supplied and already mated** | Photo 2026-09-04 |
 | C.5.7 | Backup battery or supercapacitor present? | Visual | **Yes** — a coin cell on its side next to the module, plus a `24C32A` (`FT5N4D`) 8-pin EEPROM. This is the "with EPROM" the BOM named | Photo 2026-09-04 |
@@ -314,7 +368,7 @@ why. Complete this section before anything else touches SPI0.
 | C.6.6 | Every resistor and capacitor marking | Magnifier | **Four resistors marked `103` (10 kΩ)**, silkscreened `10K`, and two unmarked capacitors. That is the entire parts list | Photo 2026-09-04 |
 | C.6.7 | Stated input range on the silkscreen | Silkscreen | **No range printed. The supply pin is labelled `3V3`** — a single value | Photo 2026-09-04 |
 | C.6.8 | Continuity: VCC pin to regulator input | Meter | Not applicable — there is no regulator | Photo 2026-09-04 |
-| C.6.9 | Continuity: card supply to regulator output, or to VCC directly | Meter | | |
+| C.6.9 | Continuity: card supply to regulator output, or to VCC directly | Meter | **Direct, and nothing in between.** The `3V3` header pin beeps to exactly one socket leg; `GND` beeps to a different single leg. No other leg responds to either | Meter 2026-09-05 / KS |
 | C.6.10 | Card retention: push-push, push-pull, or friction | Visual | **Friction / slide-in holder** — no spring eject, no hinged tray | Photo 2026-09-04 |
 
 > **This table closes [D.1](#d1--the-microsd-reader-sku-11566), the question that has blocked
@@ -346,8 +400,8 @@ why. Complete this section before anything else touches SPI0.
 | C.7.3 | Cable IPEX end variant | Compare with the RA-02 socket | Mates with the RA-02's u.FL socket, so it is the IPEX-1 / u.FL generation the BOM named | Photo 2026-09-04 |
 | C.7.4 | Antenna and cable mate without force | Hand-tight, **no power** | **Yes — mated in `1150780-ra02-antenna-mated.jpg`**, threads fully engaged, no adapter | Photo 2026-09-04 |
 | C.7.5 | IPEX end mates with the RA-02 socket | Gentle, **no power** | **Yes — snapped onto the module's u.FL socket in the same photograph** | Photo 2026-09-04 |
-| C.7.6 | Cable continuity: centre to centre, shield to shield | Meter | | |
-| C.7.7 | Cable isolation: centre to shield reads open | Meter | | |
+| C.7.6 | Cable continuity: centre to centre, shield to shield | Meter | **Both continuous.** Centre to centre and shield to shield each beep | Meter 2026-09-05 / KS |
+| C.7.7 | Cable isolation: centre to shield reads open | Meter | **Open at both ends.** No short between centre and shield | Meter 2026-09-05 / KS |
 | C.7.8 | Markings on antenna and cable | Read and photograph | **None.** Neither part carries any printed identification | Photo 2026-09-04 |
 
 > **The whole RF chain has been shown to fit: antenna → SMA joint → 10 cm pigtail → u.FL →
@@ -381,9 +435,9 @@ why. Complete this section before anything else touches SPI0.
 |---|---|---|---|---|
 | C.8.1 | Full label text | Photograph and transcribe | **`Pro-Range` Lithium Polymer Battery**, "Smartly Flavoured Li-Po Battery", `Ω MATCHED`, `TRUE BALANCE`, **`1500` mAh**, **`1 Cell 3.7V 25C`**. Back: serial `18726 52478`, `Made in P.R.C`, CE and crossed-bin marks, "Check Genuinity on lipo.robu.in" | Photo 2026-09-04 |
 | C.8.2 | Connector type: JST-PH 2.0, JST-XH, or other | Compare with a known connector | **Two leads. Main discharge: red 2-pin JST-RCY (BEC) style. Balance: white 2-pin JST-XH style.** Neither is JST-PH 2.0 | Photo 2026-09-04 |
-| C.8.3 | Polarity: which lead is positive | **Meter, not wire colour** | | |
+| C.8.3 | Polarity: which lead is positive | **Meter, not wire colour** | **Red is positive**, read on the meter at the JST-RCY discharge lead. Colour and polarity agree on this pack — confirmed, not assumed | Meter 2026-09-05 / KS |
 | C.8.4 | Protection circuit present? | Visual at the tab end | **Not visible.** Leads exit under the red heat-shrink; no protection board can be seen, and its absence cannot be proven from outside | Photo 2026-09-04 |
-| C.8.5 | Open-circuit voltage as delivered | Meter across the terminals | | |
+| C.8.5 | Open-circuit voltage as delivered | Meter across the terminals | **3.92 V** at the JST-RCY, as delivered and never charged | Meter 2026-09-05 / KS |
 | C.8.6 | Stated continuous and burst discharge | Label | **Only `25C`**, i.e. a claimed 37.5 A continuous. No burst figure, no amps printed anywhere | Photo 2026-09-04 |
 | C.8.7 | Stated charge current and cutoff | Label or manufacturer document | **Neither is printed.** The label says only "Charge Battery only with recommended charger" | Photo 2026-09-04 |
 | C.8.8 | Physical damage, puffing, or smell | Visual | Pack flat, corners square, no puffing or discolouration visible | Photo 2026-09-04 |
@@ -418,7 +472,7 @@ why. Complete this section before anything else touches SPI0.
 | C.9.2 | Hole pitch | Ruler over 10 holes, divide by 10 | Silkscreened `2.54MM` | Photo 2026-09-04 |
 | C.9.3 | Single- or double-sided | Visual | **Single-sided.** Copper pads on one face only; the reverse is bare laminate carrying the coordinate silkscreen | Photo 2026-09-04 |
 | C.9.4 | Pad pattern: isolated pads, strips, or bus rails | Visual | **Individually isolated round pads** — no strips, no linked rows. One row of elongated pads along each of the top and bottom edges | Photo 2026-09-04 |
-| C.9.5 | Adjacent pads are isolated | Meter | | |
+| C.9.5 | Adjacent pads are isolated | Meter | **Isolated.** Adjacent pads read open, both horizontally and vertically. **The elongated edge rows are isolated pad-to-pad as well** — they are not a bus | Meter 2026-09-05 / KS |
 | C.9.6 | Board thickness and mounting holes | Ruler, visual | **Four corner mounting holes.** Thickness not measurable from a photograph | Photo 2026-09-04 |
 
 > C.9.3 and C.9.4 together decide how the vehicle is built: **every connection is a wire.**
@@ -426,6 +480,11 @@ why. Complete this section before anything else touches SPI0.
 > bus have to be created by hand — a soldered bus wire, or a run of bridged pads — before any
 > module is placed. Plan those two runs first; retrofitting them under a populated board is
 > unpleasant.
+>
+> **C.9.5 confirms it on the meter, edge rows included.** The elongated pads along the top and
+> bottom edges were the one place a ready-made rail could have been hiding — they are isolated
+> pad-to-pad like every other pad on the board. There is no rail anywhere on this PCB, so both
+> bus runs are hand-built with no exceptions.
 >
 > The coordinate grid is worth using. Record each module's corner pad as, say, `F-12` in the
 > assembly notes, and the layout survives being taken apart.
@@ -516,14 +575,24 @@ question, and it belongs to bring-up gate 2.
 
 | Question | Answered by | Answer |
 |---|---|---|
-| Which lead is positive? | C.8.3 | **Open — needs a meter.** Wire colour is a convention, not evidence. |
+| Which lead is positive? | C.8.3 | **Red, confirmed on the meter** at the JST-RCY. Colour and polarity agree on this pack. |
 | Is there protection, or must the design provide cutoff? | C.8.4 | **No protection board visible**, and absence cannot be proven from outside. Assume the design must provide cutoff until shown otherwise. |
-| Is the pack healthy as delivered? | C.8.5, C.8.8 | **Physically yes** — flat, square, no puffing. **Open-circuit voltage still unmeasured.** |
+| Is the pack healthy as delivered? | C.8.5, C.8.8 | **Yes.** Flat, square, no puffing, and **3.92 V open-circuit** — a normal storage voltage, well clear of the ~3.0 V floor. |
 | What are the real charge and discharge limits? | C.8.6, C.8.7 | **Only `25C` is printed.** No charge current, no cutoff, no burst figure. |
-| Is there a charger for it? | Part A tools table | **No** — not on the BOM and not in the delivery. |
+| Is there a charger for it? | Part A tools table | **Yes** — a 1S balance charger was bought separately, 2026-09-05. |
 
-**Still blocking, and the least advanced of the four.** Two of these rows need nothing but a
-multimeter and five minutes; until they are done, no powered test can start.
+**Half answered.** The pack itself is now characterised: polarity read on the meter, and
+**3.92 V open-circuit** — healthy, and not a cell to set aside. The two rows that needed
+nothing but a multimeter are closed.
+
+**The procurement half is now closed too.** A 1S balance charger and a matching JST-RCY
+pigtail were bought on 2026-09-05, so the pack can be charged and connected.
+
+**What remains is a design obligation, not a purchase.** No protection circuit is visible and
+its absence cannot be proven from outside, so **the design must provide undervoltage cutoff**
+until something shows otherwise. The label prints no charge current and no cutoff either, so
+the charger's own 1S profile governs — use it and record what it does. Charge the pack on a
+non-flammable surface, never unattended.
 
 The delivery also changed the question. The pack is **Pro-Range, not Orange**, so the
 manufacturer document this table has been waiting on is a Pro-Range document — and the label
@@ -569,10 +638,10 @@ supplier specification the board contradicts, a missing accessory.
 | F-1 | IMU, SKU 2846 | MPU-6050, six axes | **MPU-9250**, nine axes — silkscreen `MPU-9250/6500`, die marked `MP92` | Driver replaced, attitude estimator reworked for nine axes, documentation migrated. `WHO_AM_I` at bring-up is the final confirmation |
 | F-2 | Battery, SKU 1125094 | Orange 1S 1500 mAh 25C | **Pro-Range** 1S 1500 mAh 25C. Capacity, cell count and C-rating match; brand does not | Documentation renamed to the delivered brand. Charge parameters are absent from the label and remain undocumented |
 | F-3 | microSD reader, SKU 11566 | 4.5–5.5 V input, onboard 3.3 V regulator, per the supplier listing | **3.3 V board. No regulator, no level shifter**, supply pin printed `3V3`, four 10 kΩ pull-ups and two capacitors | Second rail and boost stage removed from the power tree. Bring-up row 7.4 promoted, since nothing buffers MISO |
-| F-4 | Barometer, SKU 835813 | GY-BMP280-3.3 | Purple **6-pin** `GY-BM ☐E/☐P 280` shared-artwork board. Neither variant box legibly marked; **BMP280 vs BME280 unresolved** | Open. Re-shoot the die, or read the chip ID at bring-up (`0x58` BMP280, `0x60` BME280) |
+| F-4 | Barometer, SKU 835813 | GY-BMP280-3.3 | Purple **6-pin** `GY-BM ☐E/☐P 280` shared-artwork board, neither variant box legibly marked. **The sensor package measures 2.04 × 2.50 mm — a BMP280 (2.00 × 2.50), not a BME280 (2.50 × 2.50)** | Resolved on geometry; see [C.4.1](#c4--gy-bmp280-33). Confirm with the chip ID at bring-up (`0x58` BMP280, `0x60` BME280) |
 | F-5 | Antenna and cable | BOM: "SMA Male". Supplier page: "RP-SMA Female" | **They mate, hand-tight, no adapter.** Antenna shell female, cable shell male — agreeing with the supplier's gender, not the BOM's. Centre contacts not photographed | Assembly unblocked. Nomenclature open pending straight-on photographs of both mating faces |
-| F-6 | Pico headers | — | **No headers fitted and none supplied** | Purchase. Two 20-pin strips per Pico, or solder the vehicle Pico flat to the prototype board |
-| F-7 | Accessories | — | **No microSD card and no 1S charger** in the delivery; neither is on the BOM | Purchase. The charger is on the critical path — see [D.4](#d4--battery) |
+| F-6 | Pico headers | — | **No headers fitted and none supplied** | **Closed.** Strips bought separately and soldered to both Picos, and to every sensor, the microSD, GPS and RA-02 carriers, on 2026-09-04. Joints inspected and adjacent-pin isolation checked before power |
+| F-7 | Accessories | — | **No microSD card and no 1S charger** in the delivery; neither is on the BOM | **Closed.** Both bought separately 2026-09-05, along with a JST-RCY pigtail for the battery and a replacement multimeter. Card capacity/class and charger model still to be recorded in the Part A tools table |
 
 A finding that changes what the project believes about a component also gets a CHANGELOG
 entry — Part E, step 6.

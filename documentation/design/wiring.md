@@ -476,9 +476,11 @@ results in [documentation/testing](../testing/).
 - [ ] Manual ON/OFF switch selected and placed in the main battery feed
 - [ ] Power-LED branch designed so it lights immediately at power-on
 - [ ] Battery divider designed, built and measured before `battery_divider_ratio` is set
-- [ ] **Battery polarity confirmed with a meter**, and a mating connector obtained
-- [ ] **1S charger obtained** — none was supplied and none is on the BOM
-- [ ] Pico headers obtained, or the mounting decided without them
+- [x] **Battery polarity confirmed with a meter** — red is positive, 3.92 V open-circuit, 2026-09-05
+- [x] **A mating connector for the battery obtained** — JST-RCY pigtail, 2026-09-05
+- [x] **1S charger obtained** — 2026-09-05; none was supplied and none is on the BOM
+- [x] Pico headers obtained and fitted, 2026-09-04 — flat mounting is therefore off the table
+- [ ] Vehicle Pico mounting decided: socketed with retention, or pins soldered through the board
 - [ ] Antenna and cable centre contacts photographed, settling SMA against RP-SMA
 - [ ] 3.3 V and GND bus runs laid out on the single-sided prototype board before placement
 - [ ] Grounding, decoupling and cable-management plan recorded
