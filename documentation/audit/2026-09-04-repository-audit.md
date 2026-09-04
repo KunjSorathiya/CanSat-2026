@@ -207,6 +207,8 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-26** | The microSD driver deselected the card without the extra clock the SD specification requires, so the card could keep driving MISO — corrupting the **radio's** next transaction on the shared SPI0 bus | **High** | ✅ **Closed 2026-09-04 (cycle 10)** — every path, including failures, releases the bus properly |
 | **F-27** | `write_block()` issued CMD24 without waiting for a card still programming the previous block, which ignores commands while busy | **Medium** | ✅ **Closed 2026-09-04 (cycle 10)** — waits for ready first |
 | **F-28** | SD transfers assumed the SPI clock was still whatever initialisation left, on a bus the radio shares and can reconfigure | Low | ✅ **Closed 2026-09-04 (cycle 10)** — each transfer sets its own rate |
+| **F-29** | The bridge wrote to USB CDC with no check that a host was listening. A blocked write under its 3 s watchdog would turn a closed dashboard into a reboot loop — in the component whose requirement is to survive exactly that | **High** | ✅ **Closed 2026-09-04 (cycle 13)** — output dropped and counted while no host is attached, reported as `dropped=` in the status line |
+| **F-30** | Startup calibration gated on gyro variance alone, so a vehicle turning at a constant rate on the pad passed as "still" and had its rotation subtracted as bias for the whole flight | **Medium** | ✅ **Closed 2026-09-04 (cycle 13)** — the mean is bounded at 25 deg/s, beyond the datasheet's zero-rate offset |
 
 ---
 

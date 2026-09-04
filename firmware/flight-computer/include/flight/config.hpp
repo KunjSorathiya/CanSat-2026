@@ -137,6 +137,12 @@ struct Configuration {
     std::uint32_t calib_samples = 80;             // still IMU samples required to accept
     std::uint32_t calib_timeout_ms = 20000;       // resolve best-effort after this
     double calib_gyro_still_dps = 2.0;            // per-axis gyro std-dev gate for "stationary"
+    // A steady rotation has near-zero variance, so the std-dev gate alone accepts it and
+    // absorbs a real body rate into the "bias". The MPU-6050 datasheet gives a zero-rate
+    // output of +-20 deg/s over temperature, so a mean beyond this cannot be bias: the
+    // vehicle is turning, and the calibration must be refused rather than silently
+    // cancelling the rotation for the rest of the flight.
+    double calib_max_gyro_bias_dps = 25.0;
     double calib_accel_tol_mps2 = 1.5;            // |mean accel| must be within this of 1 g
 
     // ---- Arming / launch lockout ----------------------------------------

@@ -87,9 +87,17 @@ void StartupCalibrator::update(std::uint64_t now_ms) {
             if (var_g[i] < 0.0) var_g[i] = 0.0;
             ma[i] = sum_a_[i] / n_imu_;
         }
-        const bool still = std::sqrt(var_g[0]) < config_.calib_gyro_still_dps &&
-                           std::sqrt(var_g[1]) < config_.calib_gyro_still_dps &&
-                           std::sqrt(var_g[2]) < config_.calib_gyro_still_dps;
+        const bool steady = std::sqrt(var_g[0]) < config_.calib_gyro_still_dps &&
+                            std::sqrt(var_g[1]) < config_.calib_gyro_still_dps &&
+                            std::sqrt(var_g[2]) < config_.calib_gyro_still_dps;
+        // Low variance means "not shaking", which is not the same as "not turning": a
+        // constant rotation is perfectly steady. Bound the mean too, against what the
+        // datasheet says a zero-rate offset can actually be.
+        const bool plausible_bias =
+            std::fabs(mg[0]) < config_.calib_max_gyro_bias_dps &&
+            std::fabs(mg[1]) < config_.calib_max_gyro_bias_dps &&
+            std::fabs(mg[2]) < config_.calib_max_gyro_bias_dps;
+        const bool still = steady && plausible_bias;
         const double amag = sensors::vector_magnitude(ma[0], ma[1], ma[2]);
         const bool accel_ok =
             std::fabs(amag - sensors::kStandardGravity) < config_.calib_accel_tol_mps2;

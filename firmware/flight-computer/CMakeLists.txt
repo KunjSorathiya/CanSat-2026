@@ -75,6 +75,13 @@ target_compile_options(flight_tests PRIVATE -Wall -Wextra -Wpedantic)
 # flight_tests reads test-data/protocol-fixtures.tsv, so it needs the repository root.
 add_test(NAME flight_tests COMMAND flight_tests "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
+# Vehicle half of the cross-language end-to-end test. Not a CTest test itself: the Python
+# suite runs it and pushes its output through the ground-station pipeline.
+add_executable(emit_mission tests/emit_mission.cpp)
+target_include_directories(emit_mission PRIVATE tests)
+target_link_libraries(emit_mission PRIVATE flight_core)
+target_compile_options(emit_mission PRIVATE -Wall -Wextra -Wpedantic)
+
 # The microSD driver's command sequence, against a simulated card. sd_card.cpp compiles
 # for the host too: without PICO_BUILD it carries no SDK dependency.
 add_executable(sd_card_tests tests/sd_card_test.cpp src/pico/sd_card.cpp)

@@ -677,6 +677,46 @@ void test_orientation_blends_across_the_wrap() {
     CHECK(std::isfinite(spun));
 }
 
+// A vehicle turning at a constant rate on the pad is perfectly steady by variance, and a
+// std-dev gate alone would accept that rotation as gyro bias — cancelling a real body rate
+// for the whole flight, silently.
+void test_calibration_rejects_a_steady_rotation_as_bias() {
+    flight::Configuration config;
+    config.team_id = "CAN-Team-07";
+    config.calib_samples = 8;
+    config.calib_timeout_ms = 100000;
+
+    // A plausible zero-rate offset is accepted.
+    flight::StartupCalibrator small(config);
+    flight::ImuSample sample{};
+    sample.ax_mps2 = 0.0;
+    sample.ay_mps2 = 0.0;
+    sample.az_mps2 = 9.80665;
+    sample.gz_dps = 3.0;  // within the datasheet's +-20 deg/s zero-rate range
+    sample.valid = true;
+    small.update(0);  // starts the calibration window
+    for (int i = 0; i < 20; ++i) small.add_imu(sample);
+    small.update(1000);
+    CHECK(small.complete());
+    CHECK(small.result().gyro_bias_valid);
+    CHECK(approx(small.result().gyro_bias_dps[2], 3.0, 0.01));
+
+    // A steady 40 deg/s rotation has zero variance but cannot be bias.
+    flight::StartupCalibrator spinning(config);
+    sample.gz_dps = 40.0;
+    spinning.update(0);
+    for (int i = 0; i < 20; ++i) spinning.add_imu(sample);
+    spinning.update(1000);
+    CHECK(!spinning.complete());  // refused, and it keeps trying until the timeout
+
+    // Once the rotation stops, calibration settles normally.
+    sample.gz_dps = 1.0;
+    for (int i = 0; i < 20; ++i) spinning.add_imu(sample);
+    spinning.update(2000);
+    CHECK(spinning.complete());
+    CHECK(approx(spinning.result().gyro_bias_dps[2], 1.0, 0.01));
+}
+
 // The sensor timing model, pinned to the BMP280 datasheet's own published presets.
 void test_sensor_timing_model() {
     using flight::sensors::BaroFilter;
@@ -1246,6 +1286,7 @@ int main(int argc, char** argv) {
     test_controller_drops_optional_fields_before_overrunning_the_budget();
     test_gps_coordinate_validation();
     test_orientation_blends_across_the_wrap();
+    test_calibration_rejects_a_steady_rotation_as_bias();
     test_sensor_timing_model();
     test_config_sensor_rate_guard();
     test_controller_ignores_repeated_barometer_samples();

@@ -54,6 +54,12 @@ $CXX $CXXFLAGS ${INC[@]} \
   "$ROOT/firmware/flight-computer/tests/flight_tests.cpp" \
   -o "$OUT/flight_tests"
 
+echo "== compiling emit_mission =="
+# The vehicle half of the end-to-end test: runs the real controller through a scripted
+# mission and prints the packets it transmits, for the Python pipeline to consume.
+# shellcheck disable=SC2068
+$CXX $CXXFLAGS ${INC[@]}   ${COMMON_SRC[@]} ${FLIGHT_CORE_SRC[@]}   "$ROOT/firmware/flight-computer/tests/emit_mission.cpp"   -o "$OUT/emit_mission"
+
 echo "== compiling sx1278_tests =="
 # The LoRa driver reaches hardware only through a callback struct, so its whole register
 # sequence runs here against a fake register bank -- no radio, no SDK.

@@ -8,6 +8,38 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 13)
+
+### Fixed — the bridge could have rebooted whenever the operator closed the dashboard
+
+The ground-station bridge wrote every frame to USB CDC and flushed it, with no check that a
+host was listening. Writing to a USB endpoint with no host attached can block until the
+SDK's stdout timeout expires on **every** write, and the bridge runs under a 3 s watchdog:
+"the operator closed the laptop lid" would have become a reboot loop, in the one component
+whose stated requirement is to keep running when the PC does not. Output is now dropped
+while no host is listening, counted, and reported in the bridge's status line as
+`dropped=`. The flight computer never writes to stdout at all, so it was never exposed.
+
+### Fixed — a vehicle turning steadily on the pad had its rotation absorbed as gyro bias
+
+Startup calibration gated on gyro *variance*, which a constant rotation passes trivially: a
+vehicle spinning steadily on the pad looks perfectly still to a standard-deviation test.
+Its rotation was then subtracted as bias for the rest of the flight. The mean is now bounded
+too, at 25 deg/s — beyond the MPU-6050 datasheet's ±20 deg/s zero-rate offset, so anything
+larger is motion, not bias, and the calibration is refused rather than silently wrong.
+
+### Added — a cross-language end-to-end integration test
+
+`emit_mission` runs the real flight controller through a scripted ascent and descent;
+`test_end_to_end.py` pushes its packets through the real ground station — framing, CRC,
+parser, validator, logger, CSV export — and checks the two halves against each other rather
+than each against its own idea of the format. 13 checks, including a dropped packet, a
+corrupted frame, and an unframed link.
+
+Host total: **1326 automated checks.**
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 12)
 
 ### Changed — the project documents now reflect the second development pass

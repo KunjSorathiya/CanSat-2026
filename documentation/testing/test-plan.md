@@ -52,11 +52,11 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 33 suites across the whole flight core | ✅ **506 / 506 assertions** |
+| `flight_tests` | 34 suites across the whole flight core | ✅ **512 / 512 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 7 modules | ✅ **63 / 63 tests** |
+| Python ground station | 8 modules | ✅ **76 / 76 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **30 / 30 tests** |
 | Pico syntax check | 10 translation units | ✅ All OK |
@@ -110,7 +110,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 33 suites, 506 assertions
+### `flight_tests` — 34 suites, 512 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -188,6 +188,28 @@ falls to zero once the link drops instead of freezing at its last value.
 
 End-to-end counting and logging through the full pipeline; a CRC-error frame is recorded
 but never parsed; CSV export.
+
+---
+
+## End-to-end integration
+
+`ground-station/software/tests/test_end_to_end.py` runs the **real flight controller**
+(`emit_mission`, built by `tools/build_host.sh`) through a scripted ascent-and-descent
+mission, then pushes the packets it transmits through the **real ground station**: CRC
+framing, frame decoding, parsing, validation, logging and CSV export.
+
+Every other test checks one side of the system against its own idea of the format. This one
+checks the two halves against each other, across the C++/Python boundary, and it is the
+test that would catch a field-order, precision, packet-numbering or optional-field
+disagreement that per-side testing cannot see.
+
+13 checks: every transmitted packet survives the pipeline; no frame is reported corrupt;
+numbering is sequential from `P-001`; the values read at the ground station match the text
+the vehicle sent, field by field; GPS and diagnostic tags cross the boundary; the mission
+actually progresses past `READY`; altitude varies; every packet reaches both logs and the
+CSV export; a dropped packet is counted, not hidden; a corrupted frame is rejected by CRC
+rather than parsed, while the raw payload is still recorded; and the stream also survives an
+unframed link.
 
 ---
 

@@ -12,6 +12,9 @@
 #include "hardware/spi.h"
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
+#ifdef PICO_STDIO_USB
+#include "pico/stdio_usb.h"
+#endif
 #endif
 
 // The ground-station Pico is the physical LoRa bridge: RA-02 -> Pico -> USB serial -> PC.
@@ -46,7 +49,29 @@ bool radio_dio0(void*) { return gpio_get(PIN_DIO0) != 0; }
 std::uint32_t radio_millis(void*) { return to_ms_since_boot(get_absolute_time()); }
 #endif
 
+// The bridge must keep running when the PC application closes, crashes or is unplugged.
+// Writing to a USB CDC endpoint with no host attached can block until the SDK's stdout
+// timeout expires on every single write, and this bridge runs under a 3 s watchdog: a
+// blocking write would turn "the operator closed the dashboard" into a reboot loop.
+//
+// So output is dropped while no host is listening. Buffering it would be worse — the
+// operator wants the packet arriving now, not a backlog from before the laptop woke up,
+// and an unbounded backlog on a bridge with 264 kB of RAM is its own failure.
+bool host_listening() {
+#if defined(PICO_BUILD) && defined(PICO_STDIO_USB)
+    return stdio_usb_connected();
+#else
+    return true;
+#endif
+}
+
+std::uint32_t g_frames_dropped_no_host = 0;
+
 void emit(const std::string& payload) {
+    if (!host_listening()) {
+        ++g_frames_dropped_no_host;
+        return;
+    }
     const std::string frame = ground::frame_encode(payload);
     std::fwrite(frame.data(), 1, frame.size(), stdout);
     std::fflush(stdout);
@@ -123,8 +148,9 @@ int main() {
             last_status = now;
             char line[128];
             std::snprintf(line, sizeof(line),
-                          "#state=RX radio=%d frames=%lu rssi=%d snr=%.1f",
+                          "#state=RX radio=%d frames=%lu dropped=%lu rssi=%d snr=%.1f",
                           up ? 1 : 0, static_cast<unsigned long>(frames),
+                          static_cast<unsigned long>(g_frames_dropped_no_host),
                           radio.last_rssi_dbm(), static_cast<double>(radio.last_snr_db()));
             emit(line);
         }
