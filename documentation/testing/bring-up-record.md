@@ -39,6 +39,7 @@ fault on a shared bus is far harder to find with three devices on it than with o
 | Column | Means |
 |---|---|
 | **Predicted** | What this repository computes, with the document that computes it |
+| **Predicted Hz** | Gate 1 only, where the quantity is a rate and a meter can read it directly |
 | **How to measure** | The specific procedure, not "check it works" |
 | **Measured** | What you got. Blank if not done |
 | **Verdict** | ✅ within tolerance · ⚠️ outside but usable · ❌ needs action |
@@ -51,18 +52,40 @@ pass/fail matrix is in [test-plan.md](test-plan.md#hardware-test-plan). This doc
 
 ## Gate 1 · Bare Pico
 
-| # | Quantity | Predicted | How to measure | Measured | Verdict |
-|---|---|---|---|---|---|
-| 1.1 | Status LED blink, `READY` unarmed | 900 ms period | Stopwatch over 10 blinks, divide | | |
-| 1.2 | Status LED blink, `READY` armed | 400 ms period | Same, after the arming delay | | |
-| 1.3 | Status LED blink, `FLIGHT` | 100 ms period | Same | | |
-| 1.4 | USB serial enumerates | Appears as a serial port | Device manager / `ls /dev/tty*` | **Yes.** Both Picos enumerate; the ground bridge came up as `COM4`, and the port appears and disappears with the cable | ✅ 2026-09-05 / KS |
-| 1.5 | Boot to first telemetry attempt | < 1 s | Log timestamps from power-on | **Deferred — not measurable at this gate.** See the note below | — |
-| 1.6 | Bridge status cadence, no radio attached | 1000 ms (`STATUS_PERIOD_MS`) | Watch the `#state=RX` line in a serial monitor | **1 Hz, steady, no gaps** over a continuous run | ✅ 2026-09-05 / KS |
-| 1.7 | USB frame integrity | Length and CRC-16/CCITT match the payload | Decode one captured frame by hand against `frame_encode()` | **Byte-exact.** `$51,56b5,` against a 51-character payload whose CRC independently computes to `56b5` | ✅ 2026-09-05 / KS |
+| # | Quantity | Predicted | Predicted Hz | How to measure | Measured | Verdict |
+|---|---|---|---|---|---|---|
+| 1.1 | Status LED blink, `READY` unarmed | 900 ms on, 900 ms off — **1800 ms full cycle** | **0.56 Hz** | Stopwatch over 10 **full cycles**, divide by 10; or the meter's `Hz` range on GP14 | | |
+| 1.2 | Status LED blink, `READY` armed | 400 ms on, 400 ms off — **800 ms full cycle** | **1.25 Hz** | Same, after the arming delay | | |
+| 1.3 | Status LED blink, `FLIGHT` | 100 ms on, 100 ms off — **200 ms full cycle** | **5 Hz** | Same | | |
+| 1.4 | USB serial enumerates | Appears as a serial port | — | Device manager / `ls /dev/tty*` | **Yes.** Both Picos enumerate; the ground bridge came up as `COM4`, and the port appears and disappears with the cable | ✅ 2026-09-05 / KS |
+| 1.5 | Boot to first telemetry attempt | < 1 s | — | Log timestamps from power-on | **Deferred — not measurable at this gate.** See the note below | — |
+| 1.6 | Bridge status cadence, no radio attached | 1000 ms (`STATUS_PERIOD_MS`) | 1 Hz | Watch the `#state=RX` line in a serial monitor | **1 Hz, steady, no gaps** over a continuous run | ✅ 2026-09-05 / KS |
+| 1.7 | USB frame integrity | Length and CRC-16/CCITT match the payload | — | Decode one captured frame by hand against `frame_encode()` | **Byte-exact.** `$51,56b5,` against a 51-character payload whose CRC independently computes to `56b5` | ✅ 2026-09-05 / KS |
 
 > Blink rates come from `update_led()` in `controller.cpp`. They are the only diagnostic
 > visible on a sealed vehicle, so confirm all three before the structure closes.
+
+> **Read the predicted numbers carefully — they are half-periods, not blink rates.**
+> `update_led()` computes `on = (mission_ms / period) % 2 == 0`, so `period` is the time the
+> LED spends **on**, and the same again **off**. A "900 ms" state therefore blinks once every
+> **1800 ms**. Timing ten blinks and dividing by ten gives 1800, which is correct behaviour
+> and would read as a 2× failure against a row that only said "900 ms period". That is why
+> these rows now state on-time, full cycle and frequency separately.
+>
+> The complete map, for whichever state the vehicle is actually in when you measure:
+>
+> | `MissionState` | On / off | Full cycle | Frequency |
+> |---|---:|---:|---:|
+> | `init`, `self_test` | **solid on** | — | — |
+> | `ready`, unarmed | 900 ms | 1800 ms | 0.56 Hz |
+> | `ready`, armed | 400 ms | 800 ms | 1.25 Hz |
+> | `flight` | 100 ms | 200 ms | 5 Hz |
+> | `landed`, `recovery` | 250 ms | 500 ms | 2 Hz |
+> | `fault` | 60 ms | 120 ms | 8.3 Hz |
+>
+> **A meter's `Hz` range on GP14 beats a stopwatch** for 1.2 and 1.3, and needs no LED. Many
+> meters will not lock onto 0.56 Hz, so 1.1 may still want the stopwatch. `solid on` at
+> power-up is its own check: it says the firmware reached `update_led()` at all.
 
 > **1.1–1.3 are not yet takeable, and the reason is not a fault.** The status LED is on
 > **GP14, an external LED** — the Pico's own LED on GP25 is not driven by this firmware, so a
