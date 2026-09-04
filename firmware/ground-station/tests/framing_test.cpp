@@ -74,6 +74,27 @@ void test_resync_after_garbage() {
     CHECK(payload == "PAYLOAD-B");
 }
 
+// A header truncated mid-CRC -- a dropped byte, a receiver that lost lock -- is followed
+// immediately by the next frame's own '$'. Discarding that byte as part of the resync
+// would cost the following frame as well, turning one corrupted header into two lost
+// packets.
+void test_a_truncated_header_does_not_swallow_the_next_frame() {
+    ground::FrameReader reader;
+    ground::FrameReader::Status last;
+    std::string payload;
+    // "$9,ab" is a header cut off inside its CRC field; the next frame starts right after.
+    feed_all(reader, std::string("$9,ab") + ground::frame_encode("PAYLOAD-B"), last, payload);
+    CHECK(reader.frames_ok() == 1);
+    CHECK(payload == "PAYLOAD-B");
+    CHECK(reader.resyncs() == 1);
+
+    // The same for a length field interrupted by a new frame.
+    ground::FrameReader second;
+    feed_all(second, std::string("$12") + ground::frame_encode("PAYLOAD-C"), last, payload);
+    CHECK(second.frames_ok() == 1);
+    CHECK(payload == "PAYLOAD-C");
+}
+
 void test_payload_with_newline_survives() {
     // Length-based read means an embedded newline in a (corrupt) payload is still framed.
     const std::string packet = "abc\ndef";
@@ -96,6 +117,7 @@ int main() {
     test_roundtrip();
     test_crc_detects_corruption();
     test_resync_after_garbage();
+    test_a_truncated_header_does_not_swallow_the_next_frame();
     test_payload_with_newline_survives();
     test_known_crc_vector();
     if (failures == 0) {

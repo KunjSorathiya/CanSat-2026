@@ -106,6 +106,7 @@ class FrameDecoder:
                 else:
                     self._state = "crc"
             elif ch == b"$":
+                self.resyncs += 1
                 self._len_text = b""
             else:
                 self.resyncs += 1
@@ -122,6 +123,13 @@ class FrameDecoder:
                 self._state = "payload"
                 if self._expected == 0:
                     return self._finish()
+            elif ch == b"$":
+                # A '$' here means the header being read was corrupt and this byte starts
+                # the next frame. Dropping it would cost that frame too, so the header
+                # restarts on it instead. Mirrors framing.cpp and the web console.
+                self.resyncs += 1
+                self._reset()
+                self._state = "len"
             else:
                 self.resyncs += 1
                 self._reset()

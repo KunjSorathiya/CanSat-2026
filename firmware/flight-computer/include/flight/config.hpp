@@ -202,6 +202,21 @@ struct Configuration {
     std::uint32_t gps_baud = 9600;          // NEO-6M default
     std::uint32_t gps_uart_fifo_bytes = 32; // RP2040 UART FIFO depth
 
+    // The NMEA parser holds its last good fix indefinitely: it has no clock and cannot
+    // know the receiver stopped talking. Left alone, a GPS whose lead is pulled off at
+    // parachute deployment keeps a frozen position in every remaining packet, and the
+    // recovery team is sent to where the payload was, not where it is.
+    //
+    // The NEO-6M's default navigation rate is 1 Hz, so a live receiver refreshes its fix
+    // every 1000 ms. Three missed updates is the threshold for calling the position
+    // stale -- long enough to ride out a sentence lost to a checksum error, short enough
+    // that a frozen position never survives more than a few telemetry packets.
+    std::uint32_t gps_fix_timeout_ms = 3000;
+    // Silence on the UART itself. A receiver with no sky view still emits empty
+    // sentences continuously, so no bytes at all means the module is gone rather than
+    // merely unfixed. Used for the health report, not for rejecting a fix.
+    std::uint32_t gps_silence_after_ms = 3000;
+
     // ---- GPS optional-field precision (rulebook unspecified) --------------
     int gps_latlon_decimals = 6;
     int gps_alt_decimals = 1;

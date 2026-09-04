@@ -16,20 +16,20 @@ configuration under `.claude/`)
 > preserved as the record of that run.
 >
 > **Pass 2** was a deeper engineering review of the same software, and it found
-> substantially more — twenty-five further defects, F-12 to F-36, including several that
+> substantially more — thirty further defects, F-12 to F-41, including several that
 > would have produced a failed or mis-recorded flight. The headline: the telemetry rate the
 > project had chosen was one the radio physically could not deliver. Findings F-12 onward,
 > the [second-pass summary](#second-pass-summary) and the file-by-file rows marked with a
 > cycle number are from that pass.
 
-**Verdict:** ✅ **Pass. 29 defects found and fixed across both passes; the remaining open
+**Verdict:** ✅ **Pass. 34 defects found and fixed across both passes; the remaining open
 items all require hardware.**
 
 ---
 
 ## Second-pass summary
 
-Twenty-five findings, all fixed, all with regression tests. Grouped by what they would have
+Thirty findings, all fixed, all with regression tests. Grouped by what they would have
 cost:
 
 | Would have caused | Findings |
@@ -258,6 +258,11 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-34** | Reported battery voltage could not be told apart from a raw ADC pin voltage, and the ADC channel was hard-coded while the pin was configurable | Low | ✅ **Closed 2026-09-04 (cycle 22)** — `battery_voltage_is_scaled` in the health snapshot; channel derived from the pin |
 | **F-35** | The vertical-speed hold introduced in cycle 4 was unbounded, so a quiet or frozen barometer would have held a descent rate for ever — and the landing detector, which requires under 1 m/s, would never have fired | **Medium** | ✅ **Closed 2026-09-04 (cycle 23)** — bounded by `altitude_rate_hold_ms`; both the brief stall and the long one are tested |
 | **F-36** | After a watchdog reboot — a path the firmware explicitly supports — the ground station would have marked every remaining packet of the flight as a duplicate and out of order, making the loss statistics meaningless | **High** | ✅ **Closed 2026-09-04 (cycle 26)** — restart detection requiring both a counter reset and a clock regression, in `validator.py` and the web console; surfaced in all three interfaces |
+| **F-37** | A GPS that stopped talking mid-flight — a lead pulled off at parachute deployment, a browned-out module — left its last fix sitting in the NMEA parser, which has no clock and cannot know the receiver went quiet. The vehicle would have kept transmitting that position in every remaining packet, sending the recovery team to where the payload was minutes earlier rather than where it is | **High** | ✅ **Closed 2026-09-04 (cycle 28)** — the driver stamps each renewed fix, and the controller uses a fix only while it is younger than `gps_fix_timeout_ms` (default 3000 ms, three NEO-6M navigation periods); past that the position is withdrawn from telemetry and `gps_unavailable` is raised |
+| **F-38** | `PicoGps::poll()` reported the receiver healthy and freshly updated on every tick whether or not a single byte had ever arrived, so a GPS that was never plugged in was indistinguishable from a working one in the health record | Medium | ✅ **Closed 2026-09-04 (cycle 28)** — health is now derived from the clock of the last byte actually received, against `gps_silence_after_ms` |
+| **F-39** | The Pico GPS adapter opened its UART at a hard-coded 9600 baud while `config.gps_baud` existed and `validate_config()` sized the flight loop's tick against it. Changing the configured rate would have moved the guard without moving the hardware, leaving the loop validated against a baud rate the UART was not using | Medium | ✅ **Closed 2026-09-04 (cycle 28)** — the adapter takes the rate from the configuration it is validated against |
+| **F-40** | The GPS was polled on the raw boot clock while every other sensor was polled on the mission clock, putting two different time bases in one health structure and making any age computed from it wrong | Low | ✅ **Closed 2026-09-04 (cycle 28)** — all sensors are polled on the mission clock |
+| **F-41** | In all three frame decoders a `$` arriving inside a corrupt header was discarded as part of the resync. That byte is the start of the *next* frame, so one corrupted header cost two packets instead of one | Low | ✅ **Closed 2026-09-04 (cycle 28)** — the header restarts on the `$` in `framing.cpp`, `transport.py` and the web console; regression tests in all three |
 
 ---
 

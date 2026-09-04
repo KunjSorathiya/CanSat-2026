@@ -90,6 +90,13 @@ FrameReader::Status FrameReader::feed(char byte, std::string& out) {
                     ++resyncs_;
                     reset_frame();
                 }
+            } else if (byte == '$') {
+                // A '$' here means the header we were reading was corrupt and this byte
+                // starts the next frame. Dropping it would cost that frame as well, so
+                // the header restarts on it instead.
+                ++resyncs_;
+                reset_frame();
+                state_ = State::len;
             } else if (byte == ',' && crc_text_.size() == 4) {
                 state_ = State::payload;
                 if (expected_ == 0) {

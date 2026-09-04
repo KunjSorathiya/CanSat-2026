@@ -46,13 +46,16 @@ private:
 
 class PicoGps final : public Gps {
 public:
+    explicit PicoGps(const Configuration& config) : config_(config) {}
     bool initialize() override;
     void poll(std::uint64_t now_ms) override;
     bool latest(cansat::GpsData& data) const override;
+    std::uint64_t last_fix_ms() const override { return device_.last_fix_ms(); }
     std::uint32_t checksum_errors() const override { return device_.checksum_errors(); }
     SensorHealth health() const override { return health_; }
 
 private:
+    const Configuration& config_;
     pico::Neo6mGps device_;
     SensorHealth health_;
 };

@@ -175,7 +175,7 @@ flowchart TD
     B -- no --> C["epoch_ms = now_ms"]
     B -- yes --> D["mission_ms = now_ms - epoch_ms"]
     C --> D
-    D --> E["gps.poll — bounded UART drain, never blocks on a fix"]
+    D --> E["gps.poll(mission_ms) — bounded UART drain, never blocks on a fix"]
     E --> F{"sensor task due? 33 ms"}
     F -- yes --> G["acquire_sensors"]
     F -- no --> H["run_calibration"]
@@ -225,7 +225,7 @@ flowchart TD
     K -- yes --> M["AGL = altitude - ground baseline"]
     M --> N["vertical rate EWMA, 0.7 old and 0.3 new"]
     N --> O["snapshot altitude, pressure, temperature"]
-    L --> P["gps.latest — fix optional, never blocks"]
+    L --> P["gps.latest + last_fix_ms — a fix is used only while it is being renewed"]
     O --> P
 ```
 
@@ -381,7 +381,7 @@ timestamps. `clear()` marks recovery but keeps the history.
 | `imu_stale` / `baro_stale` | error | No good read for 2 s | Affected fields invalid; both stale is critical |
 | `orientation_invalid` | error | The estimator has no valid attitude | Roll, pitch and yaw invalid, so the packet is suppressed |
 | `sensor_implausible` | warning | A reading falls outside datasheet bounds | The sample and the previous value are both dropped |
-| `gps_unavailable` | warning | GPS initialisation fails | Optional fields omitted; mission unaffected |
+| `gps_unavailable` | warning | The GPS fails to initialise, has no fix, or has stopped refreshing its fix for longer than `gps_fix_timeout_ms` (default 3000 ms) | Optional GPS fields are omitted rather than repeating a position the receiver is no longer confirming; mission unaffected |
 | `sd_unavailable` / `sd_write` | warning | SD init fails, or a write fails | Logging disables itself after 10 consecutive failures |
 | `radio_init` / `radio_tx` | error | Init fails, or 5 consecutive transmit failures | Bounded re-init plus back-off |
 | `battery_low` | warning | Below `battery_low_voltage`, only when a divider ratio is configured | Reported; no mission change |
@@ -524,7 +524,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 36 C++ suites with 537 assertions, plus the LoRa driver (94) and the microSD driver (581) against simulated devices, 109 Python tests including an end-to-end trace, and 30 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 43 C++ suites with 676 assertions, plus the LoRa driver (94) and the microSD driver (581) against simulated devices, 126 Python tests including an end-to-end trace, and 36 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |

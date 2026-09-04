@@ -27,7 +27,12 @@ void Neo6mGps::poll(std::uint64_t now_ms) {
     int budget = kMaxBytesPerPoll;
     while (budget-- > 0 && uart_is_readable(uart_)) {
         const char ch = static_cast<char>(uart_getc(uart_));
-        parser_.consume(ch);
+        // A sentence that completes and carries a fix stamps the fix clock. The parser
+        // holds its last good fix indefinitely, so this stamp is the only evidence that
+        // the position being reported is current rather than a memory of one.
+        if (parser_.consume(ch) && parser_.has_fix()) {
+            last_fix_ms_ = now_ms;
+        }
         last_byte_ms_ = now_ms;
     }
 }

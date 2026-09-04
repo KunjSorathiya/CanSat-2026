@@ -64,20 +64,34 @@ public:
         health_.initialized = health_.healthy = true;
         return true;
     }
-    void poll(std::uint64_t now_ms) override { health_.last_update_ms = now_ms; }
+    // A live receiver refreshes its fix on every poll. Set `silent` to simulate one that
+    // has stopped talking -- an unplugged lead, a browned-out module -- which leaves the
+    // last fix in the parser but stops the clock that says how old it is.
+    void poll(std::uint64_t now_ms) override {
+        health_.last_update_ms = now_ms;
+        if (silent) {
+            health_.healthy = false;
+            return;
+        }
+        health_.healthy = true;
+        if (fix.valid) last_fix_ms_ = now_ms;
+    }
     bool latest(cansat::GpsData& data) const override {
         data = fix;
         return fix.valid;
     }
+    std::uint64_t last_fix_ms() const override { return last_fix_ms_; }
     std::uint32_t checksum_errors() const override { return checksum_error_count; }
     SensorHealth health() const override { return health_; }
 
     cansat::GpsData fix{18.0, 73.0, 20.0, true, 0.0, false, 8};
     bool fail_init = false;
+    bool silent = false;
     std::uint32_t checksum_error_count = 0;
 
 private:
     SensorHealth health_;
+    std::uint64_t last_fix_ms_ = 0;
 };
 
 class MockRadio final : public Radio {

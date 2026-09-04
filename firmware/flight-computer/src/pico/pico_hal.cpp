@@ -100,16 +100,27 @@ bool PicoBarometer::read(BaroSample& out, std::uint64_t now_ms) {
 
 // ---- GPS ----
 bool PicoGps::initialize() {
-    const bool ok = device_.begin(uart0, BoardPins::gps_tx, BoardPins::gps_rx, 9600);
+    // The baud rate is configuration, not a literal: validate_config() sizes the flight
+    // loop's tick against the time this rate takes to fill the RP2040's 32-byte UART
+    // FIFO, and that reasoning is only sound if the UART is actually opened at the rate
+    // it was given.
+    const bool ok = device_.begin(uart0, BoardPins::gps_tx, BoardPins::gps_rx,
+                                  config_.gps_baud);
     health_.initialized = ok;
-    health_.healthy = ok;
+    // A UART opens whether or not a receiver is attached to it -- nothing has been heard
+    // from the module yet, so nothing is claimed about it.
+    health_.healthy = false;
     return ok;
 }
 
 void PicoGps::poll(std::uint64_t now_ms) {
     device_.poll(now_ms);
-    health_.last_update_ms = now_ms;
-    health_.healthy = true;
+    // Report what the receiver actually did, not that we asked it to. A GPS whose lead
+    // is off, whose regulator has browned out, or that never powered up leaves this
+    // clock frozen; claiming health here would hide a dead module for a whole flight.
+    health_.last_update_ms = device_.last_byte_ms();
+    health_.healthy = device_.started() && device_.last_byte_ms() != 0 &&
+                      (now_ms - device_.last_byte_ms()) <= config_.gps_silence_after_ms;
 }
 
 bool PicoGps::latest(cansat::GpsData& data) const { return device_.latest(data); }
@@ -147,7 +158,7 @@ bool PicoBarometer::initialize() { return false; }
 bool PicoBarometer::read(BaroSample&, std::uint64_t) { return false; }
 
 bool PicoGps::initialize() { return false; }
-void PicoGps::poll(std::uint64_t) {}
+void PicoGps::poll(std::uint64_t) { health_.healthy = false; }
 bool PicoGps::latest(cansat::GpsData&) const { return false; }
 
 void PicoBoardIo::set_status_led(bool) {}

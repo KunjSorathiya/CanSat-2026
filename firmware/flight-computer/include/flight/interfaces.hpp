@@ -60,6 +60,12 @@ public:
     virtual bool initialize() = 0;
     virtual void poll(std::uint64_t now_ms) = 0;
     virtual bool latest(cansat::GpsData& data) const = 0;
+    // Mission-clock reading at which the fix returned by latest() was last refreshed by
+    // the receiver; zero if no fix has ever been parsed. A receiver that goes silent --
+    // a connector shaken loose, a browned-out module, a severed antenna lead -- leaves
+    // its last good fix in the parser forever, so the caller needs this to tell a live
+    // position from a frozen one.
+    virtual std::uint64_t last_fix_ms() const = 0;
     virtual std::uint32_t checksum_errors() const = 0;
     virtual SensorHealth health() const = 0;
 };

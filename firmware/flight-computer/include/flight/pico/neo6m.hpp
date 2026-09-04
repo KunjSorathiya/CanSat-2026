@@ -20,12 +20,18 @@ public:
     void poll(std::uint64_t now_ms);
     bool latest(cansat::GpsData& data) const;
     std::uint32_t checksum_errors() const { return parser_.checksum_errors(); }
+    // Clock reading passed to the poll() that last saw a byte arrive. Distinguishes a
+    // receiver that is talking but has no fix from one that has stopped talking at all.
     std::uint64_t last_byte_ms() const { return last_byte_ms_; }
+    // Clock reading passed to the poll() that last parsed a sentence carrying a fix.
+    std::uint64_t last_fix_ms() const { return last_fix_ms_; }
+    bool started() const { return ok_; }
 
 private:
     uart_bus_t uart_ = nullptr;
     NmeaParser parser_;
     std::uint64_t last_byte_ms_ = 0;
+    std::uint64_t last_fix_ms_ = 0;
     bool ok_ = false;
 };
 

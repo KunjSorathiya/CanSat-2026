@@ -52,14 +52,14 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 41 suites across the whole flight core | ✅ **664 / 664 assertions** |
+| `flight_tests` | 43 suites across the whole flight core | ✅ **676 / 676 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **91 / 91 tests** |
+| Python ground station | 8 modules | ✅ **93 / 93 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants | ✅ **61 / 61 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **34 / 34 tests** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **36 / 36 tests** |
 | Pico syntax check | 10 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `pico_hal`, `pico_radio`, `mpu6050`,
@@ -111,7 +111,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 41 suites, 664 assertions
+### `flight_tests` — 43 suites, 676 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -123,6 +123,8 @@ flowchart LR
 | `test_pressure_altitude` | The barometric formula produces the expected altitude for known pressures |
 | `test_orientation_levels_and_yaw` | Roll and pitch converge from the gravity vector; yaw integrates body rate and wraps correctly |
 | `test_gps_parser` | GGA and RMC parsing, checksum validation, fix and no-fix handling, malformed sentence rejection |
+| `test_a_frozen_gps_fix_is_not_reported_as_a_live_position` | A receiver that stops talking has its fix aged out of telemetry and raises `gps_unavailable`, instead of repeating the last position it saw for the rest of the flight |
+| `test_config_rejects_a_gps_timeout_faster_than_the_receiver` | A fix timeout shorter than one NEO-6M navigation period is refused, so a live fix cannot expire between its own updates |
 | `test_scheduler` | Fires at most once per period, and re-anchors after a stall instead of firing a catch-up burst |
 | `test_fault_manager` | Report, clear, occurrence counting, severity escalation, critical latching |
 | `test_state_machine_full_mission` | The full `INIT` to `RECOVERY` path with realistic inputs, including the 5 s post-impact window |
@@ -172,11 +174,11 @@ and out-of-order packets are detected; timestamp regressions are noted; implausi
 flagged while the packet is still kept; valid GPS is not flagged; diagnostic tags
 (`MODE`, `FAULTS`, `CAL`, `ARM`) are parsed.
 
-### `test_transport.py` — 9 tests
+### `test_transport.py` — 11 tests
 
-Framing: round-trip, CRC error reporting, the known CRC vector, resync after noise, frames
-split across chunks, status-frame detection. Transports: framed and plain file replay, and
-framed loopback.
+Framing: round-trip, CRC error reporting, the known CRC vector, resync after noise, a torn
+header that must not swallow the frame behind it, frames split across chunks,
+status-frame detection. Transports: framed and plain file replay, and framed loopback.
 
 ### `test_health.py` — 7 tests
 

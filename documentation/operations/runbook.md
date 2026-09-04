@@ -239,7 +239,7 @@ optional and appended by our firmware.
 | `FAULTS` | Count of currently active faults | Anything above 0 before launch |
 | `CAL` | 1 once calibration settled | Must be 1 before launch |
 | `ARM` | 1 once launch detection is enabled | Must be 1 before launch |
-| `GP-*` | GPS position, only when a fix exists | Absence is normal indoors and is not a fault |
+| `GP-*` | GPS position, only while the receiver keeps confirming a fix | Absence is normal indoors and is not a fault. Fields that were present and then disappear mid-flight mean the receiver stopped refreshing its fix — the vehicle withdraws the position rather than repeat a stale one, and raises `gps_unavailable`. Use the last logged fix for recovery, and note its timestamp |
 
 Link health on the ground station:
 
@@ -364,7 +364,7 @@ instead of overwriting earlier data.
 | Radio fails on the pad | Firmware retries with bounded back-off. If the LED shows `FAULT`, power-cycle. Onboard SD logging continues regardless |
 | SD failure | Logging disables itself after 10 consecutive write failures; the mission continues. Not flight-critical |
 | Another team is launching | Power your CanSat completely off. This is a rulebook restriction |
-| Vehicle lands out of sight | Keep the ground station recording — telemetry continues into `RECOVERY`, and the last GPS fix is in the log |
+| Vehicle lands out of sight | Keep the ground station recording — telemetry continues into `RECOVERY`, and the last GPS fix is in the log. Read its **timestamp**, not just its coordinates: the position stops being transmitted once the receiver stops confirming it, so the last logged fix is the last one the vehicle actually stood behind |
 
 ---
 

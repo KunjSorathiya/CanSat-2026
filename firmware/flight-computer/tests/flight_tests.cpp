@@ -762,7 +762,7 @@ void test_fault_severity_never_falls_while_active() {
     // the fixed array.
     for (std::size_t i = 0; i < static_cast<std::size_t>(flight::FaultCode::count); ++i) {
         const char* name = flight::fault_name(static_cast<flight::FaultCode>(i));
-        CHECK(name != nullptr && name[0] != ' ');
+        CHECK(name != nullptr && name[0] != '\0');
     }
     flight::FaultManager guarded;
     guarded.report(flight::FaultCode::count, flight::FaultSeverity::critical, 0);
@@ -1599,6 +1599,69 @@ void test_shared_protocol_fixtures(const std::string& repo_root) {
     CHECK(cases >= 30);  // the whole fixture set, not a truncated read
 }
 
+// A GPS whose lead is pulled off -- at parachute deployment, or by the impact -- leaves
+// its last good fix sitting in the NMEA parser. The parser has no clock and cannot know
+// the module stopped talking, so without an age check the vehicle would keep reporting
+// that position in every remaining packet and the recovery team would be sent to where
+// the payload was several minutes earlier.
+void test_a_frozen_gps_fix_is_not_reported_as_a_live_position() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    c.telemetry_period_ms = 500;
+    c.radio.bandwidth_hz = 250000;  // 2 Hz needs the wider modem (link-budget.md)
+    c.gps_fix_timeout_ms = 3000;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    // A talking receiver: the fix reaches telemetry.
+    for (std::uint64_t t = 0; t <= 1000; t += 500) ctrl.poll(t);
+    CHECK(radio.packets.back().find("GP-Lat-") != std::string::npos);
+
+    // The lead comes off. latest() still hands out the same fix -- the parser kept it --
+    // but nothing renews it, so it must age out rather than be transmitted forever.
+    gps.silent = true;
+    for (std::uint64_t t = 1500; t <= 3500; t += 500) ctrl.poll(t);
+    // 2.5 s old: inside the timeout, still trusted.
+    CHECK(radio.packets.back().find("GP-Lat-") != std::string::npos);
+
+    for (std::uint64_t t = 4000; t <= 6000; t += 500) ctrl.poll(t);
+    // Past the timeout: the position is withdrawn from the packet, not frozen into it.
+    CHECK(radio.packets.back().find("GP-Lat-") == std::string::npos);
+
+    // The loss is announced rather than passed over in silence.
+    CHECK(ctrl.faults().active(flight::FaultCode::gps_unavailable));
+
+    // The receiver comes back: the fix is trusted again, and the fault clears.
+    gps.silent = false;
+    for (std::uint64_t t = 6500; t <= 7500; t += 500) ctrl.poll(t);
+    CHECK(radio.packets.back().find("GP-Lat-") != std::string::npos);
+    CHECK(!ctrl.faults().active(flight::FaultCode::gps_unavailable));
+}
+
+// The fix timeout is bounded below by the receiver's own navigation rate: a timeout
+// shorter than one update period would expire a live fix between updates.
+void test_config_rejects_a_gps_timeout_faster_than_the_receiver() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    std::string why;
+    CHECK(flight::validate_config(c, why));
+
+    c.gps_fix_timeout_ms = 500;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("gps_fix_timeout_ms") != std::string::npos);
+
+    c.gps_fix_timeout_ms = 3000;
+    c.gps_silence_after_ms = 250;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("gps_silence_after_ms") != std::string::npos);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1628,6 +1691,8 @@ int main(int argc, char** argv) {
     test_landing_is_not_declared_during_a_steady_descent();
     test_battery_voltage_reports_whether_it_is_scaled();
     test_loop_tick_is_bounded_by_the_gps_uart_fifo();
+    test_a_frozen_gps_fix_is_not_reported_as_a_live_position();
+    test_config_rejects_a_gps_timeout_faster_than_the_receiver();
     test_sensor_timing_model();
     test_config_sensor_rate_guard();
     test_controller_ignores_repeated_barometer_samples();

@@ -104,8 +104,10 @@ void Controller::poll(std::uint64_t now_ms) {
     const std::uint64_t mission_ms = now_ms - epoch_ms_;
     mission_ms_ = mission_ms;
 
-    // GPS first: bounded, non-blocking drain of the UART buffer.
-    gps_.poll(now_ms);
+    // GPS first: bounded, non-blocking drain of the UART buffer. It is polled on the
+    // mission clock, like every other sensor, so that fix ages and health timestamps are
+    // all comparable against one another.
+    gps_.poll(mission_ms);
 
     if (sensor_task_.due(mission_ms)) {
         acquire_sensors(mission_ms);
@@ -277,12 +279,23 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
     }
 
     // ---- GPS snapshot (never blocks) ----
+    // A fix is only used while the receiver keeps refreshing it. The NMEA parser has no
+    // clock of its own and holds its last good fix forever, so without this age check a
+    // receiver that stopped talking mid-descent would keep publishing the position it
+    // last saw as though the vehicle were still there.
     cansat::GpsData gps{};
-    if (gps_.latest(gps)) {
+    // latest() reports that a fix exists; last_fix_ms() reports when it was last renewed.
+    // A driver that never stamps leaves the age equal to the mission clock, so an
+    // unstamped fix expires on its own rather than being trusted indefinitely.
+    const std::uint64_t fix_ms = gps_.last_fix_ms();
+    const bool fix_fresh = mission_ms >= fix_ms &&
+                           (mission_ms - fix_ms) <= config_.gps_fix_timeout_ms;
+    if (gps_.latest(gps) && fix_fresh) {
         snapshot_.gps = gps;
         faults_.clear(FaultCode::gps_unavailable);
     } else {
         snapshot_.gps.valid = false;
+        faults_.report(FaultCode::gps_unavailable, FaultSeverity::warning, mission_ms);
     }
 
     if (!imu_implausible && !baro_implausible) {

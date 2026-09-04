@@ -119,6 +119,26 @@ test("the decoder resynchronises after leading noise", () => {
   assert.equal(frames[0].payload, "after noise");
 });
 
+test("a truncated header does not swallow the next frame", () => {
+  // A header cut off inside its CRC field is followed immediately by the next frame's
+  // own '$'. Discarding that byte as part of the resync would cost the following frame
+  // too, turning one corrupted header into two lost packets. Mirrors framing.cpp.
+  const decoder = new M.FrameDecoder();
+  const noise = [...new TextEncoder().encode("$9,ab")];
+  const frames = [...decoder.feed(noise.concat(M.frameEncode("after a torn header")))];
+  assert.equal(frames.length, 1);
+  assert.equal(frames[0].payload, "after a torn header");
+  assert.equal(decoder.resyncs, 1);
+});
+
+test("a truncated length field does not swallow the next frame", () => {
+  const decoder = new M.FrameDecoder();
+  const noise = [...new TextEncoder().encode("$12")];
+  const frames = [...decoder.feed(noise.concat(M.frameEncode("after a torn length")))];
+  assert.equal(frames.length, 1);
+  assert.equal(frames[0].payload, "after a torn length");
+});
+
 test("a frame split across chunks is reassembled", () => {
   const bytes = M.frameEncode("split across reads");
   const decoder = new M.FrameDecoder();

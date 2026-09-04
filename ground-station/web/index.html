@@ -753,13 +753,16 @@ class FrameDecoder {
     if (this.state === "len") {
       if (ch >= "0" && ch <= "9") { this.len += ch; if (this.len.length > 6) { this.resyncs++; this.reset(); } }
       else if (ch === "," && this.len) { this.expected = +this.len; if (this.expected > 512) { this.resyncs++; this.reset(); } else this.state = "crc"; }
-      else if (ch === "$") this.len = "";
+      else if (ch === "$") { this.resyncs++; this.len = ""; }
       else { this.resyncs++; this.reset(); }
       return null;
     }
     if (this.state === "crc") {
       if (/[0-9a-fA-F]/.test(ch)) { this.crc += ch; if (this.crc.length > 4) { this.resyncs++; this.reset(); } }
       else if (ch === "," && this.crc.length === 4) { this.state = "payload"; if (this.expected === 0) return this._finish(); }
+      // A '$' here means the header being read was corrupt and this byte starts the next
+      // frame. Dropping it would cost that frame too, so the header restarts on it.
+      else if (ch === "$") { this.resyncs++; this.reset(); this.state = "len"; }
       else { this.resyncs++; this.reset(); }
       return null;
     }

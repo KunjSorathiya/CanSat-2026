@@ -72,6 +72,17 @@ bool validate_config(const Configuration& config, std::string& why) {
         why = "sensor_period_ms cannot be shorter than loop_tick_ms";
         return false;
     }
+    // A NEO-6M at its default settings renews the fix once a second. A timeout shorter
+    // than one navigation period would expire a perfectly live fix between updates and
+    // drop GPS out of telemetry for a fault that does not exist.
+    if (config.gps_fix_timeout_ms < 1000) {
+        why = "gps_fix_timeout_ms must be >= 1000 (one NEO-6M navigation period)";
+        return false;
+    }
+    if (config.gps_silence_after_ms < 1000) {
+        why = "gps_silence_after_ms must be >= 1000 (one NEO-6M navigation period)";
+        return false;
+    }
     if (config.post_impact_transmission_ms < 5000) {
         why = "post_impact_transmission_ms must be >= 5000 (rulebook post-impact minimum)";
         return false;

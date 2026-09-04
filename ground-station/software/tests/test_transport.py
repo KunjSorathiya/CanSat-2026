@@ -36,6 +36,22 @@ class FramingTests(unittest.TestCase):
         frames = list(decoder.feed(frame_encode(b"#state=RX radio=1")))
         self.assertEqual(frames[0].kind, "status")
 
+    def test_a_truncated_header_does_not_swallow_the_next_frame(self):
+        # A header cut off inside its CRC field is followed immediately by the next
+        # frame's own '$'. Discarding that byte as part of the resync would cost the
+        # following frame too, turning one corrupted header into two lost packets.
+        decoder = FrameDecoder()
+        frames = list(decoder.feed(b"$9,ab" + frame_encode(PACKET.encode())))
+        self.assertEqual(len(frames), 1)
+        self.assertEqual(frames[0].payload, PACKET)
+        self.assertEqual(decoder.resyncs, 1)
+
+    def test_a_truncated_length_does_not_swallow_the_next_frame(self):
+        decoder = FrameDecoder()
+        frames = list(decoder.feed(b"$12" + frame_encode(PACKET.encode())))
+        self.assertEqual(len(frames), 1)
+        self.assertEqual(frames[0].payload, PACKET)
+
     def test_crc_error_reported(self):
         raw = bytearray(frame_encode(PACKET.encode()))
         raw[-3] ^= 0x20  # corrupt a payload byte

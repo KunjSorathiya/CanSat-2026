@@ -57,7 +57,7 @@ int main() {
 
     flight::PicoImu imu(config);
     flight::PicoBarometer barometer(config);
-    flight::PicoGps gps;
+    flight::PicoGps gps(config);
     flight::PicoRadio radio(config);
     flight::PicoSdLogger logger;
     flight::PicoBoardIo board(config);
