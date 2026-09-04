@@ -924,6 +924,58 @@ void test_lora_airtime_reference_vectors() {
 }
 
 // ----------------------------------------------------------------------------
+// The SD log is read by spreadsheets and scripts that index columns by position, so every
+// row must have exactly as many columns as the header — with or without a GPS fix, whose
+// three fields are the easy ones to miscount.
+void test_sd_log_row_matches_its_header() {
+    const auto columns = [](const std::string& row) {
+        std::size_t count = 1;
+        for (const char c : row) {
+            if (c == ',') ++count;
+        }
+        return count;
+    };
+
+    flight::Configuration config;
+    config.team_id = "CAN-Team-07";
+    flight::TelemetryBuilder builder(config);
+
+    flight::SensorSnapshot snapshot;
+    snapshot.imu_valid = snapshot.baro_valid = snapshot.orientation_valid = true;
+    snapshot.altitude_m = 12.3;
+    snapshot.pressure_pa = 99000.12;
+    snapshot.temperature_c = 21.5;
+    snapshot.az_mps2 = 9.81;
+
+    const std::size_t header_columns = columns(flight::TelemetryBuilder::sd_header());
+
+    // Without a fix: the three GPS columns must still be present, just empty.
+    const auto without_gps = builder.build(1, 1000, snapshot);
+    CHECK(without_gps.has_value());
+    const std::string row_without =
+        builder.sd_line(*without_gps, flight::MissionState::ready, 0);
+    CHECK(columns(row_without) == header_columns);
+    CHECK(row_without.find(",0,,,,") != std::string::npos);  // gps_valid 0, three blanks
+
+    // With a fix: the same column count, now populated.
+    snapshot.gps.valid = true;
+    snapshot.gps.latitude = 21.1667;
+    snapshot.gps.longitude = 72.7833;
+    snapshot.gps.altitude = 15.0;
+    const auto with_gps = builder.build(2, 2000, snapshot);
+    CHECK(with_gps.has_value());
+    const std::string row_with =
+        builder.sd_line(*with_gps, flight::MissionState::flight, 3);
+    CHECK(columns(row_with) == header_columns);
+    CHECK(row_with.find(",1,21.166700,") != std::string::npos);
+
+    // The packet itself is the last column, so it can be recovered from the SD log alone.
+    CHECK(row_with.size() > with_gps->packet.size());
+    CHECK(row_with.compare(row_with.size() - with_gps->packet.size(),
+                           with_gps->packet.size(), with_gps->packet) == 0);
+    CHECK(row_with.find("FLIGHT") != std::string::npos);
+}
+
 void test_telemetry_builder() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
@@ -1368,6 +1420,7 @@ int main(int argc, char** argv) {
     test_link_profile_is_shared_by_both_ends();
     test_lora_airtime_reference_vectors();
     test_telemetry_builder();
+    test_sd_log_row_matches_its_header();
     test_raw_block_log();
     test_raw_block_log_survives_a_torn_header_write();
     test_controller_sequence_and_degradation();

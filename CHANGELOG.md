@@ -8,6 +8,43 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 15)
+
+### Changed — the flight image no longer carries iostreams
+
+An earlier pass removed `<regex>` from the shared telemetry library for exactly this
+reason. `<sstream>` and `<iomanip>` were still there: `format_packet()` built an
+`ostringstream` for **every one of the nine numeric fields**, `format_timestamp()` built
+another, `parse_packet()` used a `stringstream` to split on semicolons, and the SD log row
+used one more. iostreams pull in the locale machinery and a static initialiser, and they
+allocate — on the vehicle's telemetry hot path, once per second, for the whole flight.
+
+All of it is now `snprintf` and direct string building, which rounds identically.
+
+| Measure | Before | After |
+|---|---:|---:|
+| `telemetry.o` (`g++ -Os`) | 18,941 B | **17,278 B** |
+| Undefined iostream/locale symbols in `telemetry.o` | 6 | **0** |
+| Flight-core translation units referencing iostreams | 2 | **0** |
+
+The saving that matters is the libstdc++ iostream and locale code the linker no longer has
+to pull into the RP2040 image, and the per-packet allocations that no longer happen. Both
+are **unmeasured on the target**: there is no ARM toolchain here, so the honest claim is
+the symbol dependency, not a flash figure.
+
+### Added — the SD log's column count is now pinned
+
+Rewriting the CSV row by hand is exactly where a column can go missing, so
+`test_sd_log_row_matches_its_header` counts the columns in a row with and without a GPS fix
+and compares both against the header. It caught a missing comma in the no-fix path during
+this change — three empty GPS columns had become two — which would have shifted every
+column after it in the flight log. The output is also byte-identical to the previous
+implementation, checked by diffing both versions' rows.
+
+Host total: **1360 automated checks.**
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 14)
 
 ### Fixed — a power failure during a header write could erase the whole flight log

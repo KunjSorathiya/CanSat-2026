@@ -2,8 +2,7 @@
 
 #include <cmath>
 #include <cstddef>
-#include <iomanip>
-#include <sstream>
+#include <cstdio>
 
 namespace cansat {
 
@@ -14,10 +13,16 @@ bool TelemetryValidity::mandatory_valid() const {
 
 namespace {
 
+// Fixed-point formatting without <sstream>. This runs nine times per transmitted packet
+// on the vehicle, and iostreams drag in the locale machinery and a static initialiser for
+// code that only ever needs "%.*f". snprintf rounds identically.
 std::string number(double value, int precision) {
-    std::ostringstream output;
-    output << std::fixed << std::setprecision(precision) << value;
-    return output.str();
+    char buffer[64];
+    const int written = std::snprintf(buffer, sizeof(buffer), "%.*f", precision, value);
+    if (written <= 0) return std::string();
+    return std::string(buffer, static_cast<std::size_t>(written < static_cast<int>(sizeof(buffer))
+                                                            ? written
+                                                            : sizeof(buffer) - 1));
 }
 
 bool finite(double value) { return std::isfinite(value); }
@@ -117,11 +122,14 @@ std::string format_timestamp(std::uint64_t timestamp_ms) {
     // lasts minutes; only a bench rig left powered can reach the wrap.
     const auto hours = (total_minutes / 60) % 100;
 
-    std::ostringstream output;
-    output << std::setfill('0') << std::setw(2) << hours << ':'
-           << std::setw(2) << minutes << ':' << std::setw(2) << seconds << ':'
-           << std::setw(3) << milliseconds;
-    return output.str();
+    char buffer[16];
+    const int written = std::snprintf(buffer, sizeof(buffer), "%02u:%02u:%02u:%03u",
+                                      static_cast<unsigned>(hours),
+                                      static_cast<unsigned>(minutes),
+                                      static_cast<unsigned>(seconds),
+                                      static_cast<unsigned>(milliseconds));
+    if (written <= 0) return std::string();
+    return std::string(buffer, static_cast<std::size_t>(written));
 }
 
 bool is_valid_team_id(const std::string& team_id) {
@@ -156,9 +164,11 @@ std::optional<std::string> format_packet(
 
     const std::string packet = record.team_id + "; P-" +
         [&record]() {
-            std::ostringstream number;
-            number << std::setfill('0') << std::setw(3) << record.packet_number;
-            return number.str();
+            char buffer[16];
+            const int written = std::snprintf(buffer, sizeof(buffer), "%03u",
+                                              static_cast<unsigned>(record.packet_number));
+            return written > 0 ? std::string(buffer, static_cast<std::size_t>(written))
+                               : std::string();
         }() + "; Ti-" + format_timestamp(record.timestamp_ms) +
         "; A-" + number(record.altitude_m, 1) +
         "; Pr-" + number(record.pressure_pa, 2) +
@@ -181,13 +191,20 @@ std::optional<std::string> format_packet(
 
 ParseResult parse_packet(const std::string& packet) {
     ParseResult result;
+    // Split on ';' and trim, without <sstream>. Same result, none of the iostream weight
+    // in a library that is linked into the flight image.
     std::vector<std::string> fields;
-    std::stringstream stream(packet);
-    std::string field;
-    while (std::getline(stream, field, ';')) {
-        while (!field.empty() && field.front() == ' ') field.erase(field.begin());
-        while (!field.empty() && field.back() == ' ') field.pop_back();
-        if (!field.empty()) fields.push_back(field);
+    std::size_t start = 0;
+    while (start <= packet.size()) {
+        std::size_t end = packet.find(';', start);
+        if (end == std::string::npos) end = packet.size();
+        std::size_t first = start;
+        std::size_t last = end;
+        while (first < last && packet[first] == ' ') ++first;
+        while (last > first && packet[last - 1] == ' ') --last;
+        if (last > first) fields.push_back(packet.substr(first, last - first));
+        if (end == packet.size()) break;
+        start = end + 1;
     }
 
     if (fields.size() < 12) {

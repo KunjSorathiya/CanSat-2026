@@ -3,8 +3,7 @@
 #include "flight/health.hpp"
 
 #include <cmath>
-#include <iomanip>
-#include <sstream>
+#include <cstdio>
 #include <utility>
 #include <vector>
 
@@ -12,10 +11,16 @@ namespace flight {
 
 namespace {
 
+// snprintf rather than <sstream>: this is the flight image, and iostreams bring locale
+// machinery and a static initialiser for what is only ever "%.*f".
 std::string fixed(double value, int decimals) {
-    std::ostringstream out;
-    out << std::fixed << std::setprecision(decimals) << value;
-    return out.str();
+    char buffer[64];
+    const int written = std::snprintf(buffer, sizeof(buffer), "%.*f", decimals, value);
+    if (written <= 0) return std::string();
+    const std::size_t length = static_cast<std::size_t>(written) < sizeof(buffer)
+                                   ? static_cast<std::size_t>(written)
+                                   : sizeof(buffer) - 1;
+    return std::string(buffer, length);
 }
 
 std::string optional_field(const char* prefix, double value, int decimals) {
@@ -84,22 +89,43 @@ std::string TelemetryBuilder::sd_header() {
 std::string TelemetryBuilder::sd_line(const Built& b, MissionState state,
                                       std::uint32_t fault_total) const {
     const auto& r = b.record;
-    std::ostringstream out;
-    out << r.timestamp_ms << ',' << r.packet_number << ',' << to_string(state) << ','
-        << fault_total << ',' << fixed(r.altitude_m, 1) << ',' << fixed(r.pressure_pa, 2)
-        << ',' << fixed(r.temperature_c, 1) << ',' << fixed(r.roll_deg, 1) << ','
-        << fixed(r.pitch_deg, 1) << ',' << fixed(r.yaw_deg, 1) << ','
-        << fixed(r.acceleration_x_mps2, 2) << ',' << fixed(r.acceleration_y_mps2, 2) << ','
-        << fixed(r.acceleration_z_mps2, 2) << ',' << (r.gps ? 1 : 0) << ',';
-    if (r.gps) {
-        out << fixed(r.gps->latitude, config_.gps_latlon_decimals) << ','
-            << fixed(r.gps->longitude, config_.gps_latlon_decimals) << ','
-            << fixed(r.gps->altitude, config_.gps_alt_decimals);
-    } else {
-        out << ",,";
+    std::string out;
+    out.reserve(384);  // typical row; avoids repeated reallocation on the logging path
+
+    out += std::to_string(r.timestamp_ms);
+    out += ',';
+    out += std::to_string(r.packet_number);
+    out += ',';
+    out += to_string(state);
+    out += ',';
+    out += std::to_string(fault_total);
+    for (const std::string& field : {fixed(r.altitude_m, 1),
+                                     fixed(r.pressure_pa, 2),
+                                     fixed(r.temperature_c, 1),
+                                     fixed(r.roll_deg, 1),
+                                     fixed(r.pitch_deg, 1),
+                                     fixed(r.yaw_deg, 1),
+                                     fixed(r.acceleration_x_mps2, 2),
+                                     fixed(r.acceleration_y_mps2, 2),
+                                     fixed(r.acceleration_z_mps2, 2)}) {
+        out += ',';
+        out += field;
     }
-    out << ',' << b.packet;
-    return out.str();
+    out += ',';
+    out += (r.gps ? '1' : '0');
+    out += ',';
+    if (r.gps) {
+        out += fixed(r.gps->latitude, config_.gps_latlon_decimals);
+        out += ',';
+        out += fixed(r.gps->longitude, config_.gps_latlon_decimals);
+        out += ',';
+        out += fixed(r.gps->altitude, config_.gps_alt_decimals);
+    } else {
+        out += ",,";  // gps_lat, gps_lon, gps_alt all empty
+    }
+    out += ',';
+    out += b.packet;
+    return out;
 }
 
 }  // namespace flight
