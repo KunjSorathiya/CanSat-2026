@@ -8,6 +8,30 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 25)
+
+### Fixed — a fault's severity could quietly fall while it was still active
+
+`FaultManager::report()` overwrote the stored severity on every call. The controller
+escalates some faults — `imu_init` is reported as an *error*, then as *critical* once it is
+clear no compliant packet can ever be produced — so a later routine report at a lower
+severity would have silently downgraded it, and `has_critical()` would have stopped seeing
+a fault that still applied.
+
+Severity is now monotonic while a fault is active: escalation is honoured, downgrade is
+not, and clearing genuinely resets it. The mission's own critical-fault decision reads
+specific fault codes rather than `has_critical()`, so flight behaviour was never affected —
+but a diagnostic that can lie is worth fixing before something starts relying on it.
+
+`total_occurrences()` also now saturates rather than wrapping: a count that reads as a small
+number after wrapping is worse than one that stops at the maximum.
+
+32 assertions cover escalation, refused downgrade, clearing, the latched `ever_critical()`,
+occurrence counting across clears, that every fault code has a name, and that an
+out-of-range code is refused rather than writing past the fixed array.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 24)
 
 ### Added — the landing-detection reasoning, written down and tested

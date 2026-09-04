@@ -717,6 +717,59 @@ void test_calibration_rejects_a_steady_rotation_as_bias() {
     CHECK(approx(spinning.result().gyro_bias_dps[2], 1.0, 0.01));
 }
 
+// A fault that was critical must stay critical until it is cleared. The controller
+// escalates some faults, and a later routine report at a lower severity must not quietly
+// downgrade one that still applies.
+void test_fault_severity_never_falls_while_active() {
+    flight::FaultManager faults;
+
+    faults.report(flight::FaultCode::imu_init, flight::FaultSeverity::error, 100);
+    CHECK(faults.active(flight::FaultCode::imu_init));
+    CHECK(!faults.has_critical());
+
+    // Escalation is honoured.
+    faults.report(flight::FaultCode::imu_init, flight::FaultSeverity::critical, 200);
+    CHECK(faults.has_critical());
+
+    // A later, routine report at a lower severity must not undo it.
+    faults.report(flight::FaultCode::imu_init, flight::FaultSeverity::warning, 300);
+    CHECK(faults.has_critical());
+
+    // Clearing genuinely resolves it, and the next occurrence starts from its own severity.
+    faults.clear(flight::FaultCode::imu_init);
+    CHECK(!faults.has_critical());
+    CHECK(!faults.active(flight::FaultCode::imu_init));
+    faults.report(flight::FaultCode::imu_init, flight::FaultSeverity::warning, 400);
+    CHECK(faults.active(flight::FaultCode::imu_init));
+    CHECK(!faults.has_critical());
+
+    // ever_critical() latches for the whole power session: a critical fault that has been
+    // cleared still happened, and the ground station should be able to see that it did.
+    CHECK(faults.ever_critical());
+
+    // Occurrence counting and timestamps.
+    flight::FaultManager counted;
+    counted.report(flight::FaultCode::sd_write, flight::FaultSeverity::warning, 1000);
+    counted.report(flight::FaultCode::sd_write, flight::FaultSeverity::warning, 5000);
+    counted.report(flight::FaultCode::radio_tx, flight::FaultSeverity::error, 7000);
+    CHECK(counted.total_occurrences() == 3);
+    CHECK(counted.active_count() == 2);
+    counted.clear(flight::FaultCode::sd_write);
+    CHECK(counted.active_count() == 1);
+    CHECK(counted.total_occurrences() == 3);  // history is not erased by clearing
+
+    // Every code has a name, and an out-of-range code is refused rather than writing past
+    // the fixed array.
+    for (std::size_t i = 0; i < static_cast<std::size_t>(flight::FaultCode::count); ++i) {
+        const char* name = flight::fault_name(static_cast<flight::FaultCode>(i));
+        CHECK(name != nullptr && name[0] != ' ');
+    }
+    flight::FaultManager guarded;
+    guarded.report(flight::FaultCode::count, flight::FaultSeverity::critical, 0);
+    CHECK(guarded.total_occurrences() == 0);
+    CHECK(!guarded.has_critical());
+}
+
 // A steady parachute descent reads as 1 g on the accelerometer, indistinguishable from
 // sitting on the ground. Only the vertical rate separates them, so prove it does.
 void test_landing_is_not_declared_during_a_steady_descent() {
@@ -1571,6 +1624,7 @@ int main(int argc, char** argv) {
     test_gps_coordinate_validation();
     test_orientation_blends_across_the_wrap();
     test_calibration_rejects_a_steady_rotation_as_bias();
+    test_fault_severity_never_falls_while_active();
     test_landing_is_not_declared_during_a_steady_descent();
     test_battery_voltage_reports_whether_it_is_scaled();
     test_loop_tick_is_bounded_by_the_gps_uart_fifo();

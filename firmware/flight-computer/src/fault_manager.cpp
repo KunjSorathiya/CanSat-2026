@@ -17,7 +17,13 @@ void FaultManager::report(FaultCode code, FaultSeverity severity, std::uint64_t 
     if (record.occurrences == 0) {
         record.first_ms = now_ms;
     }
-    record.severity = severity;
+    // Severity never falls while a fault is active. The controller escalates some faults
+    // (imu_init is reported as an error, then as critical once it is clear no packet can
+    // ever be produced), and a later routine report at a lower severity must not quietly
+    // downgrade that — `has_critical()` would then stop seeing a fault that still applies.
+    if (!record.active || severity > record.severity) {
+        record.severity = severity;
+    }
     record.active = true;
     record.last_ms = now_ms;
     if (record.occurrences < 0xFFFFFFFFu) {
@@ -52,11 +58,13 @@ bool FaultManager::has_critical() const {
 bool FaultManager::ever_critical() const { return ever_critical_; }
 
 std::uint32_t FaultManager::total_occurrences() const {
-    std::uint32_t total = 0;
+    // Saturating: the count is a diagnostic, and a wrapped total that reads as a small
+    // number would be worse than one that stops at the maximum.
+    std::uint64_t total = 0;
     for (const auto& record : records_) {
         total += record.occurrences;
     }
-    return total;
+    return total > 0xFFFFFFFFull ? 0xFFFFFFFFu : static_cast<std::uint32_t>(total);
 }
 
 std::uint32_t FaultManager::active_count() const {
