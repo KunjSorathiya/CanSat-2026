@@ -55,6 +55,34 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Added — the validator's two implementations now read one file
+
+The three parsers have read `test-data/protocol-fixtures.tsv` since cycle 2, so they cannot
+disagree about what a valid packet is. The **validator** had no equivalent. Its Python and
+JavaScript versions are hand-ports held together by two sets of similarly-named tests, which
+is agreement by convention rather than by construction — and the project's own
+cross-implementation table said so, listing the guard as "shared test packets; the web
+console is a direct port".
+
+`test-data/validator-scenarios.tsv` is the construction: **11 scenarios, 29 packets**, each
+row carrying the verdict the validator must reach. Gaps counted as the packets that never
+arrived; a duplicate; a late packet that fills nothing; a vehicle reboot, and the corrupted
+`P-001` that is not one; a foreign team; a clock regression; an implausible fix that is
+flagged while the packet is kept.
+
+Both suites replay the file through their own validator. The fixture earned itself twice
+during the writing:
+
+- It rejected a **wrong expectation in the fixture**: a recognised restart clears the
+  timestamp reference it would be compared against, so a reboot is *not* also reported as a
+  clock regression. The file now says why.
+- Deleting the clock-regression requirement from the JavaScript restart rule — the single
+  edit that would make the console call every corrupted `P-001` a reboot — **fails two Node
+  tests**. That was run before the fixture was kept.
+
+`check_doc_claims.py` holds both suites to actually reading the file, so it cannot become a
+fixture sitting in the tree looking like a guarantee.
+
 ### Fixed — a number too wide to format became a number, not an error
 
 `number()` formats every mandatory telemetry field into a 64-byte buffer. Values are

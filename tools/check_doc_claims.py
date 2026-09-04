@@ -312,6 +312,23 @@ def main() -> int:
         acknowledged = "MPU-6500" in text or "receiving-inspection.md#findings" in text
         checker.check(f"{rel} says the delivered IMU has no magnetometer", acknowledged)
 
+    # The validator scenarios only guard anything while both implementations actually read
+    # them. A suite that quietly stops loading the file would leave the fixture sitting in
+    # the tree looking like a guarantee.
+    scenarios = read("test-data/validator-scenarios.tsv")
+    scenario_rows = [ln for ln in scenarios.splitlines()
+                     if ln.strip() and not ln.startswith("#")]
+    scenario_names = {ln.split("	")[0] for ln in scenario_rows}
+    for reader in ("ground-station/software/tests/test_validator.py",
+                   "ground-station/web/tests/console_core.test.mjs"):
+        checker.check(f"{reader} reads the shared validator scenarios",
+                      "validator-scenarios.tsv" in read(reader))
+    checker.check(f"test-plan.md states {len(scenario_names)} validator scenarios, "
+                  f"{len(scenario_rows)} packets",
+                  f"{len(scenario_names)} scenarios" in test_plan
+                  and f"{len(scenario_rows)} packets" in test_plan,
+                  f"{len(scenario_names)}/{len(scenario_rows)}")
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.

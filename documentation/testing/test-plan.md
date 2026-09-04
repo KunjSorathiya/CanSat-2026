@@ -87,10 +87,10 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **100 / 100 tests** |
+| Python ground station | 8 modules | ✅ **102 / 102 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **126 / 126 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **40 / 40 tests** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **129 / 129 claims** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **42 / 42 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
@@ -239,7 +239,9 @@ bearing, a relative one yields no bearing, a packet without the tag says nothing
 way, the bearing wraps into `[0, 360)`, and the CSV row records which kind of yaw it
 holds — the same distinction the C++ formatter and the web console make.
 
-### `test_validator.py` — 20 tests
+### `test_validator.py` — 22 tests
+
+Two more read the shared scenario file: the file is present and complete, and every scenario reaches the verdict it records. The web console runs the same file through its own validator.
 
 Sequential streams pass; wrong team is rejected; missing packets are counted; duplicates
 and out-of-order packets are detected; timestamp regressions are noted; implausible GPS is
@@ -327,7 +329,7 @@ Three things exist in more than one language and must not drift:
 |---|---|---|
 | Packet format and parsing | [`telemetry.cpp`](../../firmware/common/src/telemetry.cpp), [`telemetry.py`](../../ground-station/software/src/telemetry.py), `index.html` | All three read [`test-data/protocol-fixtures.tsv`](../../test-data/protocol-fixtures.tsv) — 32 packets, each with a recorded accept/reject verdict. A parser that disagrees fails the build |
 | CRC-16/CCITT framing | [`framing.cpp`](../../firmware/ground-station/src/framing.cpp), [`transport.py`](../../ground-station/software/src/transport.py), `index.html` | The same known-answer vector `0x29B1` is asserted in both suites |
-| Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Shared test packets; the web console is a direct port |
+| Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Both read [`test-data/validator-scenarios.tsv`](../../test-data/validator-scenarios.tsv) — 11 scenarios, 29 packets, each with the verdict the validator must reach: gaps, duplicates, out-of-order arrivals, a vehicle reboot and the corrupted `P-001` that is not one, wrong team, clock regression and an implausible fix. A validator that disagrees fails the build |
 | LoRa airtime model | [`lora_airtime.hpp`](../../firmware/common/include/cansat/lora_airtime.hpp), [`link_budget.py`](../../tools/link_budget.py) | Both are asserted against the same two published SX127x reference vectors (46.336 ms and 1155.072 ms) |
 | Sensor timing model | [`sensor_timing.hpp`](../../firmware/flight-computer/include/flight/sensor_timing.hpp) — register encoding *and* the rate guard | The model reproduces three published BMP280 datasheet figures, so the registers written and the rate validated cannot disagree |
 | Radio modem parameters | [`link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp) — read by the vehicle *and* the bridge | `test_link_profile_is_shared_by_both_ends()` compares the two ends field by field; a mismatch is a silent, total link failure |

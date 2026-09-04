@@ -216,3 +216,66 @@ class SeenWindowTests(unittest.TestCase):
         self.assertTrue(validator.check(self._record(1, 0)).restarted)
         self.assertEqual(len(validator._seen_numbers), 1)
         self.assertEqual(len(validator._seen_order), 1)
+
+
+class SharedScenarioTests(unittest.TestCase):
+    """Every scenario in test-data/validator-scenarios.tsv, as this validator sees it.
+
+    The web console carries a hand-port of this class. Two sets of similarly-named tests is
+    agreement by convention; one fixture file read by both is agreement by construction —
+    the same reason the three parsers read protocol-fixtures.tsv.
+    """
+
+    SCENARIOS = Path(__file__).parents[3] / "test-data" / "validator-scenarios.tsv"
+
+    def _load(self):
+        scenarios: list[tuple[str, str, list[tuple[str, str]]]] = []
+        with self.SCENARIOS.open(encoding="utf-8") as handle:
+            for line in handle:
+                line = line.rstrip("\n").rstrip("\r")
+                if not line.strip() or line.startswith("#"):
+                    continue
+                name, team, expect, packet_text = line.split("\t", 3)
+                if not scenarios or scenarios[-1][0] != name:
+                    scenarios.append((name, team, []))
+                scenarios[-1][2].append((expect, packet_text))
+        return scenarios
+
+    def test_the_fixture_file_is_present_and_complete(self):
+        scenarios = self._load()
+        self.assertGreaterEqual(len(scenarios), 10)
+        self.assertTrue(all(steps for _, _, steps in scenarios))
+
+    def test_every_scenario_matches_its_recorded_verdicts(self):
+        for name, team, steps in self._load():
+            with self.subTest(scenario=name):
+                validator = StreamValidator(expected_team=None if team == "-" else team)
+                for index, (expect, packet_text) in enumerate(steps):
+                    tokens = set(expect.split(","))
+                    missing = 0
+                    for token in list(tokens):
+                        if token.startswith("missing="):
+                            missing = int(token.split("=", 1)[1])
+                            tokens.discard(token)
+                            tokens.add("missing")
+
+                    result = parse_packet(packet_text)
+                    self.assertIsNotNone(
+                        result.record, f"{name}[{index}]: fixture packet must parse")
+
+                    before_ts = validator.stats.timestamp_regressions
+                    before_gps = validator.stats.gps_rejected
+                    report = validator.check(result.record)
+
+                    where = f"{name}[{index}] expect {expect!r}"
+                    self.assertEqual(report.accepted, "wrongteam" not in tokens, where)
+                    self.assertEqual(report.duplicate, "dup" in tokens, where)
+                    self.assertEqual(report.out_of_order, "ooo" in tokens, where)
+                    self.assertEqual(report.restarted, "restart" in tokens, where)
+                    self.assertEqual(report.missing, missing, where)
+                    self.assertEqual(
+                        validator.stats.timestamp_regressions - before_ts,
+                        1 if "tsreg" in tokens else 0, where)
+                    self.assertEqual(
+                        validator.stats.gps_rejected - before_gps,
+                        1 if "gpsrej" in tokens else 0, where)

@@ -1,0 +1,87 @@
+# CanSat 2026 — stream validator scenarios
+#
+# The parser has test-data/protocol-fixtures.tsv, read by all three implementations. The
+# validator had nothing equivalent: its Python and JavaScript versions were hand-ports held
+# together by two sets of similarly-named tests, which is agreement by convention rather
+# than by construction. This file is the construction.
+#
+#   ground-station/software/src/validator.py (Python, PC ground station)
+#   ground-station/web/index.html            (JavaScript, web console)
+#
+# A validator that disagrees with the other one miscounts packet loss, duplicates or
+# reboots — the numbers an operator judges a live link by, and the ones a post-flight
+# analysis trusts.
+#
+# Format: <scenario> TAB <expected team, or '-'> TAB <expect> TAB <packet>
+#
+# Rows of one scenario are consecutive and are fed to a fresh validator in file order.
+# <expect> is a comma-separated set describing the report for that packet:
+#
+#   ok         accepted, nothing flagged
+#   dup        duplicate packet number
+#   ooo        out of order
+#   missing=N  N packets never arrived before this one
+#   restart    recognised as a vehicle reboot
+#   wrongteam  rejected: not the expected team
+#   tsreg      the mission clock went backwards
+#   gpsrej     the GPS fix is implausible; the packet is still kept
+#
+# Blank lines and lines starting with '#' are ignored. Whitespace inside the packet is
+# significant; do not reformat this file.
+
+# A clean stream is the baseline: nothing flagged, nothing counted.
+sequential	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+sequential	CAN-Team-07	ok	CAN-Team-07; P-002; Ti-00:00:02:000; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+sequential	CAN-Team-07	ok	CAN-Team-07; P-003; Ti-00:00:03:000; A-12.0; Pr-101305.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# A gap counts the packets that never arrived, not the fact that there was a gap.
+gap	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+gap	CAN-Team-07	missing=2	CAN-Team-07; P-004; Ti-00:00:04:000; A-13.0; Pr-101295.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# A repeat of a number already seen is a duplicate, and does not advance the sequence.
+duplicate	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+duplicate	CAN-Team-07	ok	CAN-Team-07; P-002; Ti-00:00:02:000; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+duplicate	CAN-Team-07	dup	CAN-Team-07; P-002; Ti-00:00:02:500; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# A late packet that fills nothing: P-003 already counted P-002 as missing.
+out_of_order	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+out_of_order	CAN-Team-07	missing=1	CAN-Team-07; P-003; Ti-00:00:03:000; A-12.0; Pr-101305.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+out_of_order	CAN-Team-07	ooo,tsreg	CAN-Team-07; P-002; Ti-00:00:02:000; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# The watchdog is designed to reboot the vehicle. Counter back to P-001 AND the mission
+# clock back to zero: that is a restart, not a flood of duplicates for the rest of the
+# flight. The clock going backwards is not separately reported as a regression here: a
+# recognised restart clears the reference it would have been compared against, which is the
+# difference between "the vehicle rebooted" and "the vehicle's clock misbehaved".
+reboot	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+reboot	CAN-Team-07	ok	CAN-Team-07; P-002; Ti-00:00:02:000; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+reboot	CAN-Team-07	ok	CAN-Team-07; P-003; Ti-00:00:03:000; A-12.0; Pr-101305.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+reboot	CAN-Team-07	restart	CAN-Team-07; P-001; Ti-00:00:00:200; A-12.0; Pr-101305.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+reboot	CAN-Team-07	ok	CAN-Team-07; P-002; Ti-00:00:01:200; A-12.0; Pr-101305.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# A P-001 without a clock regression is a corrupted packet number, not a reboot. Both
+# signals are required, and this is the case that proves the second one is load-bearing.
+false_reboot	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+false_reboot	CAN-Team-07	ok	CAN-Team-07; P-002; Ti-00:00:02:000; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+false_reboot	CAN-Team-07	ok	CAN-Team-07; P-003; Ti-00:00:03:000; A-12.0; Pr-101305.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+false_reboot	CAN-Team-07	dup	CAN-Team-07; P-001; Ti-00:00:04:000; A-12.0; Pr-101305.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# The first packet of a session can never be a restart: there is nothing to restart from.
+first_packet_is_never_a_restart	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:00:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# Another team's packet is rejected outright and never reaches the sequence logic.
+wrong_team	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+wrong_team	CAN-Team-07	wrongteam	CAN-Team-01; P-002; Ti-00:00:02:000; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+wrong_team	CAN-Team-07	ok	CAN-Team-07; P-002; Ti-00:00:02:000; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# A clock that goes backwards without a counter restart is noted, and the packet is kept.
+timestamp_regression	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:05:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+timestamp_regression	CAN-Team-07	tsreg	CAN-Team-07; P-002; Ti-00:00:04:000; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# An impossible fix is flagged, and the packet is still kept: the mandatory fields in it
+# are as good as any other packet's.
+implausible_gps	CAN-Team-07	gpsrej	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80; GP-Lat-99.000000; GP-Lon-73.000000; GP-Alt-20.0;
+implausible_gps	CAN-Team-07	ok	CAN-Team-07; P-002; Ti-00:00:02:000; A-11.0; Pr-101315.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80; GP-Lat-18.000000; GP-Lon-73.000000; GP-Alt-20.0;
+
+# With no expected team configured, any well-formed team id is accepted.
+no_team_filter	-	ok	CAN-Team-42; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;

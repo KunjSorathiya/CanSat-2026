@@ -23,6 +23,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
 const CONSOLE_HTML = join(REPO_ROOT, "ground-station", "web", "index.html");
 const FIXTURES = join(REPO_ROOT, "test-data", "protocol-fixtures.tsv");
+const SCENARIOS = join(REPO_ROOT, "test-data", "validator-scenarios.tsv");
 
 const BEGIN = "// PORTABLE-CORE:BEGIN";
 const END = "// PORTABLE-CORE:END";
@@ -468,4 +469,65 @@ test("the sync word is read from the bridge, not assumed", () => {
   assert.equal(M.syncWordLabel(0x12), "UNKNOWN · 0x12");
   // Nothing reported yet says exactly that.
   assert.equal(M.syncWordLabel(null), "—");
+});
+
+/* The validator's shared scenarios. The Python ground station runs the same file through
+   its own StreamValidator; two hand-ported implementations agreeing by convention is what
+   this replaces. */
+function loadScenarios() {
+  const text = readFileSync(SCENARIOS, "utf8");
+  const scenarios = [];
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.replace(/\r$/, "");
+    if (!line.trim() || line.startsWith("#")) continue;
+    const parts = line.split("\t");
+    assert.ok(parts.length >= 4, `malformed scenario line: ${line}`);
+    const [name, team, expect] = parts;
+    const packet = parts.slice(3).join("\t");
+    if (!scenarios.length || scenarios[scenarios.length - 1].name !== name) {
+      scenarios.push({ name, team, steps: [] });
+    }
+    scenarios[scenarios.length - 1].steps.push({ expect, packet });
+  }
+  return scenarios;
+}
+
+const SCENARIO_CASES = loadScenarios();
+
+test("the validator scenario file is present and complete", () => {
+  assert.ok(SCENARIO_CASES.length >= 10);
+  for (const s of SCENARIO_CASES) assert.ok(s.steps.length > 0, `${s.name} has no steps`);
+});
+
+test("every validator scenario matches its recorded verdicts", () => {
+  for (const scenario of SCENARIO_CASES) {
+    const validator = new M.StreamValidator(scenario.team === "-" ? null : scenario.team);
+    scenario.steps.forEach((step, index) => {
+      const tokens = new Set(step.expect.split(","));
+      let missing = 0;
+      for (const token of [...tokens]) {
+        if (token.startsWith("missing=")) {
+          missing = Number(token.slice("missing=".length));
+          tokens.delete(token);
+          tokens.add("missing");
+        }
+      }
+
+      const parsed = M.parsePacket(step.packet, null);
+      const where = `${scenario.name}[${index}] expect ${step.expect}`;
+      assert.equal(parsed.error, undefined, `${where}: fixture packet must parse`);
+
+      const beforeTs = validator.stats.tsReg;
+      const beforeGps = validator.stats.gpsRej;
+      const r = validator.check(parsed.record);
+
+      assert.equal(r.accepted, !tokens.has("wrongteam"), where);
+      assert.equal(r.duplicate, tokens.has("dup"), where);
+      assert.equal(r.outOfOrder, tokens.has("ooo"), where);
+      assert.equal(r.restarted, tokens.has("restart"), where);
+      assert.equal(r.missing, missing, where);
+      assert.equal(validator.stats.tsReg - beforeTs, tokens.has("tsreg") ? 1 : 0, where);
+      assert.equal(validator.stats.gpsRej - beforeGps, tokens.has("gpsrej") ? 1 : 0, where);
+    });
+  }
 });
