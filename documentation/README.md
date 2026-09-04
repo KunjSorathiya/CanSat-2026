@@ -16,6 +16,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | Know what is built and what is next | [Project Timeline](project/timeline.md) |
 | Run the ground station or a launch | [Operations Runbook](operations/runbook.md) |
 | Know what is tested | [Test Plan](testing/test-plan.md) |
+| Measure the vehicle on hardware day | [Bring-Up Record](testing/bring-up-record.md) |
 | Understand why telemetry runs at 1 Hz | [Link Budget](design/link-budget.md) |
 | Understand why sensors run at 30 Hz | [Sensor Rates](design/sensor-rates.md) |
 | See what changed recently | [Changelog](../CHANGELOG.md) |

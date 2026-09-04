@@ -8,6 +8,32 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 20)
+
+### Added — the bring-up record
+
+[`documentation/testing/bring-up-record.md`](documentation/testing/bring-up-record.md)
+collects **every number this repository computes but has never observed**, pairs each with
+the procedure to measure it, and leaves a blank for the result: nine gates, from a bare
+Pico to endurance and recovery.
+
+The project has made a long series of predictions from datasheets and arithmetic — packet
+airtime, barometer output rate, acquisition rate and jitter, I2C bus load, RSSI against
+distance, log recovery after a power cut. Each is a place where reality can differ, and the
+difference is worth finding on a bench rather than in a flight. Every row cites the document
+that makes the prediction, so a mismatch leads straight to the reasoning behind it.
+
+The RSSI rows were corrected while writing them: the first draft carried numbers I had
+estimated rather than computed. They are now the free-space path-loss values the link
+budget actually produces (−28 dBm at 10 m through −68 dBm at 1 km), with an explicit note
+that real readings run 10–20 dB weaker and that the useful measurement is the shape of the
+curve and the margin to the SX1278's sensitivity.
+
+The document refuses a signed-off gate with a blank row: an unmeasured row that looks
+measured is exactly what it exists to prevent.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 19)
 
 ### Verified — the CMake build path, for the first time

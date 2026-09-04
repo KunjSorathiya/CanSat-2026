@@ -250,6 +250,12 @@ Three things exist in more than one language and must not drift:
 
 ## Hardware test plan
 
+> [!TIP]
+> [**bring-up-record.md**](bring-up-record.md) is the companion to this table: where this
+> plan says pass or fail, that one carries every number the repository *predicts* — airtime,
+> sensor output rates, bus load, RSSI against distance — with the procedure to measure each
+> and a blank to write down what you actually got. Take it to the bench.
+
 Each row is a gate. A failure stops the sequence rather than being carried forward.
 Sequence follows the [bring-up order](../design/wiring.md#bring-up-order).
 

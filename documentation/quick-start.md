@@ -569,6 +569,7 @@ will hit first:
 | Know the packet format | [telemetry-protocol.md](design/telemetry-protocol.md) |
 | Run a mission | [runbook.md](operations/runbook.md) |
 | Know what is tested | [test-plan.md](testing/test-plan.md) |
+| Measure the vehicle on hardware day | [bring-up-record.md](testing/bring-up-record.md) |
 | Know what the competition requires | [requirements.md](requirements/requirements.md) |
 | Know what is done and what is not | [timeline.md](project/timeline.md) |
 | Check the project against its own claims | [repository audit](audit/2026-09-04-repository-audit.md) |
