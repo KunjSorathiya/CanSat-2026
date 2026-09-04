@@ -323,6 +323,21 @@ def main() -> int:
                    "ground-station/web/tests/console_core.test.mjs"):
         checker.check(f"{reader} reads the shared validator scenarios",
                       "validator-scenarios.tsv" in read(reader))
+    # The escaping fixture guards the same kind of divergence, between the logger that
+    # writes a raw log and the console that replays one.
+    escapes = read("test-data/raw-log-escapes.tsv")
+    escape_rows = [ln for ln in escapes.splitlines()
+                   if ln.strip() and not ln.startswith("#")]
+    for reader in ("ground-station/software/tests/test_logger.py",
+                   "ground-station/web/tests/console_core.test.mjs"):
+        checker.check(f"{reader} reads the shared raw-log escape fixture",
+                      "raw-log-escapes.tsv" in read(reader))
+    checker.check(f"test-plan.md states {len(escape_rows)} raw-log escape cases",
+                  f"{len(escape_rows)} cases" in test_plan, str(len(escape_rows)))
+    # The console has to actually undo the escaping, not merely own a function that could.
+    console_html = read("ground-station/web/index.html")
+    checker.check("the web console unescapes a raw-log line before replaying it",
+                  "unescapeRaw(line.split" in console_html)
     checker.check(f"test-plan.md states {len(scenario_names)} validator scenarios, "
                   f"{len(scenario_rows)} packets",
                   f"{len(scenario_names)} scenarios" in test_plan

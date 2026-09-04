@@ -87,10 +87,10 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **107 / 107 tests** |
+| Python ground station | 8 modules | ✅ **111 / 111 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **145 / 145 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **42 / 42 tests** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **149 / 149 claims** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **46 / 46 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
@@ -289,7 +289,7 @@ line is recorded, status lines are never counted as telemetry, and the **sync wo
 bridge reports** reaches the dashboard — with an older bridge image that reports no sync
 word leaving the field absent rather than filling it with a guess.
 
-### `test_logger.py` — 18 tests
+### `test_logger.py` — 22 tests
 
 The raw log's escaping is reversible over every byte value, escaped text never contains a
 separator, and one line is written per record even for a corrupted payload — so a payload
@@ -297,6 +297,11 @@ that failed to parse is still recoverable from the raw log. Nothing is discarded
 packets still reach the CSV, a failing write is counted rather than raised, the station
 keeps logging the other file, errors accumulate across packets, and packet-gap accounting
 distinguishes a genuine gap from a repeat or a regression.
+
+Four more read [`test-data/raw-log-escapes.tsv`](../../test-data/raw-log-escapes.tsv), the
+fixture the web console reads too: every case escapes to its recorded form, unescapes back
+to the original, and no escaped form contains a separator. The plain text is stored as hex
+because it is allowed to contain tabs and newlines — the same reason the log escapes it.
 
 ### `test_protocol_fixtures.py` — 5 tests
 
@@ -336,6 +341,7 @@ Three things exist in more than one language and must not drift:
 |---|---|---|
 | Packet format and parsing | [`telemetry.cpp`](../../firmware/common/src/telemetry.cpp), [`telemetry.py`](../../ground-station/software/src/telemetry.py), `index.html` | All three read [`test-data/protocol-fixtures.tsv`](../../test-data/protocol-fixtures.tsv) — 32 packets, each with a recorded accept/reject verdict. A parser that disagrees fails the build |
 | CRC-16/CCITT framing | [`framing.cpp`](../../firmware/ground-station/src/framing.cpp), [`transport.py`](../../ground-station/software/src/transport.py), `index.html` | The same known-answer vector `0x29B1` is asserted in both suites |
+| Raw-log escaping | [`logger.py`](../../ground-station/software/src/logger.py), `index.html` | Both read [`test-data/raw-log-escapes.tsv`](../../test-data/raw-log-escapes.tsv) — 16 cases including a literal backslash before `t`, the one an unescaper a character out of step reads as a tab. The console replays raw logs, so a disagreement here invents payloads the vehicle never sent |
 | Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Both read [`test-data/validator-scenarios.tsv`](../../test-data/validator-scenarios.tsv) — 11 scenarios, 29 packets, each with the verdict the validator must reach: gaps, duplicates, out-of-order arrivals, a vehicle reboot and the corrupted `P-001` that is not one, wrong team, clock regression and an implausible fix. A validator that disagrees fails the build |
 | LoRa airtime model | [`lora_airtime.hpp`](../../firmware/common/include/cansat/lora_airtime.hpp), [`link_budget.py`](../../tools/link_budget.py) | Both are asserted against the same two published SX127x reference vectors (46.336 ms and 1155.072 ms) |
 | Sensor timing model | [`sensor_timing.hpp`](../../firmware/flight-computer/include/flight/sensor_timing.hpp) — register encoding *and* the rate guard | The model reproduces three published BMP280 datasheet figures, so the registers written and the rate validated cannot disagree |

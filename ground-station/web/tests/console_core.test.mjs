@@ -46,7 +46,7 @@ function loadConsoleCore() {
   }
 
   const factory = new Function(
-    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S, parseBridgeStatus, syncWordLabel, SYNC_TEST, SYNC_LAUNCH };`
+    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S, parseBridgeStatus, syncWordLabel, SYNC_TEST, SYNC_LAUNCH, unescapeRaw };`
   );
   return factory();
 }
@@ -530,4 +530,57 @@ test("every validator scenario matches its recorded verdicts", () => {
       assert.equal(validator.stats.gpsRej - beforeGps, tokens.has("gpsrej") ? 1 : 0, where);
     });
   }
+});
+
+/* The raw-log escaping, held to the same fixture file the Python logger reads. The console
+   replays raw logs, so its unescaper and logger.py's have to agree byte for byte. */
+const ESCAPES = join(REPO_ROOT, "test-data", "raw-log-escapes.tsv");
+
+function loadEscapeFixtures() {
+  const text = readFileSync(ESCAPES, "utf8");
+  const rows = [];
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.replace(/\r$/, "");
+    if (!line.trim() || line.startsWith("#")) continue;
+    const parts = line.split("\t");
+    assert.equal(parts.length, 3, `malformed escape fixture: ${line}`);
+    const [name, escaped, plainHex] = parts;
+    const bytes = Uint8Array.from(plainHex.match(/../g) ?? [], b => parseInt(b, 16));
+    rows.push({ name, escaped, plain: new TextDecoder().decode(bytes) });
+  }
+  return rows;
+}
+
+const ESCAPE_CASES = loadEscapeFixtures();
+
+test("the raw-log escape fixture is present and complete", () => {
+  assert.ok(ESCAPE_CASES.length >= 12);
+  const names = new Set(ESCAPE_CASES.map(c => c.name));
+  assert.ok(names.has("literal_backslash_then_t"));
+  assert.ok(names.has("every_rule_at_once"));
+});
+
+test("every raw-log fixture unescapes back to the original", () => {
+  for (const c of ESCAPE_CASES) {
+    assert.equal(M.unescapeRaw(c.escaped), c.plain, `case ${c.name}`);
+  }
+});
+
+test("a literal backslash is not read as the escape that follows it", () => {
+  // The case the scheme turns on. A backslash followed by the word "there" is not a tab;
+  // an unescaper one character out of step reads it as one, inventing a payload the
+  // vehicle never sent while trying to recover one.
+  assert.equal(M.unescapeRaw("a\\\\tb"), "a\\tb");
+  assert.equal(M.unescapeRaw("a\\tb"), "a\tb");
+  assert.equal(M.unescapeRaw("a\\\\x41"), "a\\x41");
+  assert.equal(M.unescapeRaw("a\\x41"), "aA");
+});
+
+test("a malformed escape is left exactly as it was found", () => {
+  // A truncated or unknown escape is corruption in a forensic record. Passing it through
+  // unchanged keeps the evidence; guessing at it would not.
+  assert.equal(M.unescapeRaw("trailing\\"), "trailing\\");
+  assert.equal(M.unescapeRaw("\\q"), "\\q");
+  assert.equal(M.unescapeRaw("\\xZZ"), "\\xZZ");
+  assert.equal(M.unescapeRaw("\\x4"), "\\x4");
 });

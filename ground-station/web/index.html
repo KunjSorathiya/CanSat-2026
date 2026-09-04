@@ -982,6 +982,34 @@ function syncWordLabel(value) {
   return "UNKNOWN · " + hex;
 }
 
+/* The raw log's escaping, reversed. logger.py writes one record per line as
+   "<receipt time> TAB <escaped payload>", turning tab, CR, LF and backslash into
+   two-character escapes and every other control character into \xNN, so a corrupted
+   payload -- which can contain any byte -- still occupies exactly one line. Replaying that
+   log without undoing the escaping hands the parser a payload that is not the one the
+   vehicle sent, and the records worth inspecting in a forensic log are precisely the
+   corrupted ones.
+
+   Mirrors unescape_raw() in logger.py; test-data/raw-log-escapes.tsv holds both to one
+   definition. */
+function unescapeRaw(text) {
+  const simple = { t: "\t", r: "\r", n: "\n", "\\": "\\" };
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch !== "\\" || i + 1 >= text.length) { out += ch; i += 1; continue; }
+    const marker = text[i + 1];
+    if (Object.prototype.hasOwnProperty.call(simple, marker)) { out += simple[marker]; i += 2; continue; }
+    if (marker === "x" && i + 3 < text.length) {
+      const hex = text.slice(i + 2, i + 4);
+      if (/^[0-9a-fA-F]{2}$/.test(hex)) { out += String.fromCharCode(parseInt(hex, 16)); i += 4; continue; }
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
 // PORTABLE-CORE:END
 
 /* ================================================================
@@ -1244,7 +1272,10 @@ function replayFile(file) {
       }
     } else {
       for (let line of text.split(/\r?\n/)) {
-        line = line.includes("\t") ? line.split("\t").pop() : line;
+        // A raw-log line is "<receipt time> TAB <escaped payload>"; a plain packet file has
+        // no tab. Both the timestamp and the escaping have to come off, or a payload that
+        // contained a tab or a newline comes back as something the vehicle never sent.
+        if (line.includes("\t")) line = unescapeRaw(line.split("\t").pop());
         line = line.trim();
         if (line && !line.startsWith("#") && line.includes(";")) queue.push(["packet", line]);
       }

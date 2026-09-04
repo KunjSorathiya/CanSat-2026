@@ -1,0 +1,37 @@
+# CanSat 2026 — raw-log escaping fixtures
+#
+# The raw log is the forensic record of a flight: every line received, corrupted ones
+# included, written as "<receipt time> TAB <escaped payload>". A corrupted payload can
+# contain any byte, so tab, CR, LF and backslash become two-character escapes and every
+# other control character becomes \xNN — that is what keeps one record on one line.
+#
+# Two implementations undo it, and they must agree exactly:
+#
+#   ground-station/software/src/logger.py     unescape_raw()
+#   ground-station/web/index.html             unescapeRaw()
+#
+# They did not. The web console stripped the timestamp and replayed the payload still
+# escaped, so exactly the records a forensic replay exists to inspect came back as
+# something the vehicle never sent. This file is why that cannot happen again.
+#
+# Format: <id> TAB <escaped> TAB <plain, as lower-case UTF-8 hex>
+#
+# The plain text is hex because it is allowed to contain tabs and newlines — a fixture
+# file cannot carry it literally, which is the same reason the log escapes it.
+#
+plain	CAN-Team-07; P-001; A-10.0;	43414e2d5465616d2d30373b20502d3030313b20412d31302e303b
+tab_inside	CAN-Team-07;\tP-001;	43414e2d5465616d2d30373b09502d3030313b
+newline_inside	CAN-Team-07;\nP-001;	43414e2d5465616d2d30373b0a502d3030313b
+carriage_return	CAN-Team-07;\rP-001;	43414e2d5465616d2d30373b0d502d3030313b
+backslash	CAN-Team-07; note\\here;	43414e2d5465616d2d30373b206e6f74655c686572653b
+literal_backslash_then_t	CAN-Team-07; literal\\there;	43414e2d5465616d2d30373b206c69746572616c5c74686572653b
+literal_backslash_then_x41	prefix\\x41suffix	7072656669785c783431737566666978
+nul_byte	CAN-Team-07;\x00P-001;	43414e2d5465616d2d30373b00502d3030313b
+bell_and_escape	\x07alarm\x1b[0m	07616c61726d1b5b306d
+delete_char	trailing\x7f	747261696c696e677f
+every_rule_at_once	a\tb\nc\rd\\e\x01f	6109620a630d645c650166
+empty		
+lone_backslash	\\	5c
+degree_sign_survives	CAN-Team-07; 21.1667°;	43414e2d5465616d2d30373b2032312e31363637c2b03b
+crlf_pair	line\r\nnext	6c696e650d0a6e657874
+high_control_run	\x00\x01\x02\x1f\x7f	0001021f7f

@@ -166,3 +166,50 @@ class DetectMissingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SharedEscapeFixtureTests(unittest.TestCase):
+    """The escaping rules, held to the same file the web console reads.
+
+    The console strips a raw-log line's timestamp and replays the payload. It used to do
+    that without unescaping, so a payload containing a tab came back as something the
+    vehicle never sent -- and a corrupted payload is exactly what a forensic replay is for.
+    Two implementations, one fixture file.
+    """
+
+    FIXTURES = Path(__file__).parents[3] / "test-data" / "raw-log-escapes.tsv"
+
+    def _rows(self):
+        rows = []
+        for line in self.FIXTURES.read_text(encoding="utf-8").splitlines():
+            if not line.strip() or line.startswith("#"):
+                continue
+            name, escaped, plain_hex = line.split("\t")
+            rows.append((name, escaped, bytes.fromhex(plain_hex).decode("utf-8")))
+        return rows
+
+    def test_the_fixture_file_is_present_and_complete(self):
+        rows = self._rows()
+        self.assertGreaterEqual(len(rows), 12)
+        names = {name for name, _, _ in rows}
+        # The two cases the whole scheme turns on must be present, not merely the easy ones.
+        self.assertIn("literal_backslash_then_t", names)
+        self.assertIn("every_rule_at_once", names)
+
+    def test_every_fixture_escapes_to_its_recorded_form(self):
+        for name, escaped, plain in self._rows():
+            with self.subTest(case=name):
+                self.assertEqual(escape_raw(plain), escaped)
+
+    def test_every_fixture_unescapes_back_to_the_original(self):
+        for name, escaped, plain in self._rows():
+            with self.subTest(case=name):
+                self.assertEqual(unescape_raw(escaped), plain)
+
+    def test_no_escaped_form_contains_a_separator(self):
+        # The property the log depends on: one record stays one line, whatever it holds.
+        for name, escaped, _ in self._rows():
+            with self.subTest(case=name):
+                self.assertNotIn("\t", escaped)
+                self.assertNotIn("\n", escaped)
+                self.assertNotIn("\r", escaped)
