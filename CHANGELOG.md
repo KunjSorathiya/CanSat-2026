@@ -55,6 +55,33 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Verified — the first firmware this project has ever run on hardware
+
+Both Picos are flashed and labelled. Gate 1 is partly measured, and for the first time a
+row in the bring-up record contains a number taken from a running board rather than a
+prediction.
+
+- **1.4 USB serial enumerates** — both boards enumerate; the bridge came up as `COM4`.
+- **1.6 Bridge status cadence** — the `#state=RX` line arrives at a steady 1 Hz with no
+  gaps, matching `STATUS_PERIOD_MS`. A starved 3 s watchdog would show as a gap and a
+  restart; there is neither.
+- **1.7 USB frame integrity** — a captured frame decodes byte-exact. `$51,56b5,` against a
+  51-character payload whose CRC-16/CCITT independently computes to `56b5`, confirming
+  `frame_encode()` against a separate implementation of the same algorithm.
+
+Rows 1.6 and 1.7 are new. They are what this gate could actually measure, and a gate that
+records only what it planned to measure is worth less than the afternoon it costs.
+
+**1.1–1.3 wait on hardware, not on a fault.** The status LED is on GP14, an external LED;
+the Pico's own GP25 LED is not driven by this firmware, so a bare board correctly shows
+nothing.
+
+**1.5 is deferred to Gate 5 or 6, whichever runs first.** The vehicle firmware writes
+nothing to USB — the only `stdout` writer in the tree is the ground-station bridge — so
+"boot to first telemetry attempt" has no observable on a vehicle with no radio and no SD
+card. Recorded as deferred rather than left blank, because a blank row invites someone to
+fill it in later from the pattern around it.
+
 ### Fixed — the Pico cross-build configured host tests it could never link
 
 `cmake --build build/pico --parallel` has never worked. The host test executables —

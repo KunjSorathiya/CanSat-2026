@@ -56,11 +56,33 @@ pass/fail matrix is in [test-plan.md](test-plan.md#hardware-test-plan). This doc
 | 1.1 | Status LED blink, `READY` unarmed | 900 ms period | Stopwatch over 10 blinks, divide | | |
 | 1.2 | Status LED blink, `READY` armed | 400 ms period | Same, after the arming delay | | |
 | 1.3 | Status LED blink, `FLIGHT` | 100 ms period | Same | | |
-| 1.4 | USB serial enumerates | Appears as a serial port | Device manager / `ls /dev/tty*` | | |
-| 1.5 | Boot to first telemetry attempt | < 1 s | Log timestamps from power-on | | |
+| 1.4 | USB serial enumerates | Appears as a serial port | Device manager / `ls /dev/tty*` | **Yes.** Both Picos enumerate; the ground bridge came up as `COM4`, and the port appears and disappears with the cable | ✅ 2026-09-05 / KS |
+| 1.5 | Boot to first telemetry attempt | < 1 s | Log timestamps from power-on | **Deferred — not measurable at this gate.** See the note below | — |
+| 1.6 | Bridge status cadence, no radio attached | 1000 ms (`STATUS_PERIOD_MS`) | Watch the `#state=RX` line in a serial monitor | **1 Hz, steady, no gaps** over a continuous run | ✅ 2026-09-05 / KS |
+| 1.7 | USB frame integrity | Length and CRC-16/CCITT match the payload | Decode one captured frame by hand against `frame_encode()` | **Byte-exact.** `$51,56b5,` against a 51-character payload whose CRC independently computes to `56b5` | ✅ 2026-09-05 / KS |
 
 > Blink rates come from `update_led()` in `controller.cpp`. They are the only diagnostic
 > visible on a sealed vehicle, so confirm all three before the structure closes.
+
+> **1.1–1.3 are not yet takeable, and the reason is not a fault.** The status LED is on
+> **GP14, an external LED** — the Pico's own LED on GP25 is not driven by this firmware, so a
+> bare board shows nothing and that is correct. The rows wait on an LED and a ~330 Ω resistor
+> between GP14 (physical pin 19) and GND (physical pin 18).
+>
+> **1.5 is deferred to Gate 5 or Gate 6, whichever runs first.** The vehicle firmware writes
+> nothing to USB — the only `stdout` writer in the tree is the ground-station bridge — so
+> "first telemetry attempt" has no observable on a vehicle with no radio and no SD card. It is
+> deferred, not skipped, and it is not evidence of a fault.
+>
+> **What the bridge did prove, on 2026-09-05:** USB CDC enumeration, a main loop running to
+> completion, a timebase good enough to hold a 1 Hz cadence with no visible drift, a 3 s
+> watchdog being fed (a starved one would show as a gap and a restart), and the framing layer
+> byte-correct against an independent implementation of the same CRC. `radio=0` and `frames=0`
+> are the correct readings with no RA-02 attached.
+>
+> Rows 1.6 and 1.7 were added because they are what this gate could actually measure. A gate
+> that records only what it planned to measure, and nothing of what it learned, is worth less
+> than the afternoon it costs.
 
 ---
 
