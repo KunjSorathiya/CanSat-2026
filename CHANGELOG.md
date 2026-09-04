@@ -55,6 +55,33 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — a dashboard row that could only ever say `n/a`
+
+Sweeping for the same shape as the cut-record counter — values computed and surfaced
+nowhere — turned up its mirror image: a display with nowhere to get its value from.
+
+The Tk dashboard carried a **Battery (V)** row, filled from `bridge_status["battery"]`.
+Nothing has ever written that key. The bridge's status line reports `radio`, `frames`,
+`dropped`, `rssi`, `snr` and now `sync` — no battery, and the bridge is a *different Pico
+with no battery sense at all*. The vehicle does measure its pack, and raises a fault when
+it is low, but the voltage stays in its health snapshot: the transmitted optional fields
+are `MODE`, `FAULTS`, `CAL`, `ARM` and `YR`, and nothing else.
+
+So the row could only ever read `n/a` — which an operator reads as *the link is not
+reporting this*, rather than *this is not sent*. The row is gone, and the reason is written
+where the decision would be made rather than left as a comment in a UI file.
+
+`telemetry-protocol.md` now records the open question honestly: `BAT-x.xx` would cost about
+nine bytes against a 255-byte budget whose measured worst case is 206, and the controller
+already drops optional fields before overrunning it — so it is affordable, and it is a
+change to the packet contract that this document requires a documented consumer and a
+bandwidth assessment for. **The decision is the team's to make, and it is now written down
+as one rather than silently made in either direction.**
+
+The sweep that found it — every `const` accessor in the firmware headers, checked against
+every call site outside the test suites — found nothing else reaching an operator falsely.
+The remaining test-only accessors are library surface the flight image has no need of.
+
 ### Fixed — the flight log counted its own cut records and told nobody
 
 `RawBlockLog` writes one record per 512-byte block and cuts anything longer. It counts

@@ -45,7 +45,13 @@ _NUMERIC_FIELDS = [
     ("gps_fix", "GPS fix"),
     ("mode", "Flight state"),
     ("fault_count", "Active faults"),
-    ("battery", "Battery (V)"),
+    # No battery row. The vehicle measures its pack voltage and raises a fault when it is
+    # low, but the voltage itself is never transmitted -- the packet's optional fields are
+    # MODE, FAULTS, CAL, ARM and YR, and nothing else. This row used to read the bridge's
+    # status dictionary for a "battery" key that nothing has ever written, from a Pico that
+    # has no battery sense at all, so it could only ever display "n/a". A permanently empty
+    # field is worse than an absent one: it reads as a link that is not reporting rather
+    # than a quantity that is not sent. A low pack still shows up here as an active fault.
 ]
 
 _VALIDATION_FIELDS = [
@@ -214,7 +220,6 @@ class Dashboard:
         bridge_status = snap.get("bridge", {})
         for key, _ in _BRIDGE_FIELDS:
             self._vars[f"bridge.{key}"].set(str(bridge_status.get(key, "--")))
-        self._vars["tele.battery"].set(str(bridge_status.get("battery", "n/a")))
         self._vars["latest_raw"].set(str(snap.get("latest_raw", "--")) or "--")
 
         self._plot.update(self._t, self._series)

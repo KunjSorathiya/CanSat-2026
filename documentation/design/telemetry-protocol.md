@@ -217,6 +217,25 @@ Rules:
 - GPS remains an additional sensor; no scoring result is claimed until it works.
 - Do not add optional fields without a documented consumer and bandwidth assessment.
 
+### Open: the pack voltage is measured and not transmitted
+
+The vehicle samples its battery through the divider on `GP26`, keeps the result in its
+health snapshot, and raises a fault when it falls below `battery_low_voltage`. **The
+voltage itself never leaves the vehicle.** The transmitted optional fields are `MODE`,
+`FAULTS`, `CAL`, `ARM` and `YR`, and nothing else, so an operator watching the link sees a
+fault count increment and cannot see how much margin is left before it does.
+
+The ground station used to imply otherwise: its dashboard carried a **Battery (V)** row
+reading a `battery` key out of the *bridge's* status dictionary — a key nothing has ever
+written, from a Pico with no battery sense. It could only ever display `n/a`, which reads
+as a link that is not reporting rather than a quantity that is not sent. The row is gone.
+
+Adding `BAT-x.xx` would cost roughly nine bytes of a 255-byte budget whose measured
+worst case is 206, and the controller already drops optional fields before overrunning it.
+That makes it affordable, not decided: it is a change to the packet contract, and this
+document requires a documented consumer and a bandwidth assessment before one is made.
+**The decision is open, and it is the team's, not the firmware's.**
+
 ## Radio Configuration
 
 ### Required Sync Words
