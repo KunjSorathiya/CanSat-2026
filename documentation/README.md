@@ -8,6 +8,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 
 | I want to… | Read |
 |---|---|
+| **Build one of these from nothing** | **[Quick Start Guide](quick-start.md)** |
 | Understand the whole project | [Root README](../README.md) |
 | Understand how the software works | [Software Architecture](design/software-architecture.md) |
 | Wire the hardware | [Wiring Diagrams](design/wiring.md) |
@@ -19,6 +20,14 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | Understand why sensors run at 30 Hz | [Sensor Rates](design/sensor-rates.md) |
 | See what changed recently | [Changelog](../CHANGELOG.md) |
 | Check the project against its own claims | [Repository Audit](audit/2026-09-04-repository-audit.md) |
+
+---
+
+## Getting started
+
+| Document | Contents |
+|---|---|
+| [quick-start.md](quick-start.md) | Zero to a working CanSat: PC setup, BOM, ordering, tools, wiring, assembly, SDK, flashing, subsystem bring-up, end-to-end test, fault injection, launch, recovery, troubleshooting, and time estimates for three experience levels |
 
 ---
 

@@ -117,7 +117,11 @@ PC can tell transport corruption apart from a malformed packet.
 
 ## Quick start
 
-Nothing here needs hardware or the Pico SDK.
+> **Building one from scratch?** [documentation/quick-start.md](documentation/quick-start.md)
+> covers the whole path — parts, wiring, firmware, bring-up, launch and recovery — with
+> realistic time estimates and every blocked step marked.
+
+Nothing below needs hardware or the Pico SDK.
 
 ```bash
 bash tools/build_host.sh

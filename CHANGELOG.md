@@ -8,6 +8,25 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 5)
+
+### Added
+
+- **[documentation/quick-start.md](documentation/quick-start.md)** — the guide the project
+  did not have: zero to a working CanSat in 27 steps. PC software, the bill of materials
+  with what each part is for, ordering guidance, tools, part-arrival checks, the power
+  problem, wiring, assembly order, Pico SDK setup, team identity, building, flashing both
+  Picos, bring-up order, the subsystem test matrix, the end-to-end telemetry test, fault
+  injection, pre-flight, launch day, post-flight, troubleshooting, and the ten mistakes
+  most likely to cost a day.
+
+  Every step is marked ✅ verified, 🟡 written but never run on hardware, or 🔴 blocked, so
+  a reader always knows what is real. Engineering-time estimates are given for beginner,
+  intermediate and experienced readers, and are kept explicitly separate from procurement
+  time, which the project cannot estimate.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 4)
 
 The acquisition loop now runs at 30 Hz, which first required admitting that the barometer
