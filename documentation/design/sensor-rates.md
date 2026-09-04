@@ -252,14 +252,26 @@ delays one acquisition instead of triggering several back to back.
 |---|---|
 | BMP280 timing formulas | Verified against three published datasheet figures |
 | MPU-9250 bandwidth table | Transcribed from the register map, register 26 |
-| 83 Hz barometer output rate | Computed from the datasheet, **never measured** |
+| 83 Hz barometer output rate | **MEASURED 2026-09-05: 83.0 Hz.** 166 `STATUS.measuring` falling edges in 2 s, on the delivered board at the configured x1/x4 oversampling |
 | I2C bus utilisation | Computed from bus speed and transaction length, **never measured** |
-| CPU headroom at 30 Hz | **Not measured** — no profiling has been run on an RP2040 |
-| Actual achieved loop rate | **Not measured** — the host tests use a synthetic clock |
+| CPU headroom at 30 Hz | **Partly measured 2026-09-05.** A barometer read costs 0.282 ms mean, 0.347 ms worst — under 1 % of the 33 ms period. Not yet measured with the IMU sharing the bus, and not profiled beyond sensor reads |
+| Actual achieved loop rate | **MEASURED 2026-09-05: 30.04 Hz**, 33.289 ms mean interval with 0.453 ms standard deviation, over 150 ticks. Taken on the bring-up diagnostic's loop, which bounds `controller.cpp`'s scheduler rather than describing it |
 | Vibration spectrum during flight | Unknown; the DLPF choice is a datasheet-informed estimate |
 
-The first hardware measurement to take is the true acquisition rate and jitter under load,
-logged on the vehicle, alongside the barometer's real output rate.
+The barometer's real output rate and the achieved loop rate have both now been taken, on
+hardware, and both matched their predictions — **83.0 Hz against 83.3 predicted, and 30.04 Hz
+against 30**. The 2.8× margin in the table above is confirmed rather than assumed.
+
+**How 3.5 was measured matters, because the obvious method gives the wrong answer.** Counting
+*changed* pressure values returns roughly 46 Hz, not 83. That is not a slow sensor: with the
+IIR filter at x16 the BMP280 deliberately moves its output slowly, so consecutive conversions
+often produce the same compensated value, and counting distinct values measures how often the
+reading moves rather than how often the part converts. Count falling edges of
+`STATUS.measuring` (register `0xF3`, bit 3) instead — one edge per completed conversion,
+regardless of whether the value changed.
+
+What remains unmeasured is the bus utilisation, which needs a scope, and CPU headroom beyond
+the sensor-read cost.
 
 ---
 

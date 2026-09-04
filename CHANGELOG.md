@@ -55,6 +55,18 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Verified — the barometer runs at 83.0 Hz, exactly as computed
+
+`STATUS.measuring` falling edges: **166 in 2 s → 83.0 Hz**, against the 83.3 Hz
+`sensor-rates.md` derived from the datasheet's timing formulas. The status register was
+polled at 9.1 kHz, 110× the output rate, so no completion could have been missed between
+polls.
+
+Two long-standing "never measured" entries in `sensor-rates.md` are now measured: the
+barometer's output rate, and the achieved loop rate at **30.04 Hz**. **The 2.8× margin over
+the 30 Hz acquisition rate is confirmed rather than assumed**, which is what the whole
+oversampling argument in that document rested on.
+
 ### Fixed — 3.5 was measuring the wrong thing, and reported 44 Hz for it
 
 The first run of the barometer rate test returned 44 Hz against a predicted 83, which looked
@@ -71,10 +83,11 @@ The diagnostic now also counts falling edges of **`STATUS.measuring`** (register
 which is the output rate as the datasheet defines it. Both methods are printed, with A
 labelled a lower bound.
 
-**The design constraint was never in danger.** Even 44 Hz is 1.5× the 30 Hz acquisition rate,
-so the failure mode `sensor-rates.md` worries about — a barometer slower than the loop — does
-not arise. But the margin may be smaller than the predicted 2.8×, and that is worth knowing
-before anyone raises `sensor_period_ms`.
+Both methods now print, so the gap stays visible: the same run that reported **83.0 Hz** by
+edge counting reported **46.5 Hz** by distinct values. The sensor was right, the datasheet was
+right, and the instrument was wrong — the same shape of error as the multimeter that invented
+a short across the MPU-9250 two days earlier. A measurement that disagrees with a prediction
+is not automatically a finding about the hardware.
 
 ### Verified — Gate 3 timing, on hardware
 
