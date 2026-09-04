@@ -105,7 +105,13 @@ Not on the BOM, but Part C cannot be completed without them. Record what you act
 > Continuity and DC volts were verified working and were used for [C.6.9](#c6--micro-sd-card-reader-sku-11566),
 > [C.7.6](#c7--antenna-and-ipex-cable), [C.7.7](#c7--antenna-and-ipex-cable),
 > [C.8.3](#c8--lipo-battery), [C.8.5](#c8--lipo-battery) and [C.9.5](#c9--prototype-pcb-quantity-2).
-> The two strap rows need a true resistance range and stay blank until a working meter exists.
+> **The four strap rows were never taken with a meter at all**, and they did not need to be.
+> `C.3.6`/`C.3.7` and `C.4.5`/`C.4.6` were closed on 2026-09-05 by the address each device
+> answers at on a live bus scan: a part replying at `0x68` can only have AD0 low, and one
+> replying at `0x76` can only have SDO low. **That is better evidence than a resistance
+> reading** — it is the strap's effect rather than its cause, measured through the same bus the
+> firmware will use.
+>
 > **Before trusting any meter here, short its probes: it must read ≤0.5 Ω and hold steady.**
 
 ---
@@ -251,8 +257,8 @@ J1 (opposite row, reading from the same end)
 | C.3.3 | Pin labels: VCC, GND, SCL, SDA, XDA, XCL, AD0, INT | Silkscreen | 10 pins. Front: `VCC GND SCL SDA EDA ECL AD0 INT NCS FSYNC`. Back names two of them dually: `SCL/SCLK`, `SDA/SDI`, `ADD/SDO` | Photo 2026-09-04 |
 | C.3.4 | Onboard regulator present? Part marking | Magnifier | **Yes** — one **SOT-23-5** beside the `VCC` pin: three pads one side, two the other, counted at full sensor resolution. **Marking still not legible**, at any enhancement this photograph supports. The package class rules out SOT-223 | Photo 2026-09-04 |
 | C.3.5 | Bus pull-ups fitted? Marked value | Magnifier | **Yes** — five resistors marked `103` (10 kΩ), grouped around the `SCL`/`SDA` and `AD0`/`INT`/`NCS` pins, plus unmarked 0402 passives and one tantalum marked `C106` (**10 µF**) beside the regulator | Photo 2026-09-04 |
-| C.3.6 | AD0 strapped high or low as delivered | Continuity to VCC/GND | | |
-| C.3.7 | Expected I2C address implied by C.3.6 | `0x68` or `0x69` | | |
+| C.3.6 | AD0 strapped high or low as delivered | Continuity to VCC/GND — **closed instead by the address the part answers at** | **LOW.** The IMU answers at `0x68` on a live bus scan, which is only possible with AD0 pulled low | Bus scan 2026-09-05 / KS |
+| C.3.7 | Expected I2C address implied by C.3.6 | `0x68` or `0x69` | **`0x68`** — matches `Mpu9250::Options::address`. No firmware change needed | Bus scan 2026-09-05 / KS |
 | C.3.8 | INT exposed on the header | Visual | **Yes**, `INT` is on the header — GP7 in the pin map is real | Photo 2026-09-04 |
 | C.3.9 | Silkscreen axis arrows present? Which way do X, Y and Z point? | Visual, photograph | **Yes** — an axis cross is printed beside the die. With the board component-side up and the pin header on the right: **X points away from the header, Y towards the `VCC` end, Z out of the board** | Photo 2026-09-04 |
 
@@ -318,12 +324,12 @@ J1 (opposite row, reading from the same end)
 
 | # | Record | How | Value | Date/by |
 |---|---|---|---|---|
-| C.4.1 | Board marking; confirm BMP280, **not** BME280 | Silkscreen, die marking, **package footprint** | **BMP280.** Silkscreen and die text both fail — shared `GY-BM ☐E/☐P 280` artwork with neither box legibly ticked, and a laser mark below this photograph's resolution. **The package outline settles it instead: 2.04 × 2.50 mm measured**, against 2.00 × 2.50 mm for a BMP280 and 2.50 × 2.50 mm for a BME280. See [F-4](#findings) | Photo 2026-09-04 |
+| C.4.1 | Board marking; confirm BMP280, **not** BME280 | Silkscreen, die marking, package footprint, **then chip ID** | **BMP280, confirmed by register.** Chip ID `0xD0` returned **`0x58`** on 2026-09-05 — a BME280 answers `0x60`. The photograph agreed: silkscreen and die text both fail — shared `GY-BM ☐E/☐P 280` artwork with neither box legibly ticked, and a laser mark below this photograph's resolution. **The package outline settles it instead: 2.04 × 2.50 mm measured**, against 2.00 × 2.50 mm for a BMP280 and 2.50 × 2.50 mm for a BME280. See [F-4](#findings) | Photo 2026-09-04; **register read 2026-09-05 / KS** |
 | C.4.2 | Pin count and labels: 4-pin I2C or 6-pin I2C/SPI | Silkscreen | **6 pins**, in order `VCC GND SCL SDA CSB SDO` — the I2C/SPI variant, not the 4-pin I2C-only board | Photo 2026-09-04 |
 | C.4.3 | Onboard regulator present? Part marking | Magnifier | **None.** The board carries only the sensor, four resistors and two capacitors — consistent with the 3.3 V-only `GY-BMP280-3.3` the BOM ordered | Photo 2026-09-04 |
 | C.4.4 | Bus pull-ups fitted? Marked value | Magnifier | **Yes** — four resistors marked `103` (10 kΩ) | Photo 2026-09-04 |
-| C.4.5 | SDO strapped high or low as delivered | Continuity to VCC/GND | | |
-| C.4.6 | Expected I2C address implied by C.4.5 | `0x76` or `0x77` | | |
+| C.4.5 | SDO strapped high or low as delivered | Continuity to VCC/GND — **closed instead by the address the part answers at** | **LOW.** The barometer answers at `0x76`, which requires SDO pulled low | Bus scan 2026-09-05 / KS |
+| C.4.6 | Expected I2C address implied by C.4.5 | `0x76` or `0x77` | **`0x76`** — matches `Bmp280::Options::address` and what wiring.md assumes. No firmware change needed | Bus scan 2026-09-05 / KS |
 
 > C.4.3 is the useful half of this table: **no regulator means no 5 V tolerance.** This board
 > must be fed 3.3 V, which is what the design already intends, and feeding it from a 5 V
@@ -661,7 +667,7 @@ supplier specification the board contradicts, a missing accessory.
 | F-1 | IMU, SKU 2846 | MPU-6050, six axes | **An MPU-6500. Six axes, no magnetometer.** Silkscreen hedges `MPU-9250/6500`; die reads `MP92`, the 9250 marking; **`WHO_AM_I` returns `0x70`**, read on the bench 2026-09-05, and `0x0C` never appears after the bypass is enabled | Driver replaced and the estimator reworked for nine axes — **correct work, and it is what lets this part fly at all**: the firmware accepts `0x70` as a six-axis part rather than refusing to boot. **The vehicle has no absolute yaw reference.** Yaw is gyro-integrated and drifts; telemetry reports `YR-G`, never `YR-M`. Gate 8 rows 8.9–8.11, 8.13 and 8.14 are not takeable on this part |
 | F-2 | Battery, SKU 1125094 | Orange 1S 1500 mAh 25C | **Pro-Range** 1S 1500 mAh 25C. Capacity, cell count and C-rating match; brand does not | Documentation renamed to the delivered brand. Charge parameters are absent from the label and remain undocumented |
 | F-3 | microSD reader, SKU 11566 | 4.5–5.5 V input, onboard 3.3 V regulator, per the supplier listing | **3.3 V board. No regulator, no level shifter**, supply pin printed `3V3`, four 10 kΩ pull-ups and two capacitors | Second rail and boost stage removed from the power tree. Bring-up row 7.4 promoted, since nothing buffers MISO |
-| F-4 | Barometer, SKU 835813 | GY-BMP280-3.3 | Purple **6-pin** `GY-BM ☐E/☐P 280` shared-artwork board, neither variant box legibly marked. **The sensor package measures 2.04 × 2.50 mm — a BMP280 (2.00 × 2.50), not a BME280 (2.50 × 2.50)** | Resolved on geometry; see [C.4.1](#c4--gy-bmp280-33). Confirm with the chip ID at bring-up (`0x58` BMP280, `0x60` BME280) |
+| F-4 | Barometer, SKU 835813 | GY-BMP280-3.3 | Purple **6-pin** `GY-BM ☐E/☐P 280` shared-artwork board, neither variant box legibly marked. Package measured 2.04 × 2.50 mm — a BMP280, not a BME280 | **Closed 2026-09-05. Chip ID `0xD0` returned `0x58`: a BMP280.** The geometric identification in [C.4.1](#c4--gy-bmp280-33) was right, and the register confirms it. It answers at `0x76`, so SDO is low and no firmware change is needed |
 | F-5 | Antenna and cable | BOM: "SMA Male". Supplier page: "RP-SMA Female" | **They mate, hand-tight, no adapter.** Antenna shell female, cable shell male — agreeing with the supplier's gender, not the BOM's. Centre contacts not photographed | Assembly unblocked. Nomenclature open pending straight-on photographs of both mating faces |
 | F-6 | Pico headers | — | **No headers fitted and none supplied** | **Closed.** Strips bought separately and soldered to both Picos, and to every sensor, the microSD, GPS and RA-02 carriers, on 2026-09-04. Joints inspected and adjacent-pin isolation checked before power |
 | F-7 | Accessories | — | **No microSD card and no 1S charger** in the delivery; neither is on the BOM | **Closed.** Both bought separately 2026-09-05, along with a JST-RCY pigtail for the battery and a replacement multimeter. Card capacity/class and charger model still to be recorded in the Part A tools table |

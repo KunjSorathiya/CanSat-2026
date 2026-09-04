@@ -55,6 +55,29 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Verified — the barometer is a BMP280, and Part C's last four straps are closed
+
+Chip ID register `0xD0` returned **`0x58`** on 2026-09-05: a BMP280, not a BME280. `F-4` is
+closed, and closed by the register read `C.4.1` explicitly deferred to rather than by the
+package measurement that stood in for it.
+
+**The geometric identification held.** `C.4.1` identified this part by measuring its lid at
+2.04 × 2.50 mm — an aspect ratio of 0.82 against a BME280's 1.00 — and the register agrees.
+That is worth putting beside `F-1`, where reading four characters of marginal laser text off
+the same class of photograph produced the wrong answer. **Measuring a shape the camera
+resolves beat reading text it did not.**
+
+The barometer also reads sensibly: ~100 822 Pa and 33.9 °C, drifting by about 7 Pa peak to
+peak, which is roughly 0.55 m of altitude noise. Plausible values mean the Bosch fixed-point
+compensation and the calibration coefficient read are both working — a broken compensation
+does not produce numbers this ordinary.
+
+**All four strap rows are now closed, and none of them needed a meter.** `C.3.6`/`C.3.7` and
+`C.4.5`/`C.4.6` were answered by the address each part replies at on a live bus: `0x68`
+requires AD0 low, `0x76` requires SDO low. Both match the firmware defaults, so no config
+change is needed. That is better evidence than a resistance reading — the strap's effect
+rather than its cause, measured through the same bus the firmware will use.
+
 ### Finding — the IMU is an MPU-6500. This vehicle has no magnetometer
 
 `WHO_AM_I` returned **`0x70`** on 2026-09-05. That is an MPU-6500: pin-compatible with the
