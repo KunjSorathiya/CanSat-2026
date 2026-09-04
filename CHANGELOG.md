@@ -8,6 +8,36 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 14)
+
+### Fixed — a power failure during a header write could erase the whole flight log
+
+`RawBlockLog` rewrites its header after **every** record, so a brownout has many chances to
+interrupt exactly that write. With one header block, a torn write left no valid header at
+all — and the next boot would restart at the first record block and overwrite the entire
+flight it had just recorded. In a flight recorder, on a vehicle whose power design is still
+open, that is the worst available failure mode.
+
+The log now keeps **two alternating header copies**, each with a sequence number and a
+checksum over its fields. Power can only interrupt the copy being written; the other still
+carries the previous complete resume point. On boot the log takes the valid copy, or the
+newer of two valid copies. Format version bumped to 2.
+
+Also: records longer than a block are still truncated, but the count is now exposed as
+`truncated_records()` rather than being silent — a shortened record in the flight log
+should be visible as one.
+
+### Added
+
+- `test_raw_block_log_survives_a_torn_header_write` destroys each header copy in turn and
+  checks the log resumes with its records intact, destroys both and checks it starts
+  cleanly rather than resuming from corrupted bytes, and checks a region too small for two
+  headers plus a record is refused.
+
+Host total: **1351 automated checks.**
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 13)
 
 ### Fixed — the bridge could have rebooted whenever the operator closed the dashboard

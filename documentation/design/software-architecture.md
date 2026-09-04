@@ -376,14 +376,22 @@ timestamps. `clear()` marks recovery but keeps the history.
 with **no filesystem at all**, so the flight code carries no FAT dependency.
 
 ```text
-base_lba + 0        header: magic 'CSAT', version, block size,
-                            next free block, boot count, region size
-base_lba + 1 .. N   one space-padded, newline-terminated record per block
+base_lba + 0        header copy A  ─┐ magic 'CSAT', version, block size, next free
+base_lba + 1        header copy B  ─┘ block, boot count, region size, sequence, checksum
+base_lba + 2 .. N   one space-padded, newline-terminated record per block
 ```
 
-The header is rewritten after every record, so a brownout or impact reset resumes at the
+A header is rewritten after every record, so a brownout or impact reset resumes at the
 correct block instead of overwriting flight data, and the boot count increments on each
 power session. A full region stops writing rather than wrapping over earlier data.
+
+**The two header copies alternate**, each carrying a sequence number and a checksum. That
+matters because the header is written after *every* record: power can fail during one, and
+with a single header there would then be no valid resume point at all — so the next boot
+would restart at the first record block and overwrite the entire flight it had just
+recorded. With two copies, only the one being written can be damaged; the other still
+holds the previous complete resume point. `test_raw_block_log_survives_a_torn_header_write`
+destroys each copy in turn and checks the log resumes with its records intact.
 
 ---
 
@@ -496,7 +504,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation | **Verified on host** — 33 C++ suites with 506 assertions, plus the LoRa driver (94) and the microSD driver (581) against simulated devices, 96 Python tests and 30 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 36 C++ suites with 537 assertions, plus the LoRa driver (94) and the microSD driver (581) against simulated devices, 109 Python tests including an end-to-end trace, and 30 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |

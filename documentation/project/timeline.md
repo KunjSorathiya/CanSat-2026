@@ -92,10 +92,10 @@ had never executed. All are recorded in [CHANGELOG.md](../../CHANGELOG.md) and i
 | Area | Delivered | Evidence |
 |---|---|---|
 | Telemetry protocol | Rulebook format, strict parser, precision rules, optional fields | [telemetry-protocol.md](../design/telemetry-protocol.md) |
-| Flight core | Controller, state machine, scheduler, orientation, calibration, faults, builder, block log, NMEA parser, link profile, airtime and sensor-rate guards | 33 C++ suites, 506 assertions |
+| Flight core | Controller, state machine, scheduler, orientation, calibration, faults, builder, block log, NMEA parser, link profile, airtime and sensor-rate guards | 36 C++ suites, 537 assertions |
 | Sensor drivers | MPU6050, BMP280, NEO-6M | Compile-checked against SDK stubs; register encodings and timing model host-tested |
 | Ground bridge | Continuous RX, CRC framing, status lines, watchdog | Framing unit-tested |
-| Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI | 63 Python tests |
+| Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI, end-to-end trace | 76 Python tests |
 | Web console | Framing, parser, validator and link health extracted from `index.html` and run under Node | 30 Node tests |
 | SPI drivers | LoRa radio and microSD command sequences against simulated devices | 675 assertions |
 | Tooling | LoRa time-on-air calculator used for the packet-rate decision | 33 Python tests |

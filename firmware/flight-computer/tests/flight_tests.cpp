@@ -995,16 +995,91 @@ void test_raw_block_log() {
     CHECK(log2.append_line("row-4", 5));
     CHECK(log2.append_line("row-5", 5));
     CHECK(log2.append_line("row-6", 5));
-    CHECK(log2.append_line("row-7", 5));
-    CHECK(log2.record_count() == 7);
-    CHECK(!log2.append_line("row-8", 5));  // region full
+    CHECK(log2.record_count() == 6);
+    // Two header blocks plus six records fills an eight-block region.
+    CHECK(!log2.append_line("row-7", 5));
     CHECK(log2.full());
 
-    // Stored record content is recoverable.
+    // Stored record content is recoverable, starting after the two header blocks.
     std::uint8_t block[512];
-    CHECK(MemBlocks::rd(&mem, 1, block));
+    CHECK(MemBlocks::rd(&mem, flight::RawBlockLog::kHeaderBlocks, block));
     CHECK(std::memcmp(block, "row-1", 5) == 0);
     CHECK(block[5] == '\n');
+
+    // A record longer than a block is cut, and the cut is counted rather than hidden.
+    MemBlocks big(16);
+    flight::RawBlockLog::Io big_io;
+    big_io.ctx = &big;
+    big_io.read_block = &MemBlocks::rd;
+    big_io.write_block = &MemBlocks::wr;
+    flight::RawBlockLog long_log;
+    CHECK(long_log.begin(big_io, 0, 16));
+    const std::string oversized(1000, 'x');
+    CHECK(long_log.append_line(oversized.data(), oversized.size()));
+    CHECK(long_log.truncated_records() == 1);
+    CHECK(long_log.append_line("short", 5));
+    CHECK(long_log.truncated_records() == 1);
+}
+
+// The header is rewritten after every record, so power can fail during that write. With a
+// single header that would leave no valid resume point, and the next boot would restart at
+// the first record block — overwriting the entire flight it had just recorded. Two
+// alternating copies mean only one can ever be damaged.
+void test_raw_block_log_survives_a_torn_header_write() {
+    MemBlocks mem(16);
+    flight::RawBlockLog::Io io;
+    io.ctx = &mem;
+    io.read_block = &MemBlocks::rd;
+    io.write_block = &MemBlocks::wr;
+
+    flight::RawBlockLog log;
+    CHECK(log.begin(io, 0, 16));
+    for (int i = 0; i < 5; ++i) CHECK(log.append_line("record", 6));
+    CHECK(log.record_count() == 5);
+
+    // Corrupt each header copy in turn, as an interrupted write would.
+    for (std::uint32_t header = 0; header < flight::RawBlockLog::kHeaderBlocks; ++header) {
+        MemBlocks damaged = mem;
+        std::memset(damaged.blocks[header].data(), 0xFF, 512);
+        flight::RawBlockLog::Io damaged_io;
+        damaged_io.ctx = &damaged;
+        damaged_io.read_block = &MemBlocks::rd;
+        damaged_io.write_block = &MemBlocks::wr;
+
+        flight::RawBlockLog resumed;
+        CHECK(resumed.begin(damaged_io, 0, 16));
+        // The surviving copy carries the resume point: no flight data is overwritten.
+        CHECK(resumed.record_count() >= 4);
+        CHECK(resumed.boot_count() >= 2);
+
+        std::uint8_t block[512];
+        CHECK(MemBlocks::rd(&damaged, flight::RawBlockLog::kHeaderBlocks, block));
+        CHECK(std::memcmp(block, "record", 6) == 0);
+    }
+
+    // Both copies destroyed is unrecoverable, and must start cleanly rather than resume at
+    // a block number read out of corrupted bytes.
+    MemBlocks wiped = mem;
+    for (std::uint32_t header = 0; header < flight::RawBlockLog::kHeaderBlocks; ++header) {
+        std::memset(wiped.blocks[header].data(), 0x00, 512);
+    }
+    flight::RawBlockLog::Io wiped_io;
+    wiped_io.ctx = &wiped;
+    wiped_io.read_block = &MemBlocks::rd;
+    wiped_io.write_block = &MemBlocks::wr;
+    flight::RawBlockLog fresh;
+    CHECK(fresh.begin(wiped_io, 0, 16));
+    CHECK(fresh.record_count() == 0);
+    CHECK(fresh.boot_count() == 1);
+
+    // A region too small for the headers plus one record is refused outright.
+    MemBlocks tiny(2);
+    flight::RawBlockLog::Io tiny_io;
+    tiny_io.ctx = &tiny;
+    tiny_io.read_block = &MemBlocks::rd;
+    tiny_io.write_block = &MemBlocks::wr;
+    flight::RawBlockLog small;
+    CHECK(!small.begin(tiny_io, 0, 2));
 }
 
 // ----------------------------------------------------------------------------
@@ -1294,6 +1369,7 @@ int main(int argc, char** argv) {
     test_lora_airtime_reference_vectors();
     test_telemetry_builder();
     test_raw_block_log();
+    test_raw_block_log_survives_a_torn_header_write();
     test_controller_sequence_and_degradation();
     test_controller_sensor_failure_suppresses_but_continues();
     test_startup_calibrator_stationary_and_moving();

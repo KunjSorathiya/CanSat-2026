@@ -209,6 +209,7 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-28** | SD transfers assumed the SPI clock was still whatever initialisation left, on a bus the radio shares and can reconfigure | Low | ✅ **Closed 2026-09-04 (cycle 10)** — each transfer sets its own rate |
 | **F-29** | The bridge wrote to USB CDC with no check that a host was listening. A blocked write under its 3 s watchdog would turn a closed dashboard into a reboot loop — in the component whose requirement is to survive exactly that | **High** | ✅ **Closed 2026-09-04 (cycle 13)** — output dropped and counted while no host is attached, reported as `dropped=` in the status line |
 | **F-30** | Startup calibration gated on gyro variance alone, so a vehicle turning at a constant rate on the pad passed as "still" and had its rotation subtracted as bias for the whole flight | **Medium** | ✅ **Closed 2026-09-04 (cycle 13)** — the mean is bounded at 25 deg/s, beyond the datasheet's zero-rate offset |
+| **F-31** | `RawBlockLog` kept one header block, rewritten after every record. A power failure during that write left no valid header, and the next boot would restart at the first record block — overwriting the entire flight just recorded | **High** | ✅ **Closed 2026-09-04 (cycle 14)** — two alternating header copies with sequence numbers and checksums; each is destroyed in turn by a test |
 
 ---
 

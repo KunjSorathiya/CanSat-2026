@@ -24,18 +24,72 @@ std::uint32_t get_u32(const std::uint8_t* p) {
            (static_cast<std::uint32_t>(p[2]) << 16) | (static_cast<std::uint32_t>(p[3]) << 24);
 }
 
+// Header layout, all little-endian:
+//   0  magic          4
+//   4  version        2
+//   6  block size     2
+//   8  next free lba  4
+//  12  boot count     4
+//  16  block count    4
+//  20  sequence       4
+//  24  checksum       4   sum of bytes 0..23, so a torn write is detectable
+constexpr std::size_t kOffMagic = 0;
+constexpr std::size_t kOffVersion = 4;
+constexpr std::size_t kOffBlockSize = 6;
+constexpr std::size_t kOffNextLba = 8;
+constexpr std::size_t kOffBootCount = 12;
+constexpr std::size_t kOffBlockCount = 16;
+constexpr std::size_t kOffSequence = 20;
+constexpr std::size_t kOffChecksum = 24;
+constexpr std::size_t kChecksummedBytes = 24;
+
+std::uint32_t header_checksum(const std::uint8_t* block) {
+    std::uint32_t sum = 0;
+    for (std::size_t i = 0; i < kChecksummedBytes; ++i) {
+        sum += block[i];
+    }
+    return sum;
+}
+
 }  // namespace
 
 bool RawBlockLog::write_header() {
     std::uint8_t block[kBlockSize];
     std::memset(block, 0, sizeof(block));
-    put_u32(block + 0, kMagic);
-    put_u16(block + 4, kVersion);
-    put_u16(block + 6, static_cast<std::uint16_t>(kBlockSize));
-    put_u32(block + 8, next_lba_);
-    put_u32(block + 12, boot_count_);
-    put_u32(block + 16, block_count_);
-    return io_.write_block(io_.ctx, base_lba_, block);
+    put_u32(block + kOffMagic, kMagic);
+    put_u16(block + kOffVersion, kVersion);
+    put_u16(block + kOffBlockSize, static_cast<std::uint16_t>(kBlockSize));
+    put_u32(block + kOffNextLba, next_lba_);
+    put_u32(block + kOffBootCount, boot_count_);
+    put_u32(block + kOffBlockCount, block_count_);
+    put_u32(block + kOffSequence, ++header_sequence_);
+    put_u32(block + kOffChecksum, header_checksum(block));
+
+    // Alternate between the two copies. A power failure can corrupt only the copy being
+    // written; the other still carries the previous, complete resume point.
+    const std::uint32_t target = base_lba_ + (header_sequence_ % kHeaderBlocks);
+    return io_.write_block(io_.ctx, target, block);
+}
+
+bool RawBlockLog::read_header(std::uint32_t lba, std::uint32_t& sequence,
+                              std::uint32_t& next_lba, std::uint32_t& boot_count) const {
+    std::uint8_t block[kBlockSize];
+    if (!io_.read_block(io_.ctx, lba, block)) {
+        return false;
+    }
+    if (get_u32(block + kOffMagic) != kMagic || get_u16(block + kOffVersion) != kVersion) {
+        return false;
+    }
+    if (get_u16(block + kOffBlockSize) != static_cast<std::uint16_t>(kBlockSize)) {
+        return false;
+    }
+    if (get_u32(block + kOffChecksum) != header_checksum(block)) {
+        return false;  // torn write: this copy was interrupted
+    }
+    sequence = get_u32(block + kOffSequence);
+    next_lba = get_u32(block + kOffNextLba);
+    boot_count = get_u32(block + kOffBootCount);
+    return true;
 }
 
 bool RawBlockLog::begin(const Io& io, std::uint32_t base_lba, std::uint32_t block_count) {
@@ -43,25 +97,39 @@ bool RawBlockLog::begin(const Io& io, std::uint32_t base_lba, std::uint32_t bloc
     base_lba_ = base_lba;
     block_count_ = block_count;
     healthy_ = false;
-    if (!io_.read_block || !io_.write_block || block_count < 2) {
+    header_sequence_ = 0;
+    truncated_records_ = 0;
+    if (!io_.read_block || !io_.write_block || block_count < kHeaderBlocks + 1) {
         return false;
     }
 
-    std::uint8_t block[kBlockSize];
-    if (!io_.read_block(io_.ctx, base_lba_, block)) {
-        return false;
-    }
-
-    if (get_u32(block + 0) == kMagic && get_u16(block + 4) == kVersion) {
-        const std::uint32_t stored_next = get_u32(block + 8);
-        boot_count_ = get_u32(block + 12) + 1;
-        next_lba_ = (stored_next > base_lba_ && stored_next <= base_lba_ + block_count_)
+    // Take whichever header copy is valid; if both are, take the newer one.
+    const std::uint32_t first_record = base_lba_ + kHeaderBlocks;
+    bool resumed = false;
+    std::uint32_t best_sequence = 0;
+    for (std::uint32_t i = 0; i < kHeaderBlocks; ++i) {
+        std::uint32_t sequence = 0;
+        std::uint32_t stored_next = 0;
+        std::uint32_t stored_boots = 0;
+        if (!read_header(base_lba_ + i, sequence, stored_next, stored_boots)) {
+            continue;
+        }
+        if (resumed && sequence <= best_sequence) {
+            continue;
+        }
+        best_sequence = sequence;
+        boot_count_ = stored_boots + 1;
+        next_lba_ = (stored_next >= first_record && stored_next <= base_lba_ + block_count_)
                         ? stored_next
-                        : base_lba_ + 1;
-    } else {
-        boot_count_ = 1;
-        next_lba_ = base_lba_ + 1;
+                        : first_record;
+        resumed = true;
     }
+
+    if (!resumed) {
+        boot_count_ = 1;
+        next_lba_ = first_record;
+    }
+    header_sequence_ = best_sequence;
 
     healthy_ = write_header();
     return healthy_;
@@ -78,8 +146,9 @@ bool RawBlockLog::append_line(const char* text, std::size_t len) {
     std::uint8_t block[kBlockSize];
     std::memset(block, ' ', sizeof(block));
     std::size_t n = len;
-    if (n > kBlockSize - 1) {
-        n = kBlockSize - 1;
+    if (n > kMaxRecordBytes) {
+        n = kMaxRecordBytes;
+        ++truncated_records_;
     }
     std::memcpy(block, text, n);
     block[n] = '\n';
