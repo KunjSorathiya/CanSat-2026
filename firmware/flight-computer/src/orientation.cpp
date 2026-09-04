@@ -64,8 +64,14 @@ void OrientationEstimator::update(double ax, double ay, double az,
             pitch_deg_ = pitch_acc;
             have_reference_ = true;
         } else {
-            roll_deg_ = alpha_ * roll_pred + (1.0 - alpha_) * roll_acc;
-            pitch_deg_ = alpha_ * pitch_pred + (1.0 - alpha_) * pitch_acc;
+            // Blend the wrapped *difference*, not the raw angles. A direct weighted mean
+            // is wrong across the +-180 deg seam: a prediction of 179 deg and an
+            // accelerometer reading of -179 deg describe attitudes 2 deg apart, but
+            // averaging them yields ~175 deg — an error of nearly 180 deg in the worst
+            // case, on a vehicle that tumbles through that seam every rotation.
+            // Away from the seam this is identical to the weighted mean.
+            roll_deg_ = roll_pred + (1.0 - alpha_) * wrap_degrees(roll_acc - roll_pred);
+            pitch_deg_ = pitch_pred + (1.0 - alpha_) * wrap_degrees(pitch_acc - pitch_pred);
         }
     } else {
         roll_deg_ = roll_pred;

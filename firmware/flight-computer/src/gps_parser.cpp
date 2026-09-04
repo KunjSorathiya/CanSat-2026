@@ -25,14 +25,28 @@ bool parse_double(const char* s, double& out) {
     return true;
 }
 
-bool parse_coordinate(const char* dm, char hemisphere, double& out) {
+// NMEA coordinates are ddmm.mmmm (latitude) or dddmm.mmmm (longitude). `limit` is the
+// mathematical bound for the axis: 90 for latitude, 180 for longitude. A sentence can pass
+// its checksum and still carry an impossible position — a corrupted field, a module fault,
+// or a hemisphere character that is neither N/S nor E/W. Rejecting here keeps an
+// impossible fix out of the telemetry stream rather than leaving the ground station to
+// notice it.
+bool parse_coordinate(const char* dm, char hemisphere, double limit, double& out) {
     double raw = 0.0;
-    if (!parse_double(dm, raw)) return false;
+    if (!parse_double(dm, raw) || raw < 0.0) return false;
+
     const double degrees = std::floor(raw / 100.0);
     const double minutes = raw - degrees * 100.0;
+    if (minutes >= 60.0) return false;  // minutes field out of range
+
     double value = degrees + minutes / 60.0;
-    if (hemisphere == 'S' || hemisphere == 'W') value = -value;
-    if (!std::isfinite(value)) return false;
+    if (!std::isfinite(value) || value > limit) return false;
+
+    if (hemisphere == 'S' || hemisphere == 'W') {
+        value = -value;
+    } else if (hemisphere != 'N' && hemisphere != 'E') {
+        return false;  // missing or corrupted hemisphere: sign is unknown, not assumed
+    }
     out = value;
     return true;
 }
@@ -137,8 +151,8 @@ bool NmeaParser::apply_sentence() {
         double lat = 0.0;
         double lon = 0.0;
         double alt = 0.0;
-        if (parse_coordinate(fields[2], fields[3][0], lat) &&
-            parse_coordinate(fields[4], fields[5][0], lon) &&
+        if (parse_coordinate(fields[2], fields[3][0], 90.0, lat) &&
+            parse_coordinate(fields[4], fields[5][0], 180.0, lon) &&
             parse_double(fields[9], alt)) {
             latest_.latitude = lat;
             latest_.longitude = lon;
@@ -167,8 +181,8 @@ bool NmeaParser::apply_sentence() {
         }
         double lat = 0.0;
         double lon = 0.0;
-        if (parse_coordinate(fields[3], fields[4][0], lat) &&
-            parse_coordinate(fields[5], fields[6][0], lon)) {
+        if (parse_coordinate(fields[3], fields[4][0], 90.0, lat) &&
+            parse_coordinate(fields[5], fields[6][0], 180.0, lon)) {
             latest_.latitude = lat;
             latest_.longitude = lon;
             latest_.valid = true;

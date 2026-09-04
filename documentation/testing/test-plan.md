@@ -52,7 +52,7 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 28 suites across the whole flight core | ✅ **357 / 357 assertions** |
+| `flight_tests` | 30 suites across the whole flight core | ✅ **400 / 400 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 6 modules | ✅ **42 / 42 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
@@ -108,7 +108,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 28 suites, 357 assertions
+### `flight_tests` — 30 suites, 400 assertions
 
 | Suite | What it proves |
 |---|---|

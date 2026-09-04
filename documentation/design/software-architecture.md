@@ -101,7 +101,7 @@ vehicle substitutes `flight::pico::*`.
 | [`controller.cpp`](../../firmware/flight-computer/src/controller.cpp) | The flight loop orchestrator — the single place mission behaviour is composed |
 | [`state_machine.cpp`](../../firmware/flight-computer/src/state_machine.cpp) | `INIT` to `SELF_TEST` to `READY` to `FLIGHT` to `LANDED` to `RECOVERY`, plus `FAULT` |
 | [`scheduler.cpp`](../../firmware/flight-computer/src/scheduler.cpp) | `PeriodicTask` — fixed-period, non-allocating, stall-tolerant timers |
-| [`orientation.cpp`](../../firmware/flight-computer/src/orientation.cpp) | Complementary-filter roll and pitch, gyro-integrated relative yaw |
+| [`orientation.cpp`](../../firmware/flight-computer/src/orientation.cpp) | Complementary-filter roll and pitch, gyro-integrated relative yaw. The filter blends the *wrapped difference* between prediction and measurement, not the raw angles — a plain weighted mean is wrong across the ±180° seam, which a tumbling vehicle crosses on every rotation |
 | [`sensor_math.cpp`](../../firmware/flight-computer/src/sensor_math.cpp) | MPU6050 scaling, Bosch BMP280 compensation, barometric altitude |
 | [`startup_calibration.cpp`](../../firmware/flight-computer/src/startup_calibration.cpp) | Pad calibration: gyro bias, accelerometer offset, barometric ground reference |
 | [`telemetry_builder.cpp`](../../firmware/flight-computer/src/telemetry_builder.cpp) | Snapshot to record to packet string to SD CSV row |
@@ -495,7 +495,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, state machine, calibration, radio airtime, sensor timing | **Verified on host** — 28 C++ suites with 357 assertions, 75 Python tests and 30 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing | **Verified on host** — 30 C++ suites with 400 assertions, 75 Python tests and 30 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |

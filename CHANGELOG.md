@@ -8,6 +8,45 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 6)
+
+A correctness pass over the two places where the vehicle turns raw sensor data into
+numbers it transmits: attitude fusion and GPS parsing.
+
+### Fixed — the complementary filter was wrong at the ±180° seam
+
+`orientation.cpp` blended the gyro prediction and the accelerometer measurement as a plain
+weighted mean. Angles wrap: a prediction of +179° and a measurement of −179° describe
+attitudes 2° apart, but their weighted mean is ≈ +175° — and in the worst case the error
+approaches 180°. A CanSat under a parachute tumbles through that seam on **every
+rotation**, so this was not an edge case.
+
+The filter now blends the *wrapped difference* between prediction and measurement, which is
+identical to the old behaviour away from the seam and correct at it.
+`test_orientation_blends_across_the_wrap()` fails against the previous formula — verified by
+reverting the fix and re-running.
+
+### Fixed — the NMEA parser accepted impossible positions
+
+A sentence can pass its checksum and still carry a corrupted field. The parser accepted:
+
+- latitudes beyond 90° and longitudes beyond 180°;
+- a minutes field of 77, which cannot occur;
+- a **missing hemisphere character**, silently treating the position as north/east.
+
+All three are now rejected at the source, so an impossible fix never reaches telemetry
+rather than being left for the ground station to notice. Rejections are not counted as
+checksum errors, since the checksum was fine.
+
+### Added
+
+- Nine GPS validation checks covering southern and western hemispheres, three-digit
+  longitudes, the GN/GL multi-constellation talker ids, and RMC's void form.
+- Four orientation checks covering the seam, the level case, and a gyro-only spin.
+- Host total: **400 assertions**.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 5)
 
 ### Added

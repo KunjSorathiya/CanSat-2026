@@ -422,6 +422,108 @@ void test_config_radio_airtime_guard() {
     CHECK(!flight::validate_config(bad, why));
 }
 
+// Feeds a whole sentence to a parser and reports whether it produced a usable fix.
+bool feed_nmea(flight::NmeaParser& parser, const std::string& sentence) {
+    for (const char c : sentence) parser.consume(c);
+    return parser.has_fix();
+}
+
+// A checksum-valid sentence can still carry an impossible position. Those must not reach
+// telemetry: the vehicle should transmit no fix rather than a wrong one.
+void test_gps_coordinate_validation() {
+    // Southern and western hemispheres must come back negative.
+    flight::NmeaParser sw;
+    CHECK(feed_nmea(sw,
+        "$GPGGA,123519,4807.038,S,01131.000,W,1,08,0.9,545.4,M,46.9,M,,*48\r\n"));
+    CHECK(approx(sw.latest().latitude, -48.1173, 0.001));
+    CHECK(approx(sw.latest().longitude, -11.5167, 0.001));
+
+    // A three-digit longitude in the eastern hemisphere.
+    flight::NmeaParser east;
+    CHECK(feed_nmea(east,
+        "$GPGGA,123519,3345.000,S,15112.000,E,1,09,0.8,12.0,M,20.0,M,,*65\r\n"));
+    CHECK(approx(east.latest().latitude, -33.75, 0.001));
+    CHECK(approx(east.latest().longitude, 151.2, 0.001));
+
+    // Latitude beyond 90 degrees is impossible, not merely unlikely.
+    flight::NmeaParser bad_lat;
+    CHECK(!feed_nmea(bad_lat,
+        "$GPGGA,123519,9907.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4B\r\n"));
+
+    // Longitude beyond 180 degrees, likewise.
+    flight::NmeaParser bad_lon;
+    CHECK(!feed_nmea(bad_lon,
+        "$GPGGA,123519,4807.038,N,18131.000,E,1,08,0.9,545.4,M,46.9,M,,*4F\r\n"));
+
+    // A minutes field of 77 cannot occur: minutes run 0..59.
+    flight::NmeaParser bad_min;
+    CHECK(!feed_nmea(bad_min,
+        "$GPGGA,123519,4877.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*40\r\n"));
+
+    // No hemisphere character means the sign is unknown; it must not be assumed north.
+    flight::NmeaParser no_hemi;
+    CHECK(!feed_nmea(no_hemi,
+        "$GPGGA,123519,4807.038,,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*09\r\n"));
+
+    // RMC carries a fix too, and its void form must clear the fix without inventing one.
+    flight::NmeaParser rmc;
+    CHECK(feed_nmea(rmc,
+        "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A\r\n"));
+    CHECK(approx(rmc.latest().latitude, 48.1173, 0.001));
+    for (const char c : std::string("$GPRMC,123519,V,,,,,,,230394,,*33\r\n")) rmc.consume(c);
+    CHECK(!rmc.has_fix());
+
+    // Multi-constellation receivers use GN/GL/GA talker ids, not only GP.
+    flight::NmeaParser gnss;
+    CHECK(feed_nmea(gnss,
+        "$GNGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*59\r\n"));
+    CHECK(approx(gnss.latest().latitude, 48.1173, 0.001));
+
+    // Rejected sentences are not checksum failures, and must not be counted as such.
+    CHECK(bad_lat.checksum_errors() == 0);
+    CHECK(no_hemi.checksum_errors() == 0);
+}
+
+// The complementary filter blends angles, which wrap. Blending them naively is wrong at
+// the seam, and a tumbling CanSat crosses that seam on every rotation.
+void test_orientation_blends_across_the_wrap() {
+    flight::OrientationEstimator est(0.98);
+
+    // Establish a reference near +180 deg of roll: gravity on -Y with the vehicle rolled
+    // almost all the way over. atan2(ay, az) with ay slightly positive and az negative
+    // gives a roll just under +180 deg.
+    est.update(0.0, 0.2, -9.8, 0.0, 0.0, 0.0, 0.05);
+    const double start = est.estimate().roll_deg;
+    CHECK(std::fabs(start) > 170.0);
+
+    // Now roll a little further, so the true attitude crosses the seam and the
+    // accelerometer reports the other sign. A naive weighted mean would swing the
+    // estimate most of the way around the circle; the wrapped blend must not.
+    for (int i = 0; i < 20; ++i) {
+        est.update(0.0, -0.2, -9.8, 0.0, 0.0, 0.0, 0.05);
+        const double roll = est.estimate().roll_deg;
+        CHECK(std::fabs(roll) > 170.0);  // stays near the seam, never swings to ~0
+    }
+
+    // The estimate must still be a valid wrapped angle.
+    const double settled = est.estimate().roll_deg;
+    CHECK(settled > -180.0 && settled <= 180.0);
+
+    // Away from the seam the wrapped blend is the ordinary weighted mean: level vehicle,
+    // no rotation, so the estimate must converge to level rather than drift.
+    flight::OrientationEstimator level(0.98);
+    for (int i = 0; i < 50; ++i) level.update(0.0, 0.0, 9.80665, 0.0, 0.0, 0.0, 0.033);
+    CHECK(approx(level.estimate().roll_deg, 0.0, 0.5));
+    CHECK(approx(level.estimate().pitch_deg, 0.0, 0.5));
+
+    // A gyro-only spin through the seam wraps rather than accumulating past 180 deg.
+    flight::OrientationEstimator spin(1.0);  // ignore the accelerometer entirely
+    for (int i = 0; i < 100; ++i) spin.update(0.0, 0.0, 9.80665, 100.0, 0.0, 0.0, 0.05);
+    const double spun = spin.estimate().roll_deg;
+    CHECK(spun > -180.0 && spun <= 180.0);
+    CHECK(std::isfinite(spun));
+}
+
 // The sensor timing model, pinned to the BMP280 datasheet's own published presets.
 void test_sensor_timing_model() {
     using flight::sensors::BaroFilter;
@@ -986,6 +1088,8 @@ int main(int argc, char** argv) {
     test_state_machine_fault_paths();
     test_config_validation();
     test_config_radio_airtime_guard();
+    test_gps_coordinate_validation();
+    test_orientation_blends_across_the_wrap();
     test_sensor_timing_model();
     test_config_sensor_rate_guard();
     test_controller_ignores_repeated_barometer_samples();

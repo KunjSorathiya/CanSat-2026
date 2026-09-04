@@ -194,6 +194,8 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-13** | The flight computer and the ground-station bridge held independent copies of the modem settings and agreed only by coincidence | **High** | ✅ **Closed 2026-09-04 (cycle 2)** — both read `cansat/link_profile.hpp`; a test compares them field by field |
 | **F-14** | The C++ parser accepted `P-000`, and the Python and JavaScript parsers accepted `P- 7` and packet numbers beyond 32 bits — three parsers, three rules | **Medium** | ✅ **Closed 2026-09-04 (cycle 2)** — one rule in all three, pinned by `test-data/protocol-fixtures.tsv` |
 | **F-15** | The barometer was hard-coded to the 26.3 Hz "indoor navigation" preset, so no acquisition rate above ~26 Hz could return fresh data; the IMU's 44 Hz anti-alias filter was also too wide for the loop rate | **Medium** | ✅ **Closed 2026-09-04 (cycle 4)** — sensor settings moved into `Configuration`, barometer at the 83 Hz preset, 30 Hz acquisition, startup guard and a duplicate-sample check on vertical speed. See [sensor-rates.md](../design/sensor-rates.md) |
+| **F-16** | The complementary filter averaged raw angles, so blending across the ±180° seam produced errors approaching 180° — on a vehicle that tumbles through that seam every rotation | **High** | ✅ **Closed 2026-09-04 (cycle 6)** — blends the wrapped difference; a regression test fails against the old formula |
+| **F-17** | The NMEA parser accepted any checksum-valid coordinate, including latitudes past 90°, minutes past 59, and a missing hemisphere character (silently treated as north/east) | Medium | ✅ **Closed 2026-09-04 (cycle 6)** — coordinates are range-checked at the source, so an impossible fix never reaches telemetry |
 
 ---
 

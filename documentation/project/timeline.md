@@ -73,7 +73,7 @@ timeline
 | Area | Delivered | Evidence |
 |---|---|---|
 | Telemetry protocol | Rulebook format, strict parser, precision rules, optional fields | [telemetry-protocol.md](../design/telemetry-protocol.md) |
-| Flight core | Controller, state machine, scheduler, orientation, calibration, faults, builder, block log, NMEA parser, link profile, airtime and sensor-rate guards | 28 C++ suites, 357 assertions |
+| Flight core | Controller, state machine, scheduler, orientation, calibration, faults, builder, block log, NMEA parser, link profile, airtime and sensor-rate guards | 30 C++ suites, 400 assertions |
 | Sensor drivers | MPU6050, BMP280, NEO-6M, microSD, SX1278 | Compile-checked against SDK stubs |
 | Ground bridge | Continuous RX, CRC framing, status lines, watchdog | Framing unit-tested |
 | Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI | 42 Python tests |
