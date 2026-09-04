@@ -8,3 +8,7 @@ venv/
 *.log
 .claude/
 host.log
+
+# Python wheels and other downloaded installers are never project sources.
+*.whl
+*.tar.gz
