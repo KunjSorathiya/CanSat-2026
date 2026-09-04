@@ -54,6 +54,12 @@ $CXX $CXXFLAGS ${INC[@]} \
   "$ROOT/firmware/flight-computer/tests/flight_tests.cpp" \
   -o "$OUT/flight_tests"
 
+echo "== compiling sx1278_tests =="
+# The LoRa driver reaches hardware only through a callback struct, so its whole register
+# sequence runs here against a fake register bank -- no radio, no SDK.
+# shellcheck disable=SC2068
+$CXX $CXXFLAGS ${INC[@]}   "$ROOT/firmware/common/src/sx1278.cpp"   "$ROOT/firmware/common/tests/sx1278_test.cpp"   -o "$OUT/sx1278_tests"
+
 echo "== compiling ground_station_tests =="
 # shellcheck disable=SC2068
 $CXX $CXXFLAGS ${INC[@]} \
@@ -64,6 +70,7 @@ $CXX $CXXFLAGS ${INC[@]} \
 echo "== running C++ tests =="
 "$OUT/flight_smoke_test"
 "$OUT/flight_tests" "$ROOT"
+"$OUT/sx1278_tests"
 "$OUT/ground_station_tests"
 
 if command -v python >/dev/null 2>&1; then

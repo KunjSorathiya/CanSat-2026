@@ -8,6 +8,44 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 9)
+
+The LoRa driver was the largest piece of never-executed code in the repository. It reaches
+hardware only through a callback struct, so its entire register sequence can be run against
+a fake register bank — which found two defects on the first pass.
+
+### Fixed — reported RSSI was 7 dB optimistic
+
+The driver used the Semtech **high-frequency** offset (−157 dBm) to convert the packet RSSI
+register. The RA-02 is a 433 MHz module and therefore sits on the **low-frequency** port,
+whose offset is −164 dBm (datasheet 5.5.5). Every reading was 7 dB stronger than reality —
+in the one number a range test exists to measure. The offset is now selected from the
+configured frequency, and both branches are tested.
+
+### Fixed — the transmit wait hammered the SPI bus
+
+The TxDone wait polled the radio in a tight loop for the whole transmission: hundreds of
+milliseconds of continuous traffic on the bus the SD card shares, while the power amplifier
+was running. It now yields 1 ms between polls. Also removed a `REG_PA_CONFIG` write that was
+immediately overwritten by the next line.
+
+### Added
+
+- **`firmware/common/tests/sx1278_test.cpp`** — 94 assertions over a simulated SX1278:
+  silicon-version rejection, LoRa mode entered from sleep, every project setting reaching
+  its register, PA_DAC selection at high power, out-of-range settings clamped rather than
+  wrapped, low-data-rate optimisation following the symbol time, SF6's special detection
+  settings, FIFO loading, TxDone completion, transmit timeouts with and without a
+  millisecond clock, RX payload delivery, CRC-error frames dropped, RSSI and SNR
+  conversion, sync-word switching, and reconfiguration.
+- `sx1278_tests` in both `tools/build_host.sh` and CMake/CTest.
+- `flight_tests` now receives the repository root from CTest, so the shared protocol
+  fixtures resolve under `ctest` as well as under the host script.
+
+Host total: **684 automated checks.**
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 8)
 
 A robustness pass over the PC ground station, against the failures that happen on a real

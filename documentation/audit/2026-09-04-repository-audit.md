@@ -187,7 +187,7 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-06** | `ground-station/web/index.legacy.html` (1081 lines) is superseded | Low | Kept intentionally for reference; now labelled as such in the web README |
 | **F-07** | ~~The web console's parser, validator, link health and CRC framing are hand-ported with **no automated tests**~~ | Medium | ✅ **Closed 2026-09-04 (cycle 2)** — 30 Node tests extract the core from `index.html`; all three parsers now read one fixture file |
 | **F-08** | The CI `cmake-configure` job has never been executed | Low | No CMake toolchain on this machine; the job will prove itself on the first push |
-| **F-09** | The Pico HAL and SX1278 driver have never executed | High | Requires hardware; this is the project's central open risk, already tracked as gates 3–5 |
+| **F-09** | The Pico HAL and SX1278 driver have never executed | High | **Partly closed 2026-09-04 (cycle 9)** — the SX1278 driver now executes against a fake register bank (94 assertions). The Pico HAL still requires hardware, and no code has run on a real RA-02; this remains the project's central open risk, tracked as gates 3–5 |
 | **F-10** | ~~`radio.py` is a compatibility shim with no remaining callers~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — file removed |
 | **F-11** | ~~`.claude/` (local tool configuration) is untracked and **not** in `.gitignore`~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — added to `.gitignore` |
 | **F-12** | The telemetry rate was set without reference to LoRa airtime: SF9/125 kHz gives 1004 ms per packet against a 500 ms schedule | **High** | ✅ **Closed 2026-09-04 (cycle 2)** — see [link-budget.md](../design/link-budget.md); profile moved to SF7 at 1 Hz, with compile-time, startup and test guards |
@@ -202,6 +202,8 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-21** | The raw log stored corrupted payloads verbatim, so a payload containing a tab or newline split one record into several and desynchronised the forensic log | **Medium** | ✅ **Closed 2026-09-04 (cycle 8)** — control characters escaped reversibly; round-tripped over all 256 code points |
 | **F-22** | An `OSError` from either log write propagated onto the ground-station thread, so a full disk would have ended reception, not just recording | **High** | ✅ **Closed 2026-09-04 (cycle 8)** — errors counted and surfaced in the snapshot, the dashboard and the CLI; reception continues |
 | **F-23** | The unframed serial reader accumulated an unbounded partial line if no newline ever arrived | Low | ✅ **Closed 2026-09-04 (cycle 8)** — capped at 4096 bytes and counted as a resync |
+| **F-24** | The radio reported RSSI using the Semtech high-frequency offset (−157 dBm), but the RA-02 is a 433 MHz module on the low-frequency port, whose offset is −164 dBm — every reading was 7 dB optimistic | **Medium** | ✅ **Closed 2026-09-04 (cycle 9)** — offset selected from the configured frequency; RSSI is the number a range test depends on |
+| **F-25** | The transmit wait polled SPI in a tight loop for the whole transmission — hundreds of milliseconds of needless traffic on the bus the SD card shares | Low | ✅ **Closed 2026-09-04 (cycle 9)** — yields 1 ms between polls |
 
 ---
 
@@ -226,7 +228,7 @@ Legend: ✅ verified · 🟡 partially verified · ⬜ content-only review (no e
 | `include/cansat/telemetry.hpp` | 65 | Interface matches implementation and both parsers | ✅ |
 | `src/telemetry.cpp` | 235 | Format and parse covered by `test_telemetry_format_exact`, `test_packet_numbering_and_padding`, `test_parser_rejects_precision_and_order`; `<regex>` removed (F-03) | ✅ |
 | `include/cansat/sx1278.hpp` | 83 | Settings match `RadioConfig`; sync-word defaults correct | ✅ |
-| `src/sx1278.cpp` | 306 | Compiles clean for `PICO_BUILD` | 🟡 Register sequence never executed (F-09) |
+| `src/sx1278.cpp` | 312 | Register sequence executed against a fake register bank, 94 assertions | 🟡 Never run on real silicon (F-09) |
 
 ### Flight core — `firmware/flight-computer/`
 

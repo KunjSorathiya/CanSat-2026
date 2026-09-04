@@ -72,4 +72,5 @@ add_executable(flight_tests tests/flight_tests.cpp)
 target_include_directories(flight_tests PRIVATE tests)
 target_link_libraries(flight_tests PRIVATE flight_core)
 target_compile_options(flight_tests PRIVATE -Wall -Wextra -Wpedantic)
-add_test(NAME flight_tests COMMAND flight_tests)
+# flight_tests reads test-data/protocol-fixtures.tsv, so it needs the repository root.
+add_test(NAME flight_tests COMMAND flight_tests "${CMAKE_CURRENT_SOURCE_DIR}/../..")

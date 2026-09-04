@@ -53,6 +53,7 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
 | `flight_tests` | 32 suites across the whole flight core | ✅ **464 / 464 assertions** |
+| `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 7 modules | ✅ **63 / 63 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
@@ -215,7 +216,7 @@ Three things exist in more than one language and must not drift:
 | Area | Why | Risk |
 |---|---|---|
 | Pico HAL drivers | Need real I2C, SPI and UART peripherals | Medium — logic is thin, but register sequences are unverified |
-| SX1278 register driver | Needs the real modem | High — the register sequence is written from the datasheet and never executed |
+| SX1278 register driver **on real silicon** | Needs the real modem | Medium — the register sequence now executes against a fake register bank (94 assertions), so the driver's own logic is covered; what remains unproven is that the RA-02 responds as the datasheet says |
 | Web console **rendering** | No headless browser in the repository | Low — the logic is now tested under Node (30 tests); only the DOM layer is manual. Verified by hand in a browser on 2026-09-04: demo mission ran to `RECOVERY`, rate steady through the injected drop and duplicate, no console errors, both themes legible |
 | Tk dashboard | Needs a display | Low |
 | CMake build | No CMake toolchain on the development machine; the host script uses `g++` directly | Low — exercised by the CI `cmake-configure` job |

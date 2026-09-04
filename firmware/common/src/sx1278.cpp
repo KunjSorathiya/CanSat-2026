@@ -162,9 +162,8 @@ bool Sx1278::apply_settings(const Sx1278Settings& s) {
     if (power < 2) power = 2;
     if (power > 20) power = 20;
     if (power > 17) {
+        // PA_DAC on: Pout = 5 + OutputPower, so OutputPower = power - 5 (17..20 dBm).
         write_reg(REG_PA_DAC, 0x87);
-        write_reg(REG_PA_CONFIG, static_cast<std::uint8_t>(PA_BOOST | (17 - 2)));
-        // Remaining headroom handled by PA_DAC; register value capped at 17 dBm nominal.
         write_reg(REG_PA_CONFIG, static_cast<std::uint8_t>(PA_BOOST | (power - 5)));
     } else {
         write_reg(REG_PA_DAC, 0x84);
@@ -250,6 +249,10 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
                 write_reg(REG_IRQ_FLAGS, 0xFF);
                 return false;
             }
+            // Yield between polls. Without this the wait spins at full SPI speed for the
+            // whole transmission — hundreds of milliseconds of needless bus traffic on a
+            // bus the SD card shares, and needless current while the PA is running.
+            sleep(1);
         } else {
             sleep(2);
             waited += 2;
@@ -297,8 +300,13 @@ std::size_t Sx1278::poll_receive(std::uint8_t* out, std::size_t cap) {
     const std::uint8_t snr_raw = read_reg(REG_PKT_SNR_VALUE);
     last_snr_db_ = static_cast<float>(static_cast<std::int8_t>(snr_raw)) / 4.0f;
     const std::uint8_t rssi_raw = read_reg(REG_PKT_RSSI_VALUE);
-    // 433 MHz band uses the -157 dBm offset (Semtech datasheet 5.5.5).
-    last_rssi_dbm_ = -157 + static_cast<int>(rssi_raw) +
+    // Semtech datasheet 5.5.5 gives two offsets, chosen by which RF port is in use:
+    // -157 dBm for the high-frequency port (862-1020 MHz) and -164 dBm for the
+    // low-frequency port (below 525 MHz). The RA-02 is a 433 MHz module, so it is on the
+    // LOW-frequency port and the correct offset is -164. Using the HF offset reports RSSI
+    // 7 dB stronger than reality — and RSSI is exactly the number a range test relies on.
+    const int offset = settings_.frequency_hz < 525000000u ? -164 : -157;
+    last_rssi_dbm_ = offset + static_cast<int>(rssi_raw) +
                      (last_snr_db_ < 0.0f ? static_cast<int>(last_snr_db_) : 0);
     return len;
 }
