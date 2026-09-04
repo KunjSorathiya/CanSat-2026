@@ -97,6 +97,11 @@ if command -v python >/dev/null 2>&1; then
 
   echo "== running Python tooling tests =="
   ( cd "$ROOT" && python -m unittest discover -s tools/tests -p "test_*.py" )
+
+  # Documentation drifts silently: a constant changes and the prose quoting it does not.
+  # A wrong pin number or telemetry rate in a document is a defect like any other.
+  echo "== checking documented claims against the source =="
+  ( cd "$ROOT" && python tools/check_doc_claims.py | tail -1 )
 fi
 
 # The web console is a single self-contained HTML file with no build step. Its parser,

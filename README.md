@@ -400,6 +400,7 @@ bash tools/build_host.sh
 | Python (ground station) | Parser, validator, transport, health, logging robustness, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **76 / 76** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
 | Web console (Node) | Framing, parser, validator and link health, extracted from `index.html` | ✅ **30 / 30** |
+| Documented claims | 56 numbers in the documentation checked against the source that defines them | ✅ **56 / 56** |
 | Pico syntax | 10 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
@@ -493,7 +494,8 @@ firmware/
 ground-station/
   software/            Python receive pipeline + tests
   web/                 single-file browser telemetry console
-tools/                 host build, Pico syntax check, LoRa link-budget calculator, SDK stubs
+tools/                 host build, Pico syntax check, LoRa link-budget calculator,
+                       documentation-claim checker, SDK stubs
 documentation/
   requirements/        rulebook, requirement checklist, gates
   design/              architecture, protocol, wiring, electrical

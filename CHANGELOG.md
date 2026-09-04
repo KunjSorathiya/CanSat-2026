@@ -8,6 +8,32 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 17)
+
+### Added — documentation drift now fails the build
+
+`tools/check_doc_claims.py` reads the numbers the documentation states and compares them
+against the source that defines them: every GPIO pin in the wiring table against
+`config.hpp`, the telemetry period and packet budget against the link profile, the quoted
+airtime against what the airtime model actually computes, the sensor period and IMU filter
+against the sensor configuration, both watchdog timeouts, the measured packet sizes, and
+the two rulebook constants that must never drift. **56 claims, all passing**, checked on
+every run of `tools/build_host.sh`.
+
+The failure this prevents is quiet and expensive: a constant changes, the prose quoting it
+does not, and someone later wires to the pin the document names or trusts a rate the radio
+cannot deliver. A wrong number in a document is a defect like any other, and now it fails
+the same build.
+
+### Changed — the audit document reflects both passes
+
+Its header still described pass 1 — "four defects found and fixed" — while its findings
+table listed F-12 to F-32 from the second pass. It now opens with what each pass covered,
+a summary of the twenty-one second-pass findings grouped by what they would have cost, and
+recommendations updated for what is now done and what still needs hardware.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 16)
 
 ### Changed — the warning set now catches the mistakes that matter on ARM

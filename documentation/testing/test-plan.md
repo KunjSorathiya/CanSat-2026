@@ -58,6 +58,7 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 8 modules | ✅ **76 / 76 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, rulebook constants | ✅ **56 / 56 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **30 / 30 tests** |
 | Pico syntax check | 10 translation units | ✅ All OK |
 

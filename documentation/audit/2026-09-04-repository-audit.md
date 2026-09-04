@@ -5,14 +5,54 @@ does the documentation describe what the code actually does, do the links resolv
 the web console behave as documented.
 
 **Auditor:** automated verification run with manual review
-**Scope:** all 124 project files (excluding `.git/`, `build/`, `__pycache__/`, and local
-tool configuration under `.claude/`)
-**Verdict:** ✅ **Pass with four defects found and fixed, and six open items recorded.**
+**Scope:** all project files (excluding `.git/`, `build/`, `__pycache__/`, and local tool
+configuration under `.claude/`)
+
+> [!NOTE]
+> **This document covers two passes on the same day.**
+>
+> **Pass 1** audited the software as first written: 124 files, four defects found and fixed
+> (F-01 to F-04), six open items recorded. Its summary tables and evidence blocks below are
+> preserved as the record of that run.
+>
+> **Pass 2** was a deeper engineering review of the same software, and it found
+> substantially more — twenty-one further defects, F-12 to F-32, including several that
+> would have produced a failed or mis-recorded flight. The headline: the telemetry rate the
+> project had chosen was one the radio physically could not deliver. Findings F-12 onward,
+> the [second-pass summary](#second-pass-summary) and the file-by-file rows marked with a
+> cycle number are from that pass.
+
+**Verdict:** ✅ **Pass. 25 defects found and fixed across both passes; the remaining open
+items all require hardware.**
+
+---
+
+## Second-pass summary
+
+Twenty-one findings, all fixed, all with regression tests. Grouped by what they would have
+cost:
+
+| Would have caused | Findings |
+|---|---|
+| **A link that never worked** — the two ends configured different modems, or the rate was unachievable | F-12, F-13 |
+| **Wrong numbers in flight** — attitude wrong at the wrap, impossible GPS accepted, RSSI 7 dB optimistic, a steady pad rotation absorbed as bias | F-16, F-17, F-24, F-30 |
+| **Lost or corrupted flight data** — a torn header erasing the log, a truncated packet reading as corruption, a raw log splitting its own records, a logging failure ending reception | F-19, F-21, F-22, F-31 |
+| **Hardware that would not have worked together** — the microSD holding the shared SPI bus, presenting as a dead radio | F-26, F-27, F-28 |
+| **A bridge that rebooted when the operator closed the dashboard** | F-29 |
+| **Silent disagreement between implementations** — three parsers, three rules | F-14 |
+| **Under-budgeted airtime, unmeasured packet size, a timestamp that overflowed its own format** | F-18, F-20 |
+| **Untested code and unnecessary weight** — the web console, the LoRa driver, iostreams in the flight image | F-07, F-25, F-32 |
+
+**Automated checks after pass 2: 1360** — 1221 C++ assertions across the flight core, the
+LoRa driver and the microSD driver, 109 Python tests including a cross-language end-to-end
+trace, and 30 Node tests over the web console. Zero warnings under an extended warning set;
+CI fails on any new one.
 
 ---
 
 ## Contents
 
+- [Second-pass summary](#second-pass-summary)
 - [Summary](#summary)
 - [Method](#method)
 - [Evidence](#evidence)
@@ -27,6 +67,9 @@ tool configuration under `.claude/`)
 ---
 
 ## Summary
+
+*Pass 1, preserved as the record of that run. Counts and verdicts have moved since; the
+current figures are in the [second-pass summary](#second-pass-summary) above.*
 
 | Area | Files | Verdict |
 |---|---:|---|
@@ -43,8 +86,8 @@ tool configuration under `.claude/`)
 | Directory placeholders | 10 | ✅ Added this audit — documented directories now exist in git |
 | **Total** | **124** | |
 
-**Automated checks passing: 226** — 189 C++ assertions plus 37 Python tests, with 10 Pico
-translation units syntax-clean.
+**Automated checks passing at the end of pass 1: 226** — 189 C++ assertions plus 37 Python
+tests, with 10 Pico translation units syntax-clean. After pass 2: **1360**.
 
 ---
 
@@ -448,20 +491,32 @@ flight readiness, and no document in it claims otherwise.
 
 ## Recommendations
 
-Ordered by value.
+Ordered by value. Items 3 and 4 from pass 1 are done; what remains needs hardware or an
+answer from the organisers.
 
 1. **Start hardware bring-up.** Every remaining gate depends on it, and the
    [bring-up order](../design/wiring.md#bring-up-order) is written and sequenced. This is
-   the single highest-value action available.
+   the single highest-value action available, and it is now more valuable than before: two
+   of the drivers have been executed against simulated devices, so bring-up is checking
+   physical behaviour rather than finding basic logic errors.
 2. **Escalate the ten organizer questions**, especially the dimension contradiction — it
-   blocks the entire mechanical phase.
-3. **Add a test harness for the web console** (F-07). It duplicates the parser, validator
-   and framing, and a silent divergence there would be discovered during a mission.
-4. **Decide on `ui.py`** (F-05) and on whether `.claude/` should be git-ignored (F-11).
+   blocks the entire mechanical phase — and the 433 MHz channel and duty-cycle question
+   raised by [link-budget.md](../design/link-budget.md).
+3. ~~Add a test harness for the web console (F-07)~~ — done in pass 2: 30 Node tests, and
+   all three parsers now read one fixture file.
+4. ~~Decide on `ui.py` (F-05) and `.claude/` (F-11)~~ — done in pass 2: both removed,
+   `.claude/` ignored.
 5. **Push once, to prove the CI workflow** (F-08), including the CMake job that cannot run
-   on this machine.
+   on this machine. CI has since grown a Node job, a `-Werror` job and new CTest targets,
+   so this matters more than it did.
 6. **Set `team_id` and the launch sync word early** and rehearse the switch, so it is not a
-   launch-day change. The firmware already refuses to run with the placeholder identity.
+   launch-day change. The firmware already refuses to run with the placeholder identity,
+   and both ends now read the sync word from one shared definition — so the rehearsal must
+   include reflashing **both** Picos.
+7. **Measure, on the first hardware available, the four numbers this repository computes
+   but has never observed**: packet airtime, the achieved acquisition rate and its jitter,
+   the barometer's real output rate, and RSSI against distance. Each has a documented
+   predicted value to compare against.
 
 ---
 
