@@ -92,6 +92,7 @@ const char* fault_name(FaultCode code) {
         case FaultCode::calibration: return "calibration";
         case FaultCode::sensor_implausible: return "sensor_implausible";
         case FaultCode::watchdog_reboot: return "watchdog_reboot";
+        case FaultCode::packet_oversize: return "packet_oversize";
         case FaultCode::count: return "count";
     }
     return "unknown";

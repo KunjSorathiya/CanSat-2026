@@ -347,6 +347,37 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         extra.push_back(std::string("ARM-") + (is_armed(mission_ms) ? "1" : "0"));
     }
     auto built = builder_.build(candidate, mission_ms, snapshot_, extra);
+
+    // The airtime budget assumes packets never exceed worst_case_packet_bytes, and the
+    // radio silently clamps anything past the 255-byte LoRa FIFO — a truncated packet the
+    // ground station can only read as corruption. The rulebook makes the priority
+    // explicit: mandatory fields first, optional fields "only if bandwidth allows". So
+    // shed optional content in order of value rather than let the radio cut the packet.
+    const auto too_long = [&](const std::optional<TelemetryBuilder::Built>& b) {
+        return b && b->packet.size() > config_.worst_case_packet_bytes;
+    };
+
+    if (too_long(built) && !extra.empty()) {
+        // 1. Diagnostic tags: project-local, the least valuable.
+        faults_.report(FaultCode::packet_oversize, FaultSeverity::warning, mission_ms);
+        extra.clear();
+        built = builder_.build(candidate, mission_ms, snapshot_, extra);
+    }
+    if (too_long(built) && snapshot_.gps.valid) {
+        // 2. GPS: optional under the rulebook, and recoverable from the SD log.
+        faults_.report(FaultCode::packet_oversize, FaultSeverity::warning, mission_ms);
+        SensorSnapshot trimmed = snapshot_;
+        trimmed.gps.valid = false;
+        built = builder_.build(candidate, mission_ms, trimmed, extra);
+    }
+    if (built && built->packet.size() > cansat::kMaxLoraPayloadBytes) {
+        // 3. Mandatory fields alone still overflow the radio. Transmitting a truncated
+        // packet would present as corruption; suppress it and say so instead.
+        faults_.report(FaultCode::packet_oversize, FaultSeverity::error, mission_ms);
+        ++health_.packets_suppressed;
+        last_error_ = "packet exceeds the LoRa payload limit; suppressed";
+        return;
+    }
     if (!built) {
         // Mandatory data invalid: produce no telemetry point and do NOT consume the
         // packet number, so transmitted packets stay strictly sequential.

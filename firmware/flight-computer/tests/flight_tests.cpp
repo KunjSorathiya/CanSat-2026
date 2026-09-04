@@ -382,10 +382,12 @@ void test_config_radio_airtime_guard() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
 
-    // Default: SF7/125 kHz, 200-byte worst case, 1 Hz -> ~318 ms airtime, ~32 % duty.
+    // Default: SF7/125 kHz, the 255-byte FIFO limit as the budget, 1 Hz -> ~400 ms
+    // airtime, ~40 % duty.
     CHECK(flight::validate_config(c, why));
-    CHECK(approx(flight::worst_case_airtime_ms(c), 317.7, 0.5));
-    CHECK(flight::channel_duty(c) < 0.35);
+    CHECK(c.worst_case_packet_bytes == cansat::kMaxLoraPayloadBytes);
+    CHECK(approx(flight::worst_case_airtime_ms(c), 399.6, 0.5));
+    CHECK(flight::channel_duty(c) < 0.45);
 
     // The former default of SF9 puts one packet at ~1 s of airtime: not sustainable.
     c.radio.spreading_factor = 9;
@@ -393,7 +395,7 @@ void test_config_radio_airtime_guard() {
     CHECK(why.find("airtime") != std::string::npos);
     CHECK(flight::worst_case_airtime_ms(c) > 900.0);
 
-    // SF7 at 2 Hz over 125 kHz is also refused: 318 ms in a 500 ms slot is 64 % duty.
+    // SF7 at 2 Hz over 125 kHz is also refused: 400 ms in a 500 ms slot is 80 % duty.
     c.radio.spreading_factor = 7;
     c.telemetry_period_ms = 500;
     CHECK(!flight::validate_config(c, why));
@@ -401,7 +403,7 @@ void test_config_radio_airtime_guard() {
     // Doubling the bandwidth halves the airtime and makes 2 Hz legitimate.
     c.radio.bandwidth_hz = 250000;
     CHECK(flight::validate_config(c, why));
-    CHECK(flight::channel_duty(c) < 0.35);
+    CHECK(flight::channel_duty(c) < 0.45);
 
     // Parameter-range rejections.
     flight::Configuration bad;
@@ -417,9 +419,97 @@ void test_config_radio_airtime_guard() {
     bad.radio.preamble_length = 8;
     bad.worst_case_packet_bytes = 256;  // beyond the LoRa FIFO
     CHECK(!flight::validate_config(bad, why));
-    bad.worst_case_packet_bytes = 200;
+    bad.worst_case_packet_bytes = 255;
     bad.max_channel_duty = 0.0;
     CHECK(!flight::validate_config(bad, why));
+}
+
+// The formatter must never emit a packet this library's own parser rejects.
+void test_formatter_and_parser_agree_at_the_edges() {
+    // Timestamp: the hour field is two digits, so it wraps at 100 hours rather than
+    // widening. Anything else produces a packet every ground station rejects.
+    CHECK(cansat::format_timestamp(0) == "00:00:00:000");
+    CHECK(cansat::format_timestamp(1) == "00:00:00:001");
+    CHECK(cansat::format_timestamp(999) == "00:00:00:999");
+    CHECK(cansat::format_timestamp(1000) == "00:00:01:000");
+    CHECK(cansat::format_timestamp(59999) == "00:00:59:999");
+    CHECK(cansat::format_timestamp(60000) == "00:01:00:000");
+    CHECK(cansat::format_timestamp(3600000) == "01:00:00:000");
+    // 99:59:59:999 is the last representable instant.
+    const std::uint64_t last = (99ULL * 3600 + 59 * 60 + 59) * 1000 + 999;
+    CHECK(cansat::format_timestamp(last) == "99:59:59:999");
+    CHECK(cansat::format_timestamp(last + 1) == "00:00:00:000");  // wraps, never 100:...
+
+    // Every timestamp the formatter can produce must survive its own parser.
+    auto record = make_valid_record();
+    for (const std::uint64_t t : {0ULL, 1ULL, 999ULL, 3600000ULL, last, last + 1,
+                                  1234567890ULL}) {
+        record.timestamp_ms = t;
+        const auto packet = cansat::format_packet(record);
+        CHECK(packet.has_value());
+        CHECK(static_cast<bool>(cansat::parse_packet(*packet)));
+    }
+
+    // Packet numbers: the rulebook pads to three digits, and wider numbers stay valid.
+    for (const std::uint32_t n : {1u, 9u, 99u, 100u, 999u, 1000u, 65535u, 4294967295u}) {
+        record.packet_number = n;
+        const auto packet = cansat::format_packet(record);
+        CHECK(packet.has_value());
+        const auto parsed = cansat::parse_packet(*packet);
+        CHECK(static_cast<bool>(parsed));
+        CHECK(parsed.record->packet_number == n);
+    }
+
+    // Values that round to a signed zero must still satisfy the precision rule.
+    record.packet_number = 1;
+    record.roll_deg = -0.001;
+    const auto negative_zero = cansat::format_packet(record);
+    CHECK(negative_zero.has_value());
+    CHECK(static_cast<bool>(cansat::parse_packet(*negative_zero)));
+}
+
+// A packet longer than the airtime budget must lose its optional fields, not be truncated
+// by the radio into something the ground station can only read as corruption.
+void test_controller_drops_optional_fields_before_overrunning_the_budget() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    c.health_period_ms = 50;
+    // A budget the 118-byte mandatory block fits inside, but GPS and diagnostics do not.
+    c.worst_case_packet_bytes = 140;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+    ctrl.poll(0);
+
+    CHECK(radio.packets.size() == 1);
+    const std::string& sent = radio.packets.front();
+    CHECK(sent.size() <= 140);
+    CHECK(sent.find("MODE-") == std::string::npos);    // diagnostics dropped first
+    CHECK(sent.find("FAULTS-") == std::string::npos);
+    CHECK(sent.find("GP-Lat-") == std::string::npos);  // then GPS, also optional
+    CHECK(ctrl.faults().active(flight::FaultCode::packet_oversize));
+
+    // The packet is still a valid, compliant, parseable telemetry point.
+    const auto parsed = cansat::parse_packet(sent);
+    CHECK(static_cast<bool>(parsed));
+    CHECK(parsed.record->packet_number == 1);
+
+    // With the default budget — the full FIFO — the diagnostics survive.
+    flight::Configuration d;
+    d.team_id = "CAN-Team-07";
+    flight::test::MockRadio radio2;
+    flight::Controller ctrl2(d, imu, baro, gps, radio2, logger, board);
+    CHECK(ctrl2.initialize());
+    ctrl2.poll(0);
+    CHECK(radio2.packets.size() == 1);
+    CHECK(radio2.packets.front().find("MODE-") != std::string::npos);
+    CHECK(radio2.packets.front().size() <= d.worst_case_packet_bytes);
+    CHECK(!ctrl2.faults().active(flight::FaultCode::packet_oversize));
 }
 
 // Feeds a whole sentence to a parser and reports whether it produced a usable fix.
@@ -1088,6 +1178,8 @@ int main(int argc, char** argv) {
     test_state_machine_fault_paths();
     test_config_validation();
     test_config_radio_airtime_guard();
+    test_formatter_and_parser_agree_at_the_edges();
+    test_controller_drops_optional_fields_before_overrunning_the_budget();
     test_gps_coordinate_validation();
     test_orientation_blends_across_the_wrap();
     test_sensor_timing_model();

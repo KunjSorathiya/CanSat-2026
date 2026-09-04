@@ -52,7 +52,7 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 30 suites across the whole flight core | ✅ **400 / 400 assertions** |
+| `flight_tests` | 32 suites across the whole flight core | ✅ **464 / 464 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 6 modules | ✅ **42 / 42 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
@@ -108,7 +108,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 30 suites, 400 assertions
+### `flight_tests` — 32 suites, 464 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -242,7 +242,7 @@ Sequence follows the [bring-up order](../design/wiring.md#bring-up-order).
 | 9 | Range test | Acceptable loss at the expected launch distance, antenna as flown; log RSSI, SNR and loss against distance to validate [link-budget.md](../design/link-budget.md) | ⬜ |
 | 10 | microSD alone | Block read and write on its own supply | ⬜ |
 | 11 | Shared SPI | Radio and SD both work with the other present; MISO releases correctly | ⬜ |
-| 12 | Packet rate | Sustained 1 Hz with no gaps in numbering; measured airtime within 10 % of the computed 318 ms | ⬜ |
+| 12 | Packet rate | Sustained 1 Hz with no gaps in numbering; measured airtime within 10 % of the computed value for the packet size actually sent (327 ms for a 206-byte packet) | ⬜ |
 | 13 | Battery power | Current draw measured; no brownout during a transmit peak | ⬜ |
 | 14 | Battery endurance | Runtime from full charge to cutoff, measured | ⬜ |
 | 15 | Watchdog recovery | Forced hang reboots and telemetry resumes automatically | ⬜ |

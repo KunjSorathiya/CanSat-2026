@@ -87,11 +87,13 @@ struct Configuration {
     std::uint32_t radio_recovery_backoff_ms = 1000;   // spacing between bounded re-init attempts
     std::uint8_t radio_max_consecutive_failures = 5;  // TX failures before a radio fault + re-init
 
-    // Airtime budget. `worst_case_packet_bytes` is the longest packet the builder can emit
-    // (team id + 12 mandatory fields + GPS + diagnostics measures 188 bytes; 200 leaves
-    // headroom for a longer team id and a five-digit packet number). `max_channel_duty` is
-    // the largest fraction of the channel one packet per telemetry period may occupy —
-    // the rest is margin for radio recovery, retries and the receiver's own timing.
+    // Airtime budget and runtime packet cap. Defaults to the 255-byte LoRa FIFO limit,
+    // the only size a packet cannot exceed (measured: 118 bytes mandatory-only, 206 with
+    // GPS and diagnostics, 247 absolute worst case). The controller drops its optional
+    // diagnostic tags rather than exceed this, because the radio would otherwise truncate
+    // the packet silently. `max_channel_duty` is the largest fraction of the channel one
+    // packet per telemetry period may occupy — the rest is margin for radio recovery,
+    // retries and the receiver's own timing.
     std::size_t worst_case_packet_bytes = cansat::link::kWorstCasePacketBytes;
     double max_channel_duty = cansat::link::kMaxChannelDuty;
 

@@ -8,6 +8,46 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 7)
+
+An edge-case sweep over the formatter, the packet budget and the radio path.
+
+### Fixed — the airtime budget was below the typical packet
+
+The 200-byte budget introduced in cycle 2 came from an estimate. Measuring the formatter
+directly gives **118 bytes** mandatory-only, **167** with GPS, **206** with GPS and all
+four diagnostic tags, and **247** for the absolute worst case. The budget was therefore
+*below the packet the vehicle sends in normal flight*, under-estimating channel occupancy
+on every transmission.
+
+The budget is now the 255-byte LoRa FIFO limit — the only size a packet cannot exceed, and
+still only 40 % duty at 1 Hz on the SF7/125 kHz profile.
+
+### Fixed — an oversized packet would have been truncated by the radio, silently
+
+The driver clamps anything past 255 bytes, so a packet that grew would have been cut
+mid-field and read as corruption at the ground station. The controller now sheds optional
+content in the rulebook's own priority order instead: diagnostic tags first, then GPS
+(recoverable from the SD log), and only if the mandatory block alone still overflows does
+it suppress the packet. Every step raises a new `packet_oversize` fault so the ground
+station sees it happen.
+
+### Fixed — the timestamp could overflow its own format
+
+`format_timestamp()` widened the hour field past two digits after 99:59:59:999, producing
+`100:00:00:000` — a packet this library's own parser rejects, and every ground station with
+it. Hours now wrap at 100, which no mission reaches but a bench rig left powered for 4.2
+days would.
+
+### Added
+
+- 40 edge-case checks: every timestamp boundary round-trips through the parser, packet
+  numbers from 1 to 4294967295 format and parse, values that round to signed zero stay
+  valid, and the optional-field degradation ladder is exercised end to end.
+- Host total: **464 assertions**.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 6)
 
 A correctness pass over the two places where the vehicle turns raw sensor data into
@@ -121,11 +161,11 @@ are now single-sourced, computed, and enforced by the build.
 ### Fixed — the telemetry rate could not have been met
 
 - **The configured 2 Hz was physically impossible.** At the previous provisional default of
-  SF9 / 125 kHz, one real telemetry packet (188 bytes measured, 200 budgeted) occupies
-  **1004 ms** of LoRa airtime. The scheduler was set to a 500 ms period, so the vehicle
+  SF9 / 125 kHz, a full telemetry packet occupies over a second of LoRa airtime. The scheduler was set to a 500 ms period, so the vehicle
   would have transmitted at roughly 1 Hz — below the rulebook minimum once any retry or
   recovery was needed — while every document claimed 2 Hz. Changed to **SF7 / 125 kHz at a
-  1000 ms period**: 318 ms airtime, ~32 % channel occupancy, full margin for recovery. The
+  1000 ms period**: ~330 ms for a typical packet, ~40 % worst-case channel occupancy, full
+  margin for recovery. The
   arithmetic, the range-margin justification and the 2 Hz upgrade path are in
   [link-budget.md](documentation/design/link-budget.md).
 - **The flight computer and the ground-station bridge could silently disagree on the

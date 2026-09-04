@@ -26,6 +26,7 @@ enum class FaultCode : std::uint8_t {
     calibration,          // startup calibration did not settle cleanly (best-effort used)
     sensor_implausible,   // a reading fell outside datasheet-derived bounds
     watchdog_reboot,      // this boot was caused by the hardware watchdog
+    packet_oversize,      // packet exceeded the airtime budget; optional fields dropped
     count
 };
 

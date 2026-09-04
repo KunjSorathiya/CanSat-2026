@@ -124,7 +124,7 @@ bash tools/build_host.sh
 
 This compiles the shared telemetry library, the whole flight core, the ground-station
 framing library and every host test, runs them, then runs the Python and Node suites.
-Expect **400 C++ assertions, 75 Python tests and 30 Node tests, all passing, with zero
+Expect **464 C++ assertions, 75 Python tests and 30 Node tests, all passing, with zero
 compiler warnings.**
 
 ```bash
@@ -176,7 +176,7 @@ and whatever your structure is made from.
   telemetry packet every second, log to SD, drive the status LED. The ground Pico does
   nothing but receive packets and frame them onto USB with a CRC.
 - **RA-02 (SX1278)** — LoRa transceiver. Long range at low power, at the cost of data
-  rate: one full telemetry packet occupies ~318 ms of airtime, which is why the link runs
+  rate: one full telemetry packet occupies ~330 ms of airtime, which is why the link runs
   at 1 Hz. See [link-budget.md](design/link-budget.md).
 - **MPU-6050** — 3-axis accelerometer and gyroscope over I2C. Gives roll, pitch, and a
   *relative* yaw. There is **no magnetometer**, so yaw is not a compass heading — it is

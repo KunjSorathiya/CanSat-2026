@@ -107,7 +107,7 @@ All 10 translation units returned `OK`: flight `main`, `pico_hal`, `pico_radio`,
 | In-page anchors | 79 checked, 0 missing ✅ |
 | Cross-file anchors | 9 checked, 0 broken ✅ |
 | Documented numeric claims | 68 checked, 0 mismatches ✅ |
-| Fault codes declared vs named | 16 declared, 16 handled by `fault_name()` ✅ |
+| Fault codes declared vs named | 16 declared, 16 handled by `fault_name()` ✅ (17 since cycle 7, still 1:1) |
 
 ---
 
@@ -196,6 +196,9 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-15** | The barometer was hard-coded to the 26.3 Hz "indoor navigation" preset, so no acquisition rate above ~26 Hz could return fresh data; the IMU's 44 Hz anti-alias filter was also too wide for the loop rate | **Medium** | ✅ **Closed 2026-09-04 (cycle 4)** — sensor settings moved into `Configuration`, barometer at the 83 Hz preset, 30 Hz acquisition, startup guard and a duplicate-sample check on vertical speed. See [sensor-rates.md](../design/sensor-rates.md) |
 | **F-16** | The complementary filter averaged raw angles, so blending across the ±180° seam produced errors approaching 180° — on a vehicle that tumbles through that seam every rotation | **High** | ✅ **Closed 2026-09-04 (cycle 6)** — blends the wrapped difference; a regression test fails against the old formula |
 | **F-17** | The NMEA parser accepted any checksum-valid coordinate, including latitudes past 90°, minutes past 59, and a missing hemisphere character (silently treated as north/east) | Medium | ✅ **Closed 2026-09-04 (cycle 6)** — coordinates are range-checked at the source, so an impossible fix never reaches telemetry |
+| **F-18** | The airtime budget (200 bytes) was below the *typical* in-flight packet (206 bytes measured), so channel occupancy was under-estimated on every transmission | **Medium** | ✅ **Closed 2026-09-04 (cycle 7)** — budget is now the 255-byte FIFO limit; sizes measured rather than estimated |
+| **F-19** | A packet exceeding 255 bytes would have been silently truncated by the radio driver and read as corruption at the ground station | **Medium** | ✅ **Closed 2026-09-04 (cycle 7)** — optional fields are shed in rulebook priority order, and the packet is suppressed with a `packet_oversize` fault rather than truncated |
+| **F-20** | `format_timestamp()` emitted a three-digit hour past 99:59:59:999, a packet its own parser rejects | Low | ✅ **Closed 2026-09-04 (cycle 7)** — hours wrap at 100, with every boundary round-tripped in tests |
 
 ---
 
@@ -363,7 +366,7 @@ Legend: ✅ verified · 🟡 partially verified · ⬜ content-only review (no e
 | Bus speeds I2C 400 kHz, SPI 400 kHz, UART 9600 | `pico_hal.cpp` | ✅ |
 | Vertical-rate EWMA 0.7 / 0.3 | `controller.cpp` | ✅ |
 | Frame payload limit 512 B | `framing.hpp` | ✅ |
-| 16 fault codes | `fault_manager.hpp` / `.cpp` | ✅ |
+| 16 fault codes | `fault_manager.hpp` / `.cpp` | ✅ (17 since cycle 7, see F-19) |
 
 ---
 

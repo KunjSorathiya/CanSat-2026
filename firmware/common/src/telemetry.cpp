@@ -110,7 +110,12 @@ std::string format_timestamp(std::uint64_t timestamp_ms) {
     const auto seconds = total_seconds % 60;
     const auto total_minutes = total_seconds / 60;
     const auto minutes = total_minutes % 60;
-    const auto hours = total_minutes / 60;
+    // The rulebook format is Ti-HH:MM:SS:MS with a two-digit hour field, and the parser
+    // enforces exactly that. Hours are therefore taken modulo 100: past 99:59:59:999 —
+    // about 4.2 days of continuous uptime — the field wraps rather than widening to three
+    // digits, which would produce a packet this library's own parser rejects. A mission
+    // lasts minutes; only a bench rig left powered can reach the wrap.
+    const auto hours = (total_minutes / 60) % 100;
 
     std::ostringstream output;
     output << std::setfill('0') << std::setw(2) << hours << ':'

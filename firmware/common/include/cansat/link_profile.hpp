@@ -38,9 +38,18 @@ inline constexpr std::uint8_t kTestSyncWord = 0xF3;      // pre-launch testing
 inline constexpr std::uint8_t kOfficialSyncWord = 0xA5;  // official launch
 
 // ---- Airtime budget ---------------------------------------------------------------
-// Longest packet the telemetry builder can emit (measured: 188 bytes with GPS and
-// diagnostics; 200 leaves headroom for a longer team id and a five-digit packet number).
-inline constexpr std::size_t kWorstCasePacketBytes = 200;
+// Budget the full LoRa FIFO, not a typical packet. Measured sizes from the formatter:
+// 118 bytes mandatory-only, 167 with GPS, 206 with GPS and all four diagnostic tags, and
+// 247 for the absolute worst case (longest team id, widest packet number, extreme values).
+// An earlier 200-byte budget was below the *typical* in-flight packet, which would have
+// under-estimated airtime on every transmission. 255 is the only figure that cannot be
+// exceeded, so it is the only honest basis for the budget — and at SF7/125 kHz it still
+// costs only 400 ms, 40 % of a 1 Hz slot.
+//
+// This is also the runtime cap: the controller drops its optional diagnostic tags rather
+// than let a packet reach the radio's silent 255-byte truncation. Lower it to buy airtime
+// margin, at the cost of dropping diagnostics from the longest packets.
+inline constexpr std::size_t kWorstCasePacketBytes = 255;
 inline constexpr std::uint32_t kTelemetryPeriodMs = 1000;  // 1 Hz rulebook minimum
 inline constexpr double kMaxChannelDuty = 0.5;
 

@@ -233,7 +233,8 @@ provisional until confirmed against the physical RA-02 and any organiser guidanc
 The hard requirement is at least 1 packet per second. The achievable rate is set by LoRa
 airtime, which is computed in [link-budget.md](link-budget.md) rather than chosen. For the
 real ~190-byte packet on the selected SF7 / 125 kHz modem, one transmission occupies
-**318 ms** of channel time.
+**400 ms** of channel time in the worst case, and about 327 ms for a typical
+in-flight packet.
 
 | Candidate | Airtime cost at SF7/125 kHz | Assessment | Decision |
 |---:|---|---|---|
