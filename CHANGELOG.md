@@ -8,6 +8,52 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 4)
+
+The acquisition loop now runs at 30 Hz, which first required admitting that the barometer
+could not have fed it.
+
+### Fixed — the sensors could not supply the rate the loop asked for
+
+- **The barometer was configured for 26.3 Hz.** Its oversampling was hard-coded in the
+  driver at the datasheet's "indoor navigation" preset (osrs_t x2, osrs_p x16, 37.5 ms per
+  conversion). Any acquisition rate above ~26 Hz would have re-read unchanged conversions.
+  Moved to the datasheet's "handheld device, dynamic" preset (x1 / x4, 11.5 ms, 83 Hz),
+  which leaves 2.8× margin at 30 Hz.
+- **The IMU's anti-alias filter was too wide for the loop rate.** `DLPF_CFG` 3 passes
+  44 Hz; sampling at 30 Hz puts Nyquist at 15 Hz, so airframe vibration would have folded
+  into the attitude estimate irreversibly. Now `DLPF_CFG` 4 (21 Hz accelerometer, 20 Hz
+  gyroscope).
+- **Vertical speed could be dragged to zero by a repeated barometer sample.** The rate is
+  differentiated from altitude, so an unchanged conversion produced a genuine-looking zero
+  climb rate. The controller now updates the rate only when the pressure reading has
+  actually changed, so the estimate survives a stalled or slowed sensor.
+
+### Changed
+
+- `sensor_period_ms` 100 → **33** (30 Hz acquisition, orientation and altitude rate).
+- Flight loop tick 5 ms → **2 ms**, cutting scheduling jitter on the 33 ms task from 15 %
+  to under 6 %.
+- Barometer oversampling, IIR filter and IMU DLPF/rate moved from driver constants into
+  `Configuration`, so they can be tuned without touching a driver.
+- `HealthSnapshot` gains `altitude_agl_m` and `altitude_rate_mps`.
+
+### Added
+
+- **`flight/sensor_timing.hpp`** — `constexpr` BMP280 and MPU6050 datasheet timing model.
+  It computes the register encodings *and* the rate limits from one place, so what the
+  driver writes and what the validator checks cannot disagree. Pinned by tests to three
+  published datasheet figures: the 43.2 ms worst case, the 26.3 Hz preset and the 83 Hz
+  preset.
+- **Startup sensor-rate guard** — `validate_config()` refuses a `sensor_period_ms` shorter
+  than the barometer's worst-case conversion time, naming the number and the document.
+- **`documentation/design/sensor-rates.md`** — the rate split, the datasheet arithmetic,
+  the aliasing argument, the I2C and CPU budget, and what remains unmeasured.
+- Three C++ suites: the timing model, the rate guard, and the repeated-sample behaviour.
+  Host total: **357 assertions**.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 2)
 
 Radio reality check. The telemetry rate was never derived from the radio's actual

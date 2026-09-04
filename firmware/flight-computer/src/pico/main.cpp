@@ -55,7 +55,7 @@ int main() {
 
     const flight::Configuration config = make_config();
 
-    flight::PicoImu imu;
+    flight::PicoImu imu(config);
     flight::PicoBarometer barometer(config);
     flight::PicoGps gps;
     flight::PicoRadio radio(config);
@@ -83,7 +83,9 @@ int main() {
 #ifdef PICO_BUILD
         watchdog_update();
 #endif
-        tick_delay_ms(5);
+        // 2 ms: the loop is non-blocking, and the shortest scheduled task is the 33 ms
+        // sensor tick, so the tick sets the scheduling jitter. 2 ms keeps that under 6 %.
+        tick_delay_ms(2);
     }
 
     return 0;

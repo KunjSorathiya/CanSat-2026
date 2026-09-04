@@ -19,10 +19,9 @@ constexpr std::uint8_t REG_CONFIG = 0xF5;
 constexpr std::uint8_t REG_PRESS_MSB = 0xF7;
 constexpr std::uint8_t REG_CALIB = 0x88;  // 24 bytes 0x88..0x9F
 
-// osrs_t = x2 (010), osrs_p = x16 (101), mode = normal (11) -> 0b010_101_11
-constexpr std::uint8_t CTRL_MEAS = 0x57;
-// t_sb = 0.5 ms (000), filter = x16 (100), spi3w = 0 -> 0b000_100_00
-constexpr std::uint8_t CONFIG = 0x10;
+// CTRL_MEAS and CONFIG are built from the configured oversampling and filter by
+// flight/sensor_timing.hpp, so the register encoding and the timing model that validates
+// the sampling rate can never disagree.
 }  // namespace
 
 #ifdef PICO_BUILD
@@ -77,8 +76,14 @@ bool Bmp280::begin(i2c_bus_t bus, const Options& options) {
         return false;
     }
 
-    if (!write_reg(bus_, options_.address, REG_CONFIG, CONFIG)) return false;
-    if (!write_reg(bus_, options_.address, REG_CTRL_MEAS, CTRL_MEAS)) return false;
+    if (!write_reg(bus_, options_.address, REG_CONFIG,
+                   sensors::baro_config(options_.filter))) {
+        return false;
+    }
+    if (!write_reg(bus_, options_.address, REG_CTRL_MEAS,
+                   sensors::baro_ctrl_meas(options_.osrs_t, options_.osrs_p))) {
+        return false;
+    }
     sleep_ms(50);
 
     ok_ = true;

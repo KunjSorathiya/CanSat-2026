@@ -166,7 +166,7 @@ is counted separately, so a transport fault is never mistaken for a sensor fault
 
 ### Flight loop control flow
 
-`Controller::poll(now_ms)` is called continuously from `main()` on a 5 ms tick. It is
+`Controller::poll(now_ms)` is called continuously from `main()` on a 2 ms tick. It is
 non-blocking and bounded: no branch waits on hardware.
 
 ```mermaid
@@ -176,7 +176,7 @@ flowchart TD
     B -- yes --> D["mission_ms = now_ms - epoch_ms"]
     C --> D
     D --> E["gps.poll — bounded UART drain, never blocks on a fix"]
-    E --> F{"sensor task due? 100 ms"}
+    E --> F{"sensor task due? 33 ms"}
     F -- yes --> G["acquire_sensors"]
     F -- no --> H["run_calibration"]
     G --> H
@@ -453,8 +453,8 @@ packet file, or a live Web Serial connection to the bridge Pico.
 
 | Activity | Period | Configured by | Note |
 |---|---:|---|---|
-| Main tick | 5 ms | `main.cpp` | The loop is non-blocking; the delay only yields |
-| Sensor acquisition and orientation | 100 ms | `sensor_period_ms` | 10 Hz attitude update |
+| Main tick | 2 ms | `main.cpp` | The loop is non-blocking; the delay only yields. Sets scheduling jitter to under 6 % of the 33 ms acquisition period |
+| Sensor acquisition and orientation | 33 ms | `sensor_period_ms` | 30 Hz attitude and altitude-rate update; bounded by the barometer, see [sensor-rates.md](sensor-rates.md) |
 | Telemetry packet | 1000 ms | `telemetry_period_ms` | 1 Hz — the fastest the SF7/125 kHz modem sustains with duty margin. **1000 ms is also the enforced ceiling** for the rulebook minimum. See [link-budget.md](link-budget.md) |
 | SD flush | 2000 ms | `sd_flush_period_ms` | Appends happen per packet; this is the sync |
 | Battery sample | 1000 ms | `battery_period_ms` | |
@@ -495,7 +495,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, state machine, calibration, radio airtime | **Verified on host** — 25 C++ suites with 324 assertions, 75 Python tests and 30 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, state machine, calibration, radio airtime, sensor timing | **Verified on host** — 28 C++ suites with 357 assertions, 75 Python tests and 30 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |

@@ -52,7 +52,7 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 25 suites across the whole flight core | ✅ **324 / 324 assertions** |
+| `flight_tests` | 28 suites across the whole flight core | ✅ **357 / 357 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 6 modules | ✅ **42 / 42 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
@@ -108,7 +108,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 25 suites, 324 assertions
+### `flight_tests` — 28 suites, 357 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -199,6 +199,7 @@ Three things exist in more than one language and must not drift:
 | CRC-16/CCITT framing | [`framing.cpp`](../../firmware/ground-station/src/framing.cpp), [`transport.py`](../../ground-station/software/src/transport.py), `index.html` | The same known-answer vector `0x29B1` is asserted in both suites |
 | Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Shared test packets; the web console is a direct port |
 | LoRa airtime model | [`lora_airtime.hpp`](../../firmware/common/include/cansat/lora_airtime.hpp), [`link_budget.py`](../../tools/link_budget.py) | Both are asserted against the same two published SX127x reference vectors (46.336 ms and 1155.072 ms) |
+| Sensor timing model | [`sensor_timing.hpp`](../../firmware/flight-computer/include/flight/sensor_timing.hpp) — register encoding *and* the rate guard | The model reproduces three published BMP280 datasheet figures, so the registers written and the rate validated cannot disagree |
 | Radio modem parameters | [`link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp) — read by the vehicle *and* the bridge | `test_link_profile_is_shared_by_both_ends()` compares the two ends field by field; a mismatch is a silent, total link failure |
 
 > [!NOTE]
@@ -234,6 +235,7 @@ Sequence follows the [bring-up order](../design/wiring.md#bring-up-order).
 | 3 | IMU read | Stationary vehicle reads about 1 g total, rates near zero | ⬜ |
 | 4 | Barometer read | Pressure within a few hundred Pa of a local reference; temperature plausible | ⬜ |
 | 5 | Calibration | `CAL-1` within the sample budget while stationary | ⬜ |
+| 5b | Acquisition rate | Logged loop actually achieves 30 Hz with under 6 % jitter; barometer returns a fresh conversion every sample ([sensor-rates.md](../design/sensor-rates.md)) | ⬜ |
 | 6 | GPS | Raw NMEA received; fix acquired outdoors; checksum errors near zero | ⬜ |
 | 7 | RA-02 identity | Chip version register reads back correctly over SPI | ⬜ |
 | 8 | Bench link | Packets received end to end at sync word `0xF3` | ⬜ |

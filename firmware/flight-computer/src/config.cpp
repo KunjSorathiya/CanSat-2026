@@ -2,6 +2,7 @@
 
 #include "cansat/lora_airtime.hpp"
 #include "cansat/telemetry.hpp"
+#include "flight/sensor_timing.hpp"
 
 #include <cmath>
 #include <string>
@@ -30,6 +31,24 @@ bool validate_config(const Configuration& config, std::string& why) {
     }
     if (config.sensor_period_ms == 0) {
         why = "sensor_period_ms must be non-zero";
+        return false;
+    }
+    // Sampling faster than the barometer converts re-reads the previous conversion. The
+    // altitude-rate estimator differentiates altitude, so duplicated samples read as zero
+    // climb rate — worst exactly when the vehicle is moving fastest.
+    const double baro_min_period =
+        sensors::baro_min_sample_period_ms(config.baro_osrs_t, config.baro_osrs_p,
+                                           config.baro_standby_ms);
+    if (static_cast<double>(config.sensor_period_ms) < baro_min_period) {
+        why = "sensor_period_ms " + std::to_string(config.sensor_period_ms) +
+              " is shorter than the barometer's worst-case conversion time (" +
+              to_int_string(baro_min_period) +
+              " ms at the configured oversampling); reduce the oversampling or slow the "
+              "acquisition rate (see documentation/design/sensor-rates.md)";
+        return false;
+    }
+    if (!(config.baro_standby_ms >= 0.0)) {
+        why = "baro_standby_ms must be non-negative";
         return false;
     }
     if (config.post_impact_transmission_ms < 5000) {

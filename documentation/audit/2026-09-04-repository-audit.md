@@ -193,6 +193,7 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-12** | The telemetry rate was set without reference to LoRa airtime: SF9/125 kHz gives 1004 ms per packet against a 500 ms schedule | **High** | ✅ **Closed 2026-09-04 (cycle 2)** — see [link-budget.md](../design/link-budget.md); profile moved to SF7 at 1 Hz, with compile-time, startup and test guards |
 | **F-13** | The flight computer and the ground-station bridge held independent copies of the modem settings and agreed only by coincidence | **High** | ✅ **Closed 2026-09-04 (cycle 2)** — both read `cansat/link_profile.hpp`; a test compares them field by field |
 | **F-14** | The C++ parser accepted `P-000`, and the Python and JavaScript parsers accepted `P- 7` and packet numbers beyond 32 bits — three parsers, three rules | **Medium** | ✅ **Closed 2026-09-04 (cycle 2)** — one rule in all three, pinned by `test-data/protocol-fixtures.tsv` |
+| **F-15** | The barometer was hard-coded to the 26.3 Hz "indoor navigation" preset, so no acquisition rate above ~26 Hz could return fresh data; the IMU's 44 Hz anti-alias filter was also too wide for the loop rate | **Medium** | ✅ **Closed 2026-09-04 (cycle 4)** — sensor settings moved into `Configuration`, barometer at the 83 Hz preset, 30 Hz acquisition, startup guard and a duplicate-sample check on vertical speed. See [sensor-rates.md](../design/sensor-rates.md) |
 
 ---
 
@@ -254,7 +255,7 @@ Legend: ✅ verified · 🟡 partially verified · ⬜ content-only review (no e
 
 | File | Lines | Verified | Verdict |
 |---|---:|---|---|
-| `pico/main.cpp` | 88 | Watchdog 2000 ms and 5 ms tick asserted | 🟡 Syntax only |
+| `pico/main.cpp` | 88 | Watchdog 2000 ms and 5 ms tick asserted (tick is 2 ms since cycle 4, see F-15) | 🟡 Syntax only |
 | `pico/pico_hal.cpp` | 146 | Bus speeds asserted: I2C 400 kHz, SPI 400 kHz, UART 9600 | 🟡 Syntax only |
 | `pico/mpu6050.cpp` | 123 | Uses verified scaling from `sensor_math` | 🟡 Syntax only |
 | `pico/bmp280.cpp` | 122 | Uses verified compensation from `sensor_math` | 🟡 Syntax only |
@@ -346,7 +347,7 @@ Legend: ✅ verified · 🟡 partially verified · ⬜ content-only review (no e
 | Claim | Source of truth | Result |
 |---|---|---|
 | 15 GPIO assignments | `BoardPins` in `config.hpp` | ✅ |
-| Telemetry 1000 ms, sensor 100 ms, SD flush 2000 ms, health 1000 ms, battery 1000 ms | `Configuration` (telemetry was 500 ms; changed in cycle 2, see F-12) | ✅ |
+| Telemetry 1000 ms, sensor 33 ms, SD flush 2000 ms, health 1000 ms, battery 1000 ms | `Configuration` (telemetry was 500 ms and sensor 100 ms; changed in cycles 2 and 4, see F-12 and F-15) | ✅ |
 | Calibration: 80 samples, 20 s timeout, 2 °/s, 1.5 m/s² | `Configuration` | ✅ |
 | Launch: 30 m/s², 15 m, 300 ms hold, 3 s arming delay | `Configuration` | ✅ |
 | Landing: 3 s minimum flight, 2.5 m/s², 1.0 m/s, 3 s hold | `Configuration` | ✅ |
@@ -356,7 +357,7 @@ Legend: ✅ verified · 🟡 partially verified · ⬜ content-only review (no e
 | Sync words `0xF3` / `0xA5` | `RadioConfig` | ✅ |
 | SD 10-failure cutoff, radio 5-failure threshold, 1000 ms back-off | `Configuration` | ✅ |
 | LED periods 900 / 400 / 100 / 250 / 60 ms | `Controller::update_led` | ✅ |
-| Watchdogs 2000 ms flight, 3000 ms bridge; 5 ms tick | `main.cpp` × 2 | ✅ |
+| Watchdogs 2000 ms flight, 3000 ms bridge; 2 ms flight tick | `main.cpp` × 2 | ✅ |
 | Bus speeds I2C 400 kHz, SPI 400 kHz, UART 9600 | `pico_hal.cpp` | ✅ |
 | Vertical-rate EWMA 0.7 / 0.3 | `controller.cpp` | ✅ |
 | Frame payload limit 512 B | `framing.hpp` | ✅ |

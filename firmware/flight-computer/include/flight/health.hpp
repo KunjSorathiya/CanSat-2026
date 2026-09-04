@@ -26,6 +26,8 @@ struct HealthSnapshot {
     bool armed = false;              // launch detection is enabled
     bool watchdog_reboot = false;   // this power session began with a watchdog reset
     float battery_voltage = 0.0f;
+    double altitude_agl_m = 0.0;      // above the power-on ground baseline
+    double altitude_rate_mps = 0.0;   // filtered vertical speed, positive is climbing
     double gyro_bias_dps[3] = {0.0, 0.0, 0.0};
     double ground_pressure_pa = 0.0;
     std::uint32_t gps_checksum_errors = 0;

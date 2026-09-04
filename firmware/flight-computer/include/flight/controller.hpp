@@ -98,6 +98,7 @@ private:
 
     double last_altitude_agl_m_ = 0.0;
     std::uint64_t last_altitude_ms_ = 0;
+    double last_baro_pressure_pa_ = 0.0;  // detects a re-read of an unchanged conversion
     double altitude_rate_mps_ = 0.0;
 
     std::uint8_t radio_consecutive_failures_ = 0;

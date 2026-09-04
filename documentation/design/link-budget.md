@@ -127,7 +127,7 @@ The architecture therefore decouples the rates rather than faking one:
 
 | Stage | Rate | Bounded by |
 |---|---|---|
-| Sensor acquisition, orientation, state estimation | 10 Hz now; the loop is non-blocking and the sensors support faster | I2C bandwidth and sensor output rates |
+| Sensor acquisition, orientation, state estimation | 30 Hz | Barometer conversion time — see [sensor-rates.md](sensor-rates.md) |
 | Canonical telemetry model | Built on demand from the latest snapshot | — |
 | SD raw block logging | Per telemetry record, independent of the radio | SD write latency |
 | **RF telemetry** | **1 Hz** | **Airtime — this document** |

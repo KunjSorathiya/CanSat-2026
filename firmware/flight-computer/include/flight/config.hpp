@@ -6,6 +6,7 @@
 
 #include "cansat/link_profile.hpp"
 #include "cansat/lora_airtime.hpp"
+#include "flight/sensor_timing.hpp"
 
 namespace flight {
 
@@ -71,7 +72,11 @@ struct Configuration {
     // packet — validate_config() rejects the combinations that are not physically
     // achievable rather than letting the scheduler silently under-run.
     std::uint32_t telemetry_period_ms = cansat::link::kTelemetryPeriodMs;  // cap 1000
-    std::uint32_t sensor_period_ms = 100;      // sensor acquisition + orientation update
+    // 33 ms = ~30 Hz acquisition, state estimation and altitude rate. Both sensors can
+    // supply data faster than this: the barometer's configured preset runs at 83 Hz and
+    // the IMU at 200 Hz. validate_config() refuses a period the barometer cannot keep up
+    // with, because re-reading an unchanged conversion reads as zero climb rate.
+    std::uint32_t sensor_period_ms = 33;       // sensor acquisition + orientation update
     std::uint32_t sd_flush_period_ms = 2000;
     std::uint32_t health_period_ms = 1000;
     std::uint32_t battery_period_ms = 1000;
@@ -96,6 +101,24 @@ struct Configuration {
 
     // ---- Sensor validity -------------------------------------------------------
     std::uint32_t sensor_stale_after_ms = 2000;
+
+    // ---- Barometer configuration (BMP280 datasheet section 3.8, table 14) ------
+    // osrs_t x1 + osrs_p x4 + IIR filter x16 is the datasheet's "handheld device,
+    // dynamic" preset: 83 Hz output, low noise, and fast enough that 30 Hz sampling
+    // always sees a fresh conversion. The previous x2/x16 setting produced only 26 Hz
+    // and could not have supported the acquisition rate.
+    sensors::Oversampling baro_osrs_t = sensors::Oversampling::x1;
+    sensors::Oversampling baro_osrs_p = sensors::Oversampling::x4;
+    sensors::BaroFilter baro_filter = sensors::BaroFilter::x16;
+    double baro_standby_ms = 0.5;
+
+    // ---- IMU configuration (MPU-6050 register map, registers 25 and 26) --------
+    // DLPF_CFG 4 gives a 21 Hz accelerometer / 20 Hz gyroscope bandwidth. At a 30 Hz
+    // sampling rate the Nyquist limit is 15 Hz, so a wider filter would alias airframe
+    // vibration into the attitude estimate; a narrower one would blur the launch
+    // transient. SMPLRT_DIV 4 leaves the internal rate at 200 Hz, well above sampling.
+    std::uint8_t imu_dlpf_cfg = 4;
+    std::uint8_t imu_sample_rate_div = 4;
 
     // ---- Barometric altitude ------------------------------------------------
     double reference_pressure_pa = 101325.0;   // PROVISIONAL sea-level reference; set from field baro

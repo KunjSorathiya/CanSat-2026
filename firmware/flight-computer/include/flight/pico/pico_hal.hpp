@@ -20,24 +20,26 @@ void pico_buses_init();
 
 class PicoImu final : public Imu {
 public:
+    explicit PicoImu(const Configuration& config) : config_(config) {}
     bool initialize() override;
     bool read(ImuSample& out, std::uint64_t now_ms) override;
     SensorHealth health() const override { return health_; }
 
 private:
+    const Configuration& config_;
     pico::Mpu6050 device_;
     SensorHealth health_;
 };
 
 class PicoBarometer final : public Barometer {
 public:
-    explicit PicoBarometer(const Configuration& config) : reference_pressure_pa_(config.reference_pressure_pa) {}
+    explicit PicoBarometer(const Configuration& config) : config_(config) {}
     bool initialize() override;
     bool read(BaroSample& out, std::uint64_t now_ms) override;
     SensorHealth health() const override { return health_; }
 
 private:
-    double reference_pressure_pa_;
+    const Configuration& config_;
     pico::Bmp280 device_;
     SensorHealth health_;
 };

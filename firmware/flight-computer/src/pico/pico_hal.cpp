@@ -58,7 +58,13 @@ bool PicoImu::initialize() {
     ensure_i2c0();
     gpio_init(BoardPins::imu_int);
     gpio_set_dir(BoardPins::imu_int, GPIO_IN);
-    const bool ok = device_.begin(i2c0, {});
+    // Bandwidth and internal rate come from the flight configuration: the DLPF setting
+    // must stay below the acquisition Nyquist limit or airframe vibration aliases into
+    // the attitude estimate (see documentation/design/sensor-rates.md).
+    pico::Mpu6050::Options options;
+    options.dlpf = config_.imu_dlpf_cfg;
+    options.sample_rate_div = config_.imu_sample_rate_div;
+    const bool ok = device_.begin(i2c0, options);
     health_.initialized = ok;
     health_.healthy = ok;
     return ok;
@@ -75,7 +81,10 @@ bool PicoImu::read(ImuSample& out, std::uint64_t now_ms) {
 bool PicoBarometer::initialize() {
     ensure_i2c0();
     pico::Bmp280::Options options;
-    options.reference_pressure_pa = reference_pressure_pa_;
+    options.reference_pressure_pa = config_.reference_pressure_pa;
+    options.osrs_t = config_.baro_osrs_t;
+    options.osrs_p = config_.baro_osrs_p;
+    options.filter = config_.baro_filter;
     const bool ok = device_.begin(i2c0, options);
     health_.initialized = ok;
     health_.healthy = ok;

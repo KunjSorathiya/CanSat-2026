@@ -233,15 +233,27 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
                                ? abs_alt - baseline_altitude_m_
                                : abs_alt;
 
-        if (last_altitude_ms_ != 0) {
+        // Vertical speed is differentiated from altitude, so it is only updated when the
+        // barometer has actually produced a new conversion. Reading the same registers
+        // twice yields an identical pressure; treating that as a real sample would feed a
+        // zero climb rate into the filter and bias the estimate toward zero exactly when
+        // the vehicle is moving fastest. validate_config() also refuses a sampling period
+        // shorter than the barometer's conversion time, but this stays correct even if the
+        // sensor stalls, slows, or is reconfigured in the field.
+        const bool pressure_changed =
+            last_altitude_ms_ == 0 || baro.pressure_pa != last_baro_pressure_pa_;
+        if (last_altitude_ms_ != 0 && pressure_changed) {
             const double dts = (mission_ms - last_altitude_ms_) / 1000.0;
             if (dts > 0.0) {
                 const double inst_rate = (agl - last_altitude_agl_m_) / dts;
                 altitude_rate_mps_ = 0.7 * altitude_rate_mps_ + 0.3 * inst_rate;
             }
         }
-        last_altitude_agl_m_ = agl;
-        last_altitude_ms_ = mission_ms;
+        if (pressure_changed) {
+            last_altitude_agl_m_ = agl;
+            last_altitude_ms_ = mission_ms;
+            last_baro_pressure_pa_ = baro.pressure_pa;
+        }
 
         snapshot_.altitude_m = agl;
         snapshot_.baro_valid = true;
@@ -428,6 +440,8 @@ void Controller::refresh_health(std::uint64_t mission_ms) {
     health_.watchdog_reboot = watchdog_reboot_;
     for (int i = 0; i < 3; ++i) health_.gyro_bias_dps[i] = gyro_bias_dps_[i];
     health_.ground_pressure_pa = calibrator_.result().ground_pressure_pa;
+    health_.altitude_agl_m = last_altitude_agl_m_;
+    health_.altitude_rate_mps = altitude_rate_mps_;
     health_.gps_checksum_errors = gps_.checksum_errors();
 }
 

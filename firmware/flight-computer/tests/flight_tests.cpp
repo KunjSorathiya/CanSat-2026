@@ -11,6 +11,7 @@
 #include "flight/raw_block_log.hpp"
 #include "flight/scheduler.hpp"
 #include "flight/sensor_math.hpp"
+#include "flight/sensor_timing.hpp"
 #include "flight/startup_calibration.hpp"
 #include "flight/state_machine.hpp"
 #include "flight/telemetry_builder.hpp"
@@ -419,6 +420,133 @@ void test_config_radio_airtime_guard() {
     bad.worst_case_packet_bytes = 200;
     bad.max_channel_duty = 0.0;
     CHECK(!flight::validate_config(bad, why));
+}
+
+// The sensor timing model, pinned to the BMP280 datasheet's own published presets.
+void test_sensor_timing_model() {
+    using flight::sensors::BaroFilter;
+    using flight::sensors::Oversampling;
+
+    // Datasheet table 14, "handheld device, dynamic": osrs_t x1, osrs_p x4, filter x16,
+    // published output data rate 83 Hz.
+    CHECK(approx(flight::sensors::baro_measure_ms_typ(Oversampling::x1, Oversampling::x4),
+                 11.5, 1e-9));
+    CHECK(approx(flight::sensors::baro_output_rate_hz(Oversampling::x1, Oversampling::x4),
+                 83.33, 0.1));
+
+    // Datasheet section 3.8.1 worst case for osrs_t x2 / osrs_p x16: 43.2 ms.
+    CHECK(approx(flight::sensors::baro_measure_ms_max(Oversampling::x2, Oversampling::x16),
+                 43.2, 0.05));
+    // ...whose typical output rate is the datasheet's 26.3 Hz "indoor navigation" preset.
+    CHECK(approx(flight::sensors::baro_output_rate_hz(Oversampling::x2, Oversampling::x16),
+                 26.3, 0.1));
+
+    // Skipping a channel removes its term entirely.
+    CHECK(flight::sensors::baro_measure_ms_typ(Oversampling::skipped, Oversampling::skipped) ==
+          1.0);
+    CHECK(flight::sensors::baro_measure_ms_typ(Oversampling::skipped, Oversampling::x1) <
+          flight::sensors::baro_measure_ms_typ(Oversampling::x1, Oversampling::x1));
+
+    // More oversampling always costs time, never saves it.
+    double previous = 0.0;
+    for (const Oversampling p : {Oversampling::x1, Oversampling::x2, Oversampling::x4,
+                                 Oversampling::x8, Oversampling::x16}) {
+        const double t = flight::sensors::baro_measure_ms_typ(Oversampling::x1, p);
+        CHECK(t > previous);
+        previous = t;
+    }
+    CHECK(flight::sensors::baro_measure_ms_max(Oversampling::x1, Oversampling::x4) >
+          flight::sensors::baro_measure_ms_typ(Oversampling::x1, Oversampling::x4));
+
+    // Register encodings, datasheet section 4.3.
+    // osrs_t x1 (001), osrs_p x4 (011), normal mode (11) -> 0b001_011_11 = 0x2F.
+    CHECK(flight::sensors::baro_ctrl_meas(Oversampling::x1, Oversampling::x4) == 0x2F);
+    // The previous hard-coded setting: osrs_t x2 (010), osrs_p x16 (101) -> 0x57.
+    CHECK(flight::sensors::baro_ctrl_meas(Oversampling::x2, Oversampling::x16) == 0x57);
+    // t_sb 0.5 ms (000), filter x16 (100) -> 0b000_100_00 = 0x10.
+    CHECK(flight::sensors::baro_config(BaroFilter::x16) == 0x10);
+    CHECK(flight::sensors::baro_config(BaroFilter::off) == 0x00);
+
+    // MPU-6050 register map: DLPF 1..6 runs the gyro at 1 kHz, divided by (1 + div).
+    CHECK(approx(flight::sensors::imu_sample_rate_hz(4, 4), 200.0, 1e-9));
+    CHECK(approx(flight::sensors::imu_sample_rate_hz(0, 4), 1600.0, 1e-9));
+    CHECK(approx(flight::sensors::imu_accel_bandwidth_hz(4), 21.0, 1e-9));
+    CHECK(approx(flight::sensors::imu_gyro_bandwidth_hz(4), 20.0, 1e-9));
+    CHECK(flight::sensors::imu_accel_bandwidth_hz(3) > flight::sensors::imu_accel_bandwidth_hz(4));
+}
+
+// The acquisition rate must be one the sensors can actually feed.
+void test_config_sensor_rate_guard() {
+    using flight::sensors::Oversampling;
+    std::string why;
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+
+    // Default: 33 ms sampling against a barometer whose worst case is ~14 ms.
+    CHECK(flight::validate_config(c, why));
+    CHECK(c.sensor_period_ms == 33);
+    const double baro_min = flight::sensors::baro_min_sample_period_ms(
+        c.baro_osrs_t, c.baro_osrs_p, c.baro_standby_ms);
+    CHECK(baro_min < static_cast<double>(c.sensor_period_ms));
+    CHECK(flight::sensors::baro_output_rate_hz(c.baro_osrs_t, c.baro_osrs_p) > 30.0);
+
+    // The old x2/x16 barometer setting cannot feed a 30 Hz loop: ~44 ms per conversion.
+    c.baro_osrs_t = Oversampling::x2;
+    c.baro_osrs_p = Oversampling::x16;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("barometer") != std::string::npos);
+
+    // It is fine at the slower rate it can actually sustain.
+    c.sensor_period_ms = 50;
+    CHECK(flight::validate_config(c, why));
+
+    // The IMU's anti-alias filter must stay below the acquisition Nyquist limit.
+    flight::Configuration d;
+    const double nyquist = 1000.0 / (2.0 * static_cast<double>(d.sensor_period_ms));
+    CHECK(flight::sensors::imu_accel_bandwidth_hz(d.imu_dlpf_cfg) <= nyquist * 1.5);
+    CHECK(flight::sensors::imu_sample_rate_hz(d.imu_dlpf_cfg, d.imu_sample_rate_div) >
+          1000.0 / static_cast<double>(d.sensor_period_ms));
+}
+
+// A barometer that returns the same conversion twice must not read as zero climb rate.
+void test_controller_ignores_repeated_barometer_samples() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    c.sensor_period_ms = 50;
+    c.health_period_ms = 50;  // keep health() current for the assertions below
+    c.altitude_relative_to_baseline = false;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    // Climb steadily: a real driver reports falling pressure and rising altitude
+    // together, so the estimated rate must go positive.
+    double pressure = 101325.0;
+    double altitude = 0.0;
+    std::uint64_t t = 0;
+    for (int i = 0; i < 40; ++i) {
+        pressure -= 12.0;   // ~1 m per step
+        altitude += 1.0;    // 1 m per 50 ms -> 20 m/s climb
+        baro.sample.pressure_pa = pressure;
+        baro.sample.altitude_m = altitude;
+        t += 50;
+        ctrl.poll(t);
+    }
+    const double climbing = ctrl.health().altitude_rate_mps;
+    CHECK(climbing > 1.0);
+
+    // Now the barometer stalls: the same conversion is returned repeatedly. The rate must
+    // hold its last value rather than being dragged to zero by fake zero-length steps.
+    for (int i = 0; i < 20; ++i) {
+        t += 50;
+        ctrl.poll(t);
+    }
+    CHECK(approx(ctrl.health().altitude_rate_mps, climbing, 1e-9));
 }
 
 // The vehicle and the bridge must configure the same modem. They agree only because both
@@ -858,6 +986,9 @@ int main(int argc, char** argv) {
     test_state_machine_fault_paths();
     test_config_validation();
     test_config_radio_airtime_guard();
+    test_sensor_timing_model();
+    test_config_sensor_rate_guard();
+    test_controller_ignores_repeated_barometer_samples();
     test_link_profile_is_shared_by_both_ends();
     test_lora_airtime_reference_vectors();
     test_telemetry_builder();

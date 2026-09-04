@@ -69,6 +69,7 @@ Other tunables worth reviewing before a flight, all in
 | Setting | Default | Review when |
 |---|---:|---|
 | `telemetry_period_ms` | 1000 | Raising the rate — but read [link-budget.md](../design/link-budget.md) first: 1000 ms is both the rulebook ceiling and roughly what the SF7/125 kHz modem sustains. `validate_config()` refuses a period the radio cannot deliver |
+| `sensor_period_ms` | 33 | Changing the acquisition rate — `validate_config()` refuses a period the barometer cannot feed ([sensor-rates.md](../design/sensor-rates.md)) |
 | `reference_pressure_pa` | 101325 | Always — set it from a field barometer reading on the day |
 | `launch_accel_mps2` / `launch_altitude_gain_m` | 30 / 15 | After the first flight data exists |
 | `arming_delay_ms` | 3000 | If the pad procedure takes longer to settle |
