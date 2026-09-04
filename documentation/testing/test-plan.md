@@ -43,7 +43,33 @@ bash tools/check_pico_syntax.sh
 Syntax-checks every `PICO_BUILD` branch against minimal SDK stubs
 (`tools/pico_sdk_stubs/`). This is a compile check, **not** a firmware build.
 
-Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
+Both scripts run on every push through [CI](../../.github/workflows/ci.yml), in four
+jobs: the host build and tests, the CMake/CTest path, the Pico syntax check, and the
+strict warning set.
+
+### The Linux baseline
+
+Every result quoted in this document was measured on the development machine: Windows,
+MSYS2 GCC 15.2.0. Until 2026-09-04 the project had never been built on Linux at all --
+the CI workflow only reached `main` with the first full push, and its first run failed in
+two of the three jobs.
+
+That failure is not yet diagnosed. What has been ruled out, by direct check rather than
+inspection: CMake configures cleanly and registers all five tests (verified against CMake
+4.4.3, the same major version the runner carries); every `#include` resolves with exact
+case; every file is stored LF in the index, with a `.gitattributes` now enforcing it;
+every source named by the build is committed; the test binaries pass when run from a
+foreign working directory, as CTest runs them; and no translation unit relies on a
+transitively included standard header. What remains untested is the runner's own
+toolchain -- a different GCC and a different C library -- which cannot be reproduced on
+the development machine.
+
+The workflow is therefore written to report rather than to guess: no step discards its
+output, every job prints its tool versions, and the build logs and CTest results are
+uploaded as artifacts on failure as well as success. The strict warning set runs
+`continue-on-error` until it has been seen to pass on Linux once, because a gate that
+fails on an unverified toolchain blocks work without telling anyone why. **Make it
+blocking again as soon as a green Linux run exists.**
 
 ---
 

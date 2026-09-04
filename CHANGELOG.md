@@ -8,6 +8,53 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 30)
+
+### Fixed — a 41 MB Windows CMake wheel was being tracked
+
+`cmake-4.4.3-py3-none-win_amd64.whl` sat in the repository root, committed while the
+CMake path was being verified. It is a downloaded installer: a build artifact,
+machine-specific to `win_amd64`, and useless to CI, Linux and macOS alike, yet every
+clone paid 41 MB for it. Untracked, with `*.whl` and `*.tar.gz` added to `.gitignore` so
+the next download cannot repeat it. The blob remains reachable through the commit that
+added it; purging it needs a history rewrite and is recorded rather than done quietly.
+
+### Added — line-ending policy, enforced
+
+A `.gitattributes` normalises every text file to LF in the repository while leaving
+Windows working copies native. The tree was already clean — all 141 tracked files verified
+LF in the index — but nothing was stopping the next one. A CRLF that reaches the index
+turns a shell script into a file Linux reports as a missing interpreter, which is a
+confusing failure to debug in CI.
+
+### Changed — CI reports instead of guessing
+
+The first CI run this project has ever had failed in two of its three jobs. The workflow
+made that harder to act on than it needed to be: the strict-warning gate sent its build
+to `/dev/null`, so the one thing it existed to surface was thrown away, and nothing was
+kept after a job ended.
+
+The workflow now: discards no output; prints `g++`, `python`, `node` and `cmake` versions
+in every job; uploads `host.log`, `strict.log` and the CTest results as artifacts whether
+the job passes or fails; and pins `ubuntu-24.04` rather than `ubuntu-latest`, so the
+toolchain changes when we decide it does and not when a runner image rolls.
+
+The strict warning set moves to its own `continue-on-error` job until it has been observed
+passing on Linux once. The tree is clean under that set on the developer's GCC 15.2; a
+different GCC may reasonably disagree, and a quality gate that fails on a toolchain nobody
+has run blocks work without explaining itself. It must be made blocking again as soon as a
+green Linux run exists — recorded in `documentation/testing/test-plan.md`.
+
+### Documentation — the Linux baseline stated plainly
+
+Every test result this project quotes was measured on Windows. The test plan now says so,
+lists what has been ruled out by direct check (CMake configure and test registration
+against CMake 4.4.3, include casing, LF in the index, committed sources, foreign working
+directory, transitive standard headers), and names what remains untested: the runner's own
+compiler and C library, which cannot be reproduced on the development machine.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 29)
 
 ### Documentation — the test plan and the defect register caught up with the code

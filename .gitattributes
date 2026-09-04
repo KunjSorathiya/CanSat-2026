@@ -1,0 +1,20 @@
+# Line endings are normalised to LF *in the repository*. The project is developed on
+# Windows and built in CI on Linux; a CRLF that reaches the index turns a shell script
+# into a file Linux cannot execute and makes every diff noisy. Working copies still get
+# native endings on Windows, so this costs the Windows developer nothing.
+* text=auto
+
+# Shell scripts must be LF even in the working tree: CI invokes them on Linux, and a
+# stray CR after the shebang is a "bad interpreter" error that reads like a missing file.
+*.sh text eol=lf
+
+# Binary or already-compressed content git must not touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.whl binary
+*.uf2 binary
+*.bin binary

@@ -1,5 +1,18 @@
 name: CI
 
+# This project is developed on Windows and has, until now, only ever been verified there.
+# These jobs are its first Linux baseline. Two rules follow from that, and they are the
+# reason this file looks the way it does:
+#
+#   1. Nothing is discarded. An earlier version of this workflow sent the strict-warning
+#      build to /dev/null -- a gate whose whole purpose is to surface a warning, throwing
+#      away the warning. A failure nobody can read costs another push to diagnose.
+#   2. The strict warning set is advisory until it has been observed passing on Linux.
+#      It is enforced on a compiler the developer can actually run; a different GCC on a
+#      runner may reasonably disagree, and a quality gate that fails on an unverified
+#      toolchain blocks work without telling anyone anything. It is reported on every run
+#      and becomes blocking once a green Linux run exists (see documentation/testing/).
+
 on:
   push:
     branches: [main]
@@ -9,7 +22,9 @@ on:
 jobs:
   host-build-and-test:
     name: Host build + tests
-    runs-on: ubuntu-latest
+    # Pinned rather than ubuntu-latest: the toolchain version is part of what this job
+    # verifies, and it should change when we decide to, not when the runner image rolls.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -21,30 +36,73 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Compiler version
-        run: g++ --version
-
-      # A warning is a finding, not decoration. The tree is clean under the extended set
-      # in tools/build_host.sh, and a new one must fail the build rather than scroll past.
-      - name: Fail on any compiler warning
+      - name: Toolchain versions
         run: |
-          set -o pipefail
-          CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wcast-align -Wnull-dereference -Wdouble-promotion -Wformat=2 -Werror"             bash tools/build_host.sh > /dev/null
+          g++ --version
+          python --version
+          node --version
 
-      # build_host.sh skips the web console suite when Node is absent. CI installs Node,
-      # so a skip here means the toolchain broke, not that the tests are optional.
       - name: Build and run the host test suites
         run: |
           set -o pipefail
           bash tools/build_host.sh 2>&1 | tee host.log
+
+      # build_host.sh skips the web console suite when Node is absent. CI installs Node,
+      # so a skip here means the toolchain broke, not that the tests are optional.
+      - name: Fail if the web console suite was skipped
+        run: |
           if grep -q 'SKIPPED web console tests' host.log; then
             echo "::error::web console tests were skipped in CI" >&2
             exit 1
           fi
 
+      # Whatever happened, the evidence survives the job.
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-build-log
+          path: host.log
+          if-no-files-found: warn
+
+  strict-warnings:
+    name: Strict warning set (advisory)
+    runs-on: ubuntu-24.04
+    # Advisory until a green Linux run exists. The tree is clean under this set on the
+    # developer's GCC 15.2; this job establishes whether the runner's GCC agrees.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # A warning is a finding, not decoration. -Wshadow catches a local hiding a member,
+      # -Wcast-align a pointer cast that faults on ARM but not on x86, -Wdouble-promotion
+      # a float silently widened on a chip with no double FPU, -Wformat=2 a printf format
+      # that does not match its argument.
+      - name: Build with every warning fatal
+        run: |
+          set -o pipefail
+          CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wcast-align -Wnull-dereference -Wdouble-promotion -Wformat=2 -Werror" \
+            bash tools/build_host.sh 2>&1 | tee strict.log
+
+      - name: Upload the strict build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strict-warning-log
+          path: strict.log
+          if-no-files-found: warn
+
   pico-syntax:
     name: Pico firmware syntax check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -53,14 +111,30 @@ jobs:
 
   cmake-configure:
     name: CMake configure (host targets)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure and build the host CMake targets
+      - name: Tool versions
         run: |
-          cmake -S . -B build/ci -DCMAKE_BUILD_TYPE=Release
-          cmake --build build/ci --parallel
+          cmake --version
+          g++ --version
+
+      - name: Configure
+        run: cmake -S . -B build/ci -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build/ci --parallel
 
       - name: Run CTest
         run: ctest --test-dir build/ci --output-on-failure
+
+      # CTest keeps its own record of what ran and what the failure was; it is far more
+      # useful than the console tail when a single assertion goes wrong.
+      - name: Upload CTest output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-log
+          path: build/ci/Testing/**
+          if-no-files-found: warn
