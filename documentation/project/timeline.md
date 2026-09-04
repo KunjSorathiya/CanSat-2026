@@ -56,6 +56,7 @@ timeline
     Hardware analysis : BOM identified against Robu SKUs : Pico and BMP280 datasheets stored : Electrical compatibility assessed : GPIO and resource maps drafted : AMS1117-3.3 rejected for direct regulation : microSD supply flagged as blocking
     Software : Telemetry protocol specified : Flight core implemented : SX1278 driver written : Pico HAL written : Ground bridge and framing built : Python ground pipeline built : Web console built : Host test suites written
     Documentation and hardening : regex removed from the shared library : CI workflow added : Architecture, wiring, timeline, test plan, runbook written : Full repository audit
+    Second pass : Telemetry rate derived from airtime : One link profile for both ends : One protocol fixture set for three parsers : Web console tested under Node : 30 Hz acquisition with sensor-rate guard : Attitude wrap bug fixed : GPS fixes validated : Packet budget measured : Logging failures survivable : LoRa and microSD drivers executed against simulated devices : Quick-start guide written
 ```
 
 ### Commit history
@@ -66,7 +67,25 @@ timeline
 | `e71706c` | 2026-09-03 | Hardware project overview |
 | `a915247` | 2026-09-03 | Competition requirements and rulebook |
 | `27495df` | 2026-09-03 | Initial CanSat software and engineering documentation |
-| *(working tree)* | 2026-09-04 | Flight core, ground station, web console, tests, full documentation set — see [CHANGELOG.md](../../CHANGELOG.md) |
+| `9c23a88` | 2026-09-04 | Flight software, ground station and host test suites |
+| `f7c75a7` | 2026-09-04 | Full documentation set and CI |
+| `486daa3` | 2026-09-04 | Telemetry rate derived from LoRa airtime; single link profile |
+| `e188b7d` | 2026-09-04 | One protocol fixture set across all three parsers; web console tested |
+| `942aa7d` | 2026-09-04 | 30 Hz acquisition, after making the sensors able to feed it |
+| `dc0b10e` | 2026-09-04 | Quick-start guide |
+| `0ab977e` | 2026-09-04 | Attitude blending across the ±180° seam; GPS fix validation |
+| `3e70c6d` | 2026-09-04 | Real packet budget; optional-field degradation instead of truncation |
+| `b2450a7` | 2026-09-04 | Ground station survives a failing log; raw log stays parseable |
+| `9266816` | 2026-09-04 | LoRa driver executed against a fake register bank |
+| `83cad81` | 2026-09-04 | microSD driver executed against a simulated card |
+| `6356709` | 2026-09-04 | IMU range encoding made host-testable |
+
+Eleven of these are a second development pass over software that already built and passed:
+a rate that the radio could not have delivered, three parsers that disagreed, sensors that
+could not feed their own loop, an attitude filter wrong at the wrap, a packet budget below
+the real packet, a logger that could take reception down with it, and two SPI drivers that
+had never executed. All are recorded in [CHANGELOG.md](../../CHANGELOG.md) and in the
+[audit findings](../audit/2026-09-04-repository-audit.md#findings) as F-12 to F-28.
 
 ### What exists now
 
@@ -74,13 +93,13 @@ timeline
 |---|---|---|
 | Telemetry protocol | Rulebook format, strict parser, precision rules, optional fields | [telemetry-protocol.md](../design/telemetry-protocol.md) |
 | Flight core | Controller, state machine, scheduler, orientation, calibration, faults, builder, block log, NMEA parser, link profile, airtime and sensor-rate guards | 33 C++ suites, 506 assertions |
-| Sensor drivers | MPU6050, BMP280, NEO-6M, microSD, SX1278 | Compile-checked against SDK stubs |
+| Sensor drivers | MPU6050, BMP280, NEO-6M | Compile-checked against SDK stubs; register encodings and timing model host-tested |
 | Ground bridge | Continuous RX, CRC framing, status lines, watchdog | Framing unit-tested |
 | Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI | 63 Python tests |
 | Web console | Framing, parser, validator and link health extracted from `index.html` and run under Node | 30 Node tests |
 | SPI drivers | LoRa radio and microSD command sequences against simulated devices | 675 assertions |
 | Tooling | LoRa time-on-air calculator used for the packet-rate decision | 33 Python tests |
-| Web console | Single-file console with demo, file replay and Web Serial | Manual use |
+| Web console UI | Single-file console with demo, file replay and Web Serial | Rendering verified by hand in a browser |
 | Documentation | Requirements, hardware, electrical, protocol, architecture, wiring, testing, operations | This directory |
 
 ---

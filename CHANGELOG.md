@@ -8,6 +8,25 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 12)
+
+### Changed — the project documents now reflect the second development pass
+
+- **[requirements.md](documentation/requirements/requirements.md)** — 23 requirements whose
+  acceptance can be judged from software moved from `Not Started` to `Complete`, each with
+  a named test in the Evidence column rather than an empty cell. Nothing is marked
+  `Verified`: that word is reserved for evidence from hardware, and the vehicle has never
+  been powered. The rate requirement (TEL-005) now cites the airtime analysis it was
+  actually derived from.
+- **[timeline.md](documentation/project/timeline.md)** — the commit table lists all eleven
+  commits of this pass instead of one "working tree" row, and says plainly what the pass
+  was: a rate the radio could not have delivered, three parsers that disagreed, sensors
+  that could not feed their own loop, an attitude filter wrong at the wrap, a packet budget
+  below the real packet, a logger that could take reception down with it, and two SPI
+  drivers that had never executed.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 11)
 
 ### Changed — the IMU's range encoding is now testable
