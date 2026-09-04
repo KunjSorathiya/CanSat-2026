@@ -197,8 +197,8 @@ flowchart LR
     classDef done fill:#1b5e20,stroke:#1b5e20,color:#fff
     classDef partial fill:#e65100,stroke:#e65100,color:#fff
     classDef todo fill:#37474f,stroke:#37474f,color:#fff
-    class G1 partial
-    class G2,G3,G4,G5,G6,G7,G8,G9 todo
+    class G1,G4,G5,G6 partial
+    class G2,G3,G7,G8,G9 todo
 ```
 
 | Gate | Status | What is missing |
@@ -206,9 +206,9 @@ flowchart LR
 | 1 · Requirements locked | 🟠 Partial | Requirements extracted and gates defined, but ten organizer questions are unanswered — including the dimension and altitude contradictions |
 | 2 · Electrical architecture approved | ⬜ Not passed | No regulator selected; module supplies unresolved |
 | 3 · Power system tested | ⬜ Not passed | No switch, no LED, no divider, no measurement |
-| 4 · Sensors individually verified | ⬜ Not passed | Drivers written and compile-checked; no hardware reads |
-| 5 · Telemetry verified | ⬜ Not passed | Format and rate verified in software; no radio link tested |
-| 6 · Ground station verified | ⬜ Not passed | Pipeline tested against files and loopback; never against a real bridge |
+| 4 · Sensors individually verified | 🟠 Partial | The IMU and barometer read on hardware and their rates, biases and noise are recorded; the GPS delivers NMEA at 9600 baud. The magnetometer, the microSD and every reading on the shared bus are still unmeasured |
+| 5 · Telemetry verified | 🟠 Partial | The RA-02 answers `0x12` and transmits: measured airtime is within 1.8 % of the model, and channel occupancy 33.4 % typical. **No link has been established** — one radio transmitting is not two radios talking |
+| 6 · Ground station verified | 🟠 Partial | The bridge image runs on its Pico, enumerates over USB and emits status frames at a verified 1 Hz with byte-exact CRC framing. The receive pipeline has still never seen a packet that arrived over the air |
 | 7 · Mechanical and recovery verified | ⬜ Not passed | Nothing built |
 | 8 · Full system integration | ⬜ Not passed | Blocked by gates 2–7 |
 | 9 · Competition readiness | ⬜ Not passed | Blocked by gate 8 |

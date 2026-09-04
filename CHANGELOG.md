@@ -55,6 +55,49 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — the README described a vehicle with a magnetometer, and a project that had measured nothing
+
+Two of its status claims had been overtaken by the bench.
+
+**The IMU.** The README named an `MPU-9250` with an `AK8963`, said yaw "can be referenced to
+magnetic north", and listed the part as *Confirmed; unverified*. The part on the bench is an
+**MPU-6500 — six axes, no magnetometer** (`WHO_AM_I` `0x70`, and `0x0C` never answers with
+or without the bypass). That is [F-1](documentation/hardware/receiving-inspection.md#findings),
+recorded in the hardware documents since it was found and absent from every design document
+and from the README. The nine-axis path is implemented, tested, and would produce `YR-M` on
+a real MPU-9250; **this vehicle has no absolute yaw reference and its yaw drifts.** Open
+question 6 is rewritten around that: if the organisers require an absolute magnetic yaw,
+this is a part the vehicle does not have — a procurement item, not a software change.
+
+**The bring-up status.** *"No bring-up, no wiring, no power system, no measurement"* and
+*"never executed on real silicon"* were true when written and had not been true for a day.
+**18 of the 77 rows in the bring-up record are measured**: the bare Pico, the IMU's bias and
+noise, the barometer's real output rate, the acquisition rate and its jitter, NMEA arriving
+at 9600 baud, the radio answering `0x12` and its airtime within 1.8 % of the model. Power is
+the row that is still genuinely untouched, and it now says so on its own rather than under a
+blanket denial that covered work already done.
+
+The timeline's gate table moves with it: gates 4, 5 and 6 go from ⬜ to 🟠, each saying what
+was measured and what was not. Gate 5 keeps the sentence that matters — one radio
+transmitting is not two radios talking.
+
+**Both are now gated.** `check_doc_claims.py` counts the measured rows in the bring-up
+record and holds the README's figure to it, and holds the README and the receiving
+inspection to the driver's own list of accepted `WHO_AM_I` values. A status that overstates
+progress and one that understates it fail the same build.
+
+The bring-up record's own Findings table, empty while its rows pointed at findings, now
+carries four: the six-axis IMU, the barometer rate procedure that measured the wrong thing
+and reported 44 Hz for it, the multimeter whose resistance range invented ~51 Ω between pins
+with no path between them, and the GPS checksum row taken without a fix and marked
+provisional.
+
+Also stale in the README's own testing table: `flight_tests` at 36 suites and 537
+assertions, Python at 93, Node at 36, the claim checker at 56, and the Pico syntax check at
+10 translation units — every one of which the table now states correctly and the build now
+checks, along with the table's contradiction of itself, which listed the web console as both
+tested and *not covered*.
+
 ### Fixed — the console stated a sync word nobody had told it
 
 The web console's **Sync word** field read `TEST · 0xF3`, written as a literal into its own

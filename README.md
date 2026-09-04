@@ -28,9 +28,9 @@ and streams telemetry from power-on through recovery.**
 
 | Layer | State |
 |---|---|
-| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 1500 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
-| 🟡 **Firmware drivers** | Written and compile-checked against SDK stubs — **never executed on real silicon** |
-| 🔴 **Hardware** | Components purchased. **No bring-up, no wiring, no power system, no measurement** |
+| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 4395 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
+| 🟡 **Firmware drivers** | The IMU, barometer, GPS and radio drivers **have run on real silicon** and their numbers are recorded. The microSD driver and the flight image as a whole have not |
+| 🟠 **Hardware** | Bring-up under way: **18 of 77 recorded measurements taken** — the bare Pico, the IMU and barometer, the GPS, the radio's airtime, and the bench identification that found the IMU is a six-axis part. **Power is untouched** — no regulator selected, no switch, no divider, nothing measured |
 | 🔴 **Mechanical** | Structure, egg chamber and parachute **not started** — blocked on a rulebook contradiction |
 
 > [!IMPORTANT]
@@ -77,7 +77,7 @@ keeps talking through every failure it can survive.
 flowchart LR
     subgraph CANSAT["🛰️ CanSat"]
         direction TB
-        S1["MPU-9250<br/>accel + gyro"]
+        S1["MPU-6500<br/>accel + gyro"]
         S2["BMP280<br/>pressure + temp"]
         S3["NEO-6M<br/>GNSS"]
         FC["Raspberry Pi Pico<br/><b>flight computer</b>"]
@@ -287,13 +287,16 @@ priority, and unknown optional fields are ignored by a conforming parser.
 </details>
 
 > [!NOTE]
-> **Yaw says which kind of yaw it is.** The MPU-9250 carries an AK8963 magnetometer, so
-> yaw can be referenced to magnetic north — but only once the magnetometer has been
-> calibrated for this airframe. Every packet carries a `YR-` tag: `YR-M` means an absolute
-> magnetic yaw, `YR-G` means a relative gyro integration whose zero is arbitrary. The
-> vehicle ships uncalibrated and therefore starts by saying `YR-G`; it never claims an
-> absolute heading it has not earned. See
-> [open question 6](#open-questions-for-the-organizers).
+> **Yaw says which kind of yaw it is.** Every packet carries a `YR-` tag: `YR-M` means an
+> absolute magnetic yaw, `YR-G` means a relative gyro integration whose zero is arbitrary.
+> The vehicle never claims an absolute heading it has not earned.
+>
+> **On the part actually delivered, that tag reads `YR-G` and always will.** The IMU is an
+> MPU-6500 — six axes, no magnetometer — not the nine-axis MPU-9250 it was sold as
+> ([F-1](documentation/hardware/receiving-inspection.md#findings), `WHO_AM_I` `0x70` read
+> on the bench). The nine-axis path is implemented and tested and would produce `YR-M` on a
+> real MPU-9250; this vehicle has no absolute yaw reference, and its yaw drifts with the
+> gyroscope. See [open question 6](#open-questions-for-the-organizers).
 
 **Radio:** 433 MHz LoRa. Only the sync words are fixed by the rulebook — **`0xF3` for
 testing, `0xA5` for the official launch**. Spreading factor, bandwidth, coding rate,
@@ -343,7 +346,7 @@ receipt time and the reason.
 | Telemetry | SX1278 RA-02 433 MHz LoRa | 2 | Vehicle + ground radio | Confirmed; configuration provisional |
 | Telemetry | 433 MHz antenna, SMA | 2 | Radio antennas | Confirmed; **connector gender disputed** |
 | Telemetry | 10 cm IPEX-to-SMA RG1.13 cable | 2 | Radio to antenna | Confirmed |
-| Sensors | MPU-9250 accelerometer + gyroscope + AK8963 magnetometer | 1 | Acceleration, angular rate, magnetic field | Confirmed; unverified |
+| Sensors | Sold as MPU-9250; **delivered an MPU-6500** — accelerometer + gyroscope, no magnetometer | 1 | Acceleration and angular rate | **Identified on the bench:** `WHO_AM_I` `0x70`, and `0x0C` never answers ([F-1](documentation/hardware/receiving-inspection.md#findings)) |
 | Sensors | GY-BMP280-3.3 | 1 | Pressure, altitude, temperature | Confirmed; unverified |
 | Sensors | NEO-6M GPS with EEPROM | 1 | Position and timing | Confirmed; unverified |
 | Storage | microSD card reader | 1 | Onboard logging | Confirmed; **highest-risk item** |
@@ -395,16 +398,16 @@ bash tools/build_host.sh
 
 | Suite | Coverage | Result |
 |---|---|---|
-| `flight_tests` | 36 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math, IMU range encoding, sensor timing, calibration, faults, scheduler, block log and torn-header recovery, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **537 / 537** |
+| `flight_tests` | 57 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math, IMU range encoding, sensor timing, calibration, faults, scheduler, block log and torn-header recovery, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **3547 / 3547** |
 | `flight_smoke_test` | Boot, first three packets, GPS parse | ✅ Passed |
 | `sx1278_tests` | LoRa driver register sequence, TX timeout, RX and CRC handling, RSSI conversion, against a fake register bank | ✅ **94 / 94** |
 | `sd_card_tests` | microSD init sequence, SDHC vs SDSC addressing, block round trip, bus release, timeouts and write-error paths, against a simulated card | ✅ **581 / 581** |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
-| Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **93 / 93** |
+| Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **100 / 100** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
-| Web console (Node) | Framing, parser, validator and link health, extracted from `index.html` | ✅ **36 / 36** |
-| Documented claims | 56 numbers in the documentation checked against the source that defines them | ✅ **56 / 56** |
-| Pico syntax | 10 translation units against SDK stubs | ✅ All OK |
+| Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **40 / 40** |
+| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **110 / 110** |
+| Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
 for byte; the BMP280 compensation reproduces the datasheet reference vector; a boost before
@@ -412,8 +415,9 @@ arming cannot trigger a launch; invalid mandatory data suppresses a packet witho
 consuming its number; `crc16_ccitt("123456789") == 0x29B1`; and the vehicle and the bridge
 are proven to configure the same radio modem.
 
-**What is not covered:** real sensors, the radio link, SD media, power behaviour, the
-mechanical system, and the web console's hand-ported logic.
+**What is not covered:** real sensors, the radio link, SD media, power behaviour, and the
+mechanical system. Everything above runs without hardware; none of it is evidence that the
+vehicle flies.
 **Details:** [test-plan.md](documentation/testing/test-plan.md)
 
 ---
@@ -433,8 +437,8 @@ requirement is satisfied in flight.
 | Egg payload and cushioned chamber | Not designed | ⬜ Not started |
 | Descent system such as a parachute | Not designed | ⬜ Not started |
 | Altitude, pressure, temperature | BMP280 driver + Bosch compensation, tested against the datasheet vector | 🟡 Implemented, hardware unverified |
-| Gyroscope and accelerometer | MPU-9250 driver + datasheet scaling, tested | 🟡 Implemented, hardware unverified |
-| Roll, pitch, yaw, X/Y/Z acceleration fields | Mahony quaternion filter over accelerometer, gyroscope and magnetometer; yaw is magnetic once calibrated and labelled `YR-M`/`YR-G` either way | 🟡 Implemented; yaw compliance is an open question |
+| Gyroscope and accelerometer | MPU-9250-family driver + datasheet scaling, tested | 🟢 **Read on hardware:** bias, noise and acquisition rate recorded |
+| Roll, pitch, yaw, X/Y/Z acceleration fields | Mahony quaternion filter over accelerometer, gyroscope and magnetometer; yaw is magnetic once calibrated and labelled `YR-M`/`YR-G` either way | 🟠 Implemented; **the delivered IMU has no magnetometer**, so yaw is gyro-integrated and drifts. Roll and pitch are still absolutely referenced by gravity |
 | Continuous telemetry, power-on to recovery | Automatic; continues in every state including `FAULT` | 🟡 Implemented, unverified |
 | At least one packet per second | 1 Hz default, chosen from measured packet size and LoRa airtime; `validate_config()` refuses any period the radio cannot sustain | 🟡 Implemented, radio unverified |
 | Correct team identifier in every packet | Formatter enforces it; `CAN-Team-XX` is rejected | 🟢 Implemented and enforced |
@@ -479,11 +483,12 @@ Both block the mechanical design, which is why phase 7 has not started.
 3. Launch altitude — 100 ft or 150 ft?
 4. Are egg-chamber dimensions included in, or added to, the main dimensions?
 5. How is the ≤ 5 m/s descent requirement enforced and scored?
-6. **What constitutes valid yaw data?** The vehicle now has a magnetometer and can
-   report an absolute magnetic yaw, but only after a hard/soft-iron calibration on the
-   assembled airframe. Is a magnetic yaw required, is a relative one acceptable, and is
-   the declared reference (`YR-M` / `YR-G`) an acceptable way to say which is being
-   transmitted?
+6. **What constitutes valid yaw data?** This question now has a hardware answer behind it:
+   the delivered IMU is a six-axis MPU-6500 with no magnetometer, so the vehicle can
+   transmit only a relative, gyro-integrated yaw, declared `YR-G`. Is a relative yaw
+   acceptable, and is the declared reference (`YR-M` / `YR-G`) an acceptable way to say
+   which is being transmitted? **If an absolute magnetic yaw is required, this is a part
+   the vehicle does not have** — a procurement item, not a software change.
 7. Are any LoRa parameters prescribed beyond the sync words?
 8. What scoring thresholds apply where the rulebook rewards higher performance?
 9. What are the actual report, media, video and arrival deadlines?

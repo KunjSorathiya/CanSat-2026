@@ -268,6 +268,35 @@ def main() -> int:
                   or (name in test_plan and f"{n} checks:" in test_plan))
         checker.check(f"test-plan.md describes {name} as {n} tests", stated, str(n))
 
+    # How much of the vehicle has actually been measured is a status this project states in
+    # more than one place, and the temptation is always to leave it as it was. The
+    # bring-up record is the only source: a row with a verdict is measured, a blank one is
+    # not, and the README quotes the two totals rather than an impression of them.
+    bring_up = read("documentation/testing/bring-up-record.md")
+    bring_up_rows = re.findall(r"^\| \d+\.\d+ \|.*$", bring_up, re.MULTILINE)
+    measured = [r for r in bring_up_rows if "✅" in r or "⚠" in r or "❌" in r]
+    checker.check(f"README states {len(measured)} of {len(bring_up_rows)} bring-up rows measured",
+                  f"{len(measured)} of {len(bring_up_rows)} recorded measurements" in readme,
+                  f"{len(measured)}/{len(bring_up_rows)}")
+
+    # The delivered IMU is a six-axis MPU-6500, not the nine-axis part it was sold as, and
+    # the driver's own list of accepted WHO_AM_I values is the record of which parts this
+    # firmware will run on. A document naming a different set is describing a different
+    # vehicle.
+    imu = read("firmware/flight-computer/include/flight/pico/mpu9250.hpp")
+    inspection = read("documentation/hardware/receiving-inspection.md")
+    for name, part in (("kWhoAmIMpu9250", "MPU-9250"), ("kWhoAmIMpu9255", "MPU-9255"),
+                       ("kWhoAmIMpu6500", "MPU-6500")):
+        match = re.search(rf"{name}\s*=\s*(0x[0-9A-Fa-f]+)", imu)
+        value = match.group(1) if match else "?"
+        checker.check(f"firmware accepts {part} as WHO_AM_I {value}", bool(match), value)
+    delivered = re.search(r"kWhoAmIMpu6500\s*=\s*(0x[0-9A-Fa-f]+)", imu)
+    word = delivered.group(1) if delivered else "?"
+    checker.check(f"receiving-inspection.md records the delivered {word}",
+                  f"`{word}`" in inspection, word)
+    checker.check(f"README records the delivered {word} rather than a nine-axis part",
+                  f"`{word}`" in readme and "MPU-6500" in readme, word)
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.
@@ -293,6 +322,17 @@ def main() -> int:
                       f"{node} Node tests" in timeline, str(node))
         checker.check(f"README badge states {cpp_total} C++ assertions",
                       f"C%2B%2B%20tests-{cpp_total}%20assertions" in readme, str(cpp_total))
+        # The README carries the same results table as the test plan, in shorter form. It
+        # is the first page anyone reads, so it is the worst place for a stale figure.
+        for suite in ("flight_tests", "sx1278", "sd_card", "python_ground",
+                      "python_tools", "node"):
+            n = counts[suite]
+            checker.check(f"README's results table states {suite} at {n}",
+                          f"**{n} / {n}**" in readme, str(n))
+        checker.check(f"README states {len(suites)} flight_tests suites",
+                      f"{len(suites)} suites:" in readme, str(len(suites)))
+        checker.check(f"README states {len(listed)} syntax-checked translation units",
+                      f"{len(listed)} translation units" in readme, str(len(listed)))
         python_total = counts["python_ground"] + counts["python_tools"]
         checker.check(f"quick-start.md states {cpp_total} C++ assertions",
                       f"**{cpp_total} C++ assertions" in quick_start, str(cpp_total))
@@ -317,9 +357,11 @@ def main() -> int:
     # Only on a full run, though -- without the suite log a dozen checks are skipped, and
     # the quoted total is the full-run one, not the short-run one.
     if counts is not None:
-        claim_total = len(checker.results) + 1
+        claim_total = len(checker.results) + 2
         checker.check(f"test-plan.md states the {claim_total} claims this script checks",
                       f"**{claim_total} / {claim_total} claims**" in test_plan, str(claim_total))
+        checker.check(f"README states the {claim_total} claims this script checks",
+                      f"**{claim_total} / {claim_total}**" in readme, str(claim_total))
 
     return checker.report()
 

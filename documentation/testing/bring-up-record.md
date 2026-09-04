@@ -489,10 +489,10 @@ measured, what you did about it.
 
 | # | Gate | Expected | Measured | Action taken |
 |---|---|---|---|---|
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
-| 4 | | | | |
+| 1 | 3 · 8 | An MPU-9250: `WHO_AM_I` `0x71`/`0x73`, and an AK8963 answering at `0x0C` once `BYPASS_EN` is set | **`WHO_AM_I` `0x70` — an MPU-6500. Six axes, no magnetometer.** `0x0C` never appears, in either scan, with or without the bypass | Recorded as [F-1](../hardware/receiving-inspection.md#findings). The firmware accepts `0x70` as a six-axis part rather than refusing to boot, and the estimator degrades instead of stopping. **The vehicle has no absolute yaw reference:** yaw is gyro-integrated and drifts, and telemetry reports `YR-G`, never `YR-M`. Rows 8.9–8.11, 8.13 and 8.14 are not takeable on this part |
+| 2 | 3 | Barometer output rate ≈ 83 Hz | The first procedure counted *changed values* and reported 44 Hz, then 46.5 Hz on a re-run — a 2× undercount, not a slow part | The procedure was the defect, not the sensor. Row 3.5 now counts falling edges of `STATUS.measuring` and reads **83.0 Hz**, matching the 83.3 Hz prediction with 2.8× margin over the 30 Hz acquisition rate |
+| 3 | — | A working multimeter | The resistance range read ~51 Ω between *every* pair of pins, including two with no path between them, and 18 Ω across its own shorted probe tips | **None of those numbers were recorded as measurements.** They describe the instrument, and it is written up in the Part A tools table instead. `C.3.6`/`C.3.7` and `C.4.5`/`C.4.6` stay blank until a working resistance range is available; the Gate 3 bus scan answers the same question from the address each device actually replies at |
+| 4 | 4 | GPS NMEA checksum errors ≈ 0 | **0** over an 18 s indoor run, without a fix | Accepted as provisional (row 4.3, ⚠️). Sentences without a fix carry empty fields and are shorter than the ones that matter; the row is to be re-taken with a fix before it counts |
 | 5 | | | | |
 
 When a finding changes a constant, change it in the source, re-run
