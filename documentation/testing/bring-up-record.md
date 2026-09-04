@@ -88,10 +88,23 @@ pass/fail matrix is in [test-plan.md](test-plan.md#hardware-test-plan). This doc
 
 ## Gate 2 · Power
 
-🔴 **This gate is blocked**: no regulator is selected, and the microSD reader's supply
-requirement is unresolved. See [electrical-architecture.md](../design/electrical-architecture.md)
-and [sd-module-analysis.md](../hardware/sd-module-analysis.md). Complete it before any
+🔴 **This gate is blocked on one thing: no regulator is selected.** See
+[electrical-architecture.md](../design/electrical-architecture.md). Complete it before any
 battery-powered test.
+
+> **The microSD reader's supply is no longer part of this blocker.** Receiving inspection
+> [D.1](../hardware/receiving-inspection.md#d1--the-microsd-reader-sku-11566) closed it on
+> 2026-09-04: the delivered board has **no regulator and no level shifter**, its supply pin is
+> printed `3V3`, and its entire parts list is four 10 kΩ pull-ups and two capacitors. The
+> supplier listing that described a 4.5–5.5 V board described a different product from the one
+> that arrived — see [sd-module-analysis.md](../hardware/sd-module-analysis.md) for why this
+> question held up the power design for so long.
+>
+> **The consequence simplifies this gate.** There is one 3.3 V rail, not two, and the boost
+> stage the earlier design reserved is not to be built. What is still needed is a load budget
+> the regulator can be chosen against — and the number nobody has is the **microSD
+> write-transient current**, which no photograph and no datasheet can supply. Measure it at
+> Gate 6 and bring it back here.
 
 | # | Quantity | Predicted | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|

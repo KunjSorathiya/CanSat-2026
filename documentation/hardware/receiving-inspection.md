@@ -66,20 +66,21 @@ and do not connect the battery to anything.
 
 | # | Item | SKU | Ordered | Received | Physical condition | Notes |
 |---|---|---:|---:|---:|---|---|
-| A.1 | Raspberry Pi Pico | 894292 | 2 | | No visible damage | **Headers not fitted, and none supplied in the photograph.** Genuine board, `© 2020` silkscreen |
-| A.2 | SX1278 RA-02 LoRa module | 1150780 | 2 | | No visible damage | Headers loose in the bag, 2 × 8-pin. See [D.3](#d3--ra-02-carrier) |
-| A.3 | 433 MHz LoRa antenna | 1121334 | 2 | | No visible damage | White rubber-duck, hinged base. See [D.2](#d2--antenna-sma-or-rp-sma) |
-| A.4 | IPEX1 to SMA cable, 10 cm RG1.13 | 1674982 | 2 | | No visible damage | Supplied with panel nut, plain washer and star washer |
-| A.5 | MPU-9250 module | 2846 | 1 | | No visible damage | **Delivered as MPU-9250/6500, not the MPU-6050 the BOM named.** Header loose, 10-pin |
-| A.6 | NEO-6M GPS with EPROM | 11782 | 1 | | No visible damage | Active patch antenna **supplied and already fitted** to the u.FL socket |
-| A.7 | GY-BMP280-3.3 | 835813 | 1 | | No visible damage | Purple 6-pin board. Header loose, 6-pin. See [F-4](#findings) |
-| A.8 | Micro SD card reader module | 11566 | 1 | | No visible damage | **3.3 V board, not the 4.5–5.5 V one the listing described.** Header loose, 6-pin. See [D.1](#d1--the-microsd-reader-sku-11566) |
-| A.9 | 1S 3.7 V 1500 mAh 25C LiPo | 1125094 | 1 | | Pack flat, no puffing visible | **Delivered as Pro-Range, not Orange.** Do not charge yet. See [D.4](#d4--battery) |
-| A.10 | Universal prototype PCB, 10 x 10 cm | 1031002 | 2 | | No visible damage | Single-sided, isolated pads, edge rails |
+| A.1 | Raspberry Pi Pico | 894292 | 2 | **2** | No visible damage | **Headers not fitted, and none supplied in the photograph.** Genuine board, `© 2020` silkscreen |
+| A.2 | SX1278 RA-02 LoRa module | 1150780 | 2 | **2** | No visible damage | Headers loose in the bag, 2 × 8-pin. See [D.3](#d3--ra-02-carrier) |
+| A.3 | 433 MHz LoRa antenna | 1121334 | 2 | **2** | No visible damage | White rubber-duck, hinged base. See [D.2](#d2--antenna-sma-or-rp-sma) |
+| A.4 | IPEX1 to SMA cable, 10 cm RG1.13 | 1674982 | 2 | **2** | No visible damage | Supplied with panel nut, plain washer and star washer |
+| A.5 | MPU-9250 module | 2846 | 1 | **1** | No visible damage | **Delivered as MPU-9250/6500, not the MPU-6050 the BOM named.** Header loose, 10-pin |
+| A.6 | NEO-6M GPS with EPROM | 11782 | 1 | **1** | No visible damage | Active patch antenna **supplied and already fitted** to the u.FL socket |
+| A.7 | GY-BMP280-3.3 | 835813 | 1 | **1** | No visible damage | Purple 6-pin board. Header loose, 6-pin. See [F-4](#findings) |
+| A.8 | Micro SD card reader module | 11566 | 1 | **1** | No visible damage | **3.3 V board, not the 4.5–5.5 V one the listing described.** Header loose, 6-pin. See [D.1](#d1--the-microsd-reader-sku-11566) |
+| A.9 | 1S 3.7 V 1500 mAh 25C LiPo | 1125094 | 1 | **1** | Pack flat, no puffing visible | **Delivered as Pro-Range, not Orange.** Do not charge yet. See [D.4](#d4--battery) |
+| A.10 | Universal prototype PCB, 10 x 10 cm | 1031002 | 2 | **2** | No visible damage | Single-sided, isolated pads, edge rails |
 
-> **The Received column is deliberately blank.** The photographs show one unit of each item;
-> a photograph of one board is not evidence that two arrived. Count them by hand and fill the
-> column in — A.1, A.2, A.3, A.4 and A.10 were each ordered in pairs.
+> **Counted by hand on 2026-09-05 / KS. Every line matches the quantity ordered.** The
+> photographs show one unit of each item, and a photograph of one board is never evidence that
+> two arrived — A.1, A.2, A.3, A.4 and A.10 were each ordered in pairs and each pair is
+> present. Nothing is short, and nothing arrived that was not ordered.
 
 Not on the BOM, but Part C cannot be completed without them. Record what you actually have:
 
@@ -88,9 +89,9 @@ Not on the BOM, but Part C cannot be completed without them. Record what you act
 | Multimeter with continuity | **Yes, the second one** | The original meter's resistance range is faulty — see the note below; its Ω readings are discarded. **A replacement was obtained 2026-09-05.** Short its probes and confirm ≤0.5 Ω, steady, before it is used for anything |
 | Magnifier or phone macro lens | | Required to read regulator and level-shifter markings |
 | Soldering iron and solder | **Yes** | Headers arrive loose on most of these boards. All headers fitted 2026-09-04 |
-| microSD card | **Yes, obtained 2026-09-05** | Not on the BOM, and none was in the reader's bag in `11566-sd-reader-front.jpg`. **Record its capacity and class here** — Gate 6.2 expects SDHC, block-addressed |
+| microSD card | **Yes, 32 GB, obtained 2026-09-05** | Not on the BOM, and none was in the reader's bag in `11566-sd-reader-front.jpg`. **32 GB is the top of the SDHC range**, so it should enumerate block-addressed as Gate 6.2 predicts — confirm with `high_capacity()` rather than from the capacity printed on the card |
 | USB micro-B cable, data-capable | | For the Pico. A charge-only cable is a classic wasted afternoon |
-| 1S LiPo charger | **Yes, obtained 2026-09-05** | Not on the BOM. **Never charge a LiPo without one.** Record the model and its charge current once used |
+| 1S LiPo charger | **Yes — USB-powered 1S charger, obtained 2026-09-05** | Not on the BOM. **Never charge a LiPo without one.** Being 1S there is no cell balancing to do, so a single-cell CC/CV charger is the right part. **Record its charge current and its output connector** — the pack's leads are JST-RCY and JST-XH, and the charger must mate with one of them or via the new pigtail. Check it terminates at 4.20 V |
 
 > Anything answered "no" here is a purchase to make today, not on the day it blocks work.
 

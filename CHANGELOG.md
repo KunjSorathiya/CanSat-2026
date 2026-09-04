@@ -55,6 +55,23 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Changed — Gate 2 is blocked on one thing, not two
+
+The bring-up record still said Gate 2 was held up by "no regulator selected, and the microSD
+reader's supply requirement unresolved". The second half stopped being true on 2026-09-04,
+when `D.1` established that the delivered reader has no regulator, no level shifter and a
+supply pin printed `3V3`.
+
+The gate now names its single real blocker — regulator selection — and records what the
+closed question bought: one 3.3 V rail rather than two, and no boost stage. What it still
+needs is a load budget, and the missing number is the **microSD write-transient current**,
+which no photograph and no datasheet can supply. Measured at Gate 6, brought back to Gate 2.
+
+Part A is also counted and complete: **every line matches the quantity ordered**, the five
+items ordered in pairs included. The microSD card is 32 GB — the top of the SDHC range, so
+Gate 6.2's block-addressed prediction should hold, though `high_capacity()` is what settles
+it rather than the number printed on the card.
+
 ### Verified — the first firmware this project has ever run on hardware
 
 Both Picos are flashed and labelled. Gate 1 is partly measured, and for the first time a
