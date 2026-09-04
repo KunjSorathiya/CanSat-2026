@@ -93,7 +93,7 @@ had never executed. All are recorded in [CHANGELOG.md](../../CHANGELOG.md) and i
 |---|---|---|
 | Telemetry protocol | Rulebook format, strict parser, precision rules, optional fields | [telemetry-protocol.md](../design/telemetry-protocol.md) |
 | Flight core | Controller, state machine, scheduler, orientation, calibration, faults, builder, block log, NMEA parser, link profile, airtime and sensor-rate guards | 36 C++ suites, 537 assertions |
-| Sensor drivers | MPU-9250, BMP280, NEO-6M | Compile-checked against SDK stubs; register encodings and timing model host-tested |
+| Sensor drivers | IMU (MPU-9250 family), BMP280, NEO-6M | Register encodings and timing model host-tested; the IMU, barometer and GPS have since read on hardware. The delivered IMU is a six-axis MPU-6500, so the magnetometer path is dormant ([F-1](../hardware/receiving-inspection.md#findings)) |
 | Ground bridge | Continuous RX, CRC framing, status lines, watchdog | Framing unit-tested |
 | Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI, end-to-end trace | 76 Python tests |
 | Web console | Framing, parser, validator and link health extracted from `index.html` and run under Node | 40 Node tests |
@@ -248,7 +248,7 @@ resolve.
 |---|---|---|
 | Mechanical design freeze | Contradictory dimension limits (organizer questions 1 and 4) | Organizers |
 | Descent-system sizing | Launch altitude contradiction, 100 ft vs 150 ft (question 3) | Organizers |
-| Yaw compliance claim | No definition of valid yaw data (question 6). The vehicle can now produce an absolute magnetic yaw, but only after an airframe calibration that has not yet been performed | Organizers |
+| Yaw compliance claim | No definition of valid yaw data (question 6) — and the vehicle can no longer answer it either way: the delivered IMU has no magnetometer, so yaw is relative and declared `YR-G`. If an absolute yaw is required this becomes a procurement item, not a calibration one | Organizers |
 | Radio parameter freeze | Only the sync words are prescribed (question 7) | Organizers |
 | Peripheral rail design | Exact breakout documentation | Team |
 | microSD integration | MISO tri-state behaviour on the shared bus, and the write-transient current | Team |
@@ -264,7 +264,7 @@ resolve.
 | microSD write transient browns out the shared 3.3 V regulator | Loses onboard logging, or resets the flight computer | Supply voltage resolved (3.3 V board on the 3.3 V rail); the write transient is still unmeasured and shares a regulator with the radio. SD failure already degrades gracefully in firmware |
 | Magnetometer calibration never performed, or performed on a bare board | Yaw stays relative, or an absolute heading is claimed that is wrong by a constant | Calibration ships invalid and the vehicle reports `YR-G` until a real sweep is loaded; the sweep is a named bring-up gate |
 | No regulator selected | Blocks the whole power build | AMS1117-3.3 assessed and rejected with reasoning recorded; replacement still open |
-| Yaw may be judged non-compliant if a relative angle is not accepted | Mandatory field may be judged non-compliant | The MPU-9250's magnetometer makes an absolute magnetic yaw available once the airframe is calibrated; until then yaw is relative. Every packet declares which it is (`YR-M` / `YR-G`), so an absolute heading is never claimed without one |
+| Yaw may be judged non-compliant if a relative angle is not accepted | Mandatory field may be judged non-compliant | **Raised by F-1:** the delivered IMU is a six-axis MPU-6500, so this vehicle transmits a relative yaw and declares it `YR-G`. The nine-axis path is implemented and tested and would produce `YR-M` on a real MPU-9250. Mitigation is procurement — a genuine nine-axis part — or an organizer ruling that a declared relative yaw is acceptable |
 | Antenna connector gender mismatch | Cannot connect the RF chain | Flagged for physical verification before assembly |
 | Dimension contradiction unresolved | Mechanical rework, or disqualification on size | No value invented locally; escalated to the organizers |
 | Radio link untested at range | Telemetry loss during flight | Link testing is a named gate; firmware already recovers from radio failure with bounded back-off |

@@ -111,6 +111,16 @@ vehicle substitutes `flight::pico::*`.
 | [`health.cpp`](../../firmware/flight-computer/src/health.cpp) | `HealthSnapshot` and mission-state names |
 | `src/pico/*` | Pico-only HAL, compiled only when the SDK is present |
 
+> [!NOTE]
+> **The nine-axis path described above is code this vehicle cannot exercise.** The delivered
+> IMU is an MPU-6500 — six axes, no magnetometer
+> ([F-1](../hardware/receiving-inspection.md#findings)). `orientation.cpp` degrades to a
+> gyroscope-propagated yaw corrected in roll and pitch by gravity, and telemetry declares
+> `YR-G`; the magnetometer branches in `orientation.cpp`, `sensor_math.cpp` and
+> `startup_calibration.cpp` are implemented, tested against simulated fields, and dormant.
+> `test_a_missing_magnetometer_degrades_rather_than_stops` is the test that says the
+> vehicle keeps flying without one.
+
 ### Ground station
 
 | Component | Path | Responsibility |

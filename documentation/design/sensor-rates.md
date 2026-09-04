@@ -123,6 +123,14 @@ vibration data without touching the driver.
 
 ## The magnetometer
 
+> [!NOTE]
+> **This section describes a part the delivered IMU does not have.** The board that arrived
+> is an MPU-6500 — six axes, no AK8963
+> ([F-1](../hardware/receiving-inspection.md#findings)). Everything below is the
+> configuration the firmware programs when a magnetometer answers at `0x0C`, and it is kept
+> because the analysis is what a nine-axis part would need. On this vehicle the driver finds
+> nothing behind the bypass and the estimator runs without it.
+
 The AK8963 inside the MPU-9250 does not follow `SMPLRT_DIV` at all. It free-runs in its own
 continuous measurement mode and raises its own data-ready flag, which the driver checks on
 every read.

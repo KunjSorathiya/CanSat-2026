@@ -297,6 +297,21 @@ def main() -> int:
     checker.check(f"README records the delivered {word} rather than a nine-axis part",
                   f"`{word}`" in readme and "MPU-6500" in readme, word)
 
+    # A document that talks about the magnetometer has to say that this vehicle does not
+    # have one. The nine-axis design is still worth documenting -- the code implements it
+    # and a real MPU-9250 would run it -- but a reader must never be left believing the
+    # delivered airframe can produce an absolute magnetic yaw. The audit is a dated record
+    # of a past run and is excluded on purpose.
+    for doc in sorted((REPO_ROOT / "documentation").rglob("*.md")) + [REPO_ROOT / "README.md"]:
+        if "audit" in doc.parts:
+            continue
+        text = doc.read_text(encoding="utf-8", errors="replace")
+        if "AK8963" not in text and "magnetometer" not in text:
+            continue
+        rel = str(doc.relative_to(REPO_ROOT)).replace("\\", "/")
+        acknowledged = "MPU-6500" in text or "receiving-inspection.md#findings" in text
+        checker.check(f"{rel} says the delivered IMU has no magnetometer", acknowledged)
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.

@@ -55,6 +55,31 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — the design documents caught up with F-1, and a rule now keeps them there
+
+The hardware documents recorded the six-axis IMU the day it was identified. The design
+documents and the requirement checklist did not, and went on describing a vehicle that
+fuses nine axes and can reference yaw to magnetic north.
+
+| Document | Said | Says |
+|---|---|---|
+| `requirements.md` | `SEN-004a` *Not Started*; `SEN-010` "nine-axis fusion; absolute magnetic yaw"; `TEL-017` "magnetometer-referenced yaw from the AK8963" | `SEN-004a` **Blocked — part absent**; both others state that this airframe transmits `YR-G` and why |
+| `telemetry-protocol.md` | "an absolute magnetic yaw is available" | `YR-M` is in the protocol and implemented; **this vehicle emits `YR-G` and nothing else** |
+| `sensor-rates.md` | A magnetometer section with no caveat | Opens by saying it describes a part the delivered IMU does not have |
+| `wiring.md` | "**I2C0 carries three devices, not two**" | "designed for three devices and carries two" — `0x0C` never appears, in either scan, with or without the bypass |
+| `pico-gpio-map.md` | Three devices on one bus | Budgeted for three, two present |
+| `software-architecture.md` | Nine-axis attitude, no caveat | Same, plus what the vehicle actually runs: gyro-propagated yaw, magnetometer branches dormant |
+| `timeline.md` | Yaw risk mitigated by "the MPU-9250's magnetometer" | Mitigation is procurement or an organizer ruling — the mitigation it named does not exist |
+
+Nothing describing the nine-axis design was deleted. The code implements it, the tests
+exercise it, and a real MPU-9250 would run it; what changed is that no document now leaves a
+reader believing this airframe can produce an absolute heading.
+
+**The rule is now enforced.** `check_doc_claims.py` requires every document that mentions
+the magnetometer to also name the delivered `MPU-6500` or link the finding. Sixteen
+documents are held to it. The repository audit is excluded on purpose: it is a dated record
+of a past run, and rewriting it would be falsifying history rather than fixing a document.
+
 ### Fixed — the README described a vehicle with a magnetometer, and a project that had measured nothing
 
 Two of its status claims had been overtaken by the bench.

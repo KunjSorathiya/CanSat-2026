@@ -130,7 +130,7 @@ The MPU-9250 and BMP280 share GPIO4/GPIO5 as one I2C0 bus.
 | Device | Expected IC-level address | Address control | Map implication |
 |---|---|---|---|
 | MPU-9250 accelerometer + gyroscope | `0x68` or `0x69` | AD0 | No conflict with the other two |
-| AK8963 magnetometer (second die in the MPU-9250) | `0x0C` | Fixed; visible only once `INT_PIN_CFG.BYPASS_EN` bridges it to the primary bus | No conflict with the other two |
+| AK8963 magnetometer (second die in an MPU-9250) — **absent on the delivered MPU-6500** ([F-1](receiving-inspection.md#findings)) | `0x0C` | Fixed; visible only once `INT_PIN_CFG.BYPASS_EN` bridges it to the primary bus | No conflict with the other two |
 | BMP280 | `0x76` or `0x77` | SDO | No conflict with the other two |
 
 The address choices are IC-level documentation. The selected breakout's AD0/SDO wiring, pull-ups, voltage domain, and exposed interface remain unresolved.
@@ -186,7 +186,7 @@ UART1 remains unassigned for debugging, a future sensor, or expansion if the fin
 
 | Resource | Device/Function | Proposed allocation | Status | Notes |
 |---|---|---|---|---|
-| I2C0 | MPU-9250, AK8963 and BMP280 | GPIO4 SDA / GPIO5 SCL | Provisional | Three devices on one bus; addresses are logically distinct; pull-ups and voltage TBD |
+| I2C0 | IMU, AK8963 (absent on the delivered part) and BMP280 | GPIO4 SDA / GPIO5 SCL | Provisional | Budgeted for three devices, two present; addresses are logically distinct; pull-ups and voltage TBD |
 | SPI0 | RA-02 and Micro SD reader | GPIO18 SCK / GPIO19 MOSI / GPIO16 MISO | Provisional | Shared bus; separate CS lines; SD electrical behavior TBD |
 | UART0 | NEO-6M GPS | GPIO12 TX / GPIO13 RX | Provisional | Pico TX -> GPS RX; Pico RX <- GPS TX |
 | UART1 | Debug or future expansion | Unassigned | Reserved | Preserve if final pin multiplexing permits |
@@ -246,7 +246,7 @@ GPIO25 is left for the Pico onboard LED function and is not used as the competit
 | I2C alternate functions | PASS | GPIO4/GPIO5 are an I2C0 SDA/SCL pair |
 | SPI alternate functions | PASS | GPIO16/18/19 provide SPI0 RX/SCK/TX |
 | Separate SPI chip selects | PASS | GPIO17 for RA-02 and GPIO6 for SD |
-| I2C address sharing | PASS logically | MPU-9250 `0x68/0x69`; AK8963 `0x0C`; BMP280 `0x76/0x77` |
+| I2C address sharing | PASS logically | IMU `0x68/0x69`; AK8963 `0x0C` (absent on the delivered part); BMP280 `0x76/0x77` |
 | GPS directions | PASS | Pico TX goes to GPS RX; Pico RX receives GPS TX |
 | GPS UART allocation | PASS | UART0 reserved; UART1 remains available |
 | ADC capability | PASS | GPIO26 is ADC0-capable |

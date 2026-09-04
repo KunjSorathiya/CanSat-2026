@@ -110,10 +110,9 @@ The exact sign convention, zero orientation, angle wrapping, and relationship be
 The telemetry protocol does not prescribe a sensor-fusion algorithm. Roll, pitch, and yaw
 are derived values, not direct raw MPU-9250 fields.
 
-The MPU-9250 includes an AK8963 magnetometer, so an absolute magnetic yaw is available — but
-only once that magnetometer has been calibrated for the assembled airframe. Because the
-mandatory `Ya-` field is a single number that looks identical either way, the vehicle
-appends an optional tag saying which quantity it is transmitting:
+An absolute magnetic yaw needs a magnetometer, and a calibration of it for the assembled
+airframe. Because the mandatory `Ya-` field is a single number that looks identical either
+way, the vehicle appends an optional tag saying which quantity it is transmitting:
 
 | Tag | Meaning |
 |---|---|
@@ -124,6 +123,13 @@ appends an optional tag saying which quantity it is transmitting:
 `YR-` is an optional field like any other: it follows every mandatory field, and a
 conforming parser that does not know it ignores it. It is four characters plus the
 separator, which is what the airtime budget could afford.
+
+> [!IMPORTANT]
+> **On the delivered hardware this vehicle transmits `YR-G` and nothing else.** The IMU is
+> an MPU-6500 — six axes, no magnetometer ([F-1](../hardware/receiving-inspection.md#findings)).
+> `YR-M` remains part of the protocol, is implemented in the firmware and exercised by
+> `test_magnetic_yaw_is_tilt_compensated`, and would be emitted by a vehicle carrying a real
+> MPU-9250. The protocol is written for both; this airframe can only produce one of them.
 
 Whether a relative yaw satisfies the mandatory field is a question for the organizers, not
 one this document can answer. What the protocol guarantees is that the receiver is never

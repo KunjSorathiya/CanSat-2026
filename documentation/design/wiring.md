@@ -243,15 +243,18 @@ GND   MISO   CLK   MOSI   CS   3V3
 
 ## Bus sharing rules
 
-**I2C0 carries three devices, not two.** The MPU-9250's magnetometer is a separate AK8963
-die at address `0x0C`, invisible until the firmware sets `INT_PIN_CFG.BYPASS_EN` and bridges
-it onto the primary bus. After that it is an ordinary third device on GP4/GP5, and it
-counts against the bus's capacitance and pull-up budget like any other.
+**I2C0 was designed for three devices and carries two.** On an MPU-9250 the magnetometer is
+a separate AK8963 die at address `0x0C`, invisible until the firmware sets
+`INT_PIN_CFG.BYPASS_EN` and bridges it onto the primary bus, after which it counts against
+the bus's capacitance and pull-up budget like any other device. **The delivered IMU is an
+MPU-6500 and `0x0C` never appears** — in either scan, with or without the bypass
+([F-1](../hardware/receiving-inspection.md#findings), bring-up row 3.1). The third row below
+is retained because it is what the bus must accommodate if a nine-axis part is ever fitted.
 
 | Device | Address | Selected by |
 |---|---|---|
-| MPU-9250 accelerometer + gyroscope | `0x68` or `0x69` | AD0 strap |
-| AK8963 magnetometer | `0x0C` | Fixed; reachable only through the pass-through bridge |
+| IMU accelerometer + gyroscope | `0x68` or `0x69` | AD0 strap |
+| AK8963 magnetometer — **absent on the delivered part** | `0x0C` | Fixed; reachable only through the pass-through bridge |
 | BMP280 | `0x76` or `0x77` | SDO strap |
 
 All three are distinct whichever way the straps are fitted, so sharing the bus works — but
