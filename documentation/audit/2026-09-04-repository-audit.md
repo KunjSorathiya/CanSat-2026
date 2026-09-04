@@ -199,6 +199,9 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-18** | The airtime budget (200 bytes) was below the *typical* in-flight packet (206 bytes measured), so channel occupancy was under-estimated on every transmission | **Medium** | ✅ **Closed 2026-09-04 (cycle 7)** — budget is now the 255-byte FIFO limit; sizes measured rather than estimated |
 | **F-19** | A packet exceeding 255 bytes would have been silently truncated by the radio driver and read as corruption at the ground station | **Medium** | ✅ **Closed 2026-09-04 (cycle 7)** — optional fields are shed in rulebook priority order, and the packet is suppressed with a `packet_oversize` fault rather than truncated |
 | **F-20** | `format_timestamp()` emitted a three-digit hour past 99:59:59:999, a packet its own parser rejects | Low | ✅ **Closed 2026-09-04 (cycle 7)** — hours wrap at 100, with every boundary round-tripped in tests |
+| **F-21** | The raw log stored corrupted payloads verbatim, so a payload containing a tab or newline split one record into several and desynchronised the forensic log | **Medium** | ✅ **Closed 2026-09-04 (cycle 8)** — control characters escaped reversibly; round-tripped over all 256 code points |
+| **F-22** | An `OSError` from either log write propagated onto the ground-station thread, so a full disk would have ended reception, not just recording | **High** | ✅ **Closed 2026-09-04 (cycle 8)** — errors counted and surfaced in the snapshot, the dashboard and the CLI; reception continues |
+| **F-23** | The unframed serial reader accumulated an unbounded partial line if no newline ever arrived | Low | ✅ **Closed 2026-09-04 (cycle 8)** — capped at 4096 bytes and counted as a resync |
 
 ---
 

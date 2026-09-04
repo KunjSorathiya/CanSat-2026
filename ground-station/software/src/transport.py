@@ -204,6 +204,12 @@ class LoopbackTransport(Transport):
 class SerialTransport(Transport):
     """Ground-station Pico over USB CDC serial. Requires pyserial."""
 
+    # In unframed mode the reader accumulates bytes until a newline arrives. A link stuck
+    # emitting noise with no newline would otherwise grow this buffer without bound for as
+    # long as the station runs, so it is capped: past this the partial line is dropped and
+    # counted as a resync rather than held forever.
+    MAX_LINE = 4096
+
     def __init__(self, port: str, baud: int = 115200, framed: bool = True,
                  reconnect: bool = True) -> None:
         try:
@@ -221,6 +227,7 @@ class SerialTransport(Transport):
         self._buf = b""
         self._handle = None
         self._closed = False
+        self.resyncs = 0
 
     def _open(self):
         return self._serial_mod.Serial(self.port, self.baud, timeout=0.2)
@@ -249,6 +256,9 @@ class SerialTransport(Transport):
                     if text:
                         kind = "status" if text.startswith("#") else "raw"
                         yield Frame(kind, text, True)
+                if len(self._buf) > self.MAX_LINE:
+                    self._buf = b""
+                    self.resyncs += 1
 
     def close(self) -> None:  # pragma: no cover - needs hardware
         self._closed = True

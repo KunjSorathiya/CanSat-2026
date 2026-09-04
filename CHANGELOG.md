@@ -8,6 +8,48 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 8)
+
+A robustness pass over the PC ground station, against the failures that happen on a real
+launch day: a full SD card, a removed drive, a link stuck emitting noise.
+
+### Fixed — a corrupted payload could break the raw log's own format
+
+The raw log's contract is one record per line, tab-separated, nothing discarded. But it
+deliberately stores corrupted payloads verbatim, and a corrupted payload can contain a tab
+or a newline — silently splitting one record into two and desynchronising every column
+after it, in the file that exists precisely to be the forensic record.
+
+Control characters are now escaped reversibly on the way in (`escape_raw` / `unescape_raw`),
+so a payload containing anything at all still occupies exactly one line and can be
+recovered byte for byte. Round-tripped over all 256 code points in tests.
+
+### Fixed — a logging failure could take down reception
+
+`PacketLog.append()` let `OSError` propagate. A full disk, a removed drive or a permission
+error would therefore raise on the ground-station thread and end the whole pipeline —
+losing the live display and the parser along with the log. Write errors are now counted and
+reported (`write_errors`, `last_error`) and reception continues: telemetry is worth more
+than its log.
+
+Because a silent logging failure is worse than a loud one, it is surfaced in three places:
+the snapshot, a **Logging** row in the Tk dashboard, and a `LOGGING FAULT` line in the
+headless CLI.
+
+### Fixed — the unframed serial reader could grow without bound
+
+A link stuck emitting bytes with no newline would have accumulated an ever-growing partial
+line for as long as the station ran. Capped at 4096 bytes, counted as a resync.
+
+### Added
+
+- `ground-station/software/tests/test_logger.py` — 18 tests covering escaping, round trips,
+  one-record-per-line under corruption, and write-failure handling.
+- Two orchestrator tests proving reception survives a failing log.
+- Python ground-station total: **63 tests**.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 7)
 
 An edge-case sweep over the formatter, the packet budget and the radio path.

@@ -85,3 +85,53 @@ class AppPipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoggingHealthTests(unittest.TestCase):
+    """A ground station that receives but cannot record must say so."""
+
+    def test_snapshot_reports_a_healthy_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            transport = LoopbackTransport()
+            station = GroundStation(transport, expected_team="CAN-Team-01", log_dir=tmp)
+            transport.push_packet(packet(1))
+            transport.stop()
+            station.run_forever()
+            logging_state = station.snapshot()["logging"]
+            self.assertEqual(logging_state["write_errors"], 0)
+            self.assertEqual(logging_state["last_error"], "")
+
+    def test_a_logging_failure_is_surfaced_and_does_not_stop_reception(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            transport = LoopbackTransport()
+            station = GroundStation(transport, expected_team="CAN-Team-01", log_dir=tmp)
+
+            def boom(*_args, **_kwargs):
+                raise OSError(28, "No space left on device")
+
+            station.log.raw_path = _FailingPath(station.log.raw_path, boom)
+            transport.push_packet(packet(1))
+            transport.push_packet(packet(2))
+            transport.stop()
+            station.run_forever()  # must not raise
+
+            logging_state = station.snapshot()["logging"]
+            self.assertEqual(logging_state["write_errors"], 2)
+            self.assertIn("No space left", logging_state["last_error"])
+            # Reception carried on regardless: both packets were parsed and counted.
+            self.assertEqual(station.validator.stats.accepted, 2)
+
+
+class _FailingPath:
+    def __init__(self, real, raiser):
+        self._real = real
+        self._raiser = raiser
+
+    def open(self, *args, **kwargs):
+        return self._raiser(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    def __fspath__(self):
+        return str(self._real)

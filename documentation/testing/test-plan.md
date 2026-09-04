@@ -54,7 +54,7 @@ Both scripts run on every push through [CI](../../.github/workflows/ci.yml).
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
 | `flight_tests` | 32 suites across the whole flight core | ✅ **464 / 464 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 6 modules | ✅ **42 / 42 tests** |
+| Python ground station | 7 modules | ✅ **63 / 63 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **30 / 30 tests** |
 | Pico syntax check | 10 translation units | ✅ All OK |

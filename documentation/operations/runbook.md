@@ -155,7 +155,7 @@ pipeline is what writes the authoritative logs. Run both when it matters.
 
 | File | Content |
 |---|---|
-| `logs/raw_packets.tsv` | Every received line with its receipt timestamp — nothing discarded, including malformed packets and CRC failures |
+| `logs/raw_packets.tsv` | Every received line with its receipt timestamp — nothing discarded, including malformed packets and CRC failures. Control characters in a corrupted payload are escaped (`\t`, `\r`, `\n`, `\xNN`) so one record is always one line; `logger.unescape_raw()` recovers the original bytes |
 | `logs/telemetry.csv` | One row per packet with validation status, sequence notes and the raw packet |
 
 ---

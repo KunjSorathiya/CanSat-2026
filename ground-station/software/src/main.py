@@ -53,6 +53,10 @@ def _run_live(args: argparse.Namespace) -> int:
                 time.sleep(2.0)
                 snap = station.snapshot()
                 print(snap["link"])
+                logging_state = snap.get("logging", {})
+                if logging_state.get("write_errors"):
+                    print("  LOGGING FAULT: {write_errors} error(s), last: {last_error}"
+                          .format(**logging_state))
         except KeyboardInterrupt:
             pass
         finally:

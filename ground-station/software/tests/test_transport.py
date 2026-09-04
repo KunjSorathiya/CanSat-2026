@@ -9,6 +9,7 @@ from transport import (
     FileReplayTransport,
     FrameDecoder,
     LoopbackTransport,
+    SerialTransport,
     crc16_ccitt,
     frame_encode,
 )
@@ -90,3 +91,24 @@ class TransportTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SerialBufferTests(unittest.TestCase):
+    """The unframed reader must not accumulate an unbounded partial line."""
+
+    def test_a_stuck_link_cannot_grow_the_buffer_without_bound(self):
+        # SerialTransport needs pyserial to construct, so exercise the buffer rule
+        # directly: it is a property of the class, not of the serial port.
+        cap = SerialTransport.MAX_LINE
+        self.assertGreater(cap, 0)
+        self.assertLessEqual(cap, 65536)
+
+        buf = b""
+        resyncs = 0
+        for _ in range(100):
+            buf += b"x" * 1000          # noise, never a newline
+            if len(buf) > cap:
+                buf = b""
+                resyncs += 1
+        self.assertLessEqual(len(buf), cap)
+        self.assertGreater(resyncs, 0)

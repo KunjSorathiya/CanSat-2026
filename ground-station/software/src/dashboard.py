@@ -97,6 +97,12 @@ class Dashboard:
         right = ttk.Frame(outer)
         right.pack(side="left", fill="both", expand=True, padx=(10, 0))
 
+        # Logging health. A ground station that is receiving but not recording looks
+        # perfectly healthy everywhere else, so it gets its own line.
+        logs = ttk.LabelFrame(left, text="Logging", padding=6)
+        logs.pack(fill="x", pady=(6, 0))
+        self._add_row(logs, "log.status", "Status", 0)
+
         raw = ttk.LabelFrame(right, text="Latest packet", padding=6)
         raw.pack(fill="x")
         self._vars["latest_raw"] = tk.StringVar(value="--")
@@ -155,6 +161,15 @@ class Dashboard:
                         "mode", "fault_count"):
                 value = tele.get(key)
                 self._vars[f"tele.{key}"].set("--" if value is None else str(value))
+        logging_state = snap.get("logging", {})
+        if isinstance(logging_state, dict):
+            errors = logging_state.get("write_errors", 0)
+            if errors:
+                self._vars["log.status"].set(
+                    f"{errors} write error(s): {logging_state.get('last_error', '')}"[:60])
+            else:
+                self._vars["log.status"].set("recording")
+
         bridge = snap.get("bridge", {})
         self._vars["tele.battery"].set(str(bridge.get("battery", "n/a")))
         self._vars["latest_raw"].set(str(snap.get("latest_raw", "--")) or "--")

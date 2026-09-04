@@ -28,7 +28,7 @@ and streams telemetry from power-on through recovery.**
 
 | Layer | State |
 |---|---|
-| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 569 automated checks on the host** |
+| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 590 automated checks on the host** |
 | 🟡 **Firmware drivers** | Written and compile-checked against SDK stubs — **never executed on real silicon** |
 | 🔴 **Hardware** | Components purchased. **No bring-up, no wiring, no power system, no measurement** |
 | 🔴 **Mechanical** | Structure, egg chamber and parachute **not started** — blocked on a rulebook contradiction |
@@ -395,7 +395,7 @@ bash tools/build_host.sh
 | `flight_tests` | 32 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math and timing, calibration, faults, scheduler, block log, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **464 / 464** |
 | `flight_smoke_test` | Boot, first three packets, GPS parse | ✅ Passed |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
-| Python (ground station) | Parser, validator, transport, health, end-to-end pipeline, shared protocol fixtures | ✅ **42 / 42** |
+| Python (ground station) | Parser, validator, transport, health, logging robustness, end-to-end pipeline, shared protocol fixtures | ✅ **63 / 63** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
 | Web console (Node) | Framing, parser, validator and link health, extracted from `index.html` | ✅ **30 / 30** |
 | Pico syntax | 10 translation units against SDK stubs | ✅ All OK |

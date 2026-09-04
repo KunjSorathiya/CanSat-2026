@@ -141,6 +141,13 @@ class GroundStation:
             "validation": vars(self.validator.stats).copy(),
             "bridge": dict(self._bridge_status),
             "latest_raw": raw,
+            # Logging failures never stop reception, so they must be visible somewhere:
+            # a flight that is not being recorded should be discovered on the pad, not
+            # afterwards.
+            "logging": {
+                "write_errors": self.log.write_errors,
+                "last_error": self.log.last_error,
+            },
         }
         if record is not None:
             data["telemetry"] = {
