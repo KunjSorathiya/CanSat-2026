@@ -396,12 +396,24 @@ tests and the firmware from one source tree. To get the toolchain without touchi
 create a throwaway project with `New Pico Project` in a folder outside it; the SDK download is
 shared.
 
-Two images appear only when the SDK is present:
+Three images appear only when the SDK is present:
 
 | File | Flash onto |
 |---|---|
 | `cansat_pico_firmware.uf2` | The vehicle Pico |
 | `cansat_ground_bridge_firmware.uf2` | The ground-station Pico |
+| `cansat_bringup_firmware.uf2` | The vehicle Pico, **temporarily**, for bring-up only |
+
+**The bring-up image is a diagnostic, not flight software.** The flight firmware speaks only
+over LoRa and writes nothing to USB, so a vehicle with no radio attached shows you nothing at
+all — which makes Gate 3 impossible to take. This image drives the same drivers and prints
+what they find over USB: two I²C bus scans, the barometer's chip ID, the IMU's `WHO_AM_I`,
+and 100 stationary samples reduced to the mean and standard deviation that
+[bring-up rows 3.2–3.4](testing/bring-up-record.md) ask for, each marked against the limit
+from `Configuration`.
+
+Flash the flight image back over it when you are done. The two cannot be confused on the
+vehicle — the bring-up image holds the status LED solid and never blinks.
 
 If the build fails on a link-profile `static_assert`, your radio settings cannot meet the
 1 Hz telemetry minimum — read the message and [link-budget.md](design/link-budget.md).

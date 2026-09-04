@@ -55,6 +55,49 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Added — a bring-up diagnostic image, because the vehicle cannot talk
+
+Gate 3's first row asks for an I2C bus scan. There was no tool to run one, and no path for
+its answer to reach a human: the flight firmware speaks only over LoRa and writes nothing to
+USB, so a vehicle with sensors wired and no radio attached produces no observable at all.
+Wiring the sensors up would have bought a blinking nothing.
+
+`cansat_bringup_firmware` is a third image that prints over USB CDC:
+
+- **Two bus scans**, before and after IMU initialisation. The AK8963 at `0x0C` must be absent
+  from the first and present in the second — it sits behind the MPU's pass-through bridge and
+  does not answer the outside bus until `INT_PIN_CFG.BYPASS_EN` is set. The difference is the
+  check. `0x0C` in both would mean something else is at that address.
+- **The barometer's chip ID** from register `0xD0`. `C.4.1` identified the delivered part by
+  measuring its package in a photograph and explicitly deferred to this register; `0x58` or
+  `0x60` settles `F-4` properly.
+- **The IMU's `WHO_AM_I`**, which settles `F-1`. `0x71`/`0x73` is a real nine-axis part;
+  `0x70` is an MPU-6500 with no magnetometer in the package at all.
+- **100 stationary samples** reduced to the mean and standard deviation that rows 3.2–3.4
+  ask for, each printed against its limit and marked PASS or OUT OF RANGE. The limits are
+  read from `Configuration` at run time, so they cannot drift away from what the firmware
+  actually enforces.
+
+It drives the same `mpu9250.cpp` and `bmp280.cpp` the vehicle flies. A diagnostic built on
+its own copy of the drivers can pass while the flight build fails, which is worse than having
+no diagnostic. It is a **separate executable and never linked into the flight image** — the
+launch build carries no debug output and no flag that could enable any. On the vehicle the
+two are told apart at a glance: the bring-up image holds the status LED solid and never
+blinks.
+
+`tools/check_pico_syntax.sh` covers it, with a new `pico/stdio_usb.h` stub.
+
+### Fixed — bring-up row 3.2 predicted a tolerance ten times tighter than the firmware's
+
+Row 3.2 read "9.81 ± 0.15 m/s²" and cited `calib_accel_tol_mps2` as its source. That constant
+is **1.5**, not 0.15. A board reading 9.6 m/s² would have failed the row as written while
+passing the gate the firmware actually enforces.
+
+The row now states the firmware's real limit, and separately that a healthy part sitting
+still should be an order of magnitude tighter than it — which is the useful bench
+expectation, and was probably what 0.15 was reaching for. The diagnostic prints against the
+config value rather than a literal, so the two cannot diverge again.
+
 ### Changed — Gate 2 is blocked on one thing, not two
 
 The bring-up record still said Gate 2 was held up by "no regulator selected, and the microSD

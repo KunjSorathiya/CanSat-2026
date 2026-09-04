@@ -16,6 +16,7 @@ INC=(
 
 FILES=(
   firmware/flight-computer/src/pico/main.cpp
+  firmware/flight-computer/src/pico/bringup_main.cpp
   firmware/flight-computer/src/pico/pico_hal.cpp
   firmware/flight-computer/src/pico/pico_radio.cpp
   firmware/flight-computer/src/pico/mpu9250.cpp

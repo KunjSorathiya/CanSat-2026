@@ -57,6 +57,42 @@ if (PICO_SDK_PATH OR DEFINED ENV{PICO_SDK_PATH})
     if (COMMAND pico_add_extra_outputs)
         pico_add_extra_outputs(cansat_pico_firmware)
     endif()
+
+    # Bring-up diagnostic image. Separate executable, never linked into the flight
+    # firmware: the launch build carries no debug output and no flag that could enable
+    # any. It drives the same drivers as the flight image so that what it verifies is
+    # what actually flies - a diagnostic built on its own copy of the drivers can pass
+    # while the flight build fails.
+    add_executable(cansat_bringup_firmware
+        src/pico/bringup_main.cpp
+        src/pico/pico_hal.cpp
+        src/pico/mpu9250.cpp
+        src/pico/bmp280.cpp
+        src/pico/neo6m.cpp
+        src/pico/sd_card.cpp
+        src/pico/sd_logger.cpp
+        src/pico/pico_radio.cpp
+        ../common/src/sx1278.cpp)
+    target_include_directories(cansat_bringup_firmware PRIVATE
+        include ../common/include)
+    target_link_libraries(cansat_bringup_firmware PRIVATE
+        flight_core
+        pico_stdlib
+        hardware_i2c
+        hardware_spi
+        hardware_uart
+        hardware_adc
+        hardware_gpio
+        hardware_watchdog)
+    target_compile_definitions(cansat_bringup_firmware PRIVATE PICO_BUILD=1)
+    target_compile_features(cansat_bringup_firmware PRIVATE cxx_std_17)
+    if (COMMAND pico_enable_stdio_usb)
+        pico_enable_stdio_usb(cansat_bringup_firmware 1)
+        pico_enable_stdio_uart(cansat_bringup_firmware 0)
+    endif()
+    if (COMMAND pico_add_extra_outputs)
+        pico_add_extra_outputs(cansat_bringup_firmware)
+    endif()
 endif()
 
 # Host tests. Skipped when cross-compiling — see the note in firmware/common/CMakeLists.txt.

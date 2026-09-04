@@ -149,8 +149,8 @@ confident wrong number.
 
 | # | Quantity | Predicted | Source | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|---|
-| 3.1 | I2C devices found | 2, at 0x68 and 0x76 | [wiring.md](../design/wiring.md) | Bus scan | | |
-| 3.2 | Stationary acceleration magnitude | 9.81 ± 0.15 m/s² | `calib_accel_tol_mps2` | Read 100 samples, take the mean | | |
+| 3.1 | I2C devices found | 2 before IMU init (0x68, 0x76), **3 after** (0x0C appears) | [wiring.md](../design/wiring.md) | Bus scan — `cansat_bringup_firmware` scans twice | | |
+| 3.2 | Stationary acceleration magnitude | 9.81 m/s². **Firmware gate is ±1.5** (`calib_accel_tol_mps2`); a healthy part at rest should be an order of magnitude tighter | `calib_accel_tol_mps2` | Read 100 samples, take the mean | | |
 | 3.3 | Stationary gyro bias, per axis | Within ±25 dps, typically < 5 | `calib_max_gyro_bias_dps` | Mean of 100 still samples | | |
 | 3.4 | Gyro noise, per axis | < 2 dps standard deviation | `calib_gyro_still_dps` | Standard deviation of the same samples | | |
 | 3.5 | Barometer output rate | **83 Hz** typical | [sensor-rates.md](../design/sensor-rates.md) | Poll continuously; count changed pressure values per second | | |
@@ -163,6 +163,37 @@ confident wrong number.
 > 3.5 and 3.7 are the two that matter most. If the barometer is slower than the loop, the
 > vertical-speed estimate degrades — the firmware detects and handles it, but the
 > configuration should be corrected rather than relied on to degrade gracefully.
+
+> **Rows 3.1–3.4 and 8.8–8.10 are taken with `cansat_bringup_firmware`**, a separate image
+> that prints over USB. The flight firmware speaks only over LoRa, so a vehicle with no radio
+> attached produces nothing to read — that is why this gate had no observable until the
+> diagnostic existed. Flash it exactly like the flight image, open the port at any baud rate,
+> and it prints:
+>
+> - **two bus scans**, before and after IMU initialisation. The AK8963 at `0x0C` must be
+>   absent from the first and present in the second — it sits behind the MPU's pass-through
+>   bridge and does not answer the outside bus until `INT_PIN_CFG.BYPASS_EN` is set. Seeing
+>   the difference is the check; seeing `0x0C` in *both* would mean something else is at that
+>   address.
+> - the **barometer chip ID** from register `0xD0` — `0x58` BMP280, `0x60` BME280. This is the
+>   register read that
+>   [C.4.1](../hardware/receiving-inspection.md#c4--gy-bmp280-33) defers to, and it settles
+>   [F-4](../hardware/receiving-inspection.md#findings) properly rather than by measuring a
+>   package in a photograph.
+> - the IMU's **`WHO_AM_I`**, which settles
+>   [F-1](../hardware/receiving-inspection.md#findings): `0x71`/`0x73` is a real nine-axis
+>   part, `0x70` an MPU-6500 with no magnetometer in the package at all.
+> - **100 stationary samples** reduced to the mean and standard deviation that rows 3.2, 3.3
+>   and 3.4 ask for, each printed against the limit from `Configuration` and marked PASS or
+>   OUT OF RANGE. The tolerances are read from the config at run time, so these can never
+>   drift away from what the firmware actually enforces.
+>
+> It drives the same `mpu9250.cpp` and `bmp280.cpp` the vehicle flies. A diagnostic built on
+> its own copy of the drivers can pass while the flight build fails, which is worse than
+> having no diagnostic at all.
+>
+> **It is not flight software and is never linked into the flight image.** The launch build
+> carries no debug output, and no flag that could accidentally enable some.
 
 ---
 
