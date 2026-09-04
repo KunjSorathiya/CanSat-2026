@@ -55,6 +55,48 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Finding — the IMU is an MPU-6500. This vehicle has no magnetometer
+
+`WHO_AM_I` returned **`0x70`** on 2026-09-05. That is an MPU-6500: pin-compatible with the
+MPU-9250, electrically identical for the accelerometer and gyroscope, and **with no
+magnetometer in the package at all**. The second bus scan confirms it — `0x0C` never appears
+after `INT_PIN_CFG.BYPASS_EN` is set, because there is nothing behind the bridge to answer.
+
+**This overturns C.3.2**, which read the die as `MP92` — the MPU-9250 marking — from a
+photograph and concluded the part was genuinely nine-axis. The row carried the right caveat
+("a photograph of a package is not a register read") and the wrong conclusion. Whether the
+die text was misread at that resolution or the die is remarked cannot be settled from here,
+and does not matter: the silicon answers `0x70`, and what the silicon answers is what flies.
+
+**What it costs.** Yaw is gyro-integrated, so it drifts without bound, and telemetry will
+always report `YR-G` — `YR-M` will never appear from this vehicle. Bring-up rows 8.9, 8.10,
+8.11, 8.13 and 8.14 are not takeable and are marked N/A with the reason; 8.12 becomes the
+only yaw row. Roll and pitch are unaffected, being referenced to gravity through the
+accelerometer. Altitude, pressure, acceleration, rates and GPS are untouched.
+
+**What it vindicates.** The driver accepts `0x70` as a six-axis part and reports degraded
+attitude rather than refusing to boot or inventing a heading from a bus that is not
+answering. That was argued for in review when the nine-axis rework landed; it is now the only
+reason this vehicle runs at all.
+
+**Nothing is wrong with the part that arrived.** It is simply not the part the listing
+described, and one of its three sensors does not exist.
+
+### Verified — Gate 3 accelerometer and gyroscope, on hardware
+
+Measured with `cansat_bringup_firmware`, 100 of 100 samples valid:
+
+- **3.2** |a| mean **9.8675 m/s²**, sd 0.0092 — under 1 % scale error against true g.
+- **3.3** gyro bias X −3.3878, Y +0.9079, Z −0.4720 dps — all inside ±25, and inside the
+  datasheet's ±5 zero-rate figure. Startup calibration removes them.
+- **3.4** gyro noise 0.0984, 0.0964, 0.1424 dps sd — fourteen to twenty times inside the
+  2 dps limit.
+- **3.1** partial: `0x68` answers, AD0 low, matching the firmware default. The BMP280 is not
+  yet wired.
+
+The inertial half of this vehicle measures well. The diagnostic also now says so out loud
+when no barometer answers, rather than printing an empty block that reads like a broken tool.
+
 ### Added — a bring-up diagnostic image, because the vehicle cannot talk
 
 Gate 3's first row asks for an I2C bus scan. There was no tool to run one, and no path for

@@ -87,9 +87,11 @@ bool read_reg8(std::uint8_t addr, std::uint8_t reg, std::uint8_t& out) {
 // This is the proof.
 void report_baro_identity() {
     std::printf("\n-- Barometer identity (register 0xD0) --\n");
+    int answered = 0;
     for (const std::uint8_t addr : {0x76, 0x77}) {
         std::uint8_t id = 0;
         if (!read_reg8(addr, 0xD0, id)) continue;
+        ++answered;
         const char* part = id == 0x58   ? "BMP280 - matches the BOM and the telemetry format"
                            : id == 0x60 ? "BME280 - HAS HUMIDITY, which the packet format has no field for"
                                         : "unrecognised - do not proceed on this part";
@@ -99,6 +101,12 @@ void report_baro_identity() {
                         "   SDO is strapped high. Change Bmp280::Options::address in\n"
                         "   config, or re-strap the board - deliberately, and record which.\n");
         }
+    }
+    // A silent block reads as a broken tool. Say that nothing was there.
+    if (answered == 0) {
+        std::printf("   no device answered at 0x76 or 0x77.\n"
+                    "   Expected if the BMP280 is not wired - this image is happy to run\n"
+                    "   with one sensor at a time.\n");
     }
 }
 

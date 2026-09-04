@@ -247,7 +247,7 @@ J1 (opposite row, reading from the same end)
 | # | Record | How | Value | Date/by |
 |---|---|---|---|---|
 | C.3.1 | Board marking, MPU-9250 breakout or other | Silkscreen | Front `MPU-9250/6500`; back `GY-6500  GY-9250` and `V356` | Photo 2026-09-04 |
-| C.3.2 | **IC marking on the die itself: MPU-9250, MPU-9255, or MPU-6500** | Magnifier | **`MP92`** / `163LA1` / `1719` on a 24-pin QFN. `MP92` is the MPU-9250 marking; an MPU-6500 reads `MP65` | Photo 2026-09-04 |
+| C.3.2 | **IC marking on the die itself: MPU-9250, MPU-9255, or MPU-6500** | Magnifier, **then `WHO_AM_I`** | Die reads **`MP92`** / `163LA1` / `1719` on a 24-pin QFN, which is the MPU-9250 marking. **The part itself disagrees: `WHO_AM_I` returns `0x70` — an MPU-6500. Six axes, no magnetometer.** The register wins; see the note below | Photo 2026-09-04; **register read 2026-09-05 / KS** |
 | C.3.3 | Pin labels: VCC, GND, SCL, SDA, XDA, XCL, AD0, INT | Silkscreen | 10 pins. Front: `VCC GND SCL SDA EDA ECL AD0 INT NCS FSYNC`. Back names two of them dually: `SCL/SCLK`, `SDA/SDI`, `ADD/SDO` | Photo 2026-09-04 |
 | C.3.4 | Onboard regulator present? Part marking | Magnifier | **Yes** — one **SOT-23-5** beside the `VCC` pin: three pads one side, two the other, counted at full sensor resolution. **Marking still not legible**, at any enhancement this photograph supports. The package class rules out SOT-223 | Photo 2026-09-04 |
 | C.3.5 | Bus pull-ups fitted? Marked value | Magnifier | **Yes** — five resistors marked `103` (10 kΩ), grouped around the `SCL`/`SDA` and `AD0`/`INT`/`NCS` pins, plus unmarked 0402 passives and one tantalum marked `C106` (**10 µF**) beside the regulator | Photo 2026-09-04 |
@@ -256,10 +256,28 @@ J1 (opposite row, reading from the same end)
 | C.3.8 | INT exposed on the header | Visual | **Yes**, `INT` is on the header — GP7 in the pin map is real | Photo 2026-09-04 |
 | C.3.9 | Silkscreen axis arrows present? Which way do X, Y and Z point? | Visual, photograph | **Yes** — an axis cross is printed beside the die. With the board component-side up and the pin header on the right: **X points away from the header, Y towards the `VCC` end, Z out of the board** | Photo 2026-09-04 |
 
-> C.3.2 settles the question C.3.1 could not: the silkscreen hedges (`MPU-9250/6500`, and the
-> back carries *both* board names), but the die says `MP92`. This is a real nine-axis part,
-> so the AK8963 and the absolute-yaw path in the firmware apply. `WHO_AM_I` at bring-up is
-> still the final word — a photograph of a package is not a register read.
+> **C.3.2 was answered wrongly from the photograph, and the register overturned it on
+> 2026-09-05.** The silkscreen hedges (`MPU-9250/6500`, and the back carries *both* board
+> names). The die reads `MP92`, which is the MPU-9250 marking. But `WHO_AM_I` returns
+> **`0x70`** — an MPU-6500. **There is no magnetometer in this package**, and the second bus
+> scan confirms it: `0x0C` does not appear after `INT_PIN_CFG.BYPASS_EN` is set, because there
+> is nothing behind the bridge to answer.
+>
+> The old note said "`WHO_AM_I` at bring-up is still the final word — a photograph of a
+> package is not a register read." That was correct, and it is why this row was never signed
+> off on the photograph alone. **The caveat did its job; the conclusion above it did not.**
+>
+> Two readings of the discrepancy, and the vehicle behaves the same under both: the die text
+> was misread at that resolution (`MP92` against `MP65` is four characters of laser marking
+> near the limit of the capture), or the die is genuinely remarked. Either way the silicon
+> answers `0x70`, and what the silicon answers is what flies. Recording it as unresolved is
+> more honest than picking one.
+>
+> **What this costs.** The AK8963 and the whole absolute-yaw path do not apply to this
+> vehicle. Yaw is gyro-integrated and will drift; telemetry reports `YR-G`, never `YR-M`. The
+> firmware already handles this deliberately — it accepts `0x70` as a six-axis part rather
+> than refusing to boot — so the vehicle flies degraded and says so. That design decision has
+> now been exercised on real hardware rather than argued about.
 >
 > C.3.4: the regulator's presence is what matters for the rail decision, and it is visible.
 > Its identity decides the input range, and that needs a macro re-shoot or a measurement.
@@ -280,12 +298,16 @@ J1 (opposite row, reading from the same end)
 > C.3.9 is recorded from the printed cross, and orientation read off a photograph is easy to
 > get wrong. Confirm it against the board in your hand before the airframe is built around it.
 
-> C.3.2 is the row that matters most on this board. Modules sold as MPU-9250 are frequently
-> MPU-6500 dies, which are pin-compatible, electrically identical for the accelerometer and
-> gyroscope, and have **no magnetometer at all**. The silkscreen is not evidence; the die
-> marking is, and `WHO_AM_I` settles it once the board is powered — `0x71` or `0x73` for a
-> real MPU-9250/9255, `0x70` for an MPU-6500. Record what the magnifier says here, and the
-> `WHO_AM_I` value in bring-up gate 8.8.
+> C.3.2 was the row that mattered most on this board, and it is now answered: **this is one
+> of the MPU-6500 dies sold as an MPU-9250.** Pin-compatible, electrically identical for the
+> accelerometer and gyroscope, and with **no magnetometer at all**. The silkscreen was never
+> evidence. The die marking looked like evidence and was not. `WHO_AM_I` = `0x70`, read on the
+> bench 2026-09-05, is the evidence — and it is recorded in bring-up gate 8.8.
+>
+> The accelerometer and gyroscope on this part measure well: |a| 9.8675 m/s² with a 0.0092
+> standard deviation, gyro noise between 0.096 and 0.142 dps against a 2 dps limit, 100 valid
+> samples out of 100. **Nothing is wrong with the part that arrived. It is simply not the part
+> the listing described**, and one of its three sensors does not exist.
 >
 > C.3.9 matters because the firmware's body frame is defined against those arrows. The
 > AK8963 magnetometer inside the package has its own, different axes; the firmware already
@@ -636,7 +658,7 @@ supplier specification the board contradicts, a missing accessory.
 
 | # | Item | Expected | Received/observed | Action taken |
 |---|---|---|---|---|
-| F-1 | IMU, SKU 2846 | MPU-6050, six axes | **MPU-9250**, nine axes — silkscreen `MPU-9250/6500`, die marked `MP92` | Driver replaced, attitude estimator reworked for nine axes, documentation migrated. `WHO_AM_I` at bring-up is the final confirmation |
+| F-1 | IMU, SKU 2846 | MPU-6050, six axes | **An MPU-6500. Six axes, no magnetometer.** Silkscreen hedges `MPU-9250/6500`; die reads `MP92`, the 9250 marking; **`WHO_AM_I` returns `0x70`**, read on the bench 2026-09-05, and `0x0C` never appears after the bypass is enabled | Driver replaced and the estimator reworked for nine axes — **correct work, and it is what lets this part fly at all**: the firmware accepts `0x70` as a six-axis part rather than refusing to boot. **The vehicle has no absolute yaw reference.** Yaw is gyro-integrated and drifts; telemetry reports `YR-G`, never `YR-M`. Gate 8 rows 8.9–8.11, 8.13 and 8.14 are not takeable on this part |
 | F-2 | Battery, SKU 1125094 | Orange 1S 1500 mAh 25C | **Pro-Range** 1S 1500 mAh 25C. Capacity, cell count and C-rating match; brand does not | Documentation renamed to the delivered brand. Charge parameters are absent from the label and remain undocumented |
 | F-3 | microSD reader, SKU 11566 | 4.5–5.5 V input, onboard 3.3 V regulator, per the supplier listing | **3.3 V board. No regulator, no level shifter**, supply pin printed `3V3`, four 10 kΩ pull-ups and two capacitors | Second rail and boost stage removed from the power tree. Bring-up row 7.4 promoted, since nothing buffers MISO |
 | F-4 | Barometer, SKU 835813 | GY-BMP280-3.3 | Purple **6-pin** `GY-BM ☐E/☐P 280` shared-artwork board, neither variant box legibly marked. **The sensor package measures 2.04 × 2.50 mm — a BMP280 (2.00 × 2.50), not a BME280 (2.50 × 2.50)** | Resolved on geometry; see [C.4.1](#c4--gy-bmp280-33). Confirm with the chip ID at bring-up (`0x58` BMP280, `0x60` BME280) |

@@ -149,10 +149,10 @@ confident wrong number.
 
 | # | Quantity | Predicted | Source | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|---|
-| 3.1 | I2C devices found | 2 before IMU init (0x68, 0x76), **3 after** (0x0C appears) | [wiring.md](../design/wiring.md) | Bus scan — `cansat_bringup_firmware` scans twice | | |
-| 3.2 | Stationary acceleration magnitude | 9.81 m/s². **Firmware gate is ±1.5** (`calib_accel_tol_mps2`); a healthy part at rest should be an order of magnitude tighter | `calib_accel_tol_mps2` | Read 100 samples, take the mean | | |
-| 3.3 | Stationary gyro bias, per axis | Within ±25 dps, typically < 5 | `calib_max_gyro_bias_dps` | Mean of 100 still samples | | |
-| 3.4 | Gyro noise, per axis | < 2 dps standard deviation | `calib_gyro_still_dps` | Standard deviation of the same samples | | |
+| 3.1 | I2C devices found | 2 before IMU init (0x68, 0x76), **3 after** (0x0C appears) | [wiring.md](../design/wiring.md) | Bus scan — `cansat_bringup_firmware` scans twice | **IMU alone: `0x68` only, in both scans. `0x0C` never appears** — there is no magnetometer in this package, see 8.8. AD0 is low, matching the firmware default. BMP280 not yet wired | ⚠️ 2026-09-05 / KS — partial, and `0x0C` is a real absence |
+| 3.2 | Stationary acceleration magnitude | 9.81 m/s². **Firmware gate is ±1.5** (`calib_accel_tol_mps2`); a healthy part at rest should be an order of magnitude tighter | `calib_accel_tol_mps2` | Read 100 samples, take the mean | **9.8675 m/s², sd 0.0092**, 100 of 100 samples valid. +0.06 against true g — under 1 % scale error | ✅ 2026-09-05 / KS |
+| 3.3 | Stationary gyro bias, per axis | Within ±25 dps, typically < 5 | `calib_max_gyro_bias_dps` | Mean of 100 still samples | **X −3.3878, Y +0.9079, Z −0.4720 dps.** All inside ±25, and inside the datasheet's ±5 zero-rate figure. Startup calibration removes these | ✅ 2026-09-05 / KS |
+| 3.4 | Gyro noise, per axis | < 2 dps standard deviation | `calib_gyro_still_dps` | Standard deviation of the same samples | **X 0.0984, Y 0.0964, Z 0.1424 dps sd.** Fourteen to twenty times inside the limit — a quiet part | ✅ 2026-09-05 / KS |
 | 3.5 | Barometer output rate | **83 Hz** typical | [sensor-rates.md](../design/sensor-rates.md) | Poll continuously; count changed pressure values per second | | |
 | 3.6 | Pressure vs a local reference | Within a few hundred Pa | — | Compare with a weather station or second barometer | | |
 | 3.7 | Achieved acquisition rate | **30 Hz** (33 ms period) | `sensor_period_ms` | Log mission time between sensor ticks | | |
@@ -296,14 +296,30 @@ bus together.
 | 8.5 | Altitude at rest | ≈ 0.0 m after calibration | Read `A-` on the bench | | |
 | 8.6 | Altitude vs a known height | Within a few metres | Carry the vehicle up a measured staircase | | |
 | 8.7 | Attitude vs a known orientation | Within a few degrees | Place on a level surface, then on each face | | |
-| 8.8 | `WHO_AM_I` of the IMU | `0x71` or `0x73` | Read at initialisation; the health report carries it | | |
-| 8.9 | Magnetometer present and answering | AK8963 found at `0x0C`, `mag_ok` true | Health snapshot | | |
-| 8.10 | Total magnetic field, vehicle assembled | 25–65 µT, and stable as the vehicle is moved | `mag_field_ut` in the health snapshot | | |
-| 8.11 | Magnetometer calibration sweep | Every axis spans ≥ 30 µT; calibration accepted | Figure-of-eight with `mag_cal_in_flight` set; watch `mag_cal_span_ut` | | |
-| 8.12 | Yaw drift, stationary, 10 minutes, uncalibrated | Drifts: no magnetic reference is being applied | Record `Ya-` with `YR-G` in the packets | | |
-| 8.13 | Yaw drift, stationary, 10 minutes, calibrated | Holds: bounded by magnetometer noise, not integrating | Record `Ya-` with `YR-M` in the packets | | |
-| 8.14 | Yaw against a known bearing | Within a few degrees of a hand compass, four cardinal directions | Point the vehicle, read `Ya-`/heading | | |
+| 8.8 | `WHO_AM_I` of the IMU | `0x71` or `0x73` | Read at initialisation; the health report carries it | **`0x70` — an MPU-6500.** Not the nine-axis part the module was sold as. Read with `cansat_bringup_firmware` | ❌ 2026-09-05 / KS — see [F-1](../hardware/receiving-inspection.md#findings) |
+| 8.9 | Magnetometer present and answering | AK8963 found at `0x0C`, `mag_ok` true | Health snapshot | **Absent.** `0x0C` does not appear in the bus scan taken *after* `BYPASS_EN` is set — there is nothing behind the bridge | ❌ 2026-09-05 / KS |
+| 8.10 | Total magnetic field, vehicle assembled | 25–65 µT, and stable as the vehicle is moved | `mag_field_ut` in the health snapshot | **Not takeable on this part** — no magnetometer. 0 of 100 samples carried one | N/A |
+| 8.11 | Magnetometer calibration sweep | Every axis spans ≥ 30 µT; calibration accepted | Figure-of-eight with `mag_cal_in_flight` set; watch `mag_cal_span_ut` | **Not takeable on this part** | N/A |
+| 8.12 | Yaw drift, stationary, 10 minutes, uncalibrated | Drifts: no magnetic reference is being applied | Record `Ya-` with `YR-G` in the packets | **Now the only yaw row this vehicle has.** Still to take — and it characterises flight behaviour, not a defect | |
+| 8.13 | Yaw drift, stationary, 10 minutes, calibrated | Holds: bounded by magnetometer noise, not integrating | Record `Ya-` with `YR-M` in the packets | **Not takeable on this part.** `YR-M` will never appear in this vehicle's telemetry | N/A |
+| 8.14 | Yaw against a known bearing | Within a few degrees of a hand compass, four cardinal directions | Point the vehicle, read `Ya-`/heading | **Not takeable on this part** — there is no absolute heading to compare | N/A |
 | 8.15 | SD log vs received telemetry | SD complete, radio may have gaps | Diff the two after a run | | |
+
+> **The delivered IMU is an MPU-6500, so 8.9, 8.10, 8.11, 8.13 and 8.14 cannot be taken on
+> this vehicle.** `WHO_AM_I` returned `0x70` on 2026-09-05 and `0x0C` never appears after the
+> pass-through bridge is enabled: there is no magnetometer in the package. The notes below
+> describe what those rows would prove, and stand for the day a genuine nine-axis part is
+> fitted — see [F-1](../hardware/receiving-inspection.md#findings).
+>
+> **What it means for the flight.** Yaw is gyro-integrated, so it drifts without bound, and
+> the packets will always say `YR-G`. Roll and pitch are unaffected: they are referenced to
+> gravity through the accelerometer, which measured well at Gate 3. Altitude, pressure,
+> acceleration, rates and GPS are all untouched. **8.12 becomes the only yaw row**, and it
+> characterises the vehicle rather than testing it.
+>
+> The firmware was written for exactly this: it accepts `0x70` as a six-axis part and reports
+> degraded attitude instead of refusing to boot, or worse, inventing a heading from a bus that
+> is not answering. That decision is now vindicated on hardware rather than in review.
 
 > 8.10 and 8.11 are the tests that decide whether this vehicle can claim an absolute
 > heading. Hard and soft iron are properties of the **assembled airframe** — battery,
