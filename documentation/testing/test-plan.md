@@ -87,9 +87,9 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **114 / 114 tests** |
+| Python ground station | 8 modules | ✅ **119 / 119 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **156 / 156 claims** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **159 / 159 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **49 / 49 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
@@ -307,6 +307,21 @@ Four more read [`test-data/raw-log-escapes.tsv`](../../test-data/raw-log-escapes
 fixture the web console reads too: every case escapes to its recorded form, unescapes back
 to the original, and no escaped form contains a separator. The plain text is stored as hex
 because it is allowed to contain tabs and newlines — the same reason the log escapes it.
+
+### `test_documented_commands.py` — 5 tests
+
+The commands the documentation tells a reader to run, run. Two defects were found by typing
+documented commands in exactly the form the documents give them, and neither would have been
+caught by testing the code those commands reach: every document named a `packets.txt` this
+repository has never contained, and the runbook's post-flight step replayed a real flight log
+to `received=0` with no error and no warning.
+
+So: the sample mission the documents name exists; the documented replay command accepts every
+packet in it; a raw log this station wrote replays through the documented command as the
+mission it recorded; a file that cannot be read fails loudly rather than silently; and every
+`python src/main.py` invocation in the README, the quick start, the runbook and the
+ground-station README parses against the real argument parser, so a document cannot offer a
+flag the program does not have.
 
 ### `test_protocol_fixtures.py` — 5 tests
 

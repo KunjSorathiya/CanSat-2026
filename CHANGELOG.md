@@ -55,6 +55,35 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Added — the documented commands are a test suite now, and CI stops racing itself
+
+Two of this cycle's defects were found by typing documented commands in exactly the form
+the documents give them, and neither would have been caught by testing the code those
+commands reach. `test_documented_commands.py` makes that a suite rather than a habit:
+
+- the sample mission the documents name **exists**;
+- the documented replay command **accepts every packet** in it;
+- a raw log this station wrote **replays through the documented command** as the mission it
+  recorded -- the runbook's post-flight step, end to end, from writing the log to reading it
+  back;
+- a file that cannot be read **fails loudly**, because the failure that hid the raw-log
+  defect was a silent zero;
+- every `python src/main.py` invocation in the README, the quick start, the runbook and the
+  ground-station README **parses against the real argument parser**, so a document cannot
+  offer a flag the program does not have.
+
+Reverting the raw-log handling fails the third of those with `AssertionError: 0 != 30` --
+the silent zero, caught. That was run before the suite was kept.
+
+**CI also stops racing itself.** A second push to a branch made the first run's answer stale
+before it arrived, and both ran to completion anyway. Superseded runs are cancelled now,
+except on `main`, where every commit's result is part of the record and worth having even
+after the next one lands.
+
+Two more claims are gated: the number of CI jobs the test plan describes, and that **no job
+carries `continue-on-error`**. The workflow's own header says every gate blocks; that is now
+checked rather than asserted.
+
 ### Fixed — three frame decoders disagreed about what a broken frame is
 
 The parser, the validator and the raw-log escaping each now read one fixture file. The

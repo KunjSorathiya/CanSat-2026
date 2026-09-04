@@ -433,6 +433,21 @@ def main() -> int:
                   f"After {calib_timeout // 1000} s it resolves best-effort" in runbook,
                   str(calib_timeout))
 
+    # The test plan says how many CI jobs there are and what each one does. A job added or
+    # removed without touching that sentence leaves a reader expecting a gate that is not
+    # there, or unaware of one that is.
+    workflow = read(".github/workflows/ci.yml")
+    jobs_section = workflow[workflow.index("\njobs:"):]
+    job_ids = re.findall(r"^  ([a-z][a-z0-9-]*):$", jobs_section, re.MULTILINE)
+    words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+    count_word = words.get(len(job_ids), str(len(job_ids)))
+    checker.check(f"test-plan.md states the {count_word} CI jobs",
+                  f"{count_word}\njobs" in test_plan or f"in {count_word} jobs" in test_plan,
+                  f"{len(job_ids)}: {', '.join(job_ids)}")
+    # Every gate blocks: an advisory job is a gate that has stopped being one.
+    checker.check("no CI job is allowed to fail without failing the workflow",
+                  "continue-on-error" not in workflow)
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.

@@ -18,6 +18,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A second push to the same branch makes the first run's answer stale before it arrives.
+# Cancel it rather than paying for both -- except on main, where every commit's result is
+# part of the record and is worth having even after the next one lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   host-build-and-test:
     name: Host build + tests
