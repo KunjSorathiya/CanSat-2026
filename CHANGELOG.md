@@ -8,6 +8,24 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 19)
+
+### Verified — the CMake build path, for the first time
+
+Audit finding F-08 recorded that the CI `cmake-configure` job had never run: the
+development machine had no CMake toolchain, so the CMakeLists files were written but never
+executed — and this session had since added three targets to them.
+
+CMake and Ninja are available through `pip install cmake ninja`, which needs no system
+package manager. With those, the host tree **configures, builds all 31 targets, and passes
+all 5 CTest tests**. F-08 closed, and the `CMakeLists.txt` changes made during this pass
+are now proven rather than assumed.
+
+The command is documented in the quick start and the contributor guide, including the pip
+route for a machine that has neither tool.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 18)
 
 ### Added — the operator can now see the link degrading before it fails

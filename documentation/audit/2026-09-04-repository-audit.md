@@ -229,7 +229,7 @@ Added a `.gitkeep` to each, carrying a one-line statement of what belongs there.
 | **F-05** | ~~`ground-station/software/src/ui.py` is dead code~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — file removed |
 | **F-06** | `ground-station/web/index.legacy.html` (1081 lines) is superseded | Low | Kept intentionally for reference; now labelled as such in the web README |
 | **F-07** | ~~The web console's parser, validator, link health and CRC framing are hand-ported with **no automated tests**~~ | Medium | ✅ **Closed 2026-09-04 (cycle 2)** — 30 Node tests extract the core from `index.html`; all three parsers now read one fixture file |
-| **F-08** | The CI `cmake-configure` job has never been executed | Low | No CMake toolchain on this machine; the job will prove itself on the first push |
+| **F-08** | ~~The CI `cmake-configure` job has never been executed~~ | Low | ✅ **Closed 2026-09-04 (cycle 19)** — CMake and Ninja installed via `pip`, the full host tree configured, all 31 targets built, and all 5 CTest tests passed |
 | **F-09** | The Pico HAL and SX1278 driver have never executed | High | **Partly closed 2026-09-04 (cycle 9)** — the SX1278 driver now executes against a fake register bank (94 assertions). The Pico HAL still requires hardware, and no code has run on a real RA-02; this remains the project's central open risk, tracked as gates 3–5 |
 | **F-10** | ~~`radio.py` is a compatibility shim with no remaining callers~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — file removed |
 | **F-11** | ~~`.claude/` (local tool configuration) is untracked and **not** in `.gitignore`~~ | Low | ✅ **Closed 2026-09-04 (cycle 2)** — added to `.gitignore` |

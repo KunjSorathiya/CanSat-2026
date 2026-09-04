@@ -108,7 +108,7 @@ is installed, nothing is connected.
 | **A C++17 compiler** (`g++` or `clang++`) | Host tests | On Windows, MSYS2 or WSL |
 | **Python 3.10+** | Ground-station application | 3.12 is what CI uses |
 | **Node.js 18+** | Web console tests | Optional; the console itself needs only a browser |
-| **CMake 3.13+** | Building Pico firmware | Only needed once you have hardware |
+| **CMake 3.13+** | Building Pico firmware, and the host build via CTest | Only needed once you have hardware. If your system has neither CMake nor a build tool: `pip install cmake ninja` |
 | **Pico SDK** | Building Pico firmware | See [step 13](#13-pico-sdk-setup) |
 | **A browser** | Web console | Chrome or Edge for live USB (Web Serial); any browser for demo and file replay |
 
@@ -133,6 +133,15 @@ bash tools/check_pico_syntax.sh
 
 Syntax-checks all ten Pico translation units against minimal SDK stubs — it proves the
 firmware compiles, not that it runs.
+
+The same suites also build through CMake, which is what CI uses:
+
+```bash
+cmake -S . -B build/host-cmake && cmake --build build/host-cmake --parallel && ctest --test-dir build/host-cmake --output-on-failure
+```
+
+31 targets, 5 CTest tests. On a machine with neither CMake nor a build tool,
+`pip install cmake ninja` supplies both.
 
 Replay a packet file through the real ground-station pipeline:
 

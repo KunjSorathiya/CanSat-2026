@@ -141,6 +141,13 @@ frameworks.
 
 `bash tools/build_host.sh` runs all of them, plus the documentation-claim check.
 
+The C++ suites also build through CMake, which is what CI uses. If your machine has
+neither CMake nor a build tool, `pip install cmake ninja` supplies both:
+
+```bash
+cmake -S . -B build/host-cmake && cmake --build build/host-cmake --parallel && ctest --test-dir build/host-cmake --output-on-failure
+```
+
 What a good test covers here: the failure path, not just the happy path. Most of this
 codebase is about behaving correctly when a sensor, a card or a radio fails.
 
