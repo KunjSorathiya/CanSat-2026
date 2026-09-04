@@ -36,7 +36,7 @@ flight::Configuration make_config() {
     flight::Configuration config;
     // >>> SET THIS to the registered competition identifier before any launch or
     //     official test. The formatter rejects the "CAN-Team-XX" placeholder.
-    config.team_id = "CAN-Team-01";
+    config.team_id = "CAN-Team-25";
     // 1 Hz: the fastest the default SF7/125 kHz modem sustains with margin. See
     // documentation/design/link-budget.md before raising this.
     config.telemetry_period_ms = cansat::link::kTelemetryPeriodMs;

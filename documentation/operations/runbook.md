@@ -43,7 +43,7 @@ Two values must be set before any official test or launch. Both live in
 [`firmware/flight-computer/src/pico/main.cpp`](../../firmware/flight-computer/src/pico/main.cpp):
 
 ```cpp
-config.team_id = "CAN-Team-01";               // registered competition identifier
+config.team_id = "CAN-Team-25";               // registered competition identifier
 config.radio_mode = flight::RadioMode::test;  // ::official for the launch
 ```
 
@@ -115,7 +115,7 @@ Run from `ground-station/software/`. The core needs only the Python standard lib
 ### Live from the bridge Pico
 
 ```bash
-python src/main.py live --port COM5 --team CAN-Team-01 --framed
+python src/main.py live --port COM5 --team CAN-Team-25 --framed
 ```
 
 Use the actual serial port: `COM5` style on Windows, `/dev/ttyACM0` style on Linux. The
@@ -126,7 +126,7 @@ dashboard runs without it.
 ### Live without the dashboard — headless, prints link health
 
 ```bash
-python src/main.py live --port COM5 --team CAN-Team-01 --framed --no-dashboard
+python src/main.py live --port COM5 --team CAN-Team-25 --framed --no-dashboard
 ```
 
 ### Rehearsal from a file, no hardware
@@ -272,7 +272,7 @@ and pressure, each against time or packet number.
    location — work only on copies.
 2. Export a clean CSV if needed:
    ```bash
-   python src/main.py replay logs/raw_packets.tsv --team CAN-Team-01 --export analysis/flight.csv
+   python src/main.py replay logs/raw_packets.tsv --team CAN-Team-25 --export analysis/flight.csv
    ```
 3. Produce the three mandatory graphs.
 4. Optional analysis that scores additional credit: acceleration profile, orientation

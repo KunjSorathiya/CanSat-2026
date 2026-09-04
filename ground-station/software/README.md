@@ -23,7 +23,7 @@ serial link and the dashboard plots.
 python src/main.py replay packets.txt --team CAN-Team-01 --output logs --export logs/flight.csv
 
 # Live from the ground-station Pico (needs pyserial)
-python src/main.py live --port COM5 --team CAN-Team-01 --framed
+python src/main.py live --port COM5 --team CAN-Team-25 --framed
 
 # Live demo from a paced file (no hardware)
 python src/main.py live --replay packets.txt --rate 2 --team CAN-Team-01
