@@ -10,7 +10,12 @@ OUT="$ROOT/build/host"
 mkdir -p "$OUT"
 
 CXX="${CXX:-g++}"
-CXXFLAGS="${CXXFLAGS:--std=c++17 -O2 -Wall -Wextra -Wpedantic}"
+# The extra warnings beyond -Wall -Wextra are the ones that catch embedded mistakes:
+# -Wshadow (a local hiding a member), -Wcast-align (a pointer cast that faults on ARM but
+# not on x86), -Wdouble-promotion (a float silently widened on a chip with no double FPU),
+# -Wformat=2 (a printf format that does not match its argument). The tree is clean under
+# all of them; keep it that way.
+CXXFLAGS="${CXXFLAGS:--std=c++17 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wcast-align -Wnull-dereference -Wdouble-promotion -Wformat=2}"
 
 INC=(
   -I"$ROOT/firmware/common/include"

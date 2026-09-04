@@ -8,6 +8,33 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 16)
+
+### Changed — the warning set now catches the mistakes that matter on ARM
+
+The build used `-Wall -Wextra -Wpedantic`. It now also uses `-Wshadow` (a local hiding a
+member), `-Wcast-align` (a pointer cast that faults on ARM but not on x86),
+`-Wdouble-promotion` (a float silently widened on a chip with no double-precision FPU),
+`-Wnull-dereference`, `-Wnon-virtual-dtor` and `-Wformat=2`. The tree was already clean
+under all of them — **zero warnings across 15 translation units and every test** — and CI
+now builds a second time with `-Werror` so a new one fails the build instead of scrolling
+past.
+
+### Fixed — two unchecked return values on initialisation paths
+
+- The BMP280 driver ignored the result of its soft-reset write. A failed reset leaves the
+  device in an unknown configuration, which is worse than an absent one: the calibration
+  read might still succeed and the driver would report a healthy sensor it never
+  configured.
+- The microSD driver ignored the result of `CMD16` (SET_BLOCKLEN) on standard-capacity
+  cards. If that fails the card may use a different block length, and every read and write
+  after it would be silently wrong.
+
+Both now fail initialisation, which the fault manager already reports and the mission
+already survives.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 15)
 
 ### Changed — the flight image no longer carries iostreams

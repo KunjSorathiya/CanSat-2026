@@ -47,7 +47,12 @@ bool Bmp280::begin(i2c_bus_t bus, const Options& options) {
     if (!read_regs(bus_, options_.address, REG_ID, &id, 1) || id != 0x58) {
         return false;
     }
-    write_reg(bus_, options_.address, REG_RESET, 0xB6);
+    // A failed reset leaves the device in an unknown configuration, which is worse than
+    // no device at all: the calibration read below might still succeed and the driver
+    // would report a healthy sensor it never actually configured.
+    if (!write_reg(bus_, options_.address, REG_RESET, 0xB6)) {
+        return false;
+    }
     sleep_ms(5);
 
     std::uint8_t c[24];

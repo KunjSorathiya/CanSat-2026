@@ -127,7 +127,13 @@ bool SdCard::begin_with(const SdCardHal& hal) {
         }
     }
     if (!sdhc_) {
-        command(16, kBlockSize, 0xFF);  // CMD16: force 512-byte blocks (SDSC)
+        // CMD16: force 512-byte blocks on a standard-capacity card. If this fails the
+        // card may be using a different block length, and every read and write after it
+        // would be silently wrong.
+        if (command(16, kBlockSize, 0xFF) != 0x00) {
+            release();
+            return false;
+        }
     }
 
     release();

@@ -24,6 +24,13 @@ jobs:
       - name: Compiler version
         run: g++ --version
 
+      # A warning is a finding, not decoration. The tree is clean under the extended set
+      # in tools/build_host.sh, and a new one must fail the build rather than scroll past.
+      - name: Fail on any compiler warning
+        run: |
+          set -o pipefail
+          CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wcast-align -Wnull-dereference -Wdouble-promotion -Wformat=2 -Werror"             bash tools/build_host.sh > /dev/null
+
       # build_host.sh skips the web console suite when Node is absent. CI installs Node,
       # so a skip here means the toolchain broke, not that the tests are optional.
       - name: Build and run the host test suites
