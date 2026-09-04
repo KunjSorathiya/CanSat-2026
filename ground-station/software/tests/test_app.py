@@ -158,6 +158,25 @@ class BridgeStatusTests(unittest.TestCase):
         self.assertEqual(bridge["rssi"], "-97")
         self.assertEqual(bridge["snr"], "9.5")
 
+    def test_the_sync_word_reaches_the_dashboard(self):
+        """The rulebook's test and launch words are one reflash apart.
+
+        Which one the radio is actually using is the bridge's to report; a ground station
+        that displays it from its own constant displays it correctly until the day of the
+        launch, which is the only day it matters.
+        """
+        bridge = self._station_with_status(
+            "#state=RX radio=1 frames=42 dropped=3 rssi=-97 snr=9.5 sync=0xF3")
+        self.assertEqual(bridge["sync"], "0xF3")
+        self.assertEqual(
+            self._station_with_status("#bridge=online radio=1 sync=0xA5")["sync"], "0xA5")
+
+    def test_a_bridge_that_reports_no_sync_word_leaves_the_field_absent(self):
+        """An older bridge image says nothing about its sync word, and the dashboard shows
+        `--` for it rather than inventing one."""
+        bridge = self._station_with_status("#state=RX radio=1 frames=42")
+        self.assertNotIn("sync", bridge)
+
     def test_a_negative_snr_survives_parsing(self):
         bridge = self._station_with_status("#state=RX radio=1 rssi=-121 snr=-7.5")
         self.assertEqual(bridge["rssi"], "-121")

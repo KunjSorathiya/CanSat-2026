@@ -76,6 +76,10 @@ _BRIDGE_FIELDS = [
     ("snr", "SNR (dB)"),
     ("frames", "Frames"),
     ("dropped", "Dropped (no host)"),
+    # Reported by the bridge rather than assumed here: the rulebook's test and launch sync
+    # words are one reflash apart, and an operator needs to see which one is actually in
+    # use before the flight, not after it.
+    ("sync", "Sync word"),
 ]
 
 _MAX_POINTS = 600

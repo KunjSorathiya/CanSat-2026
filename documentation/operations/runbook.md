@@ -179,6 +179,10 @@ pipeline is what writes the authoritative logs. Run both when it matters.
 - [ ] Bridge Pico connected; the serial port enumerates
 - [ ] Ground station started with `--framed` and the correct `--team`
 - [ ] Bridge status frames arriving once a second (`#state=RX radio=1 …`)
+- [ ] **Sync word on screen matches the one this flight is using** — `TEST · 0xF3`
+      for bench work, `LAUNCH · 0xA5` for the official launch. The console reads it
+      from the bridge, so a mismatch here means one of the two Picos was not
+      reflashed. `UNKNOWN` means neither rulebook word is programmed.
 - [ ] Log directory writable and empty of previous runs
 
 ### T-10 — Vehicle power-on
@@ -289,7 +293,10 @@ and pressure, each against time or packet number.
 <summary><b>No packets at the ground station</b></summary>
 
 1. **Sync words** — the most common cause. Vehicle and bridge must both be `0xF3` or both
-   `0xA5`. A mismatch is a silent total loss.
+   `0xA5`. A mismatch is a silent total loss. Half of that is now on screen: the bridge
+   reports its own word in the status line, and the console's **Sync word** field shows it.
+   That tells you the ground half without a reflash; the vehicle half still has to be
+   inferred from which image was loaded, because a vehicle nobody is receiving cannot say.
 2. Is the bridge sending status frames? No `#state=RX` line means the bridge or the serial
    port is the problem, not the link.
 3. `radio=0` in the status line means the bridge cannot talk to its RA-02 — check SPI

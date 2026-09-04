@@ -530,7 +530,7 @@ input[type=file] { display: none; }
           <dt>Calibration</dt><dd id="kv-cal">&mdash;</dd>
           <dt>Armed</dt><dd id="kv-arm">&mdash;</dd>
           <dt>Active faults</dt><dd id="kv-faults">&mdash;</dd>
-          <dt>Sync word</dt><dd id="kv-sync">TEST &middot; 0xF3</dd>
+          <dt>Sync word</dt><dd id="kv-sync">&mdash;</dd>
         </dl>
       </div>
     </section>
@@ -943,6 +943,45 @@ class LinkHealth {
   get lossPct() { const exp = this.packetsOk + this.missing; return exp <= 0 ? 0 : 100 * this.missing / exp; }
 }
 
+/* Bridge status lines, parsed rather than assumed.
+
+   The bridge emits `#state=RX radio=1 frames=... dropped=... rssi=... snr=... sync=0xF3`
+   once a second, and `#bridge=online radio=1 sync=0xF3` when it comes up. Every field is
+   optional here: a line that omits one leaves the previous value alone rather than
+   overwriting it with a guess.
+
+   The sync word matters more than it looks. The rulebook uses 0xF3 for testing and 0xA5
+   for the launch, the switch is a reflash of both ends, and the console used to print the
+   test word from a literal in its own markup -- correct until the one day it was not. */
+function parseBridgeStatus(line) {
+  const out = {};
+  const radio = /\bradio=([01])\b/.exec(line);
+  if (radio) out.radio = radio[1] === "1";
+  const rssi = /\brssi=(-?\d+)\b/.exec(line);
+  if (rssi) out.rssi = Number(rssi[1]);
+  const snr = /\bsnr=(-?[\d.]+)/.exec(line);
+  if (snr) out.snr = Number(snr[1]);
+  const dropped = /\bdropped=(\d+)\b/.exec(line);
+  if (dropped) out.dropped = Number(dropped[1]);
+  const frames = /\bframes=(\d+)\b/.exec(line);
+  if (frames) out.frames = Number(frames[1]);
+  const sync = /\bsync=0x([0-9A-Fa-f]{2})\b/.exec(line);
+  if (sync) out.sync = parseInt(sync[1], 16);
+  return out;
+}
+
+/* The two words the rulebook fixes, mirroring cansat/link_profile.hpp. Anything else is
+   reported as its own hex value rather than silently labelled as one of these. */
+const SYNC_TEST = 0xF3;
+const SYNC_LAUNCH = 0xA5;
+function syncWordLabel(value) {
+  if (value === null || value === undefined) return "—";
+  const hex = "0x" + value.toString(16).toUpperCase().padStart(2, "0");
+  if (value === SYNC_TEST) return "TEST · " + hex;
+  if (value === SYNC_LAUNCH) return "LAUNCH · " + hex;
+  return "UNKNOWN · " + hex;
+}
+
 // PORTABLE-CORE:END
 
 /* ================================================================
@@ -1174,7 +1213,10 @@ function startDemo() {
   source = "demo";
   resetSession();
   $("#src-mode").textContent = "DEMO";
-  $("#kv-sync").textContent = "TEST · 0xF3";
+  // The demo emulates a bench link, which is the test sync word by definition.
+  bridge.radio = true;
+  bridge.sync = SYNC_TEST;
+  renderSyncWord();
   demoTimer = setInterval(demoTick, 500);
 }
 function stopSources() {
@@ -1252,20 +1294,21 @@ async function connectSerial() {
 // The bridge reports the radio's own view of the link once a second. RSSI is the number
 // that warns an operator a link is about to fail, while packet loss is still zero — so it
 // is worth showing even though the packets are, for the moment, arriving fine.
-const bridge = { rssi: null, snr: null, dropped: 0 };
+const bridge = { rssi: null, snr: null, dropped: 0, radio: null, sync: null };
+
+function renderSyncWord() {
+  const state = bridge.radio === null ? "" : (bridge.radio ? "LINK · " : "DOWN · ");
+  $("#kv-sync").textContent = state + syncWordLabel(bridge.sync);
+}
 
 function applyBridgeStatus(line) {
-  const radio = /radio=([01])/.exec(line);
-  if (radio) {
-    $("#kv-sync").textContent = (radio[1] === "1" ? "LINK · " : "DOWN · ") +
-                                $("#kv-sync").textContent.split("· ").pop();
-  }
-  const rssi = /rssi=(-?\d+)/.exec(line);
-  if (rssi) bridge.rssi = Number(rssi[1]);
-  const snr = /snr=(-?[\d.]+)/.exec(line);
-  if (snr) bridge.snr = Number(snr[1]);
-  const dropped = /dropped=(\d+)/.exec(line);
-  if (dropped) bridge.dropped = Number(dropped[1]);
+  const status = parseBridgeStatus(line);
+  if ("rssi" in status) bridge.rssi = status.rssi;
+  if ("snr" in status) bridge.snr = status.snr;
+  if ("dropped" in status) bridge.dropped = status.dropped;
+  if ("radio" in status) bridge.radio = status.radio;
+  if ("sync" in status) bridge.sync = status.sync;
+  if ("radio" in status || "sync" in status) renderSyncWord();
 }
 
 /* ================================================================

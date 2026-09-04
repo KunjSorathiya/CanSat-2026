@@ -55,6 +55,48 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — the console stated a sync word nobody had told it
+
+The web console's **Sync word** field read `TEST · 0xF3`, written as a literal into its own
+markup and into `startDemo()`. The bridge never reported which sync word it had configured,
+so the console was not displaying a measurement — it was displaying an assumption, and the
+only way to make it wrong is the exact change the audit recommends rehearsing: reflashing
+both ends onto the rulebook's launch word `0xA5`. It would then have shown `LINK · 0xF3`
+over a link running on `0xA5`, on the one day the field matters.
+
+- **The bridge reports it.** `sync=0x..` joins the once-a-second status line, and the
+  `#bridge=online` line carries it too, so the answer is on screen from the bridge's first
+  line rather than a second later. The value is read back from the same `link_profile.hpp`
+  constant the radio was programmed with.
+- **The console reads it.** `parseBridgeStatus()` and `syncWordLabel()` move into the
+  portable core, so the field is parsed by tested code rather than by four regexes wired
+  straight into a DOM update. The label reads `TEST`, `LAUNCH`, or `UNKNOWN · 0x..` for
+  anything that is neither — and `—` until the bridge has said anything at all.
+- **The Tk dashboard shows it too**, as a new `Sync word` row under Bridge radio.
+- **A field the bridge omits stays absent.** An older bridge image reports no sync word;
+  both displays leave the field empty rather than filling it with a default that would be
+  indistinguishable from a measurement.
+
+Eight tests cover it — three under Node over the portable core, two in `test_app.py` — and
+`check_doc_claims.py` now holds the console's own copies of `SYNC_TEST` and `SYNC_LAUNCH`
+to `link_profile.hpp`, since a self-contained HTML file cannot include a C++ header and a
+copy is a thing that drifts.
+
+The runbook gains a T-30 line for it, and its "no packets" entry now says that half the
+sync-word diagnosis is on screen: the bridge's word is reported, the vehicle's still has to
+be inferred from the image that was loaded, because a vehicle nobody is receiving cannot
+say what it is transmitting on.
+
+### Fixed — the per-suite test counts in the test plan, and the plan's silence about three files
+
+`test_app.py` was documented as holding 3 tests while holding 11; `test_validator.py` as 9
+while holding 20; `test_telemetry.py` as 9 while holding 14. `test_logger.py` (18 tests),
+`test_protocol_fixtures.py` (5) and the Pico syntax check's eleventh translation unit
+(`bringup_main`) were not described at all. All are now written up, and all are checked:
+every Python suite's documented figure is held to the file it describes, and every
+`src/pico/*.cpp` must appear in `tools/check_pico_syntax.sh` — a driver added there and
+left out of that list is checked by nothing at all.
+
 ### Fixed — the documented test counts were four runs out of date, and nothing was checking them
 
 Every figure below was true when it was written and had quietly stopped being true. The

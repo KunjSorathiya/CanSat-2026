@@ -45,7 +45,7 @@ function loadConsoleCore() {
   }
 
   const factory = new Function(
-    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S };`
+    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S, parseBridgeStatus, syncWordLabel, SYNC_TEST, SYNC_LAUNCH };`
   );
   return factory();
 }
@@ -427,4 +427,45 @@ test("the console distinguishes a magnetic yaw from a relative one", () => {
   const negative = M.parsePacket(base.replace("Ya-30.0", "Ya--150.0") + " YR-M;",
                                     "CAN-Team-07");
   assert.ok(Math.abs(negative.record.heading - 150) < 1e-9);
+});
+
+test("the bridge status line is parsed field by field", () => {
+  const line = "#state=RX radio=1 frames=412 dropped=3 rssi=-84 snr=7.5 sync=0xF3";
+  const s = M.parseBridgeStatus(line);
+  assert.equal(s.radio, true);
+  assert.equal(s.frames, 412);
+  assert.equal(s.dropped, 3);
+  assert.equal(s.rssi, -84);
+  assert.equal(s.snr, 7.5);
+  assert.equal(s.sync, 0xF3);
+
+  // A negative SNR is the interesting case at the edge of a link, and the minus sign has
+  // to survive.
+  assert.equal(M.parseBridgeStatus("#state=RX radio=1 snr=-12.5").snr, -12.5);
+  // A radio the bridge cannot talk to is false, not missing.
+  assert.equal(M.parseBridgeStatus("#state=RX radio=0").radio, false);
+});
+
+test("a field the bridge did not send is absent rather than guessed", () => {
+  // The caller keeps the previous value for anything absent, which only works if absence
+  // is distinguishable from a value.
+  const s = M.parseBridgeStatus("#state=RX radio=1");
+  assert.equal("rssi" in s, false);
+  assert.equal("sync" in s, false);
+  assert.equal("dropped" in s, false);
+  assert.deepEqual(M.parseBridgeStatus("#bridge=host-stub"), {});
+});
+
+test("the sync word is read from the bridge, not assumed", () => {
+  // The console printed the test word from a literal in its own markup. Both words are
+  // one reflash apart, so the display has to come from what the bridge reports.
+  assert.equal(M.parseBridgeStatus("#bridge=online radio=1 sync=0xA5").sync, M.SYNC_LAUNCH);
+  assert.equal(M.parseBridgeStatus("#state=RX radio=1 sync=0xf3").sync, M.SYNC_TEST);
+
+  assert.equal(M.syncWordLabel(M.SYNC_TEST), "TEST · 0xF3");
+  assert.equal(M.syncWordLabel(M.SYNC_LAUNCH), "LAUNCH · 0xA5");
+  // Neither rulebook word: reported as itself rather than labelled as one of them.
+  assert.equal(M.syncWordLabel(0x12), "UNKNOWN · 0x12");
+  // Nothing reported yet says exactly that.
+  assert.equal(M.syncWordLabel(null), "—");
 });

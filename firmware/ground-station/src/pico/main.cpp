@@ -112,7 +112,14 @@ int main() {
     if (up) {
         radio.start_receive();
     }
-    emit(std::string("#bridge=online radio=") + (up ? "1" : "0"));
+    // Carry the sync word on the first line too, so an operator watching the console come
+    // up sees the truth immediately rather than a second later.
+    {
+        char online[64];
+        std::snprintf(online, sizeof(online), "#bridge=online radio=%d sync=0x%02X",
+                      up ? 1 : 0, static_cast<unsigned>(SYNC_WORD));
+        emit(online);
+    }
 
     std::uint8_t buffer[256];
     std::uint32_t frames = 0;
@@ -147,11 +154,17 @@ int main() {
         if (now - last_status >= STATUS_PERIOD_MS) {
             last_status = now;
             char line[128];
+            // The sync word is reported, not assumed. The rulebook uses one word for
+            // testing and another for the launch, and the switch is a reflash of both
+            // ends; a display that states which word is in use from a compiled-in
+            // constant states it correctly right up until the moment it matters.
             std::snprintf(line, sizeof(line),
-                          "#state=RX radio=%d frames=%lu dropped=%lu rssi=%d snr=%.1f",
+                          "#state=RX radio=%d frames=%lu dropped=%lu rssi=%d snr=%.1f "
+                          "sync=0x%02X",
                           up ? 1 : 0, static_cast<unsigned long>(frames),
                           static_cast<unsigned long>(g_frames_dropped_no_host),
-                          radio.last_rssi_dbm(), static_cast<double>(radio.last_snr_db()));
+                          radio.last_rssi_dbm(), static_cast<double>(radio.last_snr_db()),
+                          static_cast<unsigned>(SYNC_WORD));
             emit(line);
         }
         sleep_ms(2);

@@ -87,14 +87,14 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **98 / 98 tests** |
+| Python ground station | 8 modules | ✅ **100 / 100 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **82 / 82 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **37 / 37 tests** |
-| Pico syntax check | 10 translation units | ✅ All OK |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, and the test counts on this page | ✅ **95 / 95 claims** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **40 / 40 tests** |
+| Pico syntax check | 11 translation units | ✅ All OK |
 
-Translation units syntax-checked: flight `main`, `pico_hal`, `pico_radio`, `mpu9250`,
-`bmp280`, `neo6m`, `sd_card`, `sd_logger`, shared `sx1278`, ground bridge `main`.
+Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
+`mpu9250`, `bmp280`, `neo6m`, `sd_card`, `sd_logger`, shared `sx1278`, ground bridge `main`.
 
 ---
 
@@ -226,25 +226,39 @@ and a known GGA sentence parses to the expected latitude with no checksum errors
 
 ## Python test suites
 
-### `test_telemetry.py` — 9 tests
+### `test_telemetry.py` — 14 tests
 
 Rulebook packet parses; the `CAN-Team-XX` placeholder is rejected; empty and corrupt
 packets are rejected; decimal precision is enforced and extra fields are tolerated;
 optional GPS fields are preserved; missing packets are counted; out-of-order packets are
 rejected; duplicates are visible to the sequence check; raw and parsed logging both work.
 
-### `test_validator.py` — 9 tests
+Five further tests cover the yaw reference: a magnetic yaw is reported as a compass
+bearing, a relative one yields no bearing, a packet without the tag says nothing either
+way, the bearing wraps into `[0, 360)`, and the CSV row records which kind of yaw it
+holds — the same distinction the C++ formatter and the web console make.
+
+### `test_validator.py` — 20 tests
 
 Sequential streams pass; wrong team is rejected; missing packets are counted; duplicates
 and out-of-order packets are detected; timestamp regressions are noted; implausible GPS is
 flagged while the packet is still kept; valid GPS is not flagged; diagnostic tags
 (`MODE`, `FAULTS`, `CAL`, `ARM`) are parsed.
 
-### `test_transport.py` — 11 tests
+Eleven more cover vehicle reboots and the bounded duplicate window, because both are ways
+a correct stream can be read as a broken one. A reboot restarts numbering at `P-001` with
+the clock going backwards, and must be recognised rather than counted as a flood of
+duplicates; a `P-001` corrupted out of a longer number is not a restart, nor is a clock
+regression on its own; the first packet of a session is never a restart; multiple reboots
+are each counted; a restart clears both structures; and the duplicate window is bounded so
+a long flight cannot grow it without limit, while still catching recent repeats.
+
+### `test_transport.py` — 12 tests
 
 Framing: round-trip, CRC error reporting, the known CRC vector, resync after noise, a torn
-header that must not swallow the frame behind it, frames split across chunks,
-status-frame detection. Transports: framed and plain file replay, and framed loopback.
+header that must not swallow the frame behind it, a truncated length field, frames split
+across chunks, status-frame detection, and a stuck link that must not grow the buffer
+without bound. Transports: framed and plain file replay, and framed loopback.
 
 ### `test_health.py` — 7 tests
 
@@ -253,10 +267,32 @@ stability. Plus three rate-estimator tests added after a live defect was found: 
 2 Hz stream reads 2.00 Hz, a same-instant burst cannot inflate the rate, and the rate
 falls to zero once the link drops instead of freezing at its last value.
 
-### `test_app.py` — 3 tests
+### `test_app.py` — 11 tests
 
 End-to-end counting and logging through the full pipeline; a CRC-error frame is recorded
-but never parsed; CSV export.
+but never parsed; CSV export; a healthy log reports no errors, and a failing write is
+surfaced without stopping reception.
+
+The rest cover the bridge status line, which is the operator's only view of the radio
+itself: the radio report reaches the snapshot, a negative SNR keeps its sign, a radio-loss
+line is recorded, status lines are never counted as telemetry, and the **sync word the
+bridge reports** reaches the dashboard — with an older bridge image that reports no sync
+word leaving the field absent rather than filling it with a guess.
+
+### `test_logger.py` — 18 tests
+
+The raw log's escaping is reversible over every byte value, escaped text never contains a
+separator, and one line is written per record even for a corrupted payload — so a payload
+that failed to parse is still recoverable from the raw log. Nothing is discarded, valid
+packets still reach the CSV, a failing write is counted rather than raised, the station
+keeps logging the other file, errors accumulate across packets, and packet-gap accounting
+distinguishes a genuine gap from a repeat or a regression.
+
+### `test_protocol_fixtures.py` — 5 tests
+
+The fixture file is present and complete, every fixture parses to its recorded verdict,
+every rejected fixture carries a reason, every accepted fixture exposes all mandatory
+fields, and the packet-number rule matches the other implementations.
 
 ---
 

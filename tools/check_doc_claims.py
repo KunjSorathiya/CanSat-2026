@@ -119,6 +119,18 @@ def main() -> int:
         checker.check(f"link-budget.md quotes the measured {measured}-byte packet size",
                       f"**{measured}**" in link_budget)
 
+    # The web console carries its own copy of the two rulebook sync words, because it is a
+    # single self-contained HTML file that cannot include a C++ header. A copy is a thing
+    # that drifts, so it is held to the original here.
+    console = read("ground-station/web/index.html")
+    test_sync = re.search(r"kTestSyncWord\s*=\s*(0x[0-9A-Fa-f]+)", profile)
+    launch_sync = re.search(r"kOfficialSyncWord\s*=\s*(0x[0-9A-Fa-f]+)", profile)
+    for label, match, js_name in (("test", test_sync, "SYNC_TEST"),
+                                  ("launch", launch_sync, "SYNC_LAUNCH")):
+        word = match.group(1).upper().replace("0X", "0x") if match else "?"
+        checker.check(f"web console's {js_name} matches the {label} sync word {word}",
+                      f"const {js_name} = {word};" in console, word)
+
     # ---- acquisition and sensor configuration ---------------------------------------
     config = read("firmware/flight-computer/include/flight/config.hpp")
     sensor_period = constant(config, "sensor_period_ms")
@@ -226,6 +238,35 @@ def main() -> int:
                   not undocumented, ", ".join(undocumented))
     checker.check(f"test-plan.md states {len(suites)} flight_tests suites",
                   f"{len(suites)} suites" in test_plan, str(len(suites)))
+
+    # The syntax check is the only thing standing between a Pico-only source file and a
+    # defect nobody sees until the firmware is built. A driver added to src/pico/ and left
+    # out of tools/check_pico_syntax.sh is checked by nothing at all, so the list is held to
+    # the directory rather than to whoever remembered to edit it.
+    syntax_script = read("tools/check_pico_syntax.sh")
+    listed = re.findall(r"^\s+(firmware/\S+\.cpp)$", syntax_script, re.MULTILINE)
+    on_disk = sorted(str(q.relative_to(REPO_ROOT)).replace("\\", "/")
+                     for q in REPO_ROOT.glob("firmware/*/src/pico/*.cpp"))
+    unchecked = [q for q in on_disk if q not in listed]
+    checker.check(f"every one of the {len(on_disk)} Pico source files is syntax-checked",
+                  not unchecked, ", ".join(unchecked))
+    checker.check(f"test-plan.md states {len(listed)} syntax-checked translation units",
+                  f"{len(listed)} translation units" in test_plan, str(len(listed)))
+    unnamed = [Path(q).stem for q in listed if f"`{Path(q).stem}`" not in test_plan]
+    checker.check("test-plan.md names every syntax-checked translation unit",
+                  not unnamed, ", ".join(unnamed))
+
+    # The test plan describes each Python suite and says how many tests it holds. Those
+    # per-file figures drifted further than the totals did -- test_app.py was documented at
+    # 3 tests while holding 11 -- so each one is checked against the file it describes.
+    # test_end_to_end.py is prose rather than a heading, and states its figure as "N checks".
+    for test_file in sorted((REPO_ROOT / "ground-station/software/tests").glob("test_*.py")):
+        n = len(re.findall(r"^\s+def (test_\w+)", test_file.read_text(encoding="utf-8"),
+                           re.MULTILINE))
+        name = test_file.name
+        stated = (f"### `{name}` — {n} tests" in test_plan
+                  or (name in test_plan and f"{n} checks:" in test_plan))
+        checker.check(f"test-plan.md describes {name} as {n} tests", stated, str(n))
 
     counts = suite_counts()
     if counts is None:

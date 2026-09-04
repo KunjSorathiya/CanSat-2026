@@ -429,9 +429,17 @@ destroys each copy in turn and checks the log resumes with its records intact.
 
 The ground Pico is a pure bridge: the SX1278 sits in continuous RX and every received
 payload is framed straight to USB serial. It adds a
-`#state=RX radio=... frames=... rssi=... snr=...` status line once a second, re-initialises
-the radio after 20 consecutive unhealthy polls, and runs a 3 s watchdog so a hung bridge
-reboots and the PC transport reconnects on its own.
+`#state=RX radio=... frames=... dropped=... rssi=... snr=... sync=0x..` status line once a
+second, re-initialises the radio after 20 consecutive unhealthy polls, and runs a 3 s
+watchdog so a hung bridge reboots and the PC transport reconnects on its own.
+
+The `sync=` field is the sync word the bridge actually configured, read back out of the
+same `link_profile.hpp` constant it programmed. The rulebook fixes one word for testing
+(`0xF3`) and another for the launch (`0xA5`), and switching between them is a reflash of
+both ends — so neither display is allowed to state which one is in use from a constant of
+its own. Both the Tk dashboard and the web console show what the bridge reports, and show
+`—` until it has reported anything. The same field rides the `#bridge=online` line, so the
+answer is on screen from the first line the bridge emits.
 
 ### Serial framing
 
@@ -532,7 +540,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 57 C++ suites with 3547 assertions, plus the LoRa driver (94) and the microSD driver (581) against simulated devices, 131 Python tests including an end-to-end trace, and 37 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 57 C++ suites with 3547 assertions, plus the LoRa driver (94) and the microSD driver (581) against simulated devices, 133 Python tests including an end-to-end trace, and 40 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |
