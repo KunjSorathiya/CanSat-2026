@@ -127,18 +127,20 @@ dashboard runs without it.
 
 ```bash
 python src/main.py live --port COM5 --team CAN-Team-25 --framed --no-dashboard
+# Safe to pipe: the status lines are flushed as they are printed
+python src/main.py live --port COM5 --team CAN-Team-25 --framed --no-dashboard | tee logs/console.log
 ```
 
 ### Rehearsal from a file, no hardware
 
 ```bash
-python src/main.py live --replay packets.txt --rate 2 --team CAN-Team-01
+python src/main.py live --replay ../../test-data/sample-mission.txt --rate 2 --team CAN-Team-01
 ```
 
 ### Offline replay with a CSV export
 
 ```bash
-python src/main.py replay packets.txt --team CAN-Team-01 --output logs --export logs/flight.csv
+python src/main.py replay ../../test-data/sample-mission.txt --team CAN-Team-01 --output logs --export logs/flight.csv
 ```
 
 ### Web console

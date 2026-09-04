@@ -329,6 +329,30 @@ def main() -> int:
                   and f"{len(scenario_rows)} packets" in test_plan,
                   f"{len(scenario_names)}/{len(scenario_rows)}")
 
+    # The documentation tells a new reader to replay test-data/sample-mission.txt. That
+    # file is real controller output, so a change to the packet format can leave it behind
+    # -- and a sample the documentation cannot replay is worse than no sample, because the
+    # reader assumes their setup is broken rather than the file.
+    sample = read("test-data/sample-mission.txt").splitlines()
+    sample_packets = [ln for ln in sample if ln.strip()]
+    checker.check("sample-mission.txt carries a mission worth replaying",
+                  len(sample_packets) >= 20, str(len(sample_packets)))
+    # Held to the same fixture rules the parsers are: every mandatory field, in order, at
+    # the documented precision. A cheap structural check here, and the Python parser reads
+    # the same file in its own suite.
+    field_order = re.compile(
+        r"^CAN-Team-\d{2}; P-\d{3}; Ti-\d{2}:\d{2}:\d{2}:\d{3}; A--?\d+\.\d; "
+        r"Pr--?\d+\.\d{2}; T--?\d+\.\d; Ro--?\d+\.\d; Pi--?\d+\.\d; Ya--?\d+\.\d; "
+        r"AX--?\d+\.\d{2}; AY--?\d+\.\d{2}; AZ--?\d+\.\d{2};")
+    malformed = [i + 1 for i, ln in enumerate(sample_packets) if not field_order.match(ln)]
+    checker.check("every sample-mission.txt packet matches the rulebook field order",
+                  not malformed, f"lines {malformed[:5]}")
+    for doc in ("README.md", "documentation/quick-start.md",
+                "documentation/operations/runbook.md",
+                "ground-station/software/README.md"):
+        checker.check(f"{doc} replays a file that exists",
+                      "packets.txt" not in read(doc))
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.

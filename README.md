@@ -144,7 +144,7 @@ pressure plots, an attitude indicator and a live packet monitor.
 
 ```bash
 cd ground-station/software
-python src/main.py replay packets.txt --team CAN-Team-01 --export logs/flight.csv
+python src/main.py replay ../../test-data/sample-mission.txt --team CAN-Team-01 --export logs/flight.csv
 ```
 
 **Build the Pico images** (requires `PICO_SDK_PATH` and `pico_sdk_import.cmake`):
@@ -326,7 +326,7 @@ Three interfaces, one pipeline:
 |---|---|
 | **Web console** — [`ground-station/web/index.html`](ground-station/web/index.html) | Single file, no build, no dependencies. Demo replay, file replay, or live Web Serial |
 | **Tk dashboard** — `python src/main.py live --port COM5 --framed` | Live numeric view, with plots when matplotlib is installed |
-| **CLI replay** — `python src/main.py replay packets.txt --export out.csv` | Offline parse, validate, log and export |
+| **CLI replay** — `python src/main.py replay ../../test-data/sample-mission.txt --export out.csv` | Offline parse, validate, log and export |
 
 The receive pipeline runs on a background thread and hands the UI a snapshot through a
 bounded queue, so a slow interface can never stall reception or logging. **Nothing received
@@ -406,7 +406,7 @@ bash tools/build_host.sh
 | Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **107 / 107** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
 | Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **42 / 42** |
-| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **129 / 129** |
+| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **135 / 135** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte

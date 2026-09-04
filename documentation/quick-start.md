@@ -146,7 +146,7 @@ cmake -S . -B build/host-cmake && cmake --build build/host-cmake --parallel && c
 Replay a packet file through the real ground-station pipeline:
 
 ```bash
-cd ground-station/software && python src/main.py replay packets.txt --team CAN-Team-01 --export logs/flight.csv
+cd ground-station/software && python src/main.py replay ../../test-data/sample-mission.txt --team CAN-Team-01 --export logs/flight.csv
 ```
 
 If all of that passes, your development environment is ready. Everything from here needs

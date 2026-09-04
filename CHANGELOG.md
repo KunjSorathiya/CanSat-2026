@@ -55,6 +55,40 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Fixed — every documented command now runs, starting with the file none of them had
+
+Four documents tell a reader to run `python src/main.py replay packets.txt`. **There is no
+`packets.txt` in this repository, and never was.** The first ground-station command in the
+quick start ended in `FileNotFoundError` for anyone who followed it exactly.
+
+`test-data/sample-mission.txt` is now shipped, and it is not hand-written: it is the output
+of `build/host/emit_mission`, which runs the **real flight controller** through a scripted
+ascent and descent. Thirty packets carrying what the vehicle actually transmits — `MODE`
+advancing `READY` to `FLIGHT`, the arming and calibration flags changing, GPS and diagnostic
+tags present, and `YR-G` on every packet because the delivered IMU has no magnetometer.
+Every document now points at it, and `check_doc_claims.py` holds each of its packets to the
+rulebook field order and each of those documents to naming a file that exists.
+
+`test-data/README.md` explains all three fixture files and how to regenerate the sample.
+
+### Fixed — the headless monitor said nothing when piped
+
+`live --no-dashboard` prints a link summary every two seconds, and the runbook offers it as
+the form to use without a display. Python block-buffers stdout when it is not a terminal, so
+piped anywhere — `tee`, a log file, a second window — **it printed nothing at all**: twelve
+seconds of a real run produced no output, where a terminal would have shown five status
+lines. A monitoring command whose entire purpose is periodic status, silent in exactly the
+configuration an operator would pipe on launch day.
+
+Every line in that loop is flushed now, and the runbook shows the `| tee` form. The bridge
+line also gained `sync=`, so the sync word the bridge reports is visible without a display
+as well as with one.
+
+**All eleven documented commands that do not need hardware were run as written**, from the
+directory the document says to run them in: both build scripts, the Node suite, the replay
+and the paced live replay. The two failures above were found that way, and the remaining
+four are the CMake and Pico-SDK builds, which need a toolchain this machine does not have.
+
 ### Fixed — the runbook's post-flight replay produced nothing, silently
 
 Step 2 of post-flight analysis replays the raw log to export a clean CSV. The raw log is

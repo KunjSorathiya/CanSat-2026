@@ -9,6 +9,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 from pathlib import Path
 
@@ -47,7 +48,12 @@ def _run_live(args: argparse.Namespace) -> int:
 
     if args.no_dashboard:
         station.start()
-        print("live pipeline running; Ctrl-C to stop")
+        # Every print here is flushed. Python block-buffers stdout when it is not a
+        # terminal, and the runbook's headless form of this command is the one an operator
+        # pipes somewhere -- into `tee`, or a log file, or a second window. Buffered, a
+        # status line meant to appear every two seconds appears every few thousand, which
+        # makes a working link look like a dead one.
+        print("live pipeline running; Ctrl-C to stop", flush=True)
         try:
             while True:
                 time.sleep(2.0)
@@ -59,15 +65,18 @@ def _run_live(args: argparse.Namespace) -> int:
                           "began again".format(**validation))
                 bridge = snap.get("bridge", {})
                 if bridge:
-                    print("  bridge: radio={radio} rssi={rssi} snr={snr} dropped={dropped}"
+                    print("  bridge: radio={radio} rssi={rssi} snr={snr} "
+                          "dropped={dropped} sync={sync}"
                           .format(radio=bridge.get("radio", "?"),
                                   rssi=bridge.get("rssi", "?"),
                                   snr=bridge.get("snr", "?"),
-                                  dropped=bridge.get("dropped", "0")))
+                                  dropped=bridge.get("dropped", "0"),
+                                  sync=bridge.get("sync", "?")))
                 logging_state = snap.get("logging", {})
                 if logging_state.get("write_errors"):
                     print("  LOGGING FAULT: {write_errors} error(s), last: {last_error}"
                           .format(**logging_state))
+                sys.stdout.flush()
         except KeyboardInterrupt:
             pass
         finally:
