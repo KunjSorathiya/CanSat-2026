@@ -48,12 +48,17 @@ private:
     void run_calibration(std::uint64_t mission_ms);
     bool is_armed(std::uint64_t mission_ms) const;
     void feed_state_machine(std::uint64_t mission_ms);
+    void update_mag_calibration(std::uint64_t mission_ms);
+    // Compares the magnetometer-referenced heading against the GPS course over ground.
+    // A cross-check only: the course is never fed back into the attitude estimator.
+    void check_yaw_reference(std::uint64_t mission_ms);
     void emit_telemetry(std::uint64_t mission_ms);
     bool transmit_with_recovery(const std::string& packet, std::uint64_t mission_ms);
     void sample_battery(std::uint64_t mission_ms);
     void refresh_health(std::uint64_t mission_ms);
     void update_led(std::uint64_t mission_ms) const;
     bool plausible_imu(const ImuSample& s) const;
+    bool plausible_mag(const ImuSample& s) const;
     bool plausible_baro(const BaroSample& s) const;
 
     Configuration config_;
@@ -69,6 +74,7 @@ private:
     TelemetryBuilder builder_;
     FaultManager faults_;
     StartupCalibrator calibrator_;
+    MagCalibrator mag_calibrator_;
 
     PeriodicTask sensor_task_;
     PeriodicTask telemetry_task_;
@@ -92,8 +98,13 @@ private:
     bool baseline_ready_ = false;
 
     double gyro_bias_dps_[3] = {0.0, 0.0, 0.0};
-    double accel_bias_mps2_[3] = {0.0, 0.0, 0.0};
+    // Scalar accelerometer scale correction (see CalibrationResult::accel_scale). A
+    // rotation-invariant scale, not a body-frame offset: the vehicle tumbles.
+    double accel_scale_ = 1.0;
+    sensors::MagCalibration mag_calibration_{};
     bool calibration_applied_ = false;
+    std::uint64_t last_good_mag_ms_ = 0;
+    std::uint32_t cog_disagreements_ = 0;
     bool watchdog_reboot_ = false;
 
     double last_altitude_agl_m_ = 0.0;

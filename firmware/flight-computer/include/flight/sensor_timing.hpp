@@ -15,7 +15,9 @@
 // Sources:
 //   BMP280 datasheet (BST-BMP280-DS001, rev 1.19), section 3.8 "Measurement time" and
 //   table 14 "Filter settings and measurement rates".
-//   MPU-6000/6050 Register Map and Descriptions (rev 4.2), registers 25 and 26.
+//   MPU-9250 Register Map and Register Descriptions (RM-MPU-9250A-00, rev 1.6),
+//   registers 25 (SMPLRT_DIV), 26 (CONFIG) and 29 (ACCEL_CONFIG 2).
+//   AK8963 datasheet, CNTL1 continuous measurement modes.
 
 namespace flight::sensors {
 
@@ -103,41 +105,67 @@ constexpr double baro_min_sample_period_ms(Oversampling osrs_t, Oversampling osr
     return baro_measure_ms_max(osrs_t, osrs_p) + standby_ms;
 }
 
-// ---------------------------------------------------------------- MPU6050 --
+// ---------------------------------------------------------------- MPU9250 --
 
-// With DLPF_CFG in 1..6 the gyro output rate is 1 kHz; with 0 or 7 it is 8 kHz.
-// Sample rate = gyro output rate / (1 + SMPLRT_DIV).  Register map, register 25.
-constexpr double imu_sample_rate_hz(std::uint8_t dlpf_cfg, std::uint8_t smplrt_div) {
-    const double base = (dlpf_cfg >= 1 && dlpf_cfg <= 6) ? 1000.0 : 8000.0;
+// With DLPF_CFG in 1..6 (and FCHOICE_B = 00) the gyro output rate is 1 kHz; with 0 or 7
+// it is 8 kHz. Sample rate = gyro output rate / (1 + SMPLRT_DIV).  Register map,
+// registers 25 and 26.
+constexpr double imu_sample_rate_hz(std::uint8_t gyro_dlpf_cfg, std::uint8_t smplrt_div) {
+    const double base = (gyro_dlpf_cfg >= 1 && gyro_dlpf_cfg <= 6) ? 1000.0 : 8000.0;
     return base / (1.0 + static_cast<double>(smplrt_div));
 }
 
-// Accelerometer bandwidth for each DLPF_CFG setting, register map register 26.
-constexpr double imu_accel_bandwidth_hz(std::uint8_t dlpf_cfg) {
-    switch (dlpf_cfg) {
-        case 0: return 260.0;
-        case 1: return 184.0;
-        case 2: return 94.0;
-        case 3: return 44.0;
-        case 4: return 21.0;
-        case 5: return 10.0;
-        case 6: return 5.0;
-        default: return 260.0;
+// Accelerometer bandwidth for each A_DLPF_CFG setting, register map register 29
+// (ACCEL_CONFIG 2), with accel_fchoice_b = 0. The MPU-9250 gives the accelerometer its
+// OWN filter register -- on the MPU-6050 one field set both -- so the two tables below
+// are indexed by two different configuration values and must not be conflated.
+constexpr double imu_accel_bandwidth_hz(std::uint8_t accel_dlpf_cfg) {
+    switch (accel_dlpf_cfg) {
+        case 0: return 218.1;
+        case 1: return 218.1;
+        case 2: return 99.0;
+        case 3: return 44.8;
+        case 4: return 21.2;
+        case 5: return 10.2;
+        case 6: return 5.05;
+        case 7: return 420.0;
+        default: return 218.1;
     }
 }
 
-// Gyroscope bandwidth for each DLPF_CFG setting, register map register 26.
-constexpr double imu_gyro_bandwidth_hz(std::uint8_t dlpf_cfg) {
-    switch (dlpf_cfg) {
-        case 0: return 256.0;
-        case 1: return 188.0;
-        case 2: return 98.0;
-        case 3: return 42.0;
+// Gyroscope bandwidth for each DLPF_CFG setting, register map register 26 (CONFIG),
+// with FCHOICE_B = 00.
+constexpr double imu_gyro_bandwidth_hz(std::uint8_t gyro_dlpf_cfg) {
+    switch (gyro_dlpf_cfg) {
+        case 0: return 250.0;
+        case 1: return 184.0;
+        case 2: return 92.0;
+        case 3: return 41.0;
         case 4: return 20.0;
         case 5: return 10.0;
         case 6: return 5.0;
-        default: return 256.0;
+        case 7: return 3600.0;
+        default: return 250.0;
     }
+}
+
+// ----------------------------------------------------------------- AK8963 --
+
+// The magnetometer is not driven by SMPLRT_DIV: it free-runs in its own continuous
+// measurement mode and raises its own data-ready flag. Continuous mode 1 is 8 Hz and
+// mode 2 is 100 Hz, so only mode 2 can feed a 30 Hz attitude update with a fresh sample
+// every time.
+enum class MagMode : std::uint8_t { power_down = 0x00, continuous_8hz = 0x02,
+                                    continuous_100hz = 0x06, fuse_rom = 0x0F };
+
+constexpr double mag_output_rate_hz(MagMode mode) {
+    switch (mode) {
+        case MagMode::continuous_8hz: return 8.0;
+        case MagMode::continuous_100hz: return 100.0;
+        case MagMode::power_down:
+        case MagMode::fuse_rom: return 0.0;
+    }
+    return 0.0;
 }
 
 }  // namespace flight::sensors

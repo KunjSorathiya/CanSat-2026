@@ -207,12 +207,29 @@ bus together.
 | 8.5 | Altitude at rest | ≈ 0.0 m after calibration | Read `A-` on the bench | | |
 | 8.6 | Altitude vs a known height | Within a few metres | Carry the vehicle up a measured staircase | | |
 | 8.7 | Attitude vs a known orientation | Within a few degrees | Place on a level surface, then on each face | | |
-| 8.8 | Yaw drift, stationary, 10 minutes | Drifts — it has no absolute reference | Record `Ya-` over 10 minutes | | |
-| 8.9 | SD log vs received telemetry | SD complete, radio may have gaps | Diff the two after a run | | |
+| 8.8 | `WHO_AM_I` of the IMU | `0x71` or `0x73` | Read at initialisation; the health report carries it | | |
+| 8.9 | Magnetometer present and answering | AK8963 found at `0x0C`, `mag_ok` true | Health snapshot | | |
+| 8.10 | Total magnetic field, vehicle assembled | 25–65 µT, and stable as the vehicle is moved | `mag_field_ut` in the health snapshot | | |
+| 8.11 | Magnetometer calibration sweep | Every axis spans ≥ 30 µT; calibration accepted | Figure-of-eight with `mag_cal_in_flight` set; watch `mag_cal_span_ut` | | |
+| 8.12 | Yaw drift, stationary, 10 minutes, uncalibrated | Drifts: no magnetic reference is being applied | Record `Ya-` with `YR-G` in the packets | | |
+| 8.13 | Yaw drift, stationary, 10 minutes, calibrated | Holds: bounded by magnetometer noise, not integrating | Record `Ya-` with `YR-M` in the packets | | |
+| 8.14 | Yaw against a known bearing | Within a few degrees of a hand compass, four cardinal directions | Point the vehicle, read `Ya-`/heading | | |
+| 8.15 | SD log vs received telemetry | SD complete, radio may have gaps | Diff the two after a run | | |
 
-> 8.8 measures a known limitation rather than a fault. There is **no magnetometer**: yaw is
-> integrated rotation from power-on. Record the drift rate so the flight data can be read
-> with it in mind.
+> 8.10 and 8.11 are the tests that decide whether this vehicle can claim an absolute
+> heading. Hard and soft iron are properties of the **assembled airframe** — battery,
+> radio, wiring included — so the sweep must be done on the finished vehicle, not on a bare
+> breakout, and repeated whenever the layout changes.
+>
+> 8.12 and 8.13 are the same measurement either side of that calibration, and the pair is
+> the evidence. Uncalibrated yaw is expected to drift and the packets say `YR-G`; calibrated
+> yaw is expected to hold and the packets say `YR-M`. If 8.13 still drifts, the
+> magnetometer is not being believed — check the field magnitude against the 20–70 µT gate
+> before suspecting the filter.
+>
+> 8.14 is the one that catches a frame or sign error. A heading that is mirrored, offset by
+> 90°, or that turns the wrong way as the vehicle rotates points at the magnetometer axis
+> mapping, not at the calibration.
 
 ---
 

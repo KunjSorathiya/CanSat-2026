@@ -7,6 +7,10 @@ The wire format (rulebook):
 
 Optional fields (GP-Lat / GP-Lon / GP-Alt / ...) may follow, always after every
 mandatory field. A missing or malformed mandatory field yields no record.
+
+One optional field changes how a mandatory one is read: ``YR-M`` or ``YR-G`` says whether
+``Ya-`` is an absolute magnetic yaw or a relative gyro integration. See
+``TelemetryRecord.yaw_reference``.
 """
 
 from __future__ import annotations
@@ -101,6 +105,47 @@ class TelemetryRecord:
         value = self.tags.get("ARM")
         return None if value is None else value == "1"
 
+    @property
+    def yaw_reference(self) -> Optional[str]:
+        """What the ``yaw`` field means in this packet.
+
+        ``"magnetic"``  yaw is referenced to magnetic north through a calibrated
+                        magnetometer, so it is an absolute angle.
+        ``"gyro"``      yaw is a free-running gyro integration whose zero is wherever the
+                        vehicle happened to be pointing when the estimator last reset. It
+                        is a relative angle and must not be read as a heading.
+        ``None``        the vehicle did not say, which is the case for any packet older
+                        than the nine-axis upgrade.
+
+        The distinction is not cosmetic. A relative yaw plotted on a compass rose looks
+        exactly like an absolute one and is wrong by an unknown constant.
+        """
+        value = self.tags.get("YR")
+        if value == "M":
+            return "magnetic"
+        if value == "G":
+            return "gyro"
+        return None
+
+    @property
+    def yaw_is_magnetic(self) -> bool:
+        return self.yaw_reference == "magnetic"
+
+    @property
+    def heading(self) -> Optional[float]:
+        """Magnetic heading in degrees clockwise from north, or ``None``.
+
+        The vehicle reports yaw as a right-handed Z-Y-X Euler angle about its up axis,
+        which runs anticlockwise; a compass bearing runs clockwise. They are the same
+        angle with opposite signs, and this is the only place that conversion is done.
+
+        ``None`` unless the vehicle declared the yaw magnetic, because a bearing derived
+        from a relative yaw would be a bearing to nowhere.
+        """
+        if not self.yaw_is_magnetic:
+            return None
+        return (-self.yaw) % 360.0
+
     def csv_row(self, receipt_time: str = "") -> dict[str, object]:
         return {
             "receipt_time": receipt_time,
@@ -119,6 +164,10 @@ class TelemetryRecord:
             "gps_lat": self.gps_lat if self.gps_lat is not None else "",
             "gps_lon": self.gps_lon if self.gps_lon is not None else "",
             "gps_alt": self.gps_alt if self.gps_alt is not None else "",
+            # Recorded alongside yaw so a log analysed months later still says which of
+            # the two kinds of yaw its numbers are.
+            "yaw_reference": self.yaw_reference or "",
+            "heading": self.heading if self.heading is not None else "",
             "valid": True,
         }
 

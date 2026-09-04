@@ -25,10 +25,10 @@ The following facts are supported by the current documentation. `VERIFIED FROM D
 | Battery full-charge assumption | Approximately 4.2 V when fully charged | Confirmed project power information | VERIFIED FROM DOCUMENTATION |
 | RA-02 identity | SX1278 RA-02 433 MHz module, Robu SKU 1150780, quantity 2 | Robu product reference | VERIFIED FROM DOCUMENTATION |
 | RA-02 IC scope | Semtech documentation describes SX1278 IC behavior, not necessarily the complete RA-02 carrier | Semtech SX127x documentation and compatibility analysis | VERIFIED FROM DOCUMENTATION |
-| MPU6050 IC scope | InvenSense/TDK documentation describes the MPU6050 IC; the Robu breakout circuit remains separate | MPU6050 manufacturer documentation | VERIFIED FROM DOCUMENTATION |
+| MPU-9250 IC scope | InvenSense/TDK documentation describes the MPU-9250 IC; the Robu breakout circuit remains separate | MPU-9250 manufacturer documentation | VERIFIED FROM DOCUMENTATION |
 | BMP280 IC scope | Bosch documentation describes the BMP280 IC; the GY-BMP280-3.3 breakout circuit remains separate | Bosch BMP280 datasheet | VERIFIED FROM DOCUMENTATION |
 | GPS identity | NEO-6M GPS module with EPROM, Robu SKU 11782, quantity 1 | Confirmed project BOM and Robu reference | VERIFIED FROM DOCUMENTATION |
-| SD input listing | Robu SKU 11566 is listed with 4.5-5.5 V input and an onboard 3.3 V regulator | Supplied exact Robu product information | VERIFIED FROM DOCUMENTATION |
+| SD input | The delivered SKU 11566 is a 2.6-3.6 V SPI module | Receiving inspection of the board in hand | VERIFIED FROM HARDWARE |
 | SD signal labels | Robu lists GND, VCC, MISO, MOSI, SCK, and CS | Supplied exact Robu product information | VERIFIED FROM DOCUMENTATION |
 | SD logic path | The Robu information does not establish level shifting, host logic voltage, MISO release behavior, or SD-card rail voltage | SD module analysis | VERIFIED FROM DOCUMENTATION |
 | Antenna identity | 433 MHz antenna, Robu SKU 1121334, quantity 2 | Confirmed BOM and Robu page | VERIFIED FROM DOCUMENTATION |
@@ -44,10 +44,10 @@ These decisions can be made before the components arrive. They are not physical 
 | Decision | Rationale | Dependency | Status |
 |---|---|---|---|
 | Power Pico from switched LiPo through VSYS | The accepted Pico architecture uses VSYS within the documented input range | Battery protection, switch behavior, startup, and brownout testing | PROVISIONALLY ACCEPTED |
-| Do not use AMS1117-3.3 for direct 1S-to-3.3 V regulation | Its dropout/headroom requirement can exceed the fully charged 1S battery voltage; it also cannot provide the SD reader's stated 4.5-5.5 V input | Final peripheral power-conversion decision remains open | PROVISIONALLY ACCEPTED |
+| Do not use AMS1117-3.3 for direct 1S-to-3.3 V regulation | Its dropout/headroom requirement can exceed the fully charged 1S battery voltage | Final peripheral power-conversion decision remains open | PROVISIONALLY ACCEPTED |
 | Treat Pico 3.3 V output as RP2040/GPIO supply, not an automatic whole-system supply | External peripheral current and transients are not yet budgeted | Measured/documented peripheral loads | PROVISIONALLY ACCEPTED |
-| Reserve a separate power path for the SD reader | Robu lists 4.5-5.5 V input, which is not supplied by the 3.3 V rail or normal 1S battery voltage | Exact SD board and conversion architecture | PROVISIONALLY ACCEPTED |
-| Share I2C0 between MPU6050 and BMP280 | Documented IC address options are logically distinct: MPU6050 `0x68/0x69`, BMP280 `0x76/0x77` | Breakout I2C exposure, bus voltage, and pull-ups | PROVISIONALLY ACCEPTED |
+| ~~Reserve a separate power path for the SD reader~~ | Withdrawn. The delivered module is 2.6-3.6 V and runs from the 3.3 V rail; the separate path existed only to satisfy a supplier-listed 4.5-5.5 V requirement the board does not have | None | WITHDRAWN, superseded by hardware |
+| Share I2C0 between MPU-9250 and BMP280 | Documented IC address options are logically distinct: MPU-9250 `0x68/0x69`, BMP280 `0x76/0x77` | Breakout I2C exposure, bus voltage, and pull-ups | PROVISIONALLY ACCEPTED |
 | Share SPI0 between RA-02 and SD | Shared SCK/MOSI/MISO with separate CS lines is resource-efficient | SD level shifting, MISO release, and carrier pinouts | PROVISIONALLY ACCEPTED |
 | Reserve separate CS lines | Prevents simultaneous selection on the shared SPI bus | Exact board CS labels | PROVISIONALLY ACCEPTED |
 | Reserve RA-02 RESET and DIO0 | Supports radio initialization, recovery, and event/interrupt handling | Carrier pin availability and signal behavior | PROVISIONALLY ACCEPTED |
@@ -87,10 +87,10 @@ These items genuinely require the delivered boards, markings, photographs, schem
 
 ### Sensor and GPS Breakouts
 
-- Confirm board markings and revision for MPU6050, BMP280, and NEO-6M boards.
+- Confirm board markings and revision for MPU-9250, BMP280, and NEO-6M boards.
 - Confirm exposed interfaces and pin labels.
 - Confirm onboard regulators, pull-ups, level shifting, and capacitors.
-- Confirm MPU6050 INT exposure.
+- Confirm MPU-9250 INT exposure.
 - Confirm BMP280 I2C/SPI selection and SDO/address wiring.
 - Confirm GPS TX/RX arrangement and logic levels.
 
@@ -111,7 +111,7 @@ The exact BOM is selected. Documentation availability does not imply physical ve
 | SX1278 RA-02 LoRa module | 1150780 | 2 | Robu page and Semtech IC documentation | Carrier pinout, regulator, logic levels, DIO/RESET, RF connector, current |
 | 433 MHz LoRa antenna | 1121334 | 2 | Robu page and supplied BOM description | SMA/RP-SMA type, gender, markings, physical mating |
 | IPEX1 to SMA female RG1.13 cable | 1674982 | 2 | Robu product page and supplied description | IPEX variant, SMA/RP-SMA end, continuity, physical mating |
-| MPU-6050 module | 2846 | 1 | Robu SKU reference and MPU6050 IC documentation | Breakout revision, regulator, pull-ups, pins, INT, voltage |
+| MPU-9250 module | 2846 | 1 | Robu SKU reference and MPU-9250 IC documentation | Breakout revision, regulator, pull-ups, pins, INT, voltage |
 | NEO-6M GPS with EPROM | 11782 | 1 | Robu SKU reference and u-blox documentation | Board revision, regulator, pins, UART levels, antenna, current |
 | GY-BMP280-3.3 | 835813 | 1 | Robu SKU reference and Bosch BMP280 datasheet | Breakout revision, interface, address pins, pull-ups, voltage |
 | Micro SD Card Reader Module | 11566 | 1 | Robu listing facts; exact schematic unavailable | Regulator, SD rail, level shifting, pinout, MISO behavior, current |
@@ -137,7 +137,7 @@ The exact BOM is selected. Documentation availability does not imply physical ve
 - Verify antenna connector type and cable mating without applying power.
 - Measure supply voltage and current in idle, receive, and transmit test modes after safe test setup.
 
-### MPU6050
+### MPU-9250
 
 - Photograph both sides and record board marking.
 - Identify regulator, pull-up resistors, address strap, and bypass capacitors.
@@ -209,7 +209,7 @@ The exact BOM is selected. Documentation availability does not imply physical ve
 - Every connected board's actual pin labels and exposed controls are known.
 - RA-02 CS/NSS, RESET, DIO0, and any DIO1 use is confirmed.
 - SD CS and SPI signal behavior are confirmed.
-- MPU6050 INT availability is confirmed or formally removed from the design.
+- MPU-9250 INT availability is confirmed or formally removed from the design.
 - BMP280 interface and address configuration are confirmed.
 - GPS TX/RX arrangement is confirmed.
 - Pico alternate functions and pin multiplexing are reviewed together.
@@ -245,7 +245,6 @@ The power architecture can be finalized conceptually now:
 1S LiPo -> manual switch -> Pico VSYS
                          -> separate peripheral conversion, TBD
                               -> verified 3.3 V loads
-                              -> SD-reader 4.5-5.5 V input path, TBD
 ```
 
 It cannot be released as a component-level power design until the SD reader, RA-02 carrier, breakout boards, and battery details are verified. No physical verification is claimed in this document.

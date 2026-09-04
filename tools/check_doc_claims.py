@@ -86,19 +86,23 @@ def main() -> int:
     ).time_on_air_ms
     checker.check(f"link-budget.md quotes the computed airtime ({airtime_ms:.1f} ms)",
                   f"{airtime_ms:.1f}" in link_budget, f"{airtime_ms:.1f}")
-    for measured in ("118", "167", "206", "247"):
+    for measured in ("118", "167", "212"):
         checker.check(f"link-budget.md quotes the measured {measured}-byte packet size",
                       f"**{measured}**" in link_budget)
 
     # ---- acquisition and sensor configuration ---------------------------------------
     config = read("firmware/flight-computer/include/flight/config.hpp")
     sensor_period = constant(config, "sensor_period_ms")
-    dlpf = constant(config, "imu_dlpf_cfg")
+    gyro_dlpf = constant(config, "imu_gyro_dlpf_cfg")
+    accel_dlpf = constant(config, "imu_accel_dlpf_cfg")
     sample_div = constant(config, "imu_sample_rate_div")
     gyro_bias_bound = decimal(config, "calib_max_gyro_bias_dps")
 
     checker.check("config: 33 ms sensor period", sensor_period == 33, str(sensor_period))
-    checker.check("config: IMU DLPF_CFG 4", dlpf == 4, str(dlpf))
+    # The MPU-9250 filters the gyroscope and the accelerometer from two separate
+    # registers, so there are two settings to keep the documents honest about.
+    checker.check("config: gyro DLPF_CFG 4", gyro_dlpf == 4, str(gyro_dlpf))
+    checker.check("config: accel A_DLPF_CFG 4", accel_dlpf == 4, str(accel_dlpf))
     checker.check("config: SMPLRT_DIV 4", sample_div == 4, str(sample_div))
     checker.check("config: gyro bias bounded at 25 dps", gyro_bias_bound == 25.0,
                   str(gyro_bias_bound))
@@ -109,8 +113,22 @@ def main() -> int:
                   f"**{achieved_hz} Hz**" in sensor_rates, str(achieved_hz))
     checker.check("sensor-rates.md states the 33 ms period",
                   f"{sensor_period} ms" in sensor_rates)
-    checker.check("sensor-rates.md states the 21 Hz IMU bandwidth for DLPF 4",
-                  "21 Hz" in sensor_rates)
+    checker.check("sensor-rates.md states the 21.2 Hz accelerometer bandwidth for DLPF 4",
+                  "21.2 Hz" in sensor_rates)
+    checker.check("sensor-rates.md states the 20 Hz gyroscope bandwidth for DLPF 4",
+                  "20 Hz" in sensor_rates)
+    checker.check("sensor-rates.md states the 100 Hz magnetometer rate",
+                  "100 Hz" in sensor_rates)
+
+    mag_mode = re.search(r"mag_mode\s*=\s*sensors::MagMode::(\w+)", config)
+    checker.check("config: magnetometer in 100 Hz continuous mode",
+                  bool(mag_mode) and mag_mode.group(1) == "continuous_100hz",
+                  mag_mode.group(1) if mag_mode else "None")
+    checker.check("config: magnetometer at 16-bit resolution",
+                  "MagResolution::bits16" in config)
+    # An uncalibrated magnetometer must never ship claiming an absolute heading.
+    checker.check("config: magnetometer calibration ships invalid",
+                  "sensors::MagCalibration mag_calibration{};" in config)
 
     architecture = read("documentation/design/software-architecture.md")
     checker.check("software-architecture.md states the sensor period",

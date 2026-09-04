@@ -18,7 +18,7 @@ FILES=(
   firmware/flight-computer/src/pico/main.cpp
   firmware/flight-computer/src/pico/pico_hal.cpp
   firmware/flight-computer/src/pico/pico_radio.cpp
-  firmware/flight-computer/src/pico/mpu6050.cpp
+  firmware/flight-computer/src/pico/mpu9250.cpp
   firmware/flight-computer/src/pico/bmp280.cpp
   firmware/flight-computer/src/pico/neo6m.cpp
   firmware/flight-computer/src/pico/sd_card.cpp

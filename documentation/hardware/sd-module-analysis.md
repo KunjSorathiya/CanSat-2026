@@ -2,26 +2,46 @@
 
 ## Scope
 
-This document analyzes the exact Micro SD Card Reader Module identified as Robu SKU 11566 for integration with the CanSat's Raspberry Pi Pico, shared SPI bus, and current power architecture.
+This document analyzes the exact Micro SD Card Reader Module identified as Robu SKU 11566
+for integration with the CanSat's Raspberry Pi Pico, shared SPI bus, and power
+architecture.
 
-The analysis does not assume that all Micro SD breakout boards are electrically equivalent. No wiring is approved, no level shifter is selected, and no regulator is selected.
+The analysis does not assume that all Micro SD breakout boards are electrically
+equivalent. The module in hand has been identified; what its individual components measure
+under load has not.
+
+## Status change: the supply question is answered
+
+This document previously concluded that the reader required a 4.5–5.5 V input, that a 1S
+LiPo therefore could not drive it, and that a separate boost-derived rail might be needed.
+That conclusion came from a supplier listing.
+
+**The module received is a 3.3 V module: DC 2.6–3.6 V operating voltage, SPI interface.**
+It is powered from the same 3.3 V rail as the rest of the vehicle. There is no second rail,
+no boost converter, and no level shifting required for supply reasons.
+
+Everything downstream of that changes: the power tree loses a branch, the regulator
+selection loses a constraint, and the bring-up sequence loses a gate. What does *not*
+change is the measurement work — current draw, decoupling and shared-bus behaviour are
+still unmeasured, and are still what stands between "identified" and "qualified".
 
 ## Evidence Classifications
 
 - **CONFIRMED** - Directly verified from an authoritative exact-product source or project hardware record.
-- **MANUFACTURER DOCUMENTED** - From manufacturer documentation, but not necessarily the exact Robu breakout board.
-- **ROBU DOCUMENTED** - Explicitly stated by the Robu listing information for SKU 11566.
+- **VERIFIED FROM HARDWARE** - Recorded from the delivered board during receiving inspection.
+- **MANUFACTURER DOCUMENTED** - From manufacturer documentation, but not necessarily the exact breakout board.
 - **INFERRED** - A conclusion derived from documented values; the reasoning is stated.
-- **PHYSICAL VERIFICATION REQUIRED** - Cannot safely be determined without the actual board, markings, schematic, or measurement.
+- **PHYSICAL VERIFICATION REQUIRED** - Cannot safely be determined without measurement on the actual board.
 
 ## Exact Product Identity
 
 | Item | Value | Evidence |
 |---|---|---|
-| Product | Micro SD Card Reader Module | ROBU DOCUMENTED / project BOM |
-| Robu SKU | 11566 | ROBU DOCUMENTED |
+| Product | Micro SD Card Reader Module | CONFIRMED project BOM |
+| Robu SKU | 11566 | CONFIRMED project BOM |
 | Quantity | 1 | CONFIRMED project BOM |
-| Robu reference | [Robu SKU 11566 search](https://robu.in/?s=11566&post_type=product) | ROBU reference; stable canonical product page not resolved |
+| Operating voltage | DC 2.6–3.6 V | VERIFIED FROM HARDWARE, receiving inspection |
+| Interface | SPI | VERIFIED FROM HARDWARE, receiving inspection |
 | Manufacturer | TBD | PHYSICAL VERIFICATION REQUIRED |
 | Exact board revision | TBD | PHYSICAL VERIFICATION REQUIRED |
 | Board schematic | TBD | PHYSICAL VERIFICATION REQUIRED |
@@ -30,180 +50,166 @@ The analysis does not assume that all Micro SD breakout boards are electrically 
 
 | Property | Current value/status | Evidence level |
 |---|---|---|
-| Required VCC input | 4.5–5.5 V | ROBU DOCUMENTED |
-| Onboard regulator | Robu listing states an onboard 3.3 V regulator | ROBU DOCUMENTED; physical confirmation still required |
-| SD-card supply voltage | TBD; the regulator output is not independently documented for this exact board | PHYSICAL VERIFICATION REQUIRED |
-| Host logic voltage | TBD | PHYSICAL VERIFICATION REQUIRED |
-| SD-card logic voltage | TBD | PHYSICAL VERIFICATION REQUIRED |
-| Interface | GND, VCC, MISO, MOSI, SCK, CS are listed; SPI behavior is inferred but not board-verified | ROBU DOCUMENTED / INFERRED |
-| SPI signal voltage at CS | TBD | PHYSICAL VERIFICATION REQUIRED |
-| SPI signal voltage at SCK | TBD | PHYSICAL VERIFICATION REQUIRED |
-| SPI signal voltage at MOSI | TBD | PHYSICAL VERIFICATION REQUIRED |
-| SPI signal voltage at MISO | TBD | PHYSICAL VERIFICATION REQUIRED |
-| Level shifting | Presence and type unknown | PHYSICAL VERIFICATION REQUIRED |
+| Required VCC input | 2.6–3.6 V | VERIFIED FROM HARDWARE |
+| Nominal supply used by this project | 3.3 V, the Pico's own regulated rail | CONFIRMED design decision |
+| SD-card supply voltage | 3.3 V; the card and the host share one rail on a 3.3 V module | INFERRED from the module's operating range |
+| Host logic voltage | 3.3 V, matching the Pico | INFERRED from the supply range |
+| Interface | GND, VCC, MISO, MOSI, SCK, CS | VERIFIED FROM HARDWARE |
+| Level shifting | Not required for a 3.3 V host on a 3.3 V module | INFERRED |
 | Typical current | TBD | PHYSICAL VERIFICATION REQUIRED |
 | Startup current | TBD | PHYSICAL VERIFICATION REQUIRED |
-| Read current | TBD | PHYSICAL VERIFICATION REQUIRED |
-| Write current | TBD | PHYSICAL VERIFICATION REQUIRED |
-| Peak/transient current | TBD | PHYSICAL VERIFICATION REQUIRED |
+| Write current and worst-case transient | TBD | PHYSICAL VERIFICATION REQUIRED |
 | Pull-ups | TBD | PHYSICAL VERIFICATION REQUIRED |
 | Decoupling | TBD | PHYSICAL VERIFICATION REQUIRED |
-| Pinout | GND, VCC, MISO, MOSI, SCK, CS as listed by Robu | ROBU DOCUMENTED; physical order and electrical behavior TBD |
+| MISO behaviour with CS inactive | TBD | PHYSICAL VERIFICATION REQUIRED |
 
-## Regulator and SD-Card Rail
+## Supply Architecture
 
-The Robu listing states that SKU 11566 accepts 4.5–5.5 V input and contains an onboard 3.3 V regulator. That establishes the advertised input requirement and regulator claim at the listing level. It does not establish:
+A 2.6–3.6 V module on a vehicle whose logic rail is 3.3 V is the simple case:
 
-- The regulator part number
-- Its output tolerance
-- Its output current rating
-- Whether the output powers only the card or also other circuitry
-- The actual SD-card rail voltage under load
-- The regulator dropout or thermal behavior
-- Required input/output capacitors
-- Whether host-side signals are level shifted
+```text
+1S LiPo -> Pico VSYS -> Pico 3V3 regulator -> 3.3 V rail
+                                               |
+                                               +-- MPU-9250
+                                               +-- BMP280
+                                               +-- NEO-6M
+                                               +-- RA-02
+                                               +-- microSD reader   <- 3.3 V, in range
+```
 
-**Onboard regulator status:** ROBU DOCUMENTED, but physical verification and a schematic are still required before relying on it in the CanSat power design.
+3.3 V sits in the upper half of the module's range, so the supply has margin at both ends
+of a discharge curve rather than being a boundary case.
 
-## Logic-Level and Level-Shifting Analysis
+The remaining supply question is not voltage but **current**. The Pico's onboard regulator
+also feeds the radio and three sensors, and an SD card's write transient is the largest
+short-duration load on this vehicle. That is a measurement, not a specification lookup:
+see [Current and Startup Behavior](#current-and-startup-behavior).
 
-The board may contain any of the following, but none is currently documented for the exact purchased board:
+## Logic-Level Analysis
 
-- Resistor-based level shifting
-- Transistor-based level shifting
-- A dedicated level-shifter IC
-- A regulator only, with direct host/card signal connections
-- Some combination of the above
+With the module and the host both at 3.3 V, CS, SCK, MOSI and MISO are 3.3 V signals on
+both sides and no shifting is required. That is a conclusion from the supply range, and it
+is the ordinary arrangement for this class of module.
 
-The voltage seen by each SPI signal cannot be safely inferred from the presence of a 3.3 V regulator. The exact voltage at CS, SCK, MOSI, and MISO is therefore:
+Two things are still worth measuring on the bench before the vehicle is assembled, because
+they are board properties rather than voltage-domain properties:
 
-- **CS:** PHYSICAL VERIFICATION REQUIRED
-- **SCK:** PHYSICAL VERIFICATION REQUIRED
-- **MOSI:** PHYSICAL VERIFICATION REQUIRED
-- **MISO:** PHYSICAL VERIFICATION REQUIRED
-
-**Logic-level compatibility: PHYSICAL VERIFICATION REQUIRED.**
-
-The Pico must not be connected directly to the reader until the host-side input thresholds and MISO output level are established. In particular, the board's 4.5–5.5 V input requirement does not prove that its signal pins are 5 V tolerant, 3.3 V compatible, or level shifted.
+- **MISO with CS inactive.** SPI0 is shared with the RA-02. A reader that keeps driving
+  MISO after its chip select is released corrupts the radio's next transaction — a fault
+  that presents as a dead radio, not a dead card. The driver already clocks an extra byte
+  with CS high for exactly this reason (`firmware/flight-computer/src/pico/sd_card.cpp`),
+  but the board's behaviour should be confirmed rather than assumed.
+- **Bus pull-ups.** Values and presence are unrecorded, and they interact with the shared
+  bus and with the RA-02's own pins.
 
 ## Power-Source Compatibility
 
-### 1S LiPo Directly
+### Pico 3.3 V output
 
-**Decision: NO, based on the documented input requirement.**
+**Decision: YES on voltage; current not yet qualified.**
 
-Reasoning:
+3.3 V is inside the module's 2.6–3.6 V range. This is the intended supply for the
+vehicle. What remains open is whether the Pico's regulator can carry the reader's write
+transient on top of the radio and the sensors, which is a measurement.
 
-- The project battery is approximately 3.7 V nominal and approximately 4.2 V when fully charged.
-- Robu specifies 4.5–5.5 V input for SKU 11566.
-- The battery maximum stated for the project is below the reader's stated minimum input.
-- Battery voltage variation and load sag make direct operation even less defensible.
+### 1S LiPo directly
 
-A direct connection would violate the stated input range unless the exact product documentation proves that the listing is inaccurate or the board has a different input path. No such evidence exists.
+**Decision: NO.**
+
+Not because of the module — 3.7 V nominal is only just outside its 3.6 V maximum, and
+4.2 V fully charged is well outside it. A cell connected directly would overrun the
+module's stated maximum for most of its discharge curve. Use the regulated 3.3 V rail.
 
 ### Pico VSYS
 
-**Decision: NO, based on the documented input requirement.**
+**Decision: NO.**
 
-The Pico VSYS path follows the switched 1S LiPo in the accepted architecture. VSYS therefore does not provide the reader's stated 4.5–5.5 V input. The Pico's onboard 3.3 V regulator does not raise VSYS to the required reader input voltage.
+VSYS follows the battery, so it carries the same 4.2 V down to 3.0 V range as the cell
+itself and is above the module's 3.6 V maximum when the pack is charged.
 
-### Pico 3.3 V Output
+### Separate rail or boost converter
 
-**Decision: NO, based on the documented input requirement.**
-
-The reader is listed as requiring at least 4.5 V input. The Pico's 3.3 V output is below that stated minimum. The reader's onboard regulator does not change the fact that its input must be supplied within the listed range.
-
-The Pico 3.3 V output must also not be assumed capable of supplying the reader's unknown startup or write current.
-
-### Separate 5 V Rail
-
-**Decision: Potentially YES, with a separate rail, but not yet approved.**
-
-A separate regulated rail within the Robu-stated 4.5–5.5 V input range could satisfy the reader's advertised VCC requirement. However, integration still depends on:
-
-- Confirming the actual board accepts that rail
-- Confirming the onboard regulator and its output
-- Confirming host-side CS, SCK, MOSI, and MISO logic levels
-- Confirming whether level shifting is present and correctly directed
-- Confirming typical, startup, read, write, and peak current
-- Providing required decoupling
-- Confirming shared SPI MISO behavior when CS is inactive
-
-No separate 5 V rail or converter is selected by this document.
+**Not required, and removed from the design.** The earlier analysis carried a possible
+second rail purely to satisfy a 4.5–5.5 V input requirement that this module does not
+have. Nothing else on the vehicle needs more than 3.3 V, so the power tree is now a single
+regulated rail.
 
 ## SPI Architecture Compatibility
 
-The logical shared SPI arrangement remains:
+The shared SPI arrangement is:
 
 ```text
-Pico SPI bus
-    SCK  -> RA-02 + SD reader
-    MOSI -> RA-02 + SD reader
-    MISO <- RA-02 + SD reader
-    RA-02 CS -> dedicated selection
-    SD CS    -> dedicated selection
+Pico SPI0
+    SCK  (GP18) -> RA-02 + SD reader
+    MOSI (GP19) -> RA-02 + SD reader
+    MISO (GP16) <- RA-02 + SD reader
+    RA-02 CS (GP17) -> dedicated selection
+    SD CS    (GP6)  -> dedicated selection
 ```
 
-This is logically compatible with a standard SPI reader because the reader has the listed MISO, MOSI, SCK, and CS signals. Electrical shared-bus compatibility is not established until the reader's signal voltage and inactive-MISO behavior are verified.
+Only one chip select is asserted at a time. The driver sets the bus clock it needs at the
+start of every transfer rather than assuming whatever the previous user of the bus left
+behind, initialises the card at 400 kHz as the SD specification requires, and raises the
+clock to its run rate afterwards.
 
-Only one CS should be asserted at a time. The reader must not drive MISO while its CS is inactive if it is to share the bus safely with the RA-02.
+Electrical shared-bus behaviour is still the item to verify on the bench, per the MISO
+note above.
 
 ## Current and Startup Behavior
 
-No typical, maximum, startup, read, write, or peak current value has been verified for SKU 11566. The following loads must be measured or documented before power-converter sizing:
+No current value has been measured for this module. These loads must be measured before
+the power budget is closed:
 
 - Board startup
-- SD-card initialization
-- Idle state
-- Sequential reads
-- Sequential writes
-- File creation and flush operations
-- Worst-case write transient
-- Behavior with the intended card
+- SD-card initialisation (the 400 kHz phase)
+- Idle with a card inserted
+- Sequential writes at the run clock
+- Worst-case write transient, with the intended card
+- The same measurements with the radio transmitting, since they share the rail
 
-No battery-life or regulator-capacity conclusion can be made from the current information.
+The write transient is the one that matters: it is short, it is large, and it lands on the
+same regulator as a radio that is transmitting once a second.
 
 ## Decoupling
 
-Required decoupling is **PHYSICAL VERIFICATION REQUIRED**. Obtain the exact board schematic or inspect the board for:
+Required decoupling is **PHYSICAL VERIFICATION REQUIRED**. Inspect the board for VCC input
+capacitance and local bypass at the card socket, and add bulk capacitance at the module's
+supply pin if the measured write transient calls for it. Do not select capacitors before
+the transient is measured.
 
-- VCC input capacitors
-- Regulator input capacitor
-- Regulator output capacitor
-- SD-card local bypass capacitor
-- Capacitor values and voltage ratings
-- Capacitor placement relative to regulator and card socket
+## Failure Behaviour
 
-Additional capacitors must not be selected until the board circuit and measured write transients are known.
+The SD log is a recorder, not a flight-critical function, and the firmware treats it that
+way:
+
+- A card that fails to initialise raises an `sd_unavailable` warning and the mission
+  continues.
+- Consecutive write failures disable logging after `sd_max_failures` rather than retrying
+  into the flight loop.
+- No SD failure path can suppress a telemetry packet.
+
+This is deliberate. Telemetry is the graded deliverable; the card is the data that makes
+the flight worth analysing afterwards.
 
 ## Integration Verdict
 
-### Can the SD module safely operate with our 1S LiPo + Raspberry Pi Pico architecture?
+**Voltage: resolved.** The module is a 2.6–3.6 V SPI board and runs from the vehicle's
+3.3 V rail alongside everything else.
 
-**UNKNOWN pending physical verification.**
+**Remaining work is measurement, not specification:**
 
-The power-source conclusions are more specific:
+1. Current during startup, initialisation, idle and worst-case write, with the intended card.
+2. The same, with the radio transmitting, against the Pico regulator's capability.
+3. MISO behaviour with CS inactive, on the shared bus with the RA-02.
+4. Bus pull-up presence and values.
+5. Decoupling adequacy under the measured write transient.
 
-- **LiPo directly:** NO, because 3.7 V nominal and approximately 4.2 V full charge are below the Robu-stated 4.5–5.5 V input range.
-- **Pico VSYS:** NO for the same input-range reason.
-- **Pico 3.3 V:** NO for the same input-range reason.
-- **Separate 5 V rail:** Potentially YES, but only after the exact board's logic levels, level shifting, current, regulator behavior, and SPI bus behavior are verified.
+Until items 1 to 3 are done, the module may be bench-tested on the shared bus but the
+power budget is not closed.
 
-The module cannot currently be declared safe for direct Pico SPI connection. The onboard regulator claim does not establish logic-level compatibility.
+## Related documents
 
-## Required Physical Verification
-
-The minimum information needed to resolve the remaining uncertainty is:
-
-1. **Front photograph of SKU 11566** showing the complete board, labels, card socket, and all visible components.
-2. **Back photograph** showing traces, components, jumpers, and any regulator or level-shifter packages.
-3. **All IC markings** including regulator, level-shifter, buffer, transistor, and controller markings.
-4. **Exact pin labels and physical pin order** for GND, VCC, MISO, MOSI, SCK, and CS.
-5. **Board input documentation or schematic** confirming the 4.5–5.5 V input path.
-6. **Regulator identification** and confirmation of its output voltage, tolerance, current rating, and capacitor requirements.
-7. **Level-shifting identification**: resistor network, transistor network, dedicated IC, or direct traces.
-8. **Signal-voltage measurements** at CS, SCK, MOSI, and MISO relative to board ground, including MISO with CS inactive.
-9. **Current measurements** during startup, initialization, read, write, and worst-case write activity using the intended SD card.
-10. **Decoupling inspection or schematic evidence** for the VCC input, regulator, and card rail.
-
-Until these checks are complete, do not connect the module to Pico power or SPI signals.
+- [Receiving Inspection Record](receiving-inspection.md) — where the 2.6–3.6 V identification was recorded
+- [Hardware Reference](hardware.md) — the single hardware database
+- [Electrical Architecture](../design/electrical-architecture.md) — the power tree this simplifies
+- [Wiring](../design/wiring.md) — the bring-up order

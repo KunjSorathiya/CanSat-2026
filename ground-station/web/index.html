@@ -676,6 +676,7 @@ input[type=file] { display: none; }
             <dt class="label">Roll</dt><dd class="v mono" id="att-roll">&mdash;</dd>
             <dt class="label">Pitch</dt><dd class="v mono" id="att-pitch">&mdash;</dd>
             <dt class="label">Yaw</dt><dd class="v mono" id="att-yaw">&mdash;</dd>
+            <dt class="label">Reference</dt><dd class="v mono" id="att-yawref">&mdash;</dd>
             <dt class="label">Spin</dt><dd class="v mono" id="att-spin">&mdash;</dd>
           </dl>
         </div>
@@ -817,6 +818,19 @@ function parsePacket(str, team) {
   rec.faults = rec.tags["FAULTS"] !== undefined ? parseInt(rec.tags["FAULTS"], 10) : null;
   rec.calibrated = rec.tags["CAL"] !== undefined ? rec.tags["CAL"] === "1" : null;
   rec.armed = rec.tags["ARM"] !== undefined ? rec.tags["ARM"] === "1" : null;
+  // What the mandatory Ya- field means in this packet. "M": referenced to magnetic north
+  // through a calibrated magnetometer, so absolute. "G": a free-running gyro integration
+  // whose zero is arbitrary, so relative. null: the vehicle did not say.
+  //
+  // The two look identical as a number and are not interchangeable, which is why the
+  // console shows the reference beside the value and refuses to draw a compass bearing
+  // from a relative yaw.
+  rec.yaw_reference = rec.tags["YR"] === "M" ? "magnetic"
+                    : rec.tags["YR"] === "G" ? "gyro" : null;
+  // The vehicle reports yaw right-handed about its up axis, which runs anticlockwise; a
+  // compass bearing runs clockwise. Same angle, opposite sign -- converted in exactly one
+  // place, here, and only when there is a magnetic reference to convert against.
+  rec.heading = rec.yaw_reference === "magnetic" ? ((-rec.yaw % 360) + 360) % 360 : null;
   return { record: rec };
 }
 
@@ -996,7 +1010,10 @@ function buildPacket(team, pn, tSec, smp, withGps, cal, arm) {
       + "; GP-Lon-" + (BASE_LON + noise(0.00004)).toFixed(6)
       + "; GP-Alt-" + (GROUND_ELEV + smp.alt).toFixed(1) + ";";
   }
-  s += " MODE-" + smp.mode + "; FAULTS-0; CAL-" + (cal ? 1 : 0) + "; ARM-" + (arm ? 1 : 0) + ";";
+  // The demo vehicle carries a calibrated magnetometer, so it declares its yaw magnetic.
+  // Set this to "G" to see what the console does with a relative, gyro-only yaw.
+  s += " MODE-" + smp.mode + "; FAULTS-0; CAL-" + (cal ? 1 : 0) + "; ARM-" + (arm ? 1 : 0)
+    + "; YR-" + (cal ? "M" : "G") + ";";
   return s;
 }
 
@@ -1100,7 +1117,8 @@ function pushSample(r) {
   }
 
   const s = { tms: r.timestamp_ms, t: r.timestamp_ms / 1000, altitude: r.altitude, pressure: r.pressure,
-    temperature: r.temperature, amag, roll: r.roll, pitch: r.pitch, yaw: r.yaw, vspd, spin,
+    temperature: r.temperature, amag, roll: r.roll, pitch: r.pitch, yaw: r.yaw,
+    yawRef: r.yaw_reference, heading: r.heading, vspd, spin,
     x, y, fx, fy, hasFix, mode: r.mode || "",
     lat: r.gps_lat, lon: r.gps_lon, galt: r.gps_alt };
   samples.push(s);
@@ -2343,13 +2361,20 @@ function render(force) {
   /* ---- instruments ---- */
   if (s) {
     drawADI(s.roll, s.pitch);
-    drawHSI(s.yaw, s.spin);
+    // The card is a compass rose, so it is driven by the compass bearing, not by the
+    // anticlockwise Euler yaw. With no magnetic reference there is no bearing to show:
+    // the card stays north-up and the yaw is reported as the relative angle it is.
+    drawHSI(s.heading !== null && s.heading !== undefined ? s.heading : 0, s.spin);
     $("#att-roll").textContent = s.roll.toFixed(1) + "°";
     $("#att-pitch").textContent = s.pitch.toFixed(1) + "°";
     $("#att-yaw").textContent = s.yaw.toFixed(1) + "°";
+    $("#att-yawref").textContent =
+      s.yawRef === "magnetic" ? "magnetic " + s.heading.toFixed(1) + "°"
+      : s.yawRef === "gyro" ? "gyro (relative)" : "—";
     $("#att-spin").textContent = s.spin.toFixed(0) + "°/s";
   } else {
     drawADI(0, 0); drawHSI(0, 0);
+    $("#att-yawref").textContent = "—";
   }
 
   /* ---- GPS ---- */
@@ -2408,11 +2433,12 @@ function setStat(el, text, cls, icon) {
 function renderTable() {
   const wrap = $("#table-wrap");
   const head = "<tr><th>t · s</th><th>alt · m</th><th>v/s · m/s</th><th>pr · Pa</th><th>T · °C</th>" +
-               "<th>|a| · m/s²</th><th>roll</th><th>pitch</th><th>yaw</th></tr>";
+               "<th>|a| · m/s²</th><th>roll</th><th>pitch</th><th>yaw</th><th>yaw ref</th></tr>";
   const body = displaySamples().slice(-200).reverse().map(s =>
     "<tr><td>" + s.t.toFixed(1) + "</td><td>" + s.altitude.toFixed(1) + "</td><td>" + s.vspd.toFixed(2) +
     "</td><td>" + s.pressure.toFixed(0) + "</td><td>" + s.temperature.toFixed(1) + "</td><td>" + s.amag.toFixed(2) +
     "</td><td>" + s.roll.toFixed(1) + "</td><td>" + s.pitch.toFixed(1) + "</td><td>" + s.yaw.toFixed(1) +
+    "</td><td>" + (s.yawRef === "magnetic" ? "mag" : s.yawRef === "gyro" ? "gyro" : "—") +
     "</td></tr>").join("");
   wrap.innerHTML = '<table class="datatable"><caption class="sr-only">Accepted telemetry samples, newest first</caption>' +
     '<thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
@@ -2517,9 +2543,10 @@ $("#toggle-table").addEventListener("click", () => {
 });
 
 $("#copy-csv").addEventListener("click", async () => {
-  const header = "t_s,altitude_m,pressure_pa,temperature_c,accel_mag_mps2,roll_deg,pitch_deg,yaw_deg,vspeed_mps,east_m,north_m";
+  const header = "t_s,altitude_m,pressure_pa,temperature_c,accel_mag_mps2,roll_deg,pitch_deg,yaw_deg,yaw_reference,heading_deg,vspeed_mps,east_m,north_m";
   const lines = samples.map(s => [s.t.toFixed(2), s.altitude.toFixed(1), s.pressure.toFixed(2),
     s.temperature.toFixed(1), s.amag.toFixed(2), s.roll.toFixed(1), s.pitch.toFixed(1), s.yaw.toFixed(1),
+    s.yawRef || "", s.heading === null || s.heading === undefined ? "" : s.heading.toFixed(1),
     s.vspd.toFixed(2), s.x.toFixed(2), s.y.toFixed(2)].join(","));
   const csv = [header, ...lines].join("\n");
   try { await navigator.clipboard.writeText(csv); toast(samples.length + " rows copied to clipboard"); }

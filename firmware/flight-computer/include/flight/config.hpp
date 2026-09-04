@@ -6,6 +6,7 @@
 
 #include "cansat/link_profile.hpp"
 #include "cansat/lora_airtime.hpp"
+#include "flight/sensor_math.hpp"
 #include "flight/sensor_timing.hpp"
 
 namespace flight {
@@ -130,21 +131,70 @@ struct Configuration {
     sensors::BaroFilter baro_filter = sensors::BaroFilter::x16;
     double baro_standby_ms = 0.5;
 
-    // ---- IMU configuration (MPU-6050 register map, registers 25 and 26) --------
-    // DLPF_CFG 4 gives a 21 Hz accelerometer / 20 Hz gyroscope bandwidth. At a 30 Hz
-    // sampling rate the Nyquist limit is 15 Hz, so a wider filter would alias airframe
-    // vibration into the attitude estimate; a narrower one would blur the launch
+    // ---- IMU configuration (MPU-9250 register map, registers 25, 26 and 29) ----
+    // The MPU-9250 splits the MPU-6050's single DLPF field in two: DLPF_CFG in CONFIG
+    // filters the gyroscope, A_DLPF_CFG in ACCEL_CONFIG 2 filters the accelerometer.
+    // Setting 4 on each gives a 20 Hz gyroscope / 21.2 Hz accelerometer bandwidth. At a
+    // 30 Hz sampling rate the Nyquist limit is 15 Hz, so a wider filter would alias
+    // airframe vibration into the attitude estimate; a narrower one would blur the launch
     // transient. SMPLRT_DIV 4 leaves the internal rate at 200 Hz, well above sampling.
-    std::uint8_t imu_dlpf_cfg = 4;
+    std::uint8_t imu_gyro_dlpf_cfg = 4;
+    std::uint8_t imu_accel_dlpf_cfg = 4;
     std::uint8_t imu_sample_rate_div = 4;
+
+    // ---- Magnetometer configuration (AK8963 inside the MPU-9250) ---------------
+    // 16-bit output (0.15 uT/LSB) in continuous mode 2 (100 Hz). Mode 1 is 8 Hz, which
+    // cannot supply a fresh sample to every 30 Hz attitude update, and the 14-bit mode
+    // quantises the earth's ~50 uT field into steps four times coarser for no saving.
+    sensors::MagResolution mag_resolution = sensors::MagResolution::bits16;
+    sensors::MagMode mag_mode = sensors::MagMode::continuous_100hz;
+
+    // Hard-iron and soft-iron correction for THIS airframe, from a figure-of-eight sweep.
+    // It ships invalid on purpose. An uncalibrated magnetometer still stops yaw drifting,
+    // but the vehicle must not report an absolute magnetic heading it has not earned --
+    // the battery, the LoRa module and the wiring all bias the field by tens of
+    // microtesla, which is the same order as the field being measured.
+    //
+    // To fill this in: run the vehicle with mag_cal_in_flight true, rotate it through
+    // every attitude until the health snapshot reports coverage, then copy the resulting
+    // offsets and scales here so the flight starts already calibrated.
+    sensors::MagCalibration mag_calibration{};
+
+    // Runtime magnetometer calibration while on the pad. Off by default: it is a bench
+    // procedure, and a half-finished sweep is worse than none.
+    bool mag_cal_in_flight = false;
+    std::uint32_t mag_cal_min_samples = 200;   // before any calibration can be accepted
+    double mag_cal_min_span_ut = 30.0;         // each axis must sweep at least this
 
     // ---- Barometric altitude ------------------------------------------------
     double reference_pressure_pa = 101325.0;   // PROVISIONAL sea-level reference; set from field baro
     bool altitude_relative_to_baseline = true; // report altitude above the power-on ground baseline
     std::uint32_t baseline_samples = 20;       // barometer samples averaged while in READY
 
-    // ---- Orientation (complementary filter) --------------------------------
-    double orientation_alpha = 0.98;  // gyro weight; (1 - alpha) is the accelerometer correction
+    // ---- Orientation (Mahony complementary filter on the quaternion) --------
+    // Feedback gains, in (rad/s) per unit of normalised cross-product error. Yaw is
+    // corrected more gently than roll and pitch because the magnetic field is the noisier
+    // reference and yaw has no second observer to average against.
+    double orientation_kp_accel = 2.0;
+    double orientation_kp_mag = 0.6;
+    double orientation_ki_bias = 0.05;
+    double orientation_bias_limit_dps = 10.0;
+
+    // ---- Yaw cross-check against GPS course over ground ---------------------
+    // Course over ground is NOT body yaw: it is the direction the vehicle's ground track
+    // is moving, it is referenced to TRUE north rather than magnetic, and under a
+    // parachute in wind the two differ by whatever the drift is. It is therefore used for
+    // one thing only -- raising a warning when the two disagree so grossly that the
+    // magnetometer calibration should be suspected -- and never as an input to the
+    // estimator.
+    bool yaw_cog_cross_check = true;
+    double yaw_cog_min_speed_mps = 5.0;   // below this the course is noise
+    double yaw_cog_tolerance_deg = 60.0;  // generous: wind, crab and declination all live here
+    std::uint32_t yaw_cog_confirm_samples = 5;  // consecutive disagreements before warning
+    // Magnetic declination at the launch site, degrees east of true north. Applied only
+    // when comparing the magnetic heading against a true-north GPS course; the reported
+    // yaw stays magnetic. PROVISIONAL: set from a declination model for the launch site.
+    double magnetic_declination_deg = 0.0;
 
     // ---- Startup calibration (vehicle stationary on the pad) --------------
     // Gyro bias + accelerometer offset + barometric ground reference are estimated
@@ -154,10 +204,11 @@ struct Configuration {
     std::uint32_t calib_timeout_ms = 20000;       // resolve best-effort after this
     double calib_gyro_still_dps = 2.0;            // per-axis gyro std-dev gate for "stationary"
     // A steady rotation has near-zero variance, so the std-dev gate alone accepts it and
-    // absorbs a real body rate into the "bias". The MPU-6050 datasheet gives a zero-rate
-    // output of +-20 deg/s over temperature, so a mean beyond this cannot be bias: the
-    // vehicle is turning, and the calibration must be refused rather than silently
-    // cancelling the rotation for the rest of the flight.
+    // absorbs a real body rate into the "bias". The MPU-9250 product specification gives
+    // a gyroscope zero-rate output of +-5 deg/s over temperature, so a mean well beyond
+    // that cannot be bias: the vehicle is turning, and the calibration must be refused
+    // rather than silently cancelling the rotation for the rest of the flight. The bound
+    // is kept at five times the specified figure so a marginal part is not rejected.
     double calib_max_gyro_bias_dps = 25.0;
     double calib_accel_tol_mps2 = 1.5;            // |mean accel| must be within this of 1 g
 
@@ -170,8 +221,11 @@ struct Configuration {
     double baro_max_pa = 115000.0;                // BMP280 spec ceiling ~1100 hPa (margin)
     double baro_min_temp_c = -50.0;               // BMP280 operating range -40..+85 (margin)
     double baro_max_temp_c = 95.0;
-    double accel_clip_mps2 = 170.0;              // MPU6050 +-16 g full-scale ~157 m/s^2 (margin)
-    double gyro_clip_dps = 2200.0;               // MPU6050 +-2000 dps full-scale (margin)
+    double accel_clip_mps2 = 170.0;              // MPU-9250 +-16 g full-scale ~157 m/s^2 (margin)
+    double gyro_clip_dps = 2200.0;               // MPU-9250 +-2000 dps full-scale (margin)
+    // The AK8963 saturates at +-4912 uT; anything past a few times the earth's field
+    // is a magnet, a motor or a fault, never a heading.
+    double mag_clip_ut = 500.0;
 
     // ---- Launch / landing detection --------------------------------------
     // PROVISIONAL: the rulebook does not fix these thresholds. Tune against test data.
@@ -196,6 +250,9 @@ struct Configuration {
     float battery_adc_scale = 0.0f;       // deprecated alias for battery_divider_ratio
 
     // ---- SD logging -------------------------------------------------------
+    // The microSD breakout is a 3.3 V module (2.6 to 3.6 V, SPI) sharing SPI0 with the
+    // radio, chip-select on GP6. It is a best-effort recorder: losing the card raises a
+    // warning and stops the writes, and telemetry continues untouched.
     std::uint8_t sd_max_failures = 10;    // consecutive write failures before SD logging is disabled
 
     // ---- GPS ---------------------------------------------------------------

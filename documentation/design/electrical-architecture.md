@@ -12,7 +12,7 @@ The architecture is based on the confirmed hardware list and the current require
 |---|---:|---|---|
 | Raspberry Pi Pico | 1 | CanSat flight computer | Confirmed hardware; electrical integration TBD |
 | SX1278 RA-02 433 MHz LoRa module | 1 | Onboard telemetry radio | Confirmed hardware; electrical integration TBD |
-| MPU6050 | 1 | Gyroscope and accelerometer | Confirmed hardware; exact board documentation TBD |
+| MPU-9250 | 1 | Gyroscope and accelerometer | Confirmed hardware; exact board documentation TBD |
 | NEO-6M GPS with EEPROM | 1 | GPS sensor and possible additional telemetry source | Confirmed hardware; exact board documentation TBD |
 | GY-BMP280-3.3 | 1 | Pressure, altitude-related, and temperature measurement | Confirmed hardware; exact board documentation TBD |
 | Micro SD card reader | 1 | Onboard data storage | Confirmed hardware; breakout variant and documentation TBD |
@@ -56,13 +56,14 @@ The recommended architecture for evaluation is:
          -> Raspberry Pi Pico VSYS (Pico onboard 3.3 V regulator)
          -> peripheral power conversion - TBD
               -> verified 3.3 V peripheral rail - TBD
-              -> SD-reader input rail, 4.5-5.5 V requirement - TBD
+                   -> MPU-9250, BMP280, NEO-6M, RA-02, microSD reader
+                      (the microSD reader is a 2.6-3.6 V module: same rail, no second stage)
          -> power LED branch - TBD
 ```
 
 This is a topology recommendation, not an approved schematic. The Pico VSYS path is based on the official Raspberry Pi Pico documentation. The switch position, LED connection, protection elements, peripheral conversion, and rail implementation remain subject to review.
 
-The Pico's onboard regulator generates the 3.3 V rail for the RP2040 and GPIO. The Pico 3.3 V output must not be assumed capable of powering all external peripherals. A separate peripheral rail remains subject to the exact module requirements and power budget. The SD reader receives no assumed supply because its Robu listing specifies a 4.5-5.5 V input.
+The Pico's onboard regulator generates the 3.3 V rail for the RP2040 and GPIO. The Pico 3.3 V output must not be assumed capable of powering all external peripherals; that is a current question, and it is still open. It is no longer a voltage question for any load on this vehicle: the microSD reader received is a 2.6-3.6 V SPI module, so every peripheral runs from one 3.3 V rail and the separate reader rail that earlier revisions carried is removed from the design. See [sd-module-analysis.md](../hardware/sd-module-analysis.md).
 
 ## Battery Voltage Range
 
@@ -122,7 +123,7 @@ The planned AMS1117-3.3 module is rejected as the direct regulator from the 1S L
 - As the battery voltage falls, the regulator will lose regulation when the battery approaches 3.3 V plus the actual dropout. The usable battery capacity before the 3.3 V rail falls out of regulation cannot be calculated from the 1500 mAh label alone.
 - Linear-regulator loss is approximately `(Vin - 3.3 V) x load current`; heat therefore depends on the actual load and voltage difference. No thermal result is claimed.
 - Idealized conversion efficiency is approximately `3.3 V / Vin`, before regulator ground current and other losses. This does not establish system efficiency or battery life.
-- The AMS1117-3.3 output is not a solution for the SD reader, whose Robu listing specifies a 4.5-5.5 V input. A 3.3 V output is below that stated input range.
+- A 3.3 V output now suits every peripheral including the microSD reader, which is a 2.6-3.6 V module. That removes a constraint from the regulator choice; it does not rescue this regulator, whose dropout is the problem.
 
 **Decision:** Do not use the AMS1117-3.3 for direct 1S LiPo to 3.3 V regulation. A buck-boost or other suitable conversion architecture may be more appropriate for maintaining a regulated rail across the battery range, but no replacement regulator is selected here.
 
@@ -168,7 +169,7 @@ The prototype review must identify:
 - Regulator input and output capacitor requirements
 - Local bypass requirements for the Pico
 - Local bypass requirements for the RA-02
-- Local bypass requirements for MPU6050, BMP280, GPS, and SD reader
+- Local bypass requirements for MPU-9250, BMP280, GPS, and SD reader
 - Placement relative to module supply pins
 - Capacitor voltage ratings
 - Effects of wiring length and connector resistance
@@ -184,8 +185,7 @@ The preliminary distribution order is:
 3. Switched battery distribution node.
 4. Peripheral power-conversion solution, model and circuit TBD.
 5. Verified 3.3 V peripheral distribution to only compatible loads.
-6. SD-reader input rail meeting its documented 4.5-5.5 V requirement, implementation TBD.
-7. Power LED branch with any required current-limiting element, value TBD.
+6. Power LED branch with any required current-limiting element, value TBD.
 
 The final schematic must show fuse or protection decisions, connectors, polarity, test points, return paths, and all loads. No fuse, resistor, capacitor, connector type, or wire gauge is selected here.
 
@@ -226,7 +226,7 @@ The exact board or breakout documentation must be obtained before schematic appr
 |---|---|---|---|---|---|---|---|
 | Raspberry Pi Pico | Board input options and limits - TBD | GPIO levels and limits - TBD | Board and USB/regulator current - TBD | Programming and peripheral connections - TBD | GPIO-specific requirements - TBD | Board requirements - TBD | Power, ground, GPIO, and reset functions - TBD |
 | SX1278 RA-02 | Module supply range - TBD | Signal levels - TBD | Transmit peak and idle current - TBD | SPI or other supported control interface - TBD | Required control-line pull-ups - TBD | Local bypass requirements - TBD | Power, ground, antenna, control, and interrupt pins - TBD |
-| MPU6050 board | Board supply range - TBD | Signal levels - TBD | Operating and peak current - TBD | I2C, SPI, or supported alternatives - TBD | Bus pull-ups and values - TBD | Local bypass requirements - TBD | Power, ground, bus, interrupt, and configuration pins - TBD |
+| MPU-9250 board | Board supply range - TBD | Signal levels - TBD | Operating and peak current - TBD | I2C, SPI, or supported alternatives - TBD | Bus pull-ups and values - TBD | Local bypass requirements - TBD | Power, ground, bus, interrupt, and configuration pins - TBD |
 | NEO-6M board | Board supply range - TBD | UART signal levels - TBD | Acquisition and tracking current - TBD | UART or other available interface - TBD | Required pull-ups - TBD | Local bypass requirements - TBD | Power, ground, TX, RX, and control pins - TBD |
 | GY-BMP280-3.3 board | Board supply range - TBD | Signal levels - TBD | Operating and peak current - TBD | I2C, SPI, or supported alternatives - TBD | Bus pull-ups and values - TBD | Local bypass requirements - TBD | Power, ground, bus, address, and control pins - TBD |
 | Micro SD card reader | Reader-board input range - TBD | Card and host signal levels - TBD | Initialization, read/write, and peak current - TBD | SPI, SDIO, or other interface - TBD | Required bus pull-ups - TBD | Reader and card bypass requirements - TBD | Power, ground, chip select, clock, data, and control pins - TBD |
@@ -240,7 +240,7 @@ The project expects to use I2C, SPI, and UART somewhere in the system, but the e
 | Device | Interface | Pico Pins | Supply | Logic Level | Interrupt/Control | Status |
 |---|---|---|---|---|---|---|
 | SX1278 RA-02 | TBD; candidate control interface requires module verification | TBD | TBD; planned 3.3 V rail only after verification | TBD | Interrupt/control pins TBD | Requires datasheet and exact board verification |
-| MPU6050 | TBD; I2C/SPI availability and board wiring require verification | TBD | TBD | TBD | Interrupt and configuration pins TBD | Requires datasheet and exact board verification |
+| MPU-9250 | TBD; I2C/SPI availability and board wiring require verification | TBD | TBD | TBD | Interrupt and configuration pins TBD | Requires datasheet and exact board verification |
 | NEO-6M GPS | TBD; UART availability and board levels require verification | TBD | TBD | TBD | Enable/reset/control pins TBD | Requires datasheet and exact board verification |
 | GY-BMP280-3.3 | TBD; I2C/SPI availability and board wiring require verification | TBD | TBD | TBD | Address/control pins TBD | Requires datasheet and exact board verification |
 | Micro SD card reader | TBD; SPI/SDIO/other interface must be identified from the breakout documentation | TBD | TBD | TBD | Chip-select and other control pins TBD | High risk; breakout variation must be resolved first |
@@ -257,7 +257,7 @@ No typical or peak current values have been provided for the confirmed boards. V
 |---|---:|---:|---:|---|---|
 | Raspberry Pi Pico | TBD | TBD | TBD | Exact Pico board documentation and measurement | Requires verification |
 | SX1278 RA-02 | TBD | TBD | TBD | Exact RA-02/module documentation and radio test | Requires verification |
-| MPU6050 board | TBD | TBD | TBD | Exact board documentation and sensor test | Requires verification |
+| MPU-9250 board | TBD | TBD | TBD | Exact board documentation and sensor test | Requires verification |
 | NEO-6M GPS board | TBD | TBD | TBD | Exact board documentation and GPS test | Requires verification |
 | GY-BMP280-3.3 board | TBD | TBD | TBD | Exact board documentation and sensor test | Requires verification |
 | Micro SD card reader and card | TBD | TBD | TBD | Exact reader documentation and read/write test | Requires verification; breakout variation is significant |
@@ -305,7 +305,7 @@ The egg, parachute, and mechanical hardware are required by the competition but 
 
 - One Raspberry Pi Pico is intended as the onboard flight computer.
 - One SX1278 RA-02, one 433 MHz antenna, and one IPEX-to-SMA cable are intended for the CanSat.
-- The MPU6050, NEO-6M, GY-BMP280-3.3, Micro SD reader, 1S LiPo, and one prototype PCB are onboard hardware.
+- The MPU-9250, NEO-6M, GY-BMP280-3.3, Micro SD reader, 1S LiPo, and one prototype PCB are onboard hardware.
 - The battery is a 3.7 V nominal 1S LiPo and is approximately 4.2 V when fully charged.
 - A dedicated regulated 3.3 V peripheral rail is planned.
 - Manual power switching and a visible power LED are required by the competition, but the hardware is not selected.
@@ -333,4 +333,4 @@ The egg, parachute, and mechanical hardware are required by the competition but 
 
 ### Requires Datasheet Verification
 
-Before Gate 2 can be considered complete, the team must identify the exact board/module variants and obtain documentation for the Pico, RA-02, MPU6050 board, NEO-6M board, BMP280 board, and Micro SD reader. The documentation review must record supply voltage, logic levels, maximum current, interface, pull-ups, capacitor requirements, and pin functions for each device. Until then, this document is a preliminary architecture and not an approved build schematic.
+Before Gate 2 can be considered complete, the team must identify the exact board/module variants and obtain documentation for the Pico, RA-02, MPU-9250 board, NEO-6M board, BMP280 board, and Micro SD reader. The documentation review must record supply voltage, logic levels, maximum current, interface, pull-ups, capacitor requirements, and pin functions for each device. Until then, this document is a preliminary architecture and not an approved build schematic.

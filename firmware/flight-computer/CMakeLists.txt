@@ -30,7 +30,7 @@ if (PICO_SDK_PATH OR DEFINED ENV{PICO_SDK_PATH})
     add_executable(cansat_pico_firmware
         src/pico/main.cpp
         src/pico/pico_hal.cpp
-        src/pico/mpu6050.cpp
+        src/pico/mpu9250.cpp
         src/pico/bmp280.cpp
         src/pico/neo6m.cpp
         src/pico/sd_card.cpp

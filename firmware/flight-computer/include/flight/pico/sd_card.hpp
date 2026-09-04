@@ -29,6 +29,13 @@ struct SdCardHal {
 // Minimal SD/SDHC card driver in SPI mode: CMD0/CMD8/ACMD41/CMD58/CMD16 init, then
 // single-block CMD17 read and CMD24 write. 512-byte blocks only. No filesystem; pair with
 // RawBlockLog for the onboard log.
+//
+// The breakout on this vehicle is a 2.6-3.6 V SPI module running from the same 3.3 V rail
+// as everything else, so there is no supply sequencing to do here and no level shifting to
+// account for. CMD8 asks for the 2.7-3.6 V range accordingly.
+//
+// Every operation is bounded and every failure path returns rather than retrying: losing
+// the card must cost the log, never a telemetry packet.
 class SdCard {
 public:
     static constexpr std::size_t kBlockSize = 512;

@@ -160,6 +160,8 @@ class GroundStation:
                 "roll": record.roll,
                 "pitch": record.pitch,
                 "yaw": record.yaw,
+                "yaw_reference": record.yaw_reference,
+                "heading": record.heading,
                 "ax": record.ax,
                 "ay": record.ay,
                 "az": record.az,

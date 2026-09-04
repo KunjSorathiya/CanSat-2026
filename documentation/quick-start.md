@@ -78,7 +78,7 @@ the telemetry.
 ```text
  VEHICLE                                   GROUND
  ┌──────────────────────────┐              ┌─────────────────────────┐
- │ MPU6050  ─┐              │              │ RA-02 ── Pico ── USB    │
+ │ MPU-9250  ─┐              │              │ RA-02 ── Pico ── USB    │
  │ BMP280   ─┼─ Pico ─ RA-02│ ))))  ((((   │            (bridge)     │
  │ NEO-6M   ─┘   │          │   433 MHz    │              │          │
  │ microSD ──────┘          │              │              ▼          │
@@ -163,7 +163,7 @@ The confirmed BOM, with supplier SKUs, is in
 | 2 | SX1278 RA-02 433 MHz LoRa module | **2** | The radio link, one at each end |
 | 3 | 433 MHz antenna | 2 | One per radio — **never power a radio without one** |
 | 4 | IPEX-to-SMA pigtail | 2 | RA-02 has an IPEX connector, not SMA |
-| 5 | MPU-6050 | 1 | Accelerometer + gyroscope |
+| 5 | MPU-9250 | 1 | Accelerometer + gyroscope |
 | 6 | GY-BMP280-3.3 | 1 | Pressure + temperature → altitude |
 | 7 | NEO-6M GPS module | 1 | Position (optional telemetry fields) |
 | 8 | microSD card reader module | 1 | Onboard logging — **see the warning in [step 10](#10-the-power-problem--read-before-wiring)** |
@@ -187,9 +187,15 @@ and whatever your structure is made from.
 - **RA-02 (SX1278)** — LoRa transceiver. Long range at low power, at the cost of data
   rate: one full telemetry packet occupies ~330 ms of airtime, which is why the link runs
   at 1 Hz. See [link-budget.md](design/link-budget.md).
-- **MPU-6050** — 3-axis accelerometer and gyroscope over I2C. Gives roll, pitch, and a
-  *relative* yaw. There is **no magnetometer**, so yaw is not a compass heading — it is
-  integrated rotation from the moment of power-on, and drifts.
+- **MPU-9250** — 3-axis accelerometer, 3-axis gyroscope and a 3-axis AK8963 magnetometer
+  over I2C, giving roll, pitch and yaw. The magnetometer is a second die inside the same
+  package with its own I2C address and, importantly, its own axis orientation — the driver
+  rotates it into the body frame before anything else sees it.
+
+  Yaw is an absolute magnetic angle **only after the magnetometer has been calibrated for
+  the assembled airframe**: the battery, the radio and the wiring bias the field by tens of
+  microtesla, which is the same order as the field being measured. Uncalibrated, yaw still
+  stops drifting but is reported as relative. Every packet says which it is.
 - **BMP280** — pressure and temperature over I2C. Altitude is derived from pressure
   relative to a ground reference captured on the pad.
 - **NEO-6M** — GPS over UART at 9600 baud, emitting NMEA sentences. The firmware drains it
@@ -203,7 +209,7 @@ and whatever your structure is made from.
 
 - **Order two of everything on the radio path.** Two Picos, two RA-02s, two antennas, two
   pigtails. A ground station is not optional.
-- **Order spares of the cheap fragile things**: one extra MPU-6050, one extra BMP280, one
+- **Order spares of the cheap fragile things**: one extra MPU-9250, one extra BMP280, one
   extra pigtail. IPEX connectors are easy to damage.
 - **Check the antenna connector gender before ordering.** The BOM says SMA male; the
   supplier's live listing says RP-SMA female. These do not mate. This is
@@ -253,11 +259,14 @@ Three specific problems, all documented in
 
 1. **No regulator is selected.** The obvious choice, an AMS1117-3.3, was assessed and
    **rejected**: a full 1S LiPo at ≈4.2 V does not clear its dropout under load.
-2. **The microSD reader module may be incompatible** with any rail the vehicle can easily
-   produce — many of these breakouts state a 4.5–5.5 V input and contain their own
-   regulator plus level shifters.
-3. **The rulebook requires a manual ON/OFF switch and a visible power LED.** Neither is in
+2. **The rulebook requires a manual ON/OFF switch and a visible power LED.** Neither is in
    the BOM.
+
+The microSD reader used to be the third problem here — many of these breakouts state a
+4.5–5.5 V input and carry their own regulator and level shifters, which a 1S LiPo cannot
+feed. The module that arrived is not one of them: it is a 2.6–3.6 V SPI board and runs from
+the same 3.3 V rail as everything else. Its **current** draw during a write is still
+unmeasured, and shares a regulator with the radio.
 
 **What you can safely do today:** bring everything up on **USB power** with the Pico's
 `3V3` output. That is enough for every bench test in [step 18](#18-subsystem-tests) and the
@@ -277,10 +286,10 @@ there; this is the summary.
 
 | Pico pin | Signal | Goes to |
 |---|---|---|
-| GP4 | I2C0 SDA | MPU6050 SDA **and** BMP280 SDA |
-| GP5 | I2C0 SCL | MPU6050 SCL **and** BMP280 SCL |
+| GP4 | I2C0 SDA | MPU-9250 SDA **and** BMP280 SDA |
+| GP5 | I2C0 SCL | MPU-9250 SCL **and** BMP280 SCL |
 | GP6 | SPI chip select | microSD `CS` |
-| GP7 | Interrupt in | MPU6050 `INT` (optional) |
+| GP7 | Interrupt in | MPU-9250 `INT` (optional) |
 | GP12 | UART0 TX | NEO-6M `RX` |
 | GP13 | UART0 RX | NEO-6M `TX` |
 | GP14 | GPIO out | Status LED (through a resistor) |
@@ -300,7 +309,7 @@ Three rules that will save you a day of debugging:
 
 - **Two devices share SPI0** (radio and SD). Both must release MISO when deselected. If
   one holds the line, neither works. Test each alone first.
-- **Two devices share I2C0** (MPU6050 at 0x68, BMP280 at 0x76). They must be on different
+- **Two devices share I2C0** (MPU-9250 at 0x68, BMP280 at 0x76). They must be on different
   addresses; scan the bus and confirm both respond before wiring anything else.
 - **TX goes to RX.** The GPS's TX connects to the Pico's RX (GP13). Getting this backwards
   produces silence, not an error.
@@ -402,7 +411,7 @@ exists because a fault in a shared bus is far easier to find with one device on 
 | # | Test | Pass criterion |
 |---:|---|---|
 | 1 | Pico alone | GP14 LED blinks, USB serial enumerates |
-| 2 | I2C scan | MPU6050 and BMP280 both acknowledge, on different addresses |
+| 2 | I2C scan | MPU-9250 and BMP280 both acknowledge, on different addresses |
 | 3 | IMU | Stationary: total acceleration ≈ 1 g, rotation rates ≈ 0 |
 | 4 | Barometer | Pressure within a few hundred Pa of a local reference |
 | 5 | Calibration | `CAL-1` appears in telemetry within the sample budget while still |
@@ -540,7 +549,8 @@ will hit first:
 | Packets arrive but are rejected | Team identifier mismatch between vehicle and ground station |
 | CRC errors on the serial link | Cable or baud problem, not a telemetry problem — the distinction is the point of the framing |
 | Altitude reads wildly wrong | `reference_pressure_pa` not set for the day |
-| Yaw drifts steadily | Expected. There is no magnetometer; yaw is relative and drifts |
+| Yaw drifts steadily | The magnetometer is not correcting it. Check the packet's `YR-` tag: `YR-G` means yaw is running on the gyroscope alone — either the AK8963 is not answering (a module that is really an MPU-6500), the field is outside the 20–70 µT gate, or no calibration has been loaded |
+| Yaw is steady but wrong by a constant | Hard iron. Run the figure-of-eight calibration on the fully assembled vehicle, battery and radio included, not on a bare board |
 
 ## 26. Common mistakes
 

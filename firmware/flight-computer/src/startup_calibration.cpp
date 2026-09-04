@@ -55,8 +55,7 @@ void StartupCalibrator::finalise(bool best_effort) {
         const double amag = sensors::vector_magnitude(ma[0], ma[1], ma[2]);
         result_.accel_magnitude_ref = amag;
         if (amag > 1.0) {
-            const double s = sensors::kStandardGravity / amag;
-            for (int i = 0; i < 3; ++i) result_.accel_bias_mps2[i] = ma[i] - ma[i] * s;
+            result_.accel_scale = sensors::kStandardGravity / amag;
             result_.accel_reference_valid = !best_effort;
         }
         result_.imu_samples = n_imu_;
@@ -116,6 +115,76 @@ void StartupCalibrator::update(std::uint64_t now_ms) {
         result_.motion_detected = true;
         failed_ = true;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Magnetometer
+
+MagCalibrator::MagCalibrator(const Configuration& config) : config_(config) { reset(); }
+
+void MagCalibrator::reset() {
+    for (int i = 0; i < 3; ++i) {
+        min_[i] = 0.0;
+        max_[i] = 0.0;
+    }
+    n_ = 0;
+}
+
+void MagCalibrator::add(double x_ut, double y_ut, double z_ut) {
+    const double v[3] = {x_ut, y_ut, z_ut};
+    for (const double component : v) {
+        if (!std::isfinite(component)) return;
+    }
+    // Reject anything that is not a plausible reading of the earth's field before it can
+    // stretch the bounding box. One saturated sample would otherwise set an extreme that
+    // no amount of good data afterwards can undo.
+    const double field = sensors::vector_magnitude(x_ut, y_ut, z_ut);
+    if (!(field > sensors::kEarthFieldMinUt) || !(field < sensors::kEarthFieldMaxUt)) {
+        return;
+    }
+
+    if (n_ == 0) {
+        for (int i = 0; i < 3; ++i) min_[i] = max_[i] = v[i];
+    } else {
+        for (int i = 0; i < 3; ++i) {
+            if (v[i] < min_[i]) min_[i] = v[i];
+            if (v[i] > max_[i]) max_[i] = v[i];
+        }
+    }
+    ++n_;
+}
+
+double MagCalibrator::span_ut(int axis) const {
+    if (axis < 0 || axis > 2 || n_ == 0) return 0.0;
+    return max_[axis] - min_[axis];
+}
+
+bool MagCalibrator::coverage_met() const {
+    if (n_ < config_.mag_cal_min_samples) return false;
+    for (int i = 0; i < 3; ++i) {
+        if (span_ut(i) < config_.mag_cal_min_span_ut) return false;
+    }
+    return true;
+}
+
+sensors::MagCalibration MagCalibrator::result() const {
+    sensors::MagCalibration out;
+    if (!coverage_met()) {
+        return out;  // valid stays false: an unswept axis is not a calibration
+    }
+    double radius[3];
+    double mean_radius = 0.0;
+    for (int i = 0; i < 3; ++i) {
+        out.offset_ut[i] = 0.5 * (max_[i] + min_[i]);
+        radius[i] = 0.5 * (max_[i] - min_[i]);
+        mean_radius += radius[i];
+    }
+    mean_radius /= 3.0;
+    for (int i = 0; i < 3; ++i) {
+        out.scale[i] = radius[i] > 1e-6 ? mean_radius / radius[i] : 1.0;
+    }
+    out.valid = true;
+    return out;
 }
 
 }  // namespace flight

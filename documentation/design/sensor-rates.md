@@ -16,6 +16,7 @@ model in [`sensor_timing.hpp`](../../firmware/flight-computer/include/flight/sen
 - [What each sensor can actually deliver](#what-each-sensor-can-actually-deliver)
 - [The barometer: the binding constraint](#the-barometer-the-binding-constraint)
 - [The IMU: bandwidth and aliasing](#the-imu-bandwidth-and-aliasing)
+- [The magnetometer](#the-magnetometer)
 - [Why over-sampling a sensor corrupts vertical speed](#why-over-sampling-a-sensor-corrupts-vertical-speed)
 - [Bus and CPU budget](#bus-and-cpu-budget)
 - [Loop scheduling](#loop-scheduling)
@@ -46,7 +47,8 @@ is tied to it. Each stage runs at the rate its own physics allows:
 
 | Sensor | Configured output rate | Sampled at | Margin |
 |---|---:|---:|---|
-| MPU6050 (accelerometer + gyroscope) | 200 Hz internal, 21/20 Hz bandwidth | 30 Hz | 6.7× |
+| MPU-9250 (accelerometer + gyroscope) | 200 Hz internal; 21.2 Hz accelerometer / 20 Hz gyroscope bandwidth | 30 Hz | 6.7× |
+| AK8963 magnetometer (inside the MPU-9250) | 100 Hz continuous mode 2 | 30 Hz | 3.3× |
 | BMP280 (pressure + temperature) | ~83 Hz typical, ~72 Hz worst case | 30 Hz | 2.4× |
 | NEO-6M (GPS) | 1 Hz NMEA, drained continuously without blocking | every tick | n/a |
 
@@ -86,23 +88,57 @@ few centimetres of altitude resolution.
 
 ## The IMU: bandwidth and aliasing
 
-The MPU6050's digital low-pass filter is an **anti-aliasing** filter, and its cutoff has to
-be chosen against the *acquisition* rate, not the sensor's internal rate. Sampling at 30 Hz
-puts the Nyquist limit at 15 Hz: content above that folds down into the attitude estimate
-and cannot be removed afterwards.
+The MPU-9250's digital low-pass filters are **anti-aliasing** filters, and their cutoffs
+have to be chosen against the *acquisition* rate, not the sensor's internal rate. Sampling
+at 30 Hz puts the Nyquist limit at 15 Hz: content above that folds down into the attitude
+estimate and cannot be removed afterwards.
 
-| `DLPF_CFG` | Accel bandwidth | Gyro bandwidth | Delay | At 30 Hz sampling |
-|---:|---:|---:|---:|---|
-| 3 (previous) | 44 Hz | 42 Hz | 4.9 ms | **Aliases** airframe vibration from 15–44 Hz |
-| **4 (current)** | **21 Hz** | **20 Hz** | 8.5 ms | Small residual band, acceptable |
-| 5 | 10 Hz | 10 Hz | 13.8 ms | Fully anti-aliased, but blurs the launch transient |
+The MPU-9250 splits what the MPU-6050 did with one register into two. `DLPF_CFG` in
+`CONFIG` (register 26) filters the gyroscope; `A_DLPF_CFG` in `ACCEL_CONFIG 2`
+(register 29) filters the accelerometer. They are configured separately and their
+bandwidth tables are not the same, so quoting one figure for both would be wrong.
 
-`DLPF_CFG` 4 is the compromise: it removes the bulk of the vibration band while keeping the
-launch and impact transients that the state machine watches. `SMPLRT_DIV` stays at 4, so
-the sensor's internal rate is 200 Hz and every 30 Hz read returns a fresh sample.
+One more MPU-9250 trap: `FCHOICE_B` in `GYRO_CONFIG` must be `00`, or `DLPF_CFG` is
+bypassed entirely and the part stays on its 8 kHz path. The configured bandwidth is then
+silently not applied — the registers read back exactly as written and the filter is simply
+not in circuit.
 
-Both values are configuration fields (`imu_dlpf_cfg`, `imu_sample_rate_div`), not driver
-constants, so they can be re-tuned against real vibration data without touching the driver.
+| Setting | Accel bandwidth (`A_DLPF_CFG`) | Gyro bandwidth (`DLPF_CFG`) | At 30 Hz sampling |
+|---:|---:|---:|---|
+| 3 | 44.8 Hz | 41 Hz | **Aliases** airframe vibration from 15 Hz upward |
+| **4 (current)** | **21.2 Hz** | **20 Hz** | Small residual band above 15 Hz, accepted |
+| 5 | 10.2 Hz | 10 Hz | Fully anti-aliased, but blurs the launch transient |
+
+Setting 4 is the compromise: it removes the bulk of the vibration band while keeping the
+launch and impact transients that the state machine watches. It is **not** fully
+anti-aliased — 15 to 21 Hz still folds down — and that residual is accepted knowingly
+rather than hidden. `validate_config()` deliberately does not reject it: the right setting
+depends on how much this airframe actually vibrates, which is a shake-table measurement,
+not something software can assert. `SMPLRT_DIV` stays at 4, so the internal rate is 200 Hz
+and every 30 Hz read returns a fresh sample.
+
+All three are configuration fields (`imu_gyro_dlpf_cfg`, `imu_accel_dlpf_cfg`,
+`imu_sample_rate_div`), not driver constants, so they can be re-tuned against real
+vibration data without touching the driver.
+
+## The magnetometer
+
+The AK8963 inside the MPU-9250 does not follow `SMPLRT_DIV` at all. It free-runs in its own
+continuous measurement mode and raises its own data-ready flag, which the driver checks on
+every read.
+
+| Mode | Output rate | At 30 Hz acquisition |
+|---|---:|---|
+| Continuous mode 1 | 8 Hz | Too slow: most reads would return a stale sample |
+| **Continuous mode 2 (current)** | **100 Hz** | 3.3× margin, a fresh sample every time |
+
+`validate_config()` rejects a magnetometer mode slower than the acquisition rate, because a
+repeated magnetic sample is not merely wasted — it drags the yaw correction toward a
+reading the vehicle has already turned away from.
+
+The driver also reads the AK8963's `ST2` register at the end of every burst. That is not
+optional: an AK8963 whose `ST2` is never read stops updating, so a driver that reads only
+the data registers gets a magnetometer that works exactly once.
 
 ## Why over-sampling a sensor corrupts vertical speed
 
@@ -147,7 +183,7 @@ addressing and acknowledgement:
 
 | Transaction | Bytes | Bits | Time at 400 kHz |
 |---|---:|---:|---:|
-| MPU6050 burst read (accel, temp, gyro) | 14 | ~144 | ~0.36 ms |
+| MPU-9250 burst read (accel, temp, gyro) | 14 | ~144 | ~0.36 ms |
 | BMP280 burst read (pressure, temperature) | 6 | ~72 | ~0.18 ms |
 | **Per 30 Hz acquisition** | 20 | ~216 | **~0.54 ms** |
 
@@ -201,8 +237,9 @@ delays one acquisition instead of triggering several back to back.
 
 ## Changing the rates
 
-1. Edit `sensor_period_ms`, `baro_osrs_t`, `baro_osrs_p`, `baro_filter`, `imu_dlpf_cfg` or
-   `imu_sample_rate_div` in `config.hpp`.
+1. Edit `sensor_period_ms`, `baro_osrs_t`, `baro_osrs_p`, `baro_filter`,
+   `imu_gyro_dlpf_cfg`, `imu_accel_dlpf_cfg`, `imu_sample_rate_div` or `mag_mode` in
+   `config.hpp`.
 2. Rebuild and run `bash tools/build_host.sh`. If the barometer cannot feed the new rate,
    `validate_config()` says so, with the numbers.
 3. Check the IMU bandwidth against the new Nyquist limit — the guard does not enforce this
@@ -214,7 +251,7 @@ delays one acquisition instead of triggering several back to back.
 | Claim | Status |
 |---|---|
 | BMP280 timing formulas | Verified against three published datasheet figures |
-| MPU6050 bandwidth table | Transcribed from the register map, register 26 |
+| MPU-9250 bandwidth table | Transcribed from the register map, register 26 |
 | 83 Hz barometer output rate | Computed from the datasheet, **never measured** |
 | I2C bus utilisation | Computed from bus speed and transaction length, **never measured** |
 | CPU headroom at 30 Hz | **Not measured** — no profiling has been run on an RP2040 |

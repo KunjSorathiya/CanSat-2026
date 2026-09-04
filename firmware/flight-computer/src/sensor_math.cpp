@@ -39,8 +39,34 @@ double gyro_raw_to_dps(std::int16_t raw, const ImuScales& scales) {
     return static_cast<double>(raw) * scales.gyro_dps_per_lsb;
 }
 
-double mpu_temperature_c(std::int16_t raw) {
-    return static_cast<double>(raw) / 340.0 + 36.53;
+double mpu9250_temperature_c(std::int16_t raw) {
+    // PS-MPU-9250A-01 section 3.4.2. RoomTemp_Offset is zero for the MPU-9250, so the
+    // MPU-6050's 36.53 degC intercept does not appear here at all.
+    return static_cast<double>(raw) / 333.87 + 21.0;
+}
+
+double mag_ut_per_lsb(MagResolution resolution) {
+    // 4912 uT across 8190 counts (14-bit) or 32760 counts (16-bit): 0.6 and 0.15 uT/LSB.
+    return resolution == MagResolution::bits16 ? kMagFullScaleUt / 32760.0
+                                               : kMagFullScaleUt / 8190.0;
+}
+
+double mag_asa_adjust(std::uint8_t asa_raw) {
+    return (static_cast<double>(asa_raw) - 128.0) * 0.5 / 128.0 + 1.0;
+}
+
+double mag_raw_to_ut(std::int16_t raw, double ut_per_lsb, double asa_adjust) {
+    return static_cast<double>(raw) * ut_per_lsb * asa_adjust;
+}
+
+void apply_mag_calibration(const MagCalibration& calibration,
+                           double& x_ut, double& y_ut, double& z_ut) {
+    if (!calibration.valid) {
+        return;
+    }
+    x_ut = (x_ut - calibration.offset_ut[0]) * calibration.scale[0];
+    y_ut = (y_ut - calibration.offset_ut[1]) * calibration.scale[1];
+    z_ut = (z_ut - calibration.offset_ut[2]) * calibration.scale[2];
 }
 
 double vector_magnitude(double x, double y, double z) {

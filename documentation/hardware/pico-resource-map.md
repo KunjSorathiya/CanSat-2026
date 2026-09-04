@@ -20,7 +20,7 @@ No regulator is selected, no GPIO number is assigned, and no PCB or firmware is 
 Raspberry Pi Pico
 |
 +-- I2C bus
-|   +-- MPU6050
+|   +-- MPU-9250
 |   +-- BMP280
 |
 +-- SPI bus
@@ -40,7 +40,7 @@ Raspberry Pi Pico
 |   +-- Status LED
 |   +-- RA-02 CS/NSS, RESET, DIO0, optional DIO1
 |   +-- SD CS
-|   +-- MPU6050 INT
+|   +-- MPU-9250 INT
 |
 +-- ADC
 |   +-- one channel reserved for future battery monitoring
@@ -55,12 +55,12 @@ This is a logical map, not a wiring diagram. The Pico pin map must be created on
 
 ### Logical Sharing
 
-The MPU6050 and BMP280 can logically share one I2C bus if both breakout boards expose I2C and operate at a compatible bus voltage. Their documented IC-level address options do not create a required conflict:
+The MPU-9250 and BMP280 can logically share one I2C bus if both breakout boards expose I2C and operate at a compatible bus voltage. Their documented IC-level address options do not create a required conflict:
 
 | Device | IC-level address information | Address-selection signal | Conflict assessment |
 |---|---|---|---|
-| MPU6050 | `0x68` or `0x69` | AD0 | Does not conflict with the BMP280 address range |
-| BMP280 | `0x76` or `0x77` | SDO | Does not conflict with the MPU6050 address range |
+| MPU-9250 | `0x68` or `0x69` | AD0 | Does not conflict with the BMP280 address range |
+| BMP280 | `0x76` or `0x77` | SDO | Does not conflict with the MPU-9250 address range |
 
 The address values above are IC-level documentation. The actual breakout wiring for AD0, SDO, pull-ups, and exposed pins remains TBD.
 
@@ -121,7 +121,7 @@ The exact number and header availability of DIO pins on the RA-02 carrier are **
 - **CS:** Required dedicated selection resource for the SD reader.
 - **SCK, MOSI, MISO:** Shared SPI signals, subject to verification of the reader's host-side logic behavior.
 
-The Robu listing states a 4.5-5.5 V input and onboard 3.3 V regulator for SKU 11566. It does not establish that the Pico can safely drive or receive its signal pins. The SD reader must not be wired to the Pico until its level-shifting and signal-voltage implementation is verified.
+SKU 11566 as delivered is a 2.6-3.6 V SPI module, so it shares the 3.3 V rail and the Pico's signal levels. The remaining SPI0 question is behavioural rather than electrical: a reader that keeps driving MISO after its chip select is released corrupts the RA-02's next transaction, which presents as a dead radio rather than a dead card.
 
 ### Shared Versus Separate SPI Controllers
 
@@ -167,7 +167,7 @@ The following table reserves logical functions only. It intentionally contains n
 | SD CS | REQUIRED | GPIO control | Dedicated GPIO | SD board signal level and CS behavior TBD |
 | GPS TX | REQUIRED | UART | GPS UART | Breakout TX label and logic level TBD |
 | GPS RX | REQUIRED | UART | GPS UART | Breakout RX label and logic level TBD |
-| MPU6050 INT | USEFUL | GPIO interrupt/input | Reserved GPIO interrupt-capable resource | Breakout INT exposure TBD |
+| MPU-9250 INT | USEFUL | GPIO interrupt/input | Reserved GPIO interrupt-capable resource | Breakout INT exposure TBD |
 | Status LED | REQUIRED | GPIO or power-indicator control | Dedicated status/power-indicator resource | LED circuit and competition power-indicator implementation TBD |
 | Battery ADC | USEFUL | ADC | One reserved ADC channel | Divider and voltage protection TBD; no circuit designed |
 | Spare GPIO | SPARE | GPIO | Preserve from final allocation | Exact count and pin mux TBD |
@@ -204,7 +204,7 @@ The debug resources should not be consumed by normal mission peripherals unless 
 
 | Resource | Device/Function | Required/Optional | Proposed Allocation | Notes |
 |---|---|---|---|---|
-| I2C | MPU6050 and BMP280 | Required | One shared I2C bus | Addresses are logically distinct; pull-ups and bus voltage TBD |
+| I2C | MPU-9250 and BMP280 | Required | One shared I2C bus | Addresses are logically distinct; pull-ups and bus voltage TBD |
 | SPI | RA-02 and Micro SD reader | Required | One shared SPI bus | Separate CS/NSS for each device; SD electrical behavior TBD |
 | UART | NEO-6M GPS | Required | One dedicated UART | TX/RX breakout levels and labels TBD |
 | UART | Debug/future expansion | Optional | Preserve second UART if pin mux permits | Do not consume during preliminary allocation |
@@ -214,7 +214,7 @@ The debug resources should not be consumed by normal mission peripherals unless 
 | GPIO | RA-02 DIO0 | Required | Interrupt-capable GPIO resource | Useful for radio event handling; number TBD |
 | GPIO | RA-02 DIO1 | Optional | Optional interrupt-capable GPIO resource | Number TBD |
 | GPIO | SD CS | Required | Dedicated GPIO resource | Number TBD |
-| GPIO | MPU6050 INT | Useful | Interrupt-capable GPIO resource | Only if breakout exposes it and firmware uses it |
+| GPIO | MPU-9250 INT | Useful | Interrupt-capable GPIO resource | Only if breakout exposes it and firmware uses it |
 | GPIO | Status LED | Required | Dedicated indicator-control resource | Number and electrical connection TBD |
 | GPIO | Spare expansion | Spare | Preserve unallocated GPIO resources | Exact capacity depends on final pin mux |
 | USB | Programming/debugging | Required for development | USB development interface | No mission pin assigned |
@@ -224,7 +224,7 @@ The debug resources should not be consumed by normal mission peripherals unless 
 
 ### I2C Sharing
 
-No logical address conflict exists between the MPU6050 and BMP280 address options. The bus remains dependent on compatible voltage domains and verified pull-ups. This does not prevent logical allocation.
+No logical address conflict exists between the MPU-9250 and BMP280 address options. The bus remains dependent on compatible voltage domains and verified pull-ups. This does not prevent logical allocation.
 
 ### SPI Sharing
 
@@ -246,7 +246,7 @@ One ADC resource can be reserved for battery monitoring without affecting the pr
 
 ### Interrupt Requirements
 
-Reserve RA-02 DIO0 as the primary radio event input. Keep DIO1 optional. Reserve MPU6050 INT as useful rather than mandatory because the sensor can be polled if the verified board and later firmware design support that approach. The actual interrupt pin availability on each breakout remains TBD.
+Reserve RA-02 DIO0 as the primary radio event input. Keep DIO1 optional. Reserve MPU-9250 INT as useful rather than mandatory because the sensor can be polled if the verified board and later firmware design support that approach. The actual interrupt pin availability on each breakout remains TBD.
 
 ### Debug and Programming
 
@@ -269,7 +269,7 @@ This resource map does not design the power circuit. The following devices must 
 
 - Raspberry Pi Pico
 - SX1278 RA-02
-- MPU6050
+- MPU-9250
 - BMP280
 - NEO-6M GPS
 - Micro SD reader
@@ -281,7 +281,7 @@ The planned 3.3 V relationship is not automatically approved:
 - The RA-02 carrier supply remains TBD.
 - Sensor breakout supply and logic levels remain TBD.
 - The GPS breakout supply and logic levels remain TBD.
-- The SD reader is listed by Robu with a 4.5-5.5 V input and onboard 3.3 V regulator; its signal-level behavior remains unknown.
+- The SD reader is a 2.6-3.6 V SPI module on the 3.3 V rail; its MISO release behaviour on the shared bus remains unconfirmed.
 - The 3.3 V rail current and transient budget remains TBD.
 
 The power dependencies affect final electrical wiring, but they do not prevent this logical resource allocation.
@@ -294,7 +294,7 @@ These unresolved items can change the final GPIO map:
 - SD reader CS behavior and any additional control pins
 - RA-02 carrier pin availability and actual header pinout
 - RA-02 RESET and DIO0/DIO1 availability and event requirements
-- MPU6050 breakout interface selection and INT pin availability
+- MPU-9250 breakout interface selection and INT pin availability
 - BMP280 breakout interface selection and address/control pin availability
 - GPS breakout UART pin arrangement and any enable/reset controls
 - Breakout-board level shifting and pin-mux implications
@@ -317,7 +317,7 @@ They still must be resolved before electrical assembly and final verification.
 
 There is no fundamental Pico resource conflict in the proposed architecture:
 
-- MPU6050 and BMP280 can logically share I2C.
+- MPU-9250 and BMP280 can logically share I2C.
 - RA-02 and SD can logically share SPI with separate chip-select lines.
 - One UART can be dedicated to the GPS while another is preserved for debug or expansion.
 - One ADC can be reserved for battery monitoring.

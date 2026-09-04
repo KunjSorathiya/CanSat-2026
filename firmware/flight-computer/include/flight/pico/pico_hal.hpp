@@ -4,7 +4,7 @@
 #include "flight/config.hpp"
 #include "flight/interfaces.hpp"
 #include "flight/pico/bmp280.hpp"
-#include "flight/pico/mpu6050.hpp"
+#include "flight/pico/mpu9250.hpp"
 #include "flight/pico/neo6m.hpp"
 #include "flight/pico/sd_card.hpp"
 #include "flight/raw_block_log.hpp"
@@ -23,11 +23,16 @@ public:
     explicit PicoImu(const Configuration& config) : config_(config) {}
     bool initialize() override;
     bool read(ImuSample& out, std::uint64_t now_ms) override;
+    bool has_magnetometer() const override { return device_.has_magnetometer(); }
     SensorHealth health() const override { return health_; }
+
+    // WHO_AM_I read at initialisation. 0x71/0x73 is a real MPU-9250/9255; 0x70 is an
+    // MPU-6500 sold as one, with no magnetometer. Worth reporting on the bench.
+    std::uint8_t who_am_i() const { return device_.who_am_i(); }
 
 private:
     const Configuration& config_;
-    pico::Mpu6050 device_;
+    pico::Mpu9250 device_;
     SensorHealth health_;
 };
 
@@ -73,6 +78,9 @@ private:
     bool healthy_ = false;
 };
 
+// microSD over the shared SPI0 bus, chip-select on GP6. The breakout is a 3.3 V module
+// (2.6 to 3.6 V), so it sits on the same rail as everything else on this vehicle and
+// needs no level shifting or boost stage of its own.
 class PicoSdLogger final : public SdLogger {
 public:
     bool initialize() override;

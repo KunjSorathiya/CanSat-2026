@@ -8,6 +8,7 @@
 #include "flight/fault_manager.hpp"
 #include "flight/gps_parser.hpp"
 #include "flight/orientation.hpp"
+#include "flight/pico/mpu9250.hpp"
 #include "flight/raw_block_log.hpp"
 #include "flight/scheduler.hpp"
 #include "flight/sensor_math.hpp"
@@ -115,7 +116,7 @@ void test_parser_rejects_precision_and_order() {
 }
 
 // ----------------------------------------------------------------------------
-void test_mpu_scaling() {
+void test_imu_scaling() {
     using namespace flight::sensors;
     const ImuScales s = imu_scales(AccelRange::g16, GyroRange::dps2000);
     CHECK(approx(accel_raw_to_mps2(2048, s), kStandardGravity, 1e-6));
@@ -125,7 +126,74 @@ void test_mpu_scaling() {
     const ImuScales s2 = imu_scales(AccelRange::g2, GyroRange::dps250);
     CHECK(approx(accel_raw_to_mps2(16384, s2), kStandardGravity, 1e-6));
     CHECK(approx(gyro_raw_to_dps(131, s2), 1.0, 0.01));
-    CHECK(approx(mpu_temperature_c(0), 36.53, 1e-6));
+
+    // MPU-9250 temperature, NOT the MPU-6050's raw/340 + 36.53. Carrying the old
+    // transfer function across would have reported room temperature as ~36 degC.
+    CHECK(approx(mpu9250_temperature_c(0), 21.0, 1e-6));
+    CHECK(approx(mpu9250_temperature_c(333), 21.0 + 333.0 / 333.87, 1e-9));
+    CHECK(mpu9250_temperature_c(0) < 30.0);
+}
+
+// The magnetometer conversion chain: quantisation, the fuse-ROM sensitivity adjustment,
+// and the hard/soft-iron correction applied on top of both.
+void test_magnetometer_conversions() {
+    using namespace flight::sensors;
+
+    // 4912 uT across the full 16-bit range, and a quarter of the resolution at 14 bits.
+    CHECK(approx(mag_ut_per_lsb(MagResolution::bits16), 4912.0 / 32760.0, 1e-12));
+    CHECK(approx(mag_ut_per_lsb(MagResolution::bits14), 4912.0 / 8190.0, 1e-12));
+    CHECK(approx(mag_ut_per_lsb(MagResolution::bits14),
+                 4.0 * mag_ut_per_lsb(MagResolution::bits16), 1e-12));
+    CHECK(mag_resolution_bits(MagResolution::bits16) == 0x10);
+    CHECK(mag_resolution_bits(MagResolution::bits14) == 0x00);
+
+    // ASA 128 is unity; the adjustment spans 0.5 to ~1.5 across the byte.
+    CHECK(approx(mag_asa_adjust(128), 1.0, 1e-12));
+    CHECK(approx(mag_asa_adjust(0), 0.5, 1e-12));
+    CHECK(approx(mag_asa_adjust(255), 1.0 + 127.0 * 0.5 / 128.0, 1e-12));
+
+    // A full-scale count is full scale, and the ASA multiplies it.
+    const double lsb = mag_ut_per_lsb(MagResolution::bits16);
+    CHECK(approx(mag_raw_to_ut(32760, lsb, 1.0), 4912.0, 1e-6));
+    CHECK(approx(mag_raw_to_ut(1000, lsb, mag_asa_adjust(0)),
+                 0.5 * mag_raw_to_ut(1000, lsb, 1.0), 1e-9));
+
+    // Hard iron is subtracted, soft iron scales what is left -- and an invalid
+    // calibration is not applied at all, rather than silently applied as identity.
+    MagCalibration cal;
+    cal.offset_ut[0] = 10.0; cal.offset_ut[1] = -5.0; cal.offset_ut[2] = 2.0;
+    cal.scale[0] = 1.1; cal.scale[1] = 0.9; cal.scale[2] = 1.0;
+    double x = 30.0, y = 30.0, z = 30.0;
+    apply_mag_calibration(cal, x, y, z);
+    CHECK(approx(x, 30.0, 1e-12));  // still invalid -> untouched
+    cal.valid = true;
+    apply_mag_calibration(cal, x, y, z);
+    CHECK(approx(x, (30.0 - 10.0) * 1.1, 1e-12));
+    CHECK(approx(y, (30.0 + 5.0) * 0.9, 1e-12));
+    CHECK(approx(z, (30.0 - 2.0) * 1.0, 1e-12));
+}
+
+// The AK8963 die sits rotated inside the MPU-9250 package. Getting this wrong produces a
+// heading that moves smoothly and is completely wrong, so it is worth its own test.
+void test_magnetometer_axes_are_rotated_into_the_body_frame() {
+    double bx = 0.0, by = 0.0, bz = 0.0;
+    flight::pico::mag_axes_to_body(1.0, 2.0, 3.0, bx, by, bz);
+    CHECK(approx(bx, 2.0, 1e-12));   // body X comes from the AK8963's Y
+    CHECK(approx(by, 1.0, 1e-12));   // body Y comes from the AK8963's X
+    CHECK(approx(bz, -3.0, 1e-12));  // body Z is the AK8963's Z, inverted
+
+    // The mapping is a reflection-free swap of two axes plus a sign flip, so it preserves
+    // the field magnitude. A mapping that did not would corrupt the earth-field gate.
+    const double before = flight::sensors::vector_magnitude(1.0, 2.0, 3.0);
+    CHECK(approx(flight::sensors::vector_magnitude(bx, by, bz), before, 1e-12));
+
+    // Applying it twice returns the X/Y swap to where it started, which is the cheap way
+    // to notice a mapping that was written as a rotation by mistake.
+    double rx = 0.0, ry = 0.0, rz = 0.0;
+    flight::pico::mag_axes_to_body(bx, by, bz, rx, ry, rz);
+    CHECK(approx(rx, 1.0, 1e-12));
+    CHECK(approx(ry, 2.0, 1e-12));
+    CHECK(approx(rz, 3.0, 1e-12));
 }
 
 // The range written to the IMU and the scale used to convert its output must agree. A
@@ -217,29 +285,200 @@ void test_pressure_altitude() {
 }
 
 // ----------------------------------------------------------------------------
+// Deterministic field for a northern-hemisphere site, in the level frame: 40 uT north
+// (body +Y at zero yaw) and 17 uT downward (body -Z), total 43.5 uT.
+constexpr double kFieldNorthUt = 40.0;
+constexpr double kFieldDownUt = 17.0;
+
+// Rotate the level-frame field into the body frame for a given attitude, so a test can
+// feed the estimator exactly what a magnetometer would read there. This is R^T applied to
+// the level-frame field, written out longhand on purpose: if it shared code with the
+// estimator, a sign error in the estimator would cancel itself here.
+void body_field(double roll_deg, double pitch_deg, double yaw_deg,
+                double& mx, double& my, double& mz) {
+    const double d = 3.14159265358979323846 / 180.0;
+    const double cr = std::cos(roll_deg * d), sr = std::sin(roll_deg * d);
+    const double cp = std::cos(pitch_deg * d), sp = std::sin(pitch_deg * d);
+    const double cy = std::cos(yaw_deg * d), sy = std::sin(yaw_deg * d);
+    const double ex = 0.0, ey = kFieldNorthUt, ez = -kFieldDownUt;
+    // R = Rz(yaw) Ry(pitch) Rx(roll); body = R^T * level.
+    const double x1 = cy * ex + sy * ey;
+    const double y1 = -sy * ex + cy * ey;
+    const double z1 = ez;
+    const double x2 = cp * x1 - sp * z1;
+    const double y2 = y1;
+    const double z2 = sp * x1 + cp * z1;
+    mx = x2;
+    my = cr * y2 + sr * z2;
+    mz = -sr * y2 + cr * z2;
+}
+
+// Likewise for the specific force a stationary accelerometer reads at that attitude.
+void body_gravity(double roll_deg, double pitch_deg, double& ax, double& ay, double& az) {
+    const double d = 3.14159265358979323846 / 180.0;
+    const double g = flight::sensors::kStandardGravity;
+    const double cr = std::cos(roll_deg * d), sr = std::sin(roll_deg * d);
+    const double cp = std::cos(pitch_deg * d), sp = std::sin(pitch_deg * d);
+    ax = -g * sp;
+    ay = g * sr * cp;
+    az = g * cr * cp;
+}
+
 void test_orientation_levels_and_yaw() {
-    flight::OrientationEstimator est(0.98);
-    // First update establishes the accelerometer reference directly.
+    flight::OrientationEstimator est;
+    // The first accelerometer sample seeds roll and pitch directly rather than being
+    // filtered towards: a vehicle powered up on its side must not spend the first second
+    // of its life reporting level.
     est.update(0.0, 0.0, 9.80665, 0.0, 0.0, 0.0, 0.1);
     auto e = est.estimate();
     CHECK(e.valid);
     CHECK(approx(e.roll_deg, 0.0, 0.5));
     CHECK(approx(e.pitch_deg, 0.0, 0.5));
+    CHECK(!e.yaw_is_magnetic);  // no magnetometer was supplied
 
     // Rolled onto its side: gravity now on +Y.
-    flight::OrientationEstimator rolled(0.98);
+    flight::OrientationEstimator rolled;
     rolled.update(0.0, 9.80665, 0.0, 0.0, 0.0, 0.0, 0.1);
     CHECK(approx(rolled.estimate().roll_deg, 90.0, 1.0));
 
-    // Pure gyro yaw integration: 10 deg/s for 3 s -> ~30 deg (relative).
-    flight::OrientationEstimator yaw(0.98);
-    yaw.update(0.0, 0.0, 9.80665, 0.0, 0.0, 10.0, 1.0);
-    yaw.update(0.0, 0.0, 9.80665, 0.0, 0.0, 10.0, 1.0);
-    yaw.update(0.0, 0.0, 9.80665, 0.0, 0.0, 10.0, 1.0);
+    // Nose pitched up 30 degrees: gravity leaks onto -X.
+    flight::OrientationEstimator pitched;
+    double ax = 0.0, ay = 0.0, az = 0.0;
+    body_gravity(0.0, 30.0, ax, ay, az);
+    pitched.update(ax, ay, az, 0.0, 0.0, 0.0, 0.1);
+    CHECK(approx(pitched.estimate().pitch_deg, 30.0, 1.0));
+
+    // Pure gyro yaw propagation with no magnetometer. The first sample seeds the filter
+    // rather than propagating it, so three seconds of turn take four updates: 10 deg/s
+    // for 3 s -> ~30 deg, relative, and explicitly not claimed as magnetic.
+    flight::OrientationEstimator yaw;
+    yaw.update(0.0, 0.0, 9.80665, 0.0, 0.0, 10.0, 1.0);  // seeds; yaw stays 0
+    CHECK(approx(yaw.estimate().yaw_deg, 0.0, 1e-9));
+    for (int i = 0; i < 3; ++i) {
+        yaw.update(0.0, 0.0, 9.80665, 0.0, 0.0, 10.0, 1.0);
+    }
     CHECK(approx(yaw.estimate().yaw_deg, 30.0, 0.5));
+    CHECK(!yaw.estimate().yaw_is_magnetic);
 
     CHECK(approx(flight::wrap_degrees(190.0), -170.0, 1e-9));
     CHECK(approx(flight::wrap_degrees(-190.0), 170.0, 1e-9));
+    CHECK(approx(flight::wrap_degrees_360(-10.0), 350.0, 1e-9));
+    CHECK(approx(flight::wrap_degrees_360(370.0), 10.0, 1e-9));
+    CHECK(approx(flight::angle_difference_deg(179.0, -179.0), -2.0, 1e-9));
+}
+
+// Tilt-compensated magnetic yaw, checked against fields synthesised from known attitudes.
+// This is the frame-convention test: if the accelerometer, gyroscope and magnetometer
+// were not all in one consistent frame, these would not close.
+void test_magnetic_yaw_is_tilt_compensated() {
+    for (const double yaw : {0.0, 45.0, 90.0, 179.0, -90.0, -135.0}) {
+        for (const double roll : {0.0, 25.0, -40.0}) {
+            for (const double pitch : {0.0, 20.0, -30.0}) {
+                double ax, ay, az, mx, my, mz;
+                body_gravity(roll, pitch, ax, ay, az);
+                body_field(roll, pitch, yaw, mx, my, mz);
+                double recovered = 0.0;
+                CHECK(flight::OrientationEstimator::magnetic_yaw_deg(ax, ay, az, mx, my, mz,
+                                                                     recovered));
+                CHECK(approx(flight::angle_difference_deg(recovered, yaw), 0.0, 0.5));
+            }
+        }
+    }
+
+    // Zero-length inputs cannot define a heading and must be refused, not fitted.
+    double ignored = 0.0;
+    CHECK(!flight::OrientationEstimator::magnetic_yaw_deg(0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+                                                          ignored));
+    CHECK(!flight::OrientationEstimator::magnetic_yaw_deg(0.0, 0.0, 9.8, 0.0, 0.0, 0.0,
+                                                          ignored));
+}
+
+// The whole point of the nine-axis upgrade: yaw stops drifting, and it becomes absolute.
+void test_orientation_yaw_is_disciplined_by_the_magnetometer() {
+    // A vehicle sitting still at a true yaw of 60 degrees, with a gyro that has a
+    // 3 deg/s bias on Z the pad calibration never caught.
+    const double truth = 60.0;
+    double ax, ay, az, mx, my, mz;
+    body_gravity(0.0, 0.0, ax, ay, az);
+    body_field(0.0, 0.0, truth, mx, my, mz);
+
+    flight::OrientationEstimator fused;
+    flight::OrientationEstimator gyro_only;
+    for (int i = 0; i < 600; ++i) {  // 20 s at 30 Hz
+        fused.update(ax, ay, az, 0.0, 0.0, 3.0, mx, my, mz, true, 1.0 / 30.0);
+        gyro_only.update(ax, ay, az, 0.0, 0.0, 3.0, 1.0 / 30.0);
+    }
+
+    const auto f = fused.estimate();
+    CHECK(f.valid);
+    CHECK(f.yaw_is_magnetic);
+    // Held to the magnetic reference despite 20 s of biased gyro.
+    CHECK(approx(flight::angle_difference_deg(f.yaw_deg, truth), 0.0, 3.0));
+    // The bias integrator found the bias that the accelerometer and magnetometer both
+    // disagreed with, and reports it with the sign a reader expects.
+    CHECK(approx(f.gyro_bias_dps[2], 3.0, 1.0));
+    // Heading is the same angle as a compass bearing: clockwise from north.
+    CHECK(approx(f.heading_deg, flight::wrap_degrees_360(-f.yaw_deg), 1e-9));
+
+    // The same 20 s without a magnetometer drifts by roughly bias x time away from the
+    // arbitrary zero it seeded at, which is the whole reason yaw needed a second sensor.
+    const double drifted = gyro_only.estimate().yaw_deg;
+    CHECK(std::fabs(flight::angle_difference_deg(drifted, 0.0)) > 30.0);
+    CHECK(!gyro_only.estimate().yaw_is_magnetic);
+}
+
+// An uncalibrated magnetometer still stops yaw drifting, but the vehicle must not claim
+// the result is an absolute magnetic heading.
+void test_uncalibrated_magnetometer_does_not_claim_absolute_heading() {
+    double ax, ay, az, mx, my, mz;
+    body_gravity(0.0, 0.0, ax, ay, az);
+    body_field(0.0, 0.0, 25.0, mx, my, mz);
+
+    flight::OrientationEstimator est;
+    for (int i = 0; i < 200; ++i) {
+        est.update(ax, ay, az, 0.0, 0.0, 0.0, mx, my, mz, /*mag_calibrated=*/false,
+                   1.0 / 30.0);
+    }
+    const auto e = est.estimate();
+    CHECK(e.valid);
+    CHECK(!e.yaw_is_magnetic);
+    // ...and the yaw it is holding is still the right one; only the claim is withheld.
+    CHECK(approx(flight::angle_difference_deg(e.yaw_deg, 25.0), 0.0, 3.0));
+}
+
+// A field that is not the earth's must not steer the vehicle: too weak, too strong, or
+// simply absent are all reasons to fall back to the gyro rather than to fuse rubbish.
+void test_orientation_rejects_an_implausible_field() {
+    double ax, ay, az;
+    body_gravity(0.0, 0.0, ax, ay, az);
+
+    for (const double scale : {0.1, 10.0}) {  // ~4 uT and ~435 uT
+        double mx, my, mz;
+        body_field(0.0, 0.0, 90.0, mx, my, mz);
+        flight::OrientationEstimator est;
+        for (int i = 0; i < 200; ++i) {
+            est.update(ax, ay, az, 0.0, 0.0, 0.0, mx * scale, my * scale, mz * scale, true,
+                       1.0 / 30.0);
+        }
+        const auto e = est.estimate();
+        CHECK(!e.yaw_is_magnetic);
+        // Seeded at zero yaw and never corrected, because the field was never believed.
+        CHECK(approx(e.yaw_deg, 0.0, 1.0));
+    }
+}
+
+// Under boost the accelerometer measures thrust, not gravity. Correcting attitude towards
+// it would tip the solution towards the thrust axis for the whole powered phase.
+void test_orientation_ignores_the_accelerometer_under_high_g() {
+    flight::OrientationEstimator est;
+    est.update(0.0, 0.0, 9.80665, 0.0, 0.0, 0.0, 1.0 / 30.0);  // seed level
+    for (int i = 0; i < 100; ++i) {
+        // 6 g straight along +X: a gravity-following filter would roll onto its side.
+        est.update(6.0 * 9.80665, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0 / 30.0);
+    }
+    const auto e = est.estimate();
+    CHECK(approx(e.roll_deg, 0.0, 1.0));
+    CHECK(approx(e.pitch_deg, 0.0, 1.0));
 }
 
 // ----------------------------------------------------------------------------
@@ -430,9 +669,33 @@ void test_config_validation() {
     c.post_impact_transmission_ms = 5000;
     CHECK(flight::validate_config(c, why));
 
-    c.orientation_alpha = 1.5;
+    c.orientation_kp_accel = -1.0;
     CHECK(!flight::validate_config(c, why));
-    c.orientation_alpha = 0.98;
+    c.orientation_kp_accel = 2.0;
+
+    // Both proportional gains zero would leave attitude a free-running integration with
+    // no reference at all, which is not a configuration anyone means to fly.
+    c.orientation_kp_accel = 0.0;
+    c.orientation_kp_mag = 0.0;
+    CHECK(!flight::validate_config(c, why));
+    c.orientation_kp_accel = 2.0;
+    c.orientation_kp_mag = 0.6;
+
+    c.orientation_bias_limit_dps = 0.0;
+    CHECK(!flight::validate_config(c, why));
+    c.orientation_bias_limit_dps = 10.0;
+
+    // A magnetometer mode slower than the acquisition rate cannot feed every update.
+    c.mag_mode = flight::sensors::MagMode::continuous_8hz;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("magnetometer") != std::string::npos);
+    c.mag_mode = flight::sensors::MagMode::continuous_100hz;
+    CHECK(flight::validate_config(c, why));
+
+    c.yaw_cog_tolerance_deg = 0.0;
+    CHECK(!flight::validate_config(c, why));
+    c.yaw_cog_tolerance_deg = 60.0;
+    CHECK(flight::validate_config(c, why));
 
     c.reference_pressure_pa = 0.0;
     CHECK(!flight::validate_config(c, why));
@@ -643,44 +906,81 @@ void test_gps_coordinate_validation() {
     CHECK(no_hemi.checksum_errors() == 0);
 }
 
-// The complementary filter blends angles, which wrap. Blending them naively is wrong at
-// the seam, and a tumbling CanSat crosses that seam on every rotation.
-void test_orientation_blends_across_the_wrap() {
-    flight::OrientationEstimator est(0.98);
-
-    // Establish a reference near +180 deg of roll: gravity on -Y with the vehicle rolled
-    // almost all the way over. atan2(ay, az) with ay slightly positive and az negative
-    // gives a roll just under +180 deg.
+// Angles wrap; quaternions do not. The estimator carries its state as a quaternion for
+// exactly this reason, and the Euler angles it reports must stay well formed as the
+// vehicle tumbles through every seam those angles have.
+void test_orientation_survives_the_wrap_and_the_poles() {
+    // Inverted: gravity on -Z, so roll is at the +-180 degree seam.
+    flight::OrientationEstimator est;
     est.update(0.0, 0.2, -9.8, 0.0, 0.0, 0.0, 0.05);
-    const double start = est.estimate().roll_deg;
-    CHECK(std::fabs(start) > 170.0);
+    CHECK(std::fabs(est.estimate().roll_deg) > 170.0);
 
-    // Now roll a little further, so the true attitude crosses the seam and the
-    // accelerometer reports the other sign. A naive weighted mean would swing the
-    // estimate most of the way around the circle; the wrapped blend must not.
-    for (int i = 0; i < 20; ++i) {
+    // Nudge the accelerometer across the seam. A filter that averaged the raw angles
+    // would swing most of the way around the circle; this one must stay put.
+    for (int i = 0; i < 40; ++i) {
         est.update(0.0, -0.2, -9.8, 0.0, 0.0, 0.0, 0.05);
-        const double roll = est.estimate().roll_deg;
-        CHECK(std::fabs(roll) > 170.0);  // stays near the seam, never swings to ~0
+        CHECK(std::fabs(est.estimate().roll_deg) > 170.0);
     }
-
-    // The estimate must still be a valid wrapped angle.
     const double settled = est.estimate().roll_deg;
     CHECK(settled > -180.0 && settled <= 180.0);
 
-    // Away from the seam the wrapped blend is the ordinary weighted mean: level vehicle,
-    // no rotation, so the estimate must converge to level rather than drift.
-    flight::OrientationEstimator level(0.98);
-    for (int i = 0; i < 50; ++i) level.update(0.0, 0.0, 9.80665, 0.0, 0.0, 0.0, 0.033);
+    // Level and still: converges to level rather than drifting.
+    flight::OrientationEstimator level;
+    for (int i = 0; i < 100; ++i) level.update(0.0, 0.0, 9.80665, 0.0, 0.0, 0.0, 0.033);
     CHECK(approx(level.estimate().roll_deg, 0.0, 0.5));
     CHECK(approx(level.estimate().pitch_deg, 0.0, 0.5));
 
-    // A gyro-only spin through the seam wraps rather than accumulating past 180 deg.
-    flight::OrientationEstimator spin(1.0);  // ignore the accelerometer entirely
-    for (int i = 0; i < 100; ++i) spin.update(0.0, 0.0, 9.80665, 100.0, 0.0, 0.0, 0.05);
-    const double spun = spin.estimate().roll_deg;
-    CHECK(spun > -180.0 && spun <= 180.0);
-    CHECK(std::isfinite(spun));
+    // A continuous tumble at 100 deg/s about every axis at once, for 20 seconds. The old
+    // Euler integration lost its solution as pitch passed 90 degrees; this must stay a
+    // valid attitude throughout, with no accelerometer help at all (free fall).
+    flight::OrientationEstimator tumble;
+    tumble.update(0.0, 0.0, 9.80665, 0.0, 0.0, 0.0, 0.033);  // seed level
+    for (int i = 0; i < 600; ++i) {
+        tumble.update(0.0, 0.0, 0.0, 100.0, 100.0, 100.0, 0.033);
+        const auto e = tumble.estimate();
+        CHECK(std::isfinite(e.roll_deg) && std::isfinite(e.pitch_deg) &&
+              std::isfinite(e.yaw_deg));
+        CHECK(e.roll_deg > -180.0 && e.roll_deg <= 180.0);
+        CHECK(e.pitch_deg >= -90.0 && e.pitch_deg <= 90.0);
+        CHECK(e.yaw_deg > -180.0 && e.yaw_deg <= 180.0);
+    }
+
+    // A pure pitch-up through the +90 degree singularity: the reported pitch must reach
+    // the pole and come back, never produce a NaN on the way.
+    flight::OrientationEstimator over_the_top;
+    over_the_top.update(0.0, 0.0, 9.80665, 0.0, 0.0, 0.0, 0.033);
+    double max_pitch = 0.0;
+    for (int i = 0; i < 200; ++i) {
+        over_the_top.update(0.0, 0.0, 0.0, 0.0, 90.0, 0.0, 0.033);
+        const auto e = over_the_top.estimate();
+        CHECK(std::isfinite(e.pitch_deg));
+        if (e.pitch_deg > max_pitch) max_pitch = e.pitch_deg;
+    }
+    CHECK(max_pitch > 88.0);
+}
+
+// The estimator must not invent an attitude from nothing, and must not be knocked over by
+// inputs a broken sensor can produce.
+void test_orientation_rejects_unusable_input() {
+    flight::OrientationEstimator est;
+    // All-zero accelerometer: nothing defines which way is up, so nothing is claimed.
+    est.update(0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 0.033);
+    CHECK(!est.estimate().valid);
+
+    // Non-finite input is discarded rather than propagated into the quaternion.
+    est.update(0.0, 0.0, 9.80665, 0.0, 0.0, 0.0, 0.033);
+    CHECK(est.estimate().valid);
+    const double before = est.estimate().roll_deg;
+    est.update(std::nan(""), 0.0, 9.80665, 0.0, 0.0, 0.0, 0.033);
+    CHECK(approx(est.estimate().roll_deg, before, 1e-12));
+
+    // A stalled loop cannot be allowed to integrate an unbounded step.
+    est.update(0.0, 0.0, 9.80665, 0.0, 0.0, 0.0, 1e9);
+    CHECK(std::isfinite(est.estimate().roll_deg));
+
+    // reset() drops the solution; the next accelerometer sample re-seeds it.
+    est.reset();
+    CHECK(!est.estimate().valid);
 }
 
 // A vehicle turning at a constant rate on the pad is perfectly steady by variance, and a
@@ -968,12 +1268,24 @@ void test_sensor_timing_model() {
     CHECK(flight::sensors::baro_config(BaroFilter::x16) == 0x10);
     CHECK(flight::sensors::baro_config(BaroFilter::off) == 0x00);
 
-    // MPU-6050 register map: DLPF 1..6 runs the gyro at 1 kHz, divided by (1 + div).
+    // MPU-9250 register map: DLPF 1..6 runs the gyro at 1 kHz, divided by (1 + div).
     CHECK(approx(flight::sensors::imu_sample_rate_hz(4, 4), 200.0, 1e-9));
     CHECK(approx(flight::sensors::imu_sample_rate_hz(0, 4), 1600.0, 1e-9));
-    CHECK(approx(flight::sensors::imu_accel_bandwidth_hz(4), 21.0, 1e-9));
+    // The accelerometer's bandwidth comes from its own register on this part and is NOT
+    // the MPU-6050's figure for the same setting.
+    CHECK(approx(flight::sensors::imu_accel_bandwidth_hz(4), 21.2, 1e-9));
     CHECK(approx(flight::sensors::imu_gyro_bandwidth_hz(4), 20.0, 1e-9));
+    CHECK(approx(flight::sensors::imu_gyro_bandwidth_hz(0), 250.0, 1e-9));
+    CHECK(approx(flight::sensors::imu_accel_bandwidth_hz(7), 420.0, 1e-9));
     CHECK(flight::sensors::imu_accel_bandwidth_hz(3) > flight::sensors::imu_accel_bandwidth_hz(4));
+
+    // The AK8963 free-runs; only its 100 Hz mode can feed a 30 Hz attitude update.
+    CHECK(approx(flight::sensors::mag_output_rate_hz(
+                     flight::sensors::MagMode::continuous_100hz), 100.0, 1e-9));
+    CHECK(approx(flight::sensors::mag_output_rate_hz(
+                     flight::sensors::MagMode::continuous_8hz), 8.0, 1e-9));
+    CHECK(approx(flight::sensors::mag_output_rate_hz(
+                     flight::sensors::MagMode::power_down), 0.0, 1e-9));
 }
 
 // The acquisition rate must be one the sensors can actually feed.
@@ -1001,12 +1313,27 @@ void test_config_sensor_rate_guard() {
     c.sensor_period_ms = 50;
     CHECK(flight::validate_config(c, why));
 
-    // The IMU's anti-alias filter must stay below the acquisition Nyquist limit.
+    // The IMU's two anti-alias filters sit close to the acquisition Nyquist limit, which
+    // is the documented trade: a narrower filter would blur the launch transient. What
+    // must never happen is a bandwidth above the acquisition rate itself.
     flight::Configuration d;
-    const double nyquist = 1000.0 / (2.0 * static_cast<double>(d.sensor_period_ms));
-    CHECK(flight::sensors::imu_accel_bandwidth_hz(d.imu_dlpf_cfg) <= nyquist * 1.5);
-    CHECK(flight::sensors::imu_sample_rate_hz(d.imu_dlpf_cfg, d.imu_sample_rate_div) >
-          1000.0 / static_cast<double>(d.sensor_period_ms));
+    const double acquisition = 1000.0 / static_cast<double>(d.sensor_period_ms);
+    const double nyquist = acquisition / 2.0;
+    CHECK(flight::sensors::imu_accel_bandwidth_hz(d.imu_accel_dlpf_cfg) <= nyquist * 1.5);
+    CHECK(flight::sensors::imu_gyro_bandwidth_hz(d.imu_gyro_dlpf_cfg) <= nyquist * 1.5);
+    CHECK(flight::sensors::imu_sample_rate_hz(d.imu_gyro_dlpf_cfg, d.imu_sample_rate_div) >
+          acquisition);
+    // And the magnetometer must be able to supply one fresh sample per acquisition.
+    CHECK(flight::sensors::mag_output_rate_hz(d.mag_mode) >= acquisition);
+
+    // An IMU whose internal rate is below the acquisition rate IS rejected: reading it
+    // faster than it converts returns the previous sample, and a repeated gyro reading
+    // integrates as motion that never happened.
+    flight::Configuration slow;
+    slow.team_id = "CAN-Team-07";
+    slow.imu_sample_rate_div = 200;  // 1 kHz / 201 = ~5 Hz against a 30 Hz acquisition
+    CHECK(!flight::validate_config(slow, why));
+    CHECK(why.find("internal sample rate") != std::string::npos);
 }
 
 // A barometer that returns the same conversion twice must not read as zero climb rate.
@@ -1513,7 +1840,10 @@ void test_startup_calibrator_stationary_and_moving() {
     CHECK(approx(cal.result().gyro_bias_dps[2], 2.1, 1e-6));
     CHECK(cal.result().baro_reference_valid);
     CHECK(approx(cal.result().ground_pressure_pa, 100000.0, 1e-6));
-    CHECK(std::fabs(cal.result().accel_bias_mps2[2]) < 0.01);
+    // A perfect 1 g at rest needs no scale correction at all.
+    CHECK(cal.result().accel_reference_valid);
+    CHECK(approx(cal.result().accel_scale, 1.0, 1e-9));
+    CHECK(approx(cal.result().accel_magnitude_ref, flight::sensors::kStandardGravity, 1e-9));
 
     // --- moving: never accepts, resolves best-effort at the timeout, bias NOT trusted ---
     flight::Configuration c2 = c;
@@ -1668,6 +1998,307 @@ void test_config_rejects_a_gps_timeout_faster_than_the_receiver() {
     CHECK(why.find("gps_silence_after_ms") != std::string::npos);
 }
 
+
+// ---------------------------------------------------------------------------
+// Magnetometer integration at the controller level.
+
+// Every packet must say which kind of yaw it carries, because the two are not
+// interchangeable and the ground station cannot tell them apart from the number alone.
+void test_telemetry_declares_the_yaw_reference() {
+    flight::Configuration c = fast_arm_config();
+    // Ship a calibration, as a bench-calibrated vehicle would.
+    c.mag_calibration.valid = true;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 2000; t += 100) ctrl.poll(t);
+
+    CHECK(!radio.packets.empty());
+    // The magnetometer has been feeding the estimator throughout, so by now yaw is
+    // magnetic and the tag says so.
+    CHECK(radio.packets.back().find("YR-M") != std::string::npos);
+    CHECK(ctrl.health().mag_present);
+    CHECK(ctrl.health().mag_ok);
+    CHECK(ctrl.health().mag_calibrated);
+    CHECK(ctrl.health().yaw_is_magnetic);
+    CHECK(ctrl.health().mag_field_ut > 20.0 && ctrl.health().mag_field_ut < 70.0);
+    // Heading is a bearing: inside [0, 360).
+    CHECK(ctrl.health().heading_deg >= 0.0 && ctrl.health().heading_deg < 360.0);
+    // Every packet the vehicle produced is still a legal one.
+    for (const std::string& packet : radio.packets) {
+        CHECK(static_cast<bool>(cansat::parse_packet(packet)));
+    }
+}
+
+// A module sold as an MPU-9250 that turns out to be an MPU-6500 has no magnetometer. The
+// vehicle must fly on six axes and say so, not refuse to start and not pretend.
+void test_a_missing_magnetometer_degrades_rather_than_stops() {
+    flight::Configuration c = fast_arm_config();
+    c.mag_calibration.valid = true;
+    flight::test::MockImu imu;
+    imu.magnetometer = false;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+
+    CHECK(ctrl.initialize());  // still operational
+    CHECK(ctrl.faults().active(flight::FaultCode::mag_unavailable));
+    for (std::uint64_t t = 0; t <= 2000; t += 100) ctrl.poll(t);
+
+    CHECK(!ctrl.health().mag_present);
+    CHECK(!ctrl.health().mag_ok);
+    CHECK(!ctrl.health().yaw_is_magnetic);
+    CHECK(!radio.packets.empty());
+    CHECK(radio.packets.back().find("YR-G") != std::string::npos);
+    // Roll, pitch and acceleration are unaffected: only yaw was ever magnetic.
+    CHECK(ctrl.health().orientation_ok);
+    CHECK(ctrl.health().imu_ok);
+    // And it still reaches READY, so the mission is not blocked by a substituted part.
+    CHECK(ctrl.state() == flight::MissionState::ready);
+}
+
+// A magnetometer that stops answering mid-flight must cost yaw, not the vehicle.
+void test_a_magnetometer_that_stops_is_reported_and_survived() {
+    flight::Configuration c = fast_arm_config();
+    c.mag_calibration.valid = true;
+    c.sensor_stale_after_ms = 500;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 1000; t += 100) ctrl.poll(t);
+    CHECK(ctrl.health().yaw_is_magnetic);
+
+    imu.sample.mag_valid = false;  // the AK8963 stops raising data-ready
+    for (std::uint64_t t = 1100; t <= 3000; t += 100) ctrl.poll(t);
+
+    CHECK(ctrl.faults().active(flight::FaultCode::mag_unavailable));
+    CHECK(!ctrl.health().mag_ok);
+    CHECK(!ctrl.health().yaw_is_magnetic);
+    // The accelerometer and gyroscope are untouched, so attitude and telemetry continue.
+    CHECK(ctrl.health().imu_ok);
+    CHECK(ctrl.health().orientation_ok);
+    CHECK(radio.packets.back().find("YR-G") != std::string::npos);
+    CHECK(!ctrl.faults().active(flight::FaultCode::imu_stale));
+}
+
+// Course over ground is a cross-check and nothing more. It must raise a warning when it
+// disagrees grossly, and it must never move the attitude solution.
+void test_gps_course_is_a_cross_check_not_a_yaw_source() {
+    flight::Configuration c = fast_arm_config();
+    c.mag_calibration.valid = true;
+    c.yaw_cog_min_speed_mps = 5.0;
+    c.yaw_cog_tolerance_deg = 60.0;
+    c.yaw_cog_confirm_samples = 3;
+
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    // Agreeing, and moving: no warning. The mock IMU faces magnetic north, so the
+    // vehicle's heading is ~0 and a course of 10 degrees is well inside tolerance.
+    gps.fix.course_valid = true;
+    gps.fix.course_deg = 10.0;
+    gps.fix.speed_mps = 12.0;
+    for (std::uint64_t t = 0; t <= 2000; t += 100) ctrl.poll(t);
+    const double settled_yaw = ctrl.health().heading_deg;
+    CHECK(!ctrl.faults().active(flight::FaultCode::yaw_reference_disagreement));
+
+    // Now the course swings to the opposite side while the vehicle keeps pointing north:
+    // a warning after the confirmation count, and the heading does NOT follow it.
+    gps.fix.course_deg = 200.0;
+    for (std::uint64_t t = 2100; t <= 4000; t += 100) ctrl.poll(t);
+    CHECK(ctrl.faults().active(flight::FaultCode::yaw_reference_disagreement));
+    CHECK(approx(flight::angle_difference_deg(ctrl.health().heading_deg, settled_yaw), 0.0,
+                 2.0));
+    // A warning only: the mission keeps running and telemetry keeps flowing.
+    CHECK(ctrl.state() != flight::MissionState::fault);
+
+    // Slowing below the speed gate withdraws the comparison rather than the heading.
+    gps.fix.speed_mps = 0.5;
+    for (std::uint64_t t = 4100; t <= 5000; t += 100) ctrl.poll(t);
+    CHECK(ctrl.health().yaw_is_magnetic);
+}
+
+// The runtime figure-of-eight calibration must refuse to certify itself until every axis
+// has actually been swept -- that refusal is what stops a bogus absolute heading.
+void test_mag_calibration_requires_real_coverage() {
+    flight::Configuration c;
+    c.mag_cal_min_samples = 10;
+    c.mag_cal_min_span_ut = 30.0;
+    flight::MagCalibrator cal(c);
+
+    // Rotating about one axis only: two axes sweep, the third never does.
+    for (int i = 0; i < 360; i += 5) {
+        const double a = i * 3.14159265358979323846 / 180.0;
+        cal.add(40.0 * std::cos(a), 40.0 * std::sin(a), -17.0);
+    }
+    CHECK(cal.samples() > 10);
+    CHECK(!cal.coverage_met());
+    CHECK(!cal.result().valid);
+
+    // Add the missing sweep, with a deliberate hard-iron offset and a squashed X axis.
+    flight::MagCalibrator full(c);
+    const double offset[3] = {12.0, -8.0, 5.0};
+    for (int i = 0; i < 360; i += 5) {
+        const double a = i * 3.14159265358979323846 / 180.0;
+        // Two great circles cover all three axes; X is scaled to 0.5 to give the soft
+        // iron term something to find.
+        full.add(offset[0] + 0.5 * 40.0 * std::cos(a), offset[1] + 40.0 * std::sin(a),
+                 offset[2]);
+        full.add(offset[0] + 0.5 * 40.0 * std::cos(a), offset[1],
+                 offset[2] + 40.0 * std::sin(a));
+    }
+    CHECK(full.coverage_met());
+    const auto result = full.result();
+    CHECK(result.valid);
+    for (int i = 0; i < 3; ++i) {
+        CHECK(approx(result.offset_ut[i], offset[i], 1.0));
+    }
+    // Half-widths of 20, 40 and 40 uT give a mean of 33.3, so X is scaled up by 5/3 and
+    // Y and Z down by 5/6. What matters is the ratio between them: X must end up twice
+    // the scale of the other two, which is exactly the squash that was applied.
+    CHECK(approx(result.scale[0], (100.0 / 3.0) / 20.0, 0.05));
+    CHECK(approx(result.scale[1], (100.0 / 3.0) / 40.0, 0.05));
+    CHECK(approx(result.scale[2], (100.0 / 3.0) / 40.0, 0.05));
+    CHECK(approx(result.scale[0] / result.scale[1], 2.0, 0.05));
+
+    // A correction that reports a valid calibration must actually round the field out:
+    // corrected samples all land on one sphere, whatever direction they came from.
+    double radius_min = 1e9, radius_max = 0.0;
+    for (int i = 0; i < 360; i += 15) {
+        const double a = i * 3.14159265358979323846 / 180.0;
+        double x = offset[0] + 0.5 * 40.0 * std::cos(a);
+        double y = offset[1] + 40.0 * std::sin(a);
+        double z = offset[2];
+        flight::sensors::apply_mag_calibration(result, x, y, z);
+        const double r = flight::sensors::vector_magnitude(x, y, z);
+        if (r < radius_min) radius_min = r;
+        if (r > radius_max) radius_max = r;
+    }
+    CHECK((radius_max - radius_min) < 0.05 * radius_max);
+
+    // Saturated or absent readings must never stretch the bounding box.
+    flight::MagCalibrator guarded(c);
+    guarded.add(4000.0, 4000.0, 4000.0);
+    guarded.add(0.0, 0.0, 0.0);
+    CHECK(guarded.samples() == 0);
+}
+
+// The accelerometer correction is a scale, not an offset, so it has to survive rotation.
+void test_accel_calibration_is_rotation_invariant() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    c.calib_samples = 8;
+    c.calib_timeout_ms = 100000;
+
+    // A part reading 2 % high, resting upright.
+    const double high = 1.02;
+    flight::StartupCalibrator cal(c);
+    flight::ImuSample s{};
+    s.valid = true;
+    s.az_mps2 = flight::sensors::kStandardGravity * high;
+    for (int i = 0; i < 12; ++i) {
+        cal.add_imu(s);
+        cal.update(static_cast<std::uint64_t>(i) * 100);
+    }
+    CHECK(cal.complete());
+    CHECK(cal.result().accel_reference_valid);
+    CHECK(approx(cal.result().accel_scale, 1.0 / high, 1e-9));
+
+    // Applying that scale in ANY attitude returns one standard gravity. An offset vector
+    // fitted upright would only have been right while the vehicle stayed upright.
+    const double scale = cal.result().accel_scale;
+    for (const double roll : {0.0, 37.0, 90.0, 143.0, -85.0}) {
+        double ax, ay, az;
+        body_gravity(roll, 0.0, ax, ay, az);
+        const double magnitude = flight::sensors::vector_magnitude(
+            ax * high * scale, ay * high * scale, az * high * scale);
+        CHECK(approx(magnitude, flight::sensors::kStandardGravity, 1e-9));
+    }
+}
+
+// The airtime budget rests on measured packet sizes, and adding a field to every packet
+// is exactly the change that quietly invalidates it. These are the three figures
+// documentation/design/link-budget.md quotes; they are asserted here so a change to the
+// format cannot make that document wrong without failing a test.
+void test_measured_packet_sizes_match_the_link_budget() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    flight::TelemetryBuilder builder(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = s.orientation_valid = s.baro_valid = true;
+    s.altitude_m = 123.4;
+    s.pressure_pa = 101325.00;
+    s.temperature_c = 25.0;
+    s.roll_deg = 1.0;
+    s.pitch_deg = 2.0;
+    s.yaw_deg = 3.0;
+    s.ax_mps2 = 0.1;
+    s.ay_mps2 = 0.2;
+    s.az_mps2 = 9.8;
+
+    const auto mandatory = builder.build(1, 1000, s, {});
+    CHECK(mandatory.has_value());
+    CHECK(mandatory->packet.size() == 118);
+
+    s.gps.valid = true;
+    s.gps.latitude = 18.5;
+    s.gps.longitude = 73.8;
+    s.gps.altitude = 15.0;
+    const auto with_gps = builder.build(1, 1000, s, {});
+    CHECK(with_gps.has_value());
+    CHECK(with_gps->packet.size() == 167);
+
+    // The in-flight packet: GPS plus every diagnostic tag, including the yaw-reference
+    // tag the nine-axis upgrade added. Six bytes more than before it existed.
+    const std::vector<std::string> tags = {"MODE-RECOVERY", "FAULTS-3", "CAL-1", "ARM-1",
+                                           "YR-M"};
+    const auto full = builder.build(1, 1000, s, tags);
+    CHECK(full.has_value());
+    CHECK(full->packet.size() == 212);
+    CHECK(full->packet.size() <= c.worst_case_packet_bytes);
+    CHECK(static_cast<bool>(cansat::parse_packet(full->packet)));
+
+    // The absolute worst case is not bounded by the format -- the team identifier has no
+    // length limit, and extreme values widen every field -- so it is bounded by the
+    // controller shedding optional content instead. Demonstrate that the builder really
+    // can exceed the FIFO, which is what makes that shedding necessary rather than
+    // theoretical.
+    flight::SensorSnapshot extreme = s;
+    extreme.altitude_m = -9999.9;
+    extreme.pressure_pa = -110000.55;
+    extreme.temperature_c = -55.5;
+    extreme.roll_deg = extreme.pitch_deg = extreme.yaw_deg = -179.9;
+    extreme.ax_mps2 = extreme.ay_mps2 = extreme.az_mps2 = -157.99;
+    extreme.gps.latitude = -12.345678;
+    extreme.gps.longitude = -123.456789;
+    extreme.gps.altitude = -1234.5;
+    const auto worst = builder.build(
+        4294967295u, 359999999u, extreme,
+        {"MODE-RECOVERY", "FAULTS-4294967295", "CAL-0", "ARM-0", "YR-M"});
+    CHECK(worst.has_value());
+    CHECK(worst->packet.size() > cansat::kMaxLoraPayloadBytes);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1676,11 +2307,19 @@ int main(int argc, char** argv) {
     test_packet_numbering_and_padding();
     test_parser_rejects_precision_and_order();
     test_shared_protocol_fixtures(repo_root);
-    test_mpu_scaling();
+    test_imu_scaling();
+    test_magnetometer_conversions();
+    test_magnetometer_axes_are_rotated_into_the_body_frame();
     test_imu_range_bits_match_their_sensitivities();
     test_bmp280_compensation_datasheet_vector();
     test_pressure_altitude();
     test_orientation_levels_and_yaw();
+    test_magnetic_yaw_is_tilt_compensated();
+    test_orientation_yaw_is_disciplined_by_the_magnetometer();
+    test_uncalibrated_magnetometer_does_not_claim_absolute_heading();
+    test_orientation_rejects_an_implausible_field();
+    test_orientation_ignores_the_accelerometer_under_high_g();
+    test_orientation_rejects_unusable_input();
     test_gps_parser();
     test_scheduler();
     test_fault_manager();
@@ -1691,7 +2330,7 @@ int main(int argc, char** argv) {
     test_formatter_and_parser_agree_at_the_edges();
     test_controller_drops_optional_fields_before_overrunning_the_budget();
     test_gps_coordinate_validation();
-    test_orientation_blends_across_the_wrap();
+    test_orientation_survives_the_wrap_and_the_poles();
     test_calibration_rejects_a_steady_rotation_as_bias();
     test_fault_severity_never_falls_while_active();
     test_landing_is_not_declared_during_a_steady_descent();
@@ -1714,6 +2353,13 @@ int main(int argc, char** argv) {
     test_controller_launch_detection();
     test_controller_arming_lockout_blocks_early_boost();
     test_controller_sensor_plausibility();
+    test_telemetry_declares_the_yaw_reference();
+    test_a_missing_magnetometer_degrades_rather_than_stops();
+    test_a_magnetometer_that_stops_is_reported_and_survived();
+    test_gps_course_is_a_cross_check_not_a_yaw_source();
+    test_mag_calibration_requires_real_coverage();
+    test_accel_calibration_is_rotation_invariant();
+    test_measured_packet_sizes_match_the_link_budget();
 
     std::cout << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
     if (g_failures != 0) {

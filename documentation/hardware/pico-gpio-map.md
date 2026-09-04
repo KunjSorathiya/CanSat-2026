@@ -18,7 +18,7 @@ No regulator is selected and no PCB or firmware is created here.
 
 | Bus or function | Preliminary allocation | Rationale |
 |---|---|---|
-| I2C0 | GPIO4/GPIO5 | Matched I2C0 SDA/SCL alternate functions for the MPU6050 and BMP280 |
+| I2C0 | GPIO4/GPIO5 | Matched I2C0 SDA/SCL alternate functions for the MPU-9250 and BMP280 |
 | SPI0 | GPIO18/GPIO19/GPIO16 | Matched SPI0 SCK/TX/RX alternate functions for shared RA-02 and SD access |
 | RA-02 CS/NSS | GPIO17 | Dedicated selection line; also supports SPI0 CSn alternate function |
 | SD CS | GPIO6 | Separate ordinary GPIO selection line; not shared with RA-02 CS |
@@ -26,7 +26,7 @@ No regulator is selected and no PCB or firmware is created here.
 | RA-02 RESET | GPIO20 | Dedicated ordinary GPIO control line |
 | RA-02 DIO0 | GPIO21 | Dedicated input/event line for radio interrupt handling |
 | RA-02 DIO1 | GPIO22 | Optional dedicated radio event line; may be released if not needed |
-| MPU6050 INT | GPIO7 | Reserved interrupt-capable ordinary GPIO input |
+| MPU-9250 INT | GPIO7 | Reserved interrupt-capable ordinary GPIO input |
 | Status LED | GPIO14 | Dedicated ordinary GPIO; external LED polarity and resistor remain TBD |
 | Battery ADC | GPIO26 / ADC0 | Reserved ADC-capable GPIO; divider is not designed |
 
@@ -52,8 +52,8 @@ The Pico's onboard LED is not used as the competition-visible external LED. GPIO
 
 | Pico GPIO | Function | Peripheral | Direction | Connected Device | Priority | Status | Notes |
 |---:|---|---|---|---|---|---|---|
-| GPIO4 | I2C SDA | I2C0 | Bidirectional | MPU6050 + BMP280 | REQUIRED | Provisional | Shared bus; breakout pull-ups and voltage TBD |
-| GPIO5 | I2C SCL | I2C0 | Output/open-drain bus | MPU6050 + BMP280 | REQUIRED | Provisional | Shared bus; breakout pull-ups and voltage TBD |
+| GPIO4 | I2C SDA | I2C0 | Bidirectional | MPU-9250 + BMP280 | REQUIRED | Provisional | Shared bus; breakout pull-ups and voltage TBD |
+| GPIO5 | I2C SCL | I2C0 | Output/open-drain bus | MPU-9250 + BMP280 | REQUIRED | Provisional | Shared bus; breakout pull-ups and voltage TBD |
 | GPIO18 | SPI SCK | SPI0 | Output | RA-02 + Micro SD reader | REQUIRED | Provisional | Shared clock; exact board interfaces TBD |
 | GPIO19 | SPI MOSI | SPI0 TX | Output | RA-02 + Micro SD reader | REQUIRED | Provisional | Shared controller-to-device data |
 | GPIO16 | SPI MISO | SPI0 RX | Input | RA-02 + Micro SD reader | REQUIRED | Provisional | Only selected device may drive the bus |
@@ -64,7 +64,7 @@ The Pico's onboard LED is not used as the competition-visible external LED. GPIO
 | GPIO22 | RA-02 DIO1 | GPIO interrupt/input | Input | SX1278 RA-02 | OPTIONAL | Provisional | Release if the verified radio design does not need it |
 | GPIO12 | GPS TX path | UART0 TX | Output | NEO-6M RX | REQUIRED | Provisional | Pico TX -> GPS RX; breakout labels and levels TBD |
 | GPIO13 | GPS RX path | UART0 RX | Input | NEO-6M TX | REQUIRED | Provisional | Pico RX <- GPS TX; breakout labels and levels TBD |
-| GPIO7 | MPU6050 INT | GPIO interrupt/input | Input | MPU6050 INT | USEFUL | Provisional | Only if the breakout exposes INT and the design uses it |
+| GPIO7 | MPU-9250 INT | GPIO interrupt/input | Input | MPU-9250 INT | USEFUL | Provisional | Only if the breakout exposes INT and the design uses it |
 | GPIO14 | Status LED | GPIO | Output | External visible LED | REQUIRED | Provisional | Proposed GPIO -> resistor -> LED -> GND; polarity and resistor value TBD |
 | GPIO26 | Battery monitoring | ADC0 | Analog input | Battery-voltage monitor reservation | USEFUL | Reserved | Divider and protection not designed; never connect LiPo directly |
 
@@ -72,8 +72,8 @@ The Pico's onboard LED is not used as the competition-visible external LED. GPIO
 
 ```text
 I2C:
-GPIO4 -> SDA -> MPU6050 + BMP280
-GPIO5 -> SCL -> MPU6050 + BMP280
+GPIO4 -> SDA -> MPU-9250 + BMP280
+GPIO5 -> SCL -> MPU-9250 + BMP280
 
 SPI:
 GPIO18 -> SCK  -> RA-02 + Micro SD
@@ -91,7 +91,7 @@ GPIO20 -> RESET
 GPIO21 <- DIO0
 GPIO22 <- DIO1 (optional)
 
-MPU6050:
+MPU-9250:
 GPIO7 <- INT
 
 LED:
@@ -125,12 +125,13 @@ GPIO26/ADC0 is reserved for future battery-voltage monitoring. This is only a re
 
 ## I2C Analysis and Design
 
-The MPU6050 and BMP280 share GPIO4/GPIO5 as one I2C0 bus.
+The MPU-9250 and BMP280 share GPIO4/GPIO5 as one I2C0 bus.
 
 | Device | Expected IC-level address | Address control | Map implication |
 |---|---|---|---|
-| MPU6050 | `0x68` or `0x69` | AD0 | No conflict with BMP280 addresses |
-| BMP280 | `0x76` or `0x77` | SDO | No conflict with MPU6050 addresses |
+| MPU-9250 accelerometer + gyroscope | `0x68` or `0x69` | AD0 | No conflict with the other two |
+| AK8963 magnetometer (second die in the MPU-9250) | `0x0C` | Fixed; visible only once `INT_PIN_CFG.BYPASS_EN` bridges it to the primary bus | No conflict with the other two |
+| BMP280 | `0x76` or `0x77` | SDO | No conflict with the other two |
 
 The address choices are IC-level documentation. The selected breakout's AD0/SDO wiring, pull-ups, voltage domain, and exposed interface remain unresolved.
 
@@ -164,7 +165,7 @@ The RA-02 additionally receives:
 
 DIO0 is reserved because it is useful for receive-complete, transmit-complete, and other configured radio event handling. The exact event mapping depends on the final radio configuration and carrier-board availability.
 
-The SD reader's Robu listing states a 4.5-5.5 V input and onboard 3.3 V regulator. Its host-side signal levels, level shifting, MISO release behavior, and exact pin implementation remain unresolved. **GPIO assignment does not imply electrical approval.**
+The SD reader is a 2.6-3.6 V SPI module, so its signals are 3.3 V like the Pico's and its supply comes from the same rail. What remains unresolved is its MISO release behaviour when deselected on the bus it shares with the RA-02, and its write-transient current. **GPIO assignment does not imply electrical approval.**
 
 **SPI result:** Shared SPI with separate CS lines is logically valid and preserves the second SPI controller for future use. Electrical bus operation remains provisional.
 
@@ -185,12 +186,12 @@ UART1 remains unassigned for debugging, a future sensor, or expansion if the fin
 
 | Resource | Device/Function | Proposed allocation | Status | Notes |
 |---|---|---|---|---|
-| I2C0 | MPU6050 and BMP280 | GPIO4 SDA / GPIO5 SCL | Provisional | Shared bus; addresses are logically distinct; pull-ups and voltage TBD |
+| I2C0 | MPU-9250, AK8963 and BMP280 | GPIO4 SDA / GPIO5 SCL | Provisional | Three devices on one bus; addresses are logically distinct; pull-ups and voltage TBD |
 | SPI0 | RA-02 and Micro SD reader | GPIO18 SCK / GPIO19 MOSI / GPIO16 MISO | Provisional | Shared bus; separate CS lines; SD electrical behavior TBD |
 | UART0 | NEO-6M GPS | GPIO12 TX / GPIO13 RX | Provisional | Pico TX -> GPS RX; Pico RX <- GPS TX |
 | UART1 | Debug or future expansion | Unassigned | Reserved | Preserve if final pin multiplexing permits |
 | ADC0 | Battery-voltage monitoring | GPIO26 | Reserved | Divider and protection not designed |
-| GPIO | RA-02 controls, SD CS, MPU6050 INT, status LED | GPIO17, GPIO6, GPIO20-GPIO22, GPIO7, GPIO14 | Provisional | Exact breakout pins and logic levels TBD |
+| GPIO | RA-02 controls, SD CS, MPU-9250 INT, status LED | GPIO17, GPIO6, GPIO20-GPIO22, GPIO7, GPIO14 | Provisional | Exact breakout pins and logic levels TBD |
 | USB | Programming and development debug | USB interface | Preserved | Not consumed by mission peripherals |
 | SWD/debug | Low-level development/debug | Pico debug interface | Preserved where practical | Access and header arrangement remain TBD |
 
@@ -212,7 +213,7 @@ UART1 remains unassigned for debugging, a future sensor, or expansion if the fin
 - GPIO22: optional RA-02 DIO1
 - GPIO26/ADC0: battery monitoring reservation
 - GPIO14: external visible status LED
-- GPIO7: MPU6050 INT reservation
+- GPIO7: MPU-9250 INT reservation
 - UART1-capable GPIO resources: preserved for debug or expansion
 - USB: preserved for development and programming
 - SWD/debug access: preserved where practical through the Pico debug interface
@@ -245,12 +246,12 @@ GPIO25 is left for the Pico onboard LED function and is not used as the competit
 | I2C alternate functions | PASS | GPIO4/GPIO5 are an I2C0 SDA/SCL pair |
 | SPI alternate functions | PASS | GPIO16/18/19 provide SPI0 RX/SCK/TX |
 | Separate SPI chip selects | PASS | GPIO17 for RA-02 and GPIO6 for SD |
-| I2C address sharing | PASS logically | MPU6050 `0x68/0x69`; BMP280 `0x76/0x77` |
+| I2C address sharing | PASS logically | MPU-9250 `0x68/0x69`; AK8963 `0x0C`; BMP280 `0x76/0x77` |
 | GPS directions | PASS | Pico TX goes to GPS RX; Pico RX receives GPS TX |
 | GPS UART allocation | PASS | UART0 reserved; UART1 remains available |
 | ADC capability | PASS | GPIO26 is ADC0-capable |
 | LED GPIO capability | PASS | GPIO14 is assigned as ordinary GPIO |
-| Interrupt resources | PASS provisionally | RA-02 DIO0 required; DIO1 optional; MPU6050 INT useful |
+| Interrupt resources | PASS provisionally | RA-02 DIO0 required; DIO1 optional; MPU-9250 INT useful |
 | GPIO capacity | PASS logically | Required functions fit while preserving spare exposed GPIOs |
 | Debugging | PASS provisionally | USB and SWD/debug access preserved; UART1 unassigned |
 | Electrical compatibility | NOT PASSED | Breakout supply, logic, pull-ups, MISO behavior, and pinouts remain unresolved |
@@ -258,11 +259,11 @@ GPIO25 is left for the Pico onboard LED function and is not used as the competit
 
 ## Provisional Power Relationship
 
-This pin map does not design the power circuit. The eventual power architecture must consider the Pico, RA-02, MPU6050, BMP280, NEO-6M, Micro SD reader, and status LED.
+This pin map does not design the power circuit. The eventual power architecture must consider the Pico, RA-02, MPU-9250, BMP280, NEO-6M, Micro SD reader, and status LED.
 
 - The Pico supply input path remains subject to the electrical-compatibility review.
 - The RA-02 and sensor breakout supply and logic levels remain subject to physical verification.
-- The SD reader's Robu-documented 4.5-5.5 V input and onboard 3.3 V regulator do not establish that its signals are safe for direct Pico connection.
+- The SD reader's 2.6-3.6 V range settles its supply, but not its behaviour on a shared SPI bus: confirm that it releases MISO when deselected before trusting it beside the RA-02.
 - No regulator, level shifter, resistor, capacitor, or power wiring is selected here.
 - Power uncertainty can invalidate a physical connection, but it does not change the logical bus reservation by itself.
 
@@ -276,7 +277,7 @@ The following GPIO assignments may change after physical verification:
 - GPIO6 if the SD reader CS label or host interface differs from the Robu listing
 - GPIO16, GPIO18, and GPIO19 if the SD reader cannot share SPI electrically
 - GPIO4 and GPIO5 if either sensor breakout does not expose I2C or its bus voltage/pull-ups are incompatible
-- GPIO7 if the MPU6050 breakout does not expose INT
+- GPIO7 if the MPU-9250 breakout does not expose INT
 - GPIO12 and GPIO13 if the GPS breakout uses different exposed pins or levels
 - GPIO26 if battery monitoring is removed or a different ADC arrangement is required
 - GPIO14 if the physical LED circuit requires a different control arrangement
@@ -291,7 +292,7 @@ The following unresolved hardware questions can force a pin reassignment:
 - RA-02 RESET, DIO0, and optional DIO1 exposure
 - SD module pin labels, CS behavior, and host-side logic-level implementation
 - Whether the SD reader can share SPI electrically with the RA-02
-- MPU6050 breakout interface selection and INT availability
+- MPU-9250 breakout interface selection and INT availability
 - BMP280 breakout interface selection and address/control pins
 - GPS breakout TX/RX arrangement and any enable/reset controls
 - Breakout-board logic levels and required level shifting
@@ -311,7 +312,7 @@ The following uncertainties do not prevent this logical allocation, although the
 
 There is no identified GPIO or peripheral conflict in this preliminary map:
 
-- I2C0 supports the MPU6050 and BMP280 with distinct logical addresses.
+- I2C0 supports the MPU-9250 and BMP280 with distinct logical addresses.
 - SPI0 supports shared RA-02 and SD signals with separate CS lines.
 - UART0 supports the GPS with correct TX/RX directions.
 - UART1, USB, SWD/debug, ADC capacity, and multiple GPIOs remain available.
@@ -331,10 +332,10 @@ Yes, for this preliminary GPIO-number map. The final map remains subject to the 
 2. **Are any GPIOs conflicting?** No logical GPIO or alternate-function conflict was identified.
 3. **How many GPIOs remain spare?** Eleven exposed GPIOs are intentionally listed as spare: GPIO0, GPIO1, GPIO2, GPIO3, GPIO8, GPIO9, GPIO10, GPIO11, GPIO15, GPIO27, and GPIO28. GPIO25 remains reserved for the Pico onboard LED and is not used for the external competition LED.
 4. **Is the SPI sharing architecture valid?** Yes logically, with shared SCK/MOSI/MISO and separate RA-02 and SD CS lines. Electrical validation remains pending.
-5. **Is the I2C sharing architecture valid?** Yes logically; MPU6050 and BMP280 address options do not conflict. Pull-ups and bus voltage remain pending.
+5. **Is the I2C sharing architecture valid?** Yes logically; MPU-9250 and BMP280 address options do not conflict. Pull-ups and bus voltage remain pending.
 6. **Is the GPS UART allocation valid?** Yes; Pico TX is connected logically to GPS RX and Pico RX to GPS TX using UART0. Breakout labels and levels remain pending.
 7. **Is battery ADC reserved?** Yes, GPIO26/ADC0 is reserved. No divider or direct battery connection is designed.
 8. **Are debugging resources preserved?** Yes; USB, SWD/debug access, UART1 capacity, spare GPIO, and spare ADC-capable GPIOs are preserved.
-9. **What physical checks could force reassignment?** RA-02 carrier pin availability, SD pin labels and level shifting, MPU6050 INT exposure, GPS TX/RX arrangement, BMP280 interface selection, breakout logic levels, and Pico board/pin-mux verification.
+9. **What physical checks could force reassignment?** RA-02 carrier pin availability, SD pin labels and level shifting, MPU-9250 INT exposure, GPS TX/RX arrangement, BMP280 interface selection, breakout logic levels, and Pico board/pin-mux verification.
 
 This is a preliminary GPIO-number map only. No final wiring, regulator, PCB, firmware, or competition compliance claim is made.

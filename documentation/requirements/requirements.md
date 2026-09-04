@@ -52,12 +52,12 @@ mechanical build or a launch.
 | TEL-012 | The packet must include altitude as `A-XXX.X` in metres with 1 decimal place. | Rulebook - Mandatory Packet Format | Mandatory | BMP280 altitude, 1 decimal place, relative to the pad baseline | Validate field syntax, units, and precision. | Complete | `test_pressure_altitude`, `test_bmp280_compensation_datasheet_vector` |
 | TEL-013 | The packet must include pressure as `Pr-XXXX.XX` in Pa with 2 decimals. | Rulebook - Mandatory Packet Format | Mandatory | BMP280 pressure in Pa, 2 decimal places | Validate field syntax, units, and precision. | Complete | `test_bmp280_compensation_datasheet_vector` reproduces the datasheet vector |
 | TEL-014 | The packet must include temperature as `T-XX.X` in degrees C with 1 decimal place. | Rulebook - Mandatory Packet Format | Mandatory | BMP280 temperature in degrees C, 1 decimal place | Validate field syntax, units, and precision. | Complete | `test_bmp280_compensation_datasheet_vector` |
-| TEL-015 | The packet must include roll as `Ro-XX.X` in degrees with 1 decimal place. | Rulebook - Mandatory Packet Format | Mandatory | Complementary filter roll, 1 decimal place; blending is correct across the +-180 deg seam | Validate field syntax, units, precision, and test orientation. | Complete | `test_orientation_levels_and_yaw`, `test_orientation_blends_across_the_wrap` |
-| TEL-016 | The packet must include pitch as `Pi-XX.X` in degrees with 1 decimal place. | Rulebook - Mandatory Packet Format | Mandatory | Complementary filter pitch, 1 decimal place | Validate field syntax, units, precision, and test orientation. | Complete | `test_orientation_levels_and_yaw` |
-| TEL-017 | The packet must include yaw as `Ya-XX.X` in degrees with 1 decimal place. | Rulebook - Mandatory Packet Format | Mandatory | Yaw source and algorithm - TBD | Obtain organizer clarification and test the selected implementation. | TBD | |
-| TEL-018 | The packet must include X acceleration as `AX-XX.XX` in m/s2 with 2 decimals. | Rulebook - Mandatory Packet Format | Mandatory | MPU6050 X acceleration in m/s2, 2 decimal places; range bits and scale come from one enum | Validate field syntax, units, precision, and calibrated readings. | Complete | `test_mpu_scaling`, `test_imu_range_bits_match_their_sensitivities` |
-| TEL-019 | The packet must include Y acceleration as `AY-XX.XX` in m/s2 with 2 decimals. | Rulebook - Mandatory Packet Format | Mandatory | MPU6050 Y acceleration in m/s2, 2 decimal places | Validate field syntax, units, precision, and calibrated readings. | Complete | `test_mpu_scaling`, `test_imu_range_bits_match_their_sensitivities` |
-| TEL-020 | The packet must include Z acceleration as `AZ-XX.XX` in m/s2 with 2 decimals. | Rulebook - Mandatory Packet Format | Mandatory | MPU6050 Z acceleration in m/s2, 2 decimal places | Validate field syntax, units, precision, and calibrated readings. | Complete | `test_mpu_scaling`, `test_imu_range_bits_match_their_sensitivities` |
+| TEL-015 | The packet must include roll as `Ro-XX.X` in degrees with 1 decimal place. | Rulebook - Mandatory Packet Format | Mandatory | Mahony quaternion filter roll, 1 decimal place; no seam or singularity in the state | Validate field syntax, units, precision, and test orientation. | Complete | `test_orientation_levels_and_yaw`, `test_orientation_survives_the_wrap_and_the_poles` |
+| TEL-016 | The packet must include pitch as `Pi-XX.X` in degrees with 1 decimal place. | Rulebook - Mandatory Packet Format | Mandatory | Mahony quaternion filter pitch, 1 decimal place | Validate field syntax, units, precision, and test orientation. | Complete | `test_orientation_levels_and_yaw`, `test_orientation_survives_the_wrap_and_the_poles` |
+| TEL-017 | The packet must include yaw as `Ya-XX.X` in degrees with 1 decimal place. | Rulebook - Mandatory Packet Format | Mandatory | Magnetometer-referenced yaw from the AK8963 once the airframe is calibrated, gyro-propagated otherwise; the `YR-M`/`YR-G` tag declares which. Field syntax is complete; whether a relative yaw is acceptable remains an organizer question | Obtain organizer clarification; test against known bearings on the assembled vehicle. | Implemented; acceptance TBD | `test_orientation_yaw_is_disciplined_by_the_magnetometer`, `test_telemetry_declares_the_yaw_reference` |
+| TEL-018 | The packet must include X acceleration as `AX-XX.XX` in m/s2 with 2 decimals. | Rulebook - Mandatory Packet Format | Mandatory | MPU-9250 X acceleration in m/s2, 2 decimal places; range bits and scale come from one enum | Validate field syntax, units, precision, and calibrated readings. | Complete | `test_mpu_scaling`, `test_imu_range_bits_match_their_sensitivities` |
+| TEL-019 | The packet must include Y acceleration as `AY-XX.XX` in m/s2 with 2 decimals. | Rulebook - Mandatory Packet Format | Mandatory | MPU-9250 Y acceleration in m/s2, 2 decimal places | Validate field syntax, units, precision, and calibrated readings. | Complete | `test_mpu_scaling`, `test_imu_range_bits_match_their_sensitivities` |
+| TEL-020 | The packet must include Z acceleration as `AZ-XX.XX` in m/s2 with 2 decimals. | Rulebook - Mandatory Packet Format | Mandatory | MPU-9250 Z acceleration in m/s2, 2 decimal places | Validate field syntax, units, precision, and calibrated readings. | Complete | `test_mpu_scaling`, `test_imu_range_bits_match_their_sensitivities` |
 | TEL-021 | Missing or corrupted mandatory fields must not be accepted as telemetry points. | Rulebook - Telemetry | Mandatory | Per-field validity flags; an incomplete mandatory set produces no packet and no telemetry point | Inject malformed packets and confirm rejection. | Complete | `test_controller_sensor_plausibility`, `test_controller_sensor_failure_suppresses_but_continues` |
 | TEL-022 | Optional sensor data may be appended only after mandatory data and must not displace it. | Rulebook - Telemetry | Recommended | Optional fields are appended after the mandatory block and shed first when the packet would exceed its budget | Test packets with and without optional fields. | Complete | `test_controller_drops_optional_fields_before_overrunning_the_budget` |
 | TEL-023 | Official launch LoRa sync word must be `0xA5`. | Rulebook - LoRa Configuration | Mandatory | `0xA5` selected by `RadioMode::official`, defined once in the shared link profile | Inspect configuration and test against the official receiver. | Complete | `test_link_profile_is_shared_by_both_ends`, `test_sync_word_can_be_switched_for_the_official_launch` |
@@ -67,13 +67,14 @@ mechanical build or a launch.
 | SEN-001 | The CanSat must measure altitude. | Rulebook - Sensor Requirements | Mandatory | GY-BMP280-3.3; integration and altitude method - TBD | Sensor test, calibration, and altitude validation. | Not Started | |
 | SEN-002 | The CanSat must measure pressure. | Rulebook - Sensor Requirements | Mandatory | GY-BMP280-3.3; interface - TBD | Compare readings against a controlled pressure test. | Not Started | |
 | SEN-003 | The CanSat must measure temperature. | Rulebook - Sensor Requirements | Mandatory | BMP280 temperature reading intended; integration - TBD | Validate readings and required telemetry formatting. | Not Started | |
-| SEN-004 | The CanSat must measure angular motion with a gyroscope. | Rulebook - Sensor Requirements | Mandatory | MPU6050; interface and calibration - TBD | Verify all axes and calibration in a sensor test. | Not Started | |
-| SEN-005 | The CanSat must measure X acceleration. | Rulebook - Sensor Requirements | Mandatory | MPU6050; pin/interface - TBD | Static and controlled-motion test. | Not Started | |
-| SEN-006 | The CanSat must measure Y acceleration. | Rulebook - Sensor Requirements | Mandatory | MPU6050; pin/interface - TBD | Static and controlled-motion test. | Not Started | |
-| SEN-007 | The CanSat must measure Z acceleration. | Rulebook - Sensor Requirements | Mandatory | MPU6050; pin/interface - TBD | Static and controlled-motion test. | Not Started | |
-| SEN-008 | Roll data must be generated and transmitted. | Rulebook - Mandatory Telemetry Fields | Mandatory | MPU6050 orientation processing - TBD | Validate against known orientations. | Not Started | |
-| SEN-009 | Pitch data must be generated and transmitted. | Rulebook - Mandatory Telemetry Fields | Mandatory | MPU6050 orientation processing - TBD | Validate against known orientations. | Not Started | |
-| SEN-010 | Yaw data must be generated and transmitted in an organizer-acceptable form. | Rulebook - Mandatory Telemetry Fields | Mandatory | Yaw implementation - TBD | Obtain clarification and conduct orientation tests. | TBD | |
+| SEN-004 | The CanSat must measure angular motion with a gyroscope. | Rulebook - Sensor Requirements | Mandatory | MPU-9250 gyroscope, +/-2000 deg/s, bias estimated on the pad | Verify all axes and calibration in a sensor test. | Not Started | |
+| SEN-004a | The CanSat measures the magnetic field, for yaw reference. | Project addition | Supporting | AK8963 inside the MPU-9250, 16-bit, 100 Hz, axis-mapped into the body frame | Verify all three axes and the airframe calibration on hardware. | Not Started | |
+| SEN-005 | The CanSat must measure X acceleration. | Rulebook - Sensor Requirements | Mandatory | MPU-9250; pin/interface - TBD | Static and controlled-motion test. | Not Started | |
+| SEN-006 | The CanSat must measure Y acceleration. | Rulebook - Sensor Requirements | Mandatory | MPU-9250; pin/interface - TBD | Static and controlled-motion test. | Not Started | |
+| SEN-007 | The CanSat must measure Z acceleration. | Rulebook - Sensor Requirements | Mandatory | MPU-9250; pin/interface - TBD | Static and controlled-motion test. | Not Started | |
+| SEN-008 | Roll data must be generated and transmitted. | Rulebook - Mandatory Telemetry Fields | Mandatory | MPU-9250 orientation processing - TBD | Validate against known orientations. | Not Started | |
+| SEN-009 | Pitch data must be generated and transmitted. | Rulebook - Mandatory Telemetry Fields | Mandatory | MPU-9250 orientation processing - TBD | Validate against known orientations. | Not Started | |
+| SEN-010 | Yaw data must be generated and transmitted in an organizer-acceptable form. | Rulebook - Mandatory Telemetry Fields | Mandatory | Nine-axis fusion; absolute magnetic yaw after an airframe hard/soft-iron calibration, relative otherwise, declared either way | Obtain clarification; bring-up gates 8.11 to 8.14 test it on hardware. | Implemented; acceptance TBD | `test_magnetic_yaw_is_tilt_compensated` |
 | SEN-011 | Additional working sensors may be used for scoring. | Rulebook - Sensor Requirements | Scoring | NEO-6M GPS is available as an additional sensor; integration - TBD | Demonstrate working GPS and document transmitted or logged data. | Not Started | |
 | PWR-001 | The CanSat must have a manual ON/OFF switch. | Rulebook - Power / Functional Requirements | Mandatory | Switch hardware - TBD | Inspect hardware and perform repeated power-cycle test. | Blocked | |
 | PWR-002 | The CanSat must have a visible LED power indicator. | Rulebook - Power / Functional Requirements | Mandatory | LED hardware - TBD | Confirm visibility and measure immediate power-on behavior. | Blocked | |
@@ -156,7 +157,7 @@ The following comparison is against the confirmed project BOM. A component is no
 - SX1278 RA-02 433 MHz LoRa module x2: one intended for each node.
 - 433 MHz LoRa antenna with SMA male connector x2.
 - 10 cm IPEX-to-SMA female RG1.13 cable x2.
-- MPU6050 3-axis accelerometer and gyroscope x1.
+- MPU-9250 3-axis accelerometer, 3-axis gyroscope and AK8963 3-axis magnetometer x1.
 - NEO-6M GPS module with EEPROM x1.
 - GY-BMP280-3.3 pressure/altitude sensor module x1.
 - MicroSD card reader module x1.
@@ -180,12 +181,12 @@ The following comparison is against the confirmed project BOM. A component is no
 
 - Exact Pico pin allocation: TBD.
 - LoRa electrical interface, logic levels, configuration, and connector wiring: TBD.
-- MPU6050 interface, voltage, address/configuration, and wiring: TBD.
+- MPU-9250 interface, voltage, address/configuration, and wiring: TBD.
 - BMP280 interface, voltage, module behavior, calibration, and wiring: TBD.
 - NEO-6M interface, voltage, antenna arrangement, and wiring: TBD.
 - MicroSD reader supply voltage, logic levels, interface, and wiring: TBD. Do not assume the module is safe for the Pico or the planned rail without verification.
 - Complete battery-to-load architecture, grounding, decoupling, current budget, and brownout behavior: TBD.
-- Whether the MPU6050-based design can provide organizer-acceptable yaw data: TBD.
+- Whether an absolute magnetic yaw (after airframe calibration) or a declared relative yaw is organizer-acceptable: TBD.
 
 ## Open Questions for Organizers
 
@@ -214,7 +215,7 @@ A gate may be passed only when its conditions are met and evidence is recorded i
 ### Gate 2 - Electrical Architecture Approved
 
 - Pico pin allocation is documented.
-- Interfaces and voltage/logic requirements for MPU6050, BMP280, NEO-6M, MicroSD reader, and RA-02 are verified from applicable documentation or measured hardware.
+- Interfaces and voltage/logic requirements for MPU-9250, BMP280, NEO-6M, MicroSD reader, and RA-02 are verified from applicable documentation or measured hardware.
 - Schematic, grounding, connector, antenna, decoupling, and wiring approach are reviewed.
 - 3.3 V regulated power supply selection remains explicitly documented with its specifications before approval.
 
@@ -229,7 +230,7 @@ A gate may be passed only when its conditions are met and evidence is recorded i
 ### Gate 4 - Sensors Individually Verified
 
 - BMP280 pressure, altitude method, and temperature readings are working and calibrated.
-- MPU6050 acceleration and gyroscope axes are working, calibrated, and oriented.
+- MPU-9250 acceleration, gyroscope and magnetometer axes are working, calibrated, and oriented in one consistent frame.
 - Roll and pitch are validated.
 - Yaw approach is clarified and tested against the organizer's acceptance interpretation.
 - NEO-6M GPS is integrated and working if used as an additional sensor.

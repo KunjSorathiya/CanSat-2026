@@ -29,6 +29,19 @@ struct GpsData {
     double time_of_day_s = 0.0;       // UTC seconds since midnight, when time_valid
     bool time_valid = false;
     std::uint8_t satellites = 0;
+    // Ground track, from RMC. Speed over ground in m/s, and course over ground in
+    // degrees clockwise from TRUE north.
+    //
+    // Course over ground is not the vehicle's yaw and must never be used as though it
+    // were: it describes where the ground track is going, not where the body is pointing.
+    // A payload descending under a parachute in wind is crabbing, so the two differ by
+    // the drift angle; a payload that is spinning has a body yaw that sweeps through 360
+    // degrees while its course stays constant; and a stationary receiver reports a course
+    // that is pure noise. It is carried here for cross-checking and for the ground track,
+    // nothing else.
+    double speed_mps = 0.0;
+    double course_deg = 0.0;
+    bool course_valid = false;
 };
 
 struct TelemetryRecord {

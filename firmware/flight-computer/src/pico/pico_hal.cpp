@@ -58,12 +58,17 @@ bool PicoImu::initialize() {
     ensure_i2c0();
     gpio_init(BoardPins::imu_int);
     gpio_set_dir(BoardPins::imu_int, GPIO_IN);
-    // Bandwidth and internal rate come from the flight configuration: the DLPF setting
-    // must stay below the acquisition Nyquist limit or airframe vibration aliases into
-    // the attitude estimate (see documentation/design/sensor-rates.md).
-    pico::Mpu6050::Options options;
-    options.dlpf = config_.imu_dlpf_cfg;
+    // Bandwidth, internal rate and magnetometer mode all come from the flight
+    // configuration: the filter settings must stay compatible with the acquisition rate
+    // or airframe vibration aliases into the attitude estimate, and the magnetometer must
+    // run fast enough to have a fresh sample for every attitude update (see
+    // documentation/design/sensor-rates.md). validate_config() enforces both.
+    pico::Mpu9250::Options options;
+    options.gyro_dlpf = config_.imu_gyro_dlpf_cfg;
+    options.accel_dlpf = config_.imu_accel_dlpf_cfg;
     options.sample_rate_div = config_.imu_sample_rate_div;
+    options.mag_resolution = config_.mag_resolution;
+    options.mag_mode = config_.mag_mode;
     const bool ok = device_.begin(i2c0, options);
     health_.initialized = ok;
     health_.healthy = ok;

@@ -64,5 +64,54 @@ class TelemetryTests(unittest.TestCase):
             self.assertEqual(rows[0]["packet_number"], "1")
 
 
+
+class YawReferenceTests(unittest.TestCase):
+    """The Ya- field is two different quantities depending on the YR tag beside it."""
+
+    BASE = ("CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; "
+            "Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;")
+
+    def test_magnetic_yaw_is_reported_as_a_bearing(self):
+        result = parse_packet(self.BASE + " YR-M;")
+        self.assertTrue(result)
+        record = result.record
+        self.assertEqual(record.yaw_reference, "magnetic")
+        self.assertTrue(record.yaw_is_magnetic)
+        # Yaw runs anticlockwise about the vehicle's up axis; a bearing runs clockwise.
+        self.assertAlmostEqual(record.heading, 330.0)
+
+    def test_a_relative_yaw_yields_no_bearing(self):
+        result = parse_packet(self.BASE + " YR-G;")
+        self.assertTrue(result)
+        record = result.record
+        self.assertEqual(record.yaw_reference, "gyro")
+        self.assertFalse(record.yaw_is_magnetic)
+        # A bearing derived from a relative yaw would be wrong by an unknown constant, so
+        # none is offered rather than one that looks usable.
+        self.assertIsNone(record.heading)
+
+    def test_a_packet_without_the_tag_says_nothing_either_way(self):
+        result = parse_packet(self.BASE)
+        self.assertTrue(result)
+        self.assertIsNone(result.record.yaw_reference)
+        self.assertIsNone(result.record.heading)
+
+    def test_the_bearing_wraps_into_zero_to_three_sixty(self):
+        packet = self.BASE.replace("Ya-30.0", "Ya--150.0")
+        record = parse_packet(packet + " YR-M;").record
+        self.assertAlmostEqual(record.heading, 150.0)
+        packet = self.BASE.replace("Ya-30.0", "Ya-0.0")
+        record = parse_packet(packet + " YR-M;").record
+        self.assertAlmostEqual(record.heading, 0.0)
+
+    def test_the_csv_row_records_which_kind_of_yaw_it_holds(self):
+        row = parse_packet(self.BASE + " YR-M;").record.csv_row("t")
+        self.assertEqual(row["yaw_reference"], "magnetic")
+        self.assertAlmostEqual(row["heading"], 330.0)
+        row = parse_packet(self.BASE + " YR-G;").record.csv_row("t")
+        self.assertEqual(row["yaw_reference"], "gyro")
+        self.assertEqual(row["heading"], "")
+
+
 if __name__ == "__main__":
     unittest.main()

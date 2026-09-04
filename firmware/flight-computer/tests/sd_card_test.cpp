@@ -1,14 +1,16 @@
 // Host tests for the microSD SPI driver, against a simulated card.
 //
-// The microSD reader is this project's highest-risk integration item: it shares SPI0 with
-// the radio, its breakout's supply and level-shifting are undocumented, and until now its
-// driver had never executed anywhere. The driver reaches hardware through a callback
-// struct, so the whole command sequence runs here against a card model built from the SD
-// Physical Layer Simplified Specification.
+// The breakout received is a 2.6-3.6 V SPI module, so it runs from the vehicle's 3.3 V
+// rail with no level shifting and no rail of its own. What is left is the part this file
+// covers: the driver shares SPI0 with the radio, and its command sequence has to be right
+// the first time it runs on hardware. The driver reaches hardware through a callback
+// struct, so the whole sequence runs here against a card model built from the SD Physical
+// Layer Simplified Specification.
 //
 // This proves the driver issues the right commands, in the right order, with the right
 // addressing, and gives up on every failure path. It proves nothing about the physical
-// module.
+// module: current draw, decoupling and MISO release on the shared bus are bench
+// measurements, not test assertions.
 
 #include "flight/pico/sd_card.hpp"
 
@@ -311,7 +313,10 @@ void test_initialisation_sequence_follows_the_specification() {
     CHECK(issued(card, 41));
     CHECK(issued(card, 58));
 
-    // CMD8's argument carries the 2.7-3.6 V range and the 0xAA check pattern.
+    // CMD8's argument carries the 2.7-3.6 V range and the 0xAA check pattern. That range
+    // is the one this vehicle actually supplies: a 3.3 V rail into a 2.6-3.6 V module.
+    // Asking for a range the hardware cannot supply would let a card claim compatibility
+    // it does not have.
     for (std::size_t i = 0; i < card.commands.size(); ++i) {
         if (card.commands[i] == 8) CHECK(card.command_args[i] == 0x000001AA);
         // ACMD41 must set HCS for a v2 card, or high-capacity cards never initialise.

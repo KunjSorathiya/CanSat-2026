@@ -32,6 +32,10 @@ _NUMERIC_FIELDS = [
     ("roll", "Roll (deg)"),
     ("pitch", "Pitch (deg)"),
     ("yaw", "Yaw (deg)"),
+    # Yaw alone is ambiguous, so the reference is shown beside it rather than left for
+    # the operator to infer from a number that looks the same either way.
+    ("yaw_reference", "Yaw reference"),
+    ("heading", "Heading (deg)"),
     ("ax", "Accel X (m/s2)"),
     ("ay", "Accel Y (m/s2)"),
     ("az", "Accel Z (m/s2)"),
@@ -185,6 +189,7 @@ class Dashboard:
             self._vars["tele.mission_time"].set(tele.get("timestamp", "--"))
             self._vars["tele.packet_number"].set(str(tele.get("packet_number", "--")))
             for key in ("altitude", "pressure", "temperature", "roll", "pitch", "yaw",
+                        "yaw_reference", "heading",
                         "ax", "ay", "az", "gps_lat", "gps_lon", "gps_alt", "gps_fix",
                         "mode", "fault_count"):
                 value = tele.get(key)

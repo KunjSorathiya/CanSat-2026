@@ -401,3 +401,30 @@ test("frame kinds are counted separately", () => {
 test("the rate window matches the Python ground station", () => {
   assert.equal(M.RATE_WINDOW_S, 5);
 });
+
+test("the console distinguishes a magnetic yaw from a relative one", () => {
+  const base = "CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; " +
+    "Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;";
+
+  const magnetic = M.parsePacket(base + " YR-M;", "CAN-Team-07");
+  assert.equal(magnetic.error, undefined);
+  assert.equal(magnetic.record.yaw_reference, "magnetic");
+  // Yaw runs anticlockwise about the vehicle's up axis; a compass bearing runs
+  // clockwise, so the console converts once, here, and only when it may.
+  assert.ok(Math.abs(magnetic.record.heading - 330) < 1e-9);
+
+  const relative = M.parsePacket(base + " YR-G;", "CAN-Team-07");
+  assert.equal(relative.record.yaw_reference, "gyro");
+  assert.equal(relative.record.heading, null);
+
+  // A packet from before the nine-axis upgrade says nothing either way, and the console
+  // must not guess on its behalf.
+  const silent = M.parsePacket(base, "CAN-Team-07");
+  assert.equal(silent.record.yaw_reference, null);
+  assert.equal(silent.record.heading, null);
+
+  // The bearing is always inside [0, 360).
+  const negative = M.parsePacket(base.replace("Ya-30.0", "Ya--150.0") + " YR-M;",
+                                    "CAN-Team-07");
+  assert.ok(Math.abs(negative.record.heading - 150) < 1e-9);
+});

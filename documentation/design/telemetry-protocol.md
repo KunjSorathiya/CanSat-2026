@@ -36,12 +36,12 @@ The mandatory fields must appear in exactly this order. The separator shown by t
 | 4 | Altitude | `A-XXX.X` | Altitude | Metres | 1 decimal place | BMP280-derived altitude | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid; do not emit a valid mandatory packet | Required |
 | 5 | Pressure | `Pr-XXXX.XX` | Atmospheric pressure | Pa | 2 decimal places | BMP280 | Signed/unsigned numeric representation TBD; rendered as text | No rulebook numeric range established | Sensor-invalid; do not emit a valid mandatory packet | Required |
 | 6 | Temperature | `T-XX.X` | Temperature | Degrees C | 1 decimal place | BMP280 | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid; do not emit a valid mandatory packet | Required |
-| 7 | Roll | `Ro-XX.X` | Rotation about the project-defined roll axis | Degrees | 1 decimal place | MPU6050-derived orientation | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid or orientation-invalid; do not emit a valid mandatory packet | Required |
-| 8 | Pitch | `Pi-XX.X` | Rotation about the project-defined pitch axis | Degrees | 1 decimal place | MPU6050-derived orientation | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid or orientation-invalid; do not emit a valid mandatory packet | Required |
-| 9 | Yaw | `Ya-XX.X` | Rotation about the project-defined yaw axis | Degrees | 1 decimal place | MPU6050-derived orientation; absolute reference TBD | Signed numeric value rendered as text | No rulebook numeric range established | Yaw validity failure; do not silently claim an absolute heading | Required; engineering decision open |
-| 10 | X acceleration | `AX-XX.XX` | Acceleration on project-defined X axis | m/s2 | 2 decimal places | MPU6050 | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid; do not emit a valid mandatory packet | Required |
-| 11 | Y acceleration | `AY-XX.XX` | Acceleration on project-defined Y axis | m/s2 | 2 decimal places | MPU6050 | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid; do not emit a valid mandatory packet | Required |
-| 12 | Z acceleration | `AZ-XX.XX` | Acceleration on project-defined Z axis | m/s2 | 2 decimal places | MPU6050 | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid; do not emit a valid mandatory packet | Required |
+| 7 | Roll | `Ro-XX.X` | Rotation about the project-defined roll axis | Degrees | 1 decimal place | MPU-9250-derived orientation | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid or orientation-invalid; do not emit a valid mandatory packet | Required |
+| 8 | Pitch | `Pi-XX.X` | Rotation about the project-defined pitch axis | Degrees | 1 decimal place | MPU-9250-derived orientation | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid or orientation-invalid; do not emit a valid mandatory packet | Required |
+| 9 | Yaw | `Ya-XX.X` | Rotation about the project-defined yaw axis | Degrees | 1 decimal place | MPU-9250-derived orientation; absolute reference TBD | Signed numeric value rendered as text | No rulebook numeric range established | Yaw validity failure; do not silently claim an absolute heading | Required; engineering decision open |
+| 10 | X acceleration | `AX-XX.XX` | Acceleration on project-defined X axis | m/s2 | 2 decimal places | MPU-9250 | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid; do not emit a valid mandatory packet | Required |
+| 11 | Y acceleration | `AY-XX.XX` | Acceleration on project-defined Y axis | m/s2 | 2 decimal places | MPU-9250 | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid; do not emit a valid mandatory packet | Required |
+| 12 | Z acceleration | `AZ-XX.XX` | Acceleration on project-defined Z axis | m/s2 | 2 decimal places | MPU-9250 | Signed numeric value rendered as text | No rulebook numeric range established | Sensor-invalid; do not emit a valid mandatory packet | Required |
 
 The rulebook does not establish numeric valid ranges for these fields. Firmware must not invent arbitrary acceptance limits. Engineering plausibility checks may be added later only when based on sensor documentation, calibration, physical constraints, or a documented project requirement.
 
@@ -88,10 +88,10 @@ GPS time may be logged internally or appended as an optional field after GPS int
 | Altitude | BMP280 | Project-defined pressure-to-altitude calculation and ground baseline | Required; algorithm and calibration TBD |
 | Pressure | BMP280 | Read and convert to Pa at required precision | Required; driver and validity rules TBD |
 | Temperature | BMP280 | Read and convert to degrees C at required precision | Required; integration TBD |
-| Roll | MPU6050 | Orientation processing using project frame | Required; algorithm TBD |
-| Pitch | MPU6050 | Orientation processing using project frame | Required; algorithm TBD |
-| Yaw | MPU6050-derived orientation | Method and absolute-reference validity are open | Required; high-risk engineering decision |
-| AX/AY/AZ | MPU6050 | Axis mapping and unit conversion to m/s2 | Required; calibration and frame TBD |
+| Roll | MPU-9250 | Orientation processing using project frame | Required; algorithm TBD |
+| Pitch | MPU-9250 | Orientation processing using project frame | Required; algorithm TBD |
+| Yaw | MPU-9250-derived orientation | Method and absolute-reference validity are open | Required; high-risk engineering decision |
+| AX/AY/AZ | MPU-9250 | Axis mapping and unit conversion to m/s2 | Required; calibration and frame TBD |
 | GPS extensions | NEO-6M | Parse position/time when valid | Optional; no scoring claim until working |
 
 ## Orientation Definitions
@@ -105,9 +105,29 @@ The project will define a right-handed body reference frame fixed to the CanSat 
 - **Pitch:** rotation about the project Y axis.
 - **Yaw:** rotation about the project Z axis.
 
-The exact sign convention, zero orientation, angle wrapping, and relationship between body axes and MPU6050 axes must be documented with the mechanical mounting orientation before firmware implementation.
+The exact sign convention, zero orientation, angle wrapping, and relationship between body axes and MPU-9250 axes must be documented with the mechanical mounting orientation before firmware implementation.
 
-The telemetry protocol does not prescribe a sensor-fusion algorithm. Roll, pitch, and yaw are derived values, not direct raw MPU6050 fields. In particular, the MPU6050 has no magnetometer in the confirmed hardware, so absolute yaw validity is a project risk. The team must decide whether the transmitted yaw is a relative gyro-integrated angle, another documented estimate, or a value that requires additional hardware. No solution is assumed here.
+The telemetry protocol does not prescribe a sensor-fusion algorithm. Roll, pitch, and yaw
+are derived values, not direct raw MPU-9250 fields.
+
+The MPU-9250 includes an AK8963 magnetometer, so an absolute magnetic yaw is available — but
+only once that magnetometer has been calibrated for the assembled airframe. Because the
+mandatory `Ya-` field is a single number that looks identical either way, the vehicle
+appends an optional tag saying which quantity it is transmitting:
+
+| Tag | Meaning |
+|---|---|
+| `YR-M` | Yaw is referenced to magnetic north through a calibrated magnetometer: an absolute angle. |
+| `YR-G` | Yaw is a free-running gyro integration whose zero is wherever the vehicle was pointing at reset: a relative angle. |
+| *(absent)* | The transmitter did not say. Treat the yaw as relative. |
+
+`YR-` is an optional field like any other: it follows every mandatory field, and a
+conforming parser that does not know it ignores it. It is four characters plus the
+separator, which is what the airtime budget could afford.
+
+Whether a relative yaw satisfies the mandatory field is a question for the organizers, not
+one this document can answer. What the protocol guarantees is that the receiver is never
+left guessing which of the two it has.
 
 ## Data Validation
 
@@ -332,7 +352,7 @@ Each test record must contain a requirement reference, method, expected result, 
 - Team number for `CAN-Team-XX`
 - Whether the Pico timer timestamp is accepted as the final mission timestamp and the exact epoch/rollover policy
 - Roll, pitch, and yaw sign convention and body-frame mounting definition
-- Yaw method and whether the current MPU6050-only hardware provides an acceptable field
+- Yaw method and whether the current MPU-9250-only hardware provides an acceptable field
 - Final packet rate; 1 Hz is the selected default and the airtime-supported choice
 - Spreading factor, bandwidth, coding rate, frequency, transmit power, preamble, CRC, and retry behavior
 - Packet counter policy when sensor data is invalid
@@ -347,7 +367,7 @@ Future flight firmware will need to implement:
 - Sensor acquisition and initialization
 - Sensor freshness and validity state
 - BMP280 pressure, temperature, and altitude processing
-- MPU6050 axis conversion and orientation processing
+- MPU-9250 axis conversion and orientation processing
 - Timestamp generation from the selected source
 - Team-ID configuration
 - Packet counter and startup behavior

@@ -23,6 +23,8 @@ enum class FaultCode : std::uint8_t {
     battery_low,
     telemetry_suppressed,
     orientation_invalid,
+    mag_unavailable,      // no magnetometer, or it stopped producing fresh samples
+    yaw_reference_disagreement,  // magnetic heading and GPS course disagree while moving
     calibration,          // startup calibration did not settle cleanly (best-effort used)
     sensor_implausible,   // a reading fell outside datasheet-derived bounds
     watchdog_reboot,      // this boot was caused by the hardware watchdog

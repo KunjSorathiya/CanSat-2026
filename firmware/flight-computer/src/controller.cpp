@@ -1,5 +1,6 @@
 #include "flight/controller.hpp"
 
+#include "flight/orientation.hpp"
 #include "flight/sensor_math.hpp"
 
 #include <cmath>
@@ -25,9 +26,19 @@ Controller::Controller(Configuration config, Imu& imu, Barometer& barometer, Gps
       logger_(logger),
       board_(board),
       state_machine_(config_),
-      orientation_(config_.orientation_alpha),
       builder_(config_),
-      calibrator_(config_) {
+      calibrator_(config_),
+      mag_calibrator_(config_) {
+    OrientationEstimator::Gains gains;
+    gains.kp_accel = config_.orientation_kp_accel;
+    gains.kp_mag = config_.orientation_kp_mag;
+    gains.ki_bias = config_.orientation_ki_bias;
+    gains.bias_limit_dps = config_.orientation_bias_limit_dps;
+    orientation_.set_gains(gains);
+    // A calibration carried in the configuration was measured on this airframe on the
+    // bench; one produced in flight is adopted later, if the vehicle is ever swept
+    // through enough attitudes to earn it.
+    mag_calibration_ = config_.mag_calibration;
     sensor_task_.configure(config_.sensor_period_ms, 0);
     telemetry_task_.configure(config_.telemetry_period_ms, 0);
     sd_flush_task_.configure(config_.sd_flush_period_ms, config_.sd_flush_period_ms);
@@ -66,6 +77,13 @@ bool Controller::initialize() {
     const bool radio_ok = radio_.initialize(sync_word(config_));
 
     if (!imu_ok) faults_.report(FaultCode::imu_init, FaultSeverity::error, 0);
+    // A module sold as an MPU-9250 that answers WHO_AM_I with an MPU-6500 has no
+    // magnetometer. That is a degraded vehicle, not a broken one: roll and pitch are
+    // unaffected and yaw falls back to relative gyro integration.
+    if (imu_ok && !imu_.has_magnetometer()) {
+        faults_.report(FaultCode::mag_unavailable, FaultSeverity::warning, 0);
+        last_error_ = "no magnetometer detected; yaw is relative only";
+    }
     if (!baro_ok) faults_.report(FaultCode::baro_init, FaultSeverity::error, 0);
     if (!gps_ok) faults_.report(FaultCode::gps_unavailable, FaultSeverity::warning, 0);
     if (!logger_enabled_) faults_.report(FaultCode::sd_unavailable, FaultSeverity::warning, 0);
@@ -144,6 +162,12 @@ bool Controller::plausible_imu(const ImuSample& s) const {
            std::fabs(s.gx_dps) < g && std::fabs(s.gy_dps) < g && std::fabs(s.gz_dps) < g;
 }
 
+bool Controller::plausible_mag(const ImuSample& s) const {
+    const double c = config_.mag_clip_ut;
+    return std::isfinite(s.mx_ut) && std::isfinite(s.my_ut) && std::isfinite(s.mz_ut) &&
+           std::fabs(s.mx_ut) < c && std::fabs(s.my_ut) < c && std::fabs(s.mz_ut) < c;
+}
+
 bool Controller::plausible_baro(const BaroSample& s) const {
     return s.pressure_pa >= config_.baro_min_pa && s.pressure_pa <= config_.baro_max_pa &&
            s.temperature_c >= config_.baro_min_temp_c && s.temperature_c <= config_.baro_max_temp_c;
@@ -167,16 +191,26 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
         snapshot_.orientation_valid = false;
         faults_.report(FaultCode::sensor_implausible, FaultSeverity::warning, mission_ms);
     }
+    // The magnetometer is validated on its own terms. It shares a die package with the
+    // accelerometer and gyroscope but not their failure modes: a saturated or absent
+    // magnetometer must cost yaw only, never roll, pitch or acceleration telemetry.
+    bool mag_read = imu_read && imu.mag_valid && plausible_mag(imu);
+    if (imu_read && imu.mag_valid && !mag_read) {
+        faults_.report(FaultCode::sensor_implausible, FaultSeverity::warning, mission_ms);
+    }
+
     if (imu_read) {
-        // Feed the raw sample to the pad calibration before any bias correction.
+        // Feed the raw sample to the pad calibration before any correction is applied.
         if (!calibrator_.settled()) {
             calibrator_.add_imu(imu);
         }
 
-        // Bias-corrected values feed both orientation and the telemetry snapshot.
-        const double ax = imu.ax_mps2 - accel_bias_mps2_[0];
-        const double ay = imu.ay_mps2 - accel_bias_mps2_[1];
-        const double az = imu.az_mps2 - accel_bias_mps2_[2];
+        // Corrected values feed both orientation and the telemetry snapshot. The
+        // accelerometer correction is a scalar scale rather than a subtracted vector,
+        // because a vector measured in one attitude stops being right in any other.
+        const double ax = imu.ax_mps2 * accel_scale_;
+        const double ay = imu.ay_mps2 * accel_scale_;
+        const double az = imu.az_mps2 * accel_scale_;
         const double gx = imu.gx_dps - gyro_bias_dps_[0];
         const double gy = imu.gy_dps - gyro_bias_dps_[1];
         const double gz = imu.gz_dps - gyro_bias_dps_[2];
@@ -186,17 +220,48 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
         snapshot_.az_mps2 = az;
         snapshot_.imu_valid = true;
 
+        double mx = imu.mx_ut;
+        double my = imu.my_ut;
+        double mz = imu.mz_ut;
+        if (mag_read) {
+            // The sweep calibrator sees the field as the sensor reports it; applying the
+            // correction first would fit a correction to already-corrected data.
+            if (config_.mag_cal_in_flight && !mag_calibration_.valid) {
+                mag_calibrator_.add(mx, my, mz);
+            }
+            sensors::apply_mag_calibration(mag_calibration_, mx, my, mz);
+            snapshot_.mx_ut = mx;
+            snapshot_.my_ut = my;
+            snapshot_.mz_ut = mz;
+            snapshot_.mag_valid = true;
+            last_good_mag_ms_ = mission_ms;
+            faults_.clear(FaultCode::mag_unavailable);
+        } else if (imu_.has_magnetometer() &&
+                   mission_ms - last_good_mag_ms_ > config_.sensor_stale_after_ms) {
+            snapshot_.mag_valid = false;
+            faults_.report(FaultCode::mag_unavailable, FaultSeverity::warning, mission_ms);
+        }
+
         double dt = (last_sensor_ms_ == 0)
                         ? config_.sensor_period_ms / 1000.0
                         : (mission_ms - last_sensor_ms_) / 1000.0;
         if (!(dt > 0.0) || dt > 1.0) {
             dt = config_.sensor_period_ms / 1000.0;
         }
-        orientation_.update(ax, ay, az, gx, gy, gz, dt);
+        if (mag_read) {
+            orientation_.update(ax, ay, az, gx, gy, gz, mx, my, mz,
+                                mag_calibration_.valid, dt);
+        } else {
+            // No usable field this tick: yaw propagates on the gyro alone, which is
+            // exactly what the 6-axis entry point does.
+            orientation_.update(ax, ay, az, gx, gy, gz, dt);
+        }
         const OrientationEstimate o = orientation_.estimate();
         snapshot_.roll_deg = o.roll_deg;
         snapshot_.pitch_deg = o.pitch_deg;
         snapshot_.yaw_deg = o.yaw_deg;
+        snapshot_.heading_deg = o.heading_deg;
+        snapshot_.yaw_is_magnetic = o.yaw_is_magnetic;
         snapshot_.orientation_valid = o.valid;
         if (o.valid) {
             faults_.clear(FaultCode::orientation_invalid);
@@ -206,7 +271,9 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
         last_good_imu_ms_ = mission_ms;
     } else if (mission_ms - last_good_imu_ms_ > config_.sensor_stale_after_ms) {
         snapshot_.imu_valid = false;
+        snapshot_.mag_valid = false;
         snapshot_.orientation_valid = false;
+        snapshot_.yaw_is_magnetic = false;
         faults_.report(FaultCode::imu_stale, FaultSeverity::error, mission_ms);
         faults_.report(FaultCode::orientation_invalid, FaultSeverity::error, mission_ms);
     }
@@ -301,6 +368,59 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
     if (!imu_implausible && !baro_implausible) {
         faults_.clear(FaultCode::sensor_implausible);
     }
+
+    update_mag_calibration(mission_ms);
+    check_yaw_reference(mission_ms);
+}
+
+void Controller::update_mag_calibration(std::uint64_t mission_ms) {
+    (void)mission_ms;
+    if (!config_.mag_cal_in_flight || mag_calibration_.valid) {
+        return;
+    }
+    if (!mag_calibrator_.coverage_met()) {
+        return;
+    }
+    // Adopt without resetting the filter. The correction is a few tens of microtesla and
+    // the estimator converges onto it within a second; re-seeding mid-flight would throw
+    // away a good attitude solution to save that second.
+    mag_calibration_ = mag_calibrator_.result();
+}
+
+void Controller::check_yaw_reference(std::uint64_t mission_ms) {
+    if (!config_.yaw_cog_cross_check) {
+        return;
+    }
+    // Every one of these conditions is a reason the comparison would be meaningless
+    // rather than a reason to distrust the heading, so they reset the counter instead of
+    // accumulating towards a warning.
+    if (!snapshot_.orientation_valid || !snapshot_.yaw_is_magnetic ||
+        !snapshot_.gps.valid || !snapshot_.gps.course_valid ||
+        snapshot_.gps.speed_mps < config_.yaw_cog_min_speed_mps) {
+        cog_disagreements_ = 0;
+        return;
+    }
+
+    // Course over ground is referenced to true north and the estimator's heading to
+    // magnetic north, so one of them has to be moved before they can be subtracted.
+    const double heading_true =
+        wrap_degrees_360(snapshot_.heading_deg + config_.magnetic_declination_deg);
+    const double difference =
+        std::fabs(angle_difference_deg(heading_true, snapshot_.gps.course_deg));
+
+    if (difference > config_.yaw_cog_tolerance_deg) {
+        if (++cog_disagreements_ >= config_.yaw_cog_confirm_samples) {
+            // A warning, and only a warning. The two quantities are allowed to differ --
+            // wind, crab and a spinning payload all separate them legitimately -- so this
+            // says "suspect the magnetometer calibration", not "the heading is wrong".
+            faults_.report(FaultCode::yaw_reference_disagreement, FaultSeverity::warning,
+                           mission_ms);
+            cog_disagreements_ = config_.yaw_cog_confirm_samples;
+        }
+    } else {
+        cog_disagreements_ = 0;
+        faults_.clear(FaultCode::yaw_reference_disagreement);
+    }
 }
 
 void Controller::run_calibration(std::uint64_t mission_ms) {
@@ -319,7 +439,7 @@ void Controller::run_calibration(std::uint64_t mission_ms) {
         for (int i = 0; i < 3; ++i) gyro_bias_dps_[i] = r.gyro_bias_dps[i];
     }
     if (r.accel_reference_valid) {
-        for (int i = 0; i < 3; ++i) accel_bias_mps2_[i] = r.accel_bias_mps2[i];
+        accel_scale_ = r.accel_scale;
     }
     // The barometric ground reference is trustworthy even if the IMU saw motion.
     if (r.baro_reference_valid) {
@@ -369,6 +489,11 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         extra.push_back("FAULTS-" + std::to_string(faults_.active_count()));
         extra.push_back(std::string("CAL-") + (calibrator_.complete() ? "1" : "0"));
         extra.push_back(std::string("ARM-") + (is_armed(mission_ms) ? "1" : "0"));
+        // What the yaw field means in this packet: M = magnetometer-referenced (absolute
+        // magnetic yaw, calibration applied), G = gyro-only (relative, arbitrary zero).
+        // Four characters, because the ground station must never have to guess which of
+        // the two it is looking at and the airtime budget has no room for a longer tag.
+        extra.push_back(std::string("YR-") + (snapshot_.yaw_is_magnetic ? "M" : "G"));
     }
     auto built = builder_.build(candidate, mission_ms, snapshot_, extra);
 
@@ -487,6 +612,16 @@ void Controller::refresh_health(std::uint64_t mission_ms) {
     health_.imu_ok = snapshot_.imu_valid;
     health_.baro_ok = snapshot_.baro_valid;
     health_.orientation_ok = snapshot_.orientation_valid;
+    health_.mag_present = imu_.has_magnetometer();
+    health_.mag_ok = snapshot_.mag_valid;
+    health_.mag_calibrated = mag_calibration_.valid;
+    health_.yaw_is_magnetic = snapshot_.yaw_is_magnetic;
+    health_.heading_deg = snapshot_.heading_deg;
+    health_.mag_field_ut = snapshot_.mag_valid
+                               ? sensors::vector_magnitude(snapshot_.mx_ut, snapshot_.my_ut,
+                                                           snapshot_.mz_ut)
+                               : 0.0;
+    for (int i = 0; i < 3; ++i) health_.mag_cal_span_ut[i] = mag_calibrator_.span_ut(i);
     health_.gps_fix = snapshot_.gps.valid;
     health_.radio_ok = radio_.healthy();
     health_.sd_ok = logger_enabled_;

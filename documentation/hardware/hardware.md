@@ -84,31 +84,42 @@ Cable length and RG1.13 description come from the supplied product name. IPEX ve
 
 ## Sensors
 
-### MPU-6050 Module
+### MPU-9250 Module
 
-- **Exact product:** MPU-6050 3-Axis Accelerometer and Gyro Sensor
+- **Exact product:** MPU-9250 9-Axis Accelerometer, Gyroscope and Magnetometer Sensor
 - **Robu SKU:** 2846
 - **Quantity:** 1
 - **Robu reference:** [Robu SKU search](https://robu.in/?s=2846&post_type=product)
-- **Manufacturer:** InvenSense/TDK for the MPU-6050 IC; breakout-board manufacturer - TBD
-- **Manufacturer document:** [MPU-6000/6050 datasheet](https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf)
+- **Manufacturer:** InvenSense/TDK for the MPU-9250; AKM for the AK8963 magnetometer die; breakout-board manufacturer - TBD
+- **Manufacturer documents:** MPU-9250 Product Specification (PS-MPU-9250A-01) and MPU-9250 Register Map (RM-MPU-9250A-00); AK8963 datasheet for the magnetometer
 
-The exact Robu breakout page and board schematic were not resolved. The manufacturer document applies to the IC, not necessarily to the purchased carrier board.
+The exact Robu breakout page and board schematic were not resolved. The manufacturer documents apply to the ICs, not necessarily to the purchased carrier board.
+
+**The MPU-9250 is two dies in one package.** The accelerometer and gyroscope answer at the module's own address; the AK8963 magnetometer is a separate I2C slave at `0x0C` that is invisible from outside until the MPU is told to bridge to it. Two consequences that are easy to get wrong and hard to notice afterwards:
+
+- The magnetometer's axes are **not** the accelerometer's. Magnetometer X lies along the MPU's Y, magnetometer Y along the MPU's X, and magnetometer Z is inverted. The firmware rotates them in `mag_axes_to_body()` before anything else sees the sample; skipping that produces a heading that moves smoothly as the vehicle turns and is completely wrong.
+- Modules sold as MPU-9250 are frequently MPU-6500 dies with no magnetometer at all. `WHO_AM_I` distinguishes them: `0x71`/`0x73` is a real MPU-9250/9255, `0x70` is an MPU-6500. The firmware accepts both and reports which it found.
 
 | Item | IC-level documented value or status | Breakout-board status | Source |
 |---|---|---|---|
-| Supply | Verify MPU-6050 VDD range in the manufacturer datasheet | Board input and onboard regulator - TBD | MPU-6000/6050 datasheet |
-| Logic | Verify VLOGIC range in the manufacturer datasheet | Board signal levels - TBD | MPU-6000/6050 datasheet |
-| Interface | I2C and SPI support at IC level | Exposed bus and board wiring - TBD | Datasheet and board schematic |
-| I2C address | `0x68` or `0x69` based on AD0 | AD0 wiring and available address - TBD | MPU-6000/6050 datasheet |
-| Accelerometer ranges | +/-2, +/-4, +/-8, and +/-16 g | Configured range - TBD | MPU-6000/6050 datasheet |
-| Gyroscope ranges | +/-250, +/-500, +/-1000, and +/-2000 degrees/s | Configured range - TBD | MPU-6000/6050 datasheet |
-| Output data rates | IC rates and divider behavior - verify | Board/software setting - TBD | MPU-6000/6050 datasheet |
-| Interrupt | IC INT output exists | Header exposure and electrical behavior - TBD | Datasheet and board schematic |
-| Current | IC and board current under selected mode - TBD | Board current - TBD | Datasheet and measurement |
+| Supply | Verify MPU-9250 VDD range in the product specification | Board input and onboard regulator - TBD | MPU-9250 product specification |
+| Logic | Verify VDDIO range in the product specification | Board signal levels - TBD | MPU-9250 product specification |
+| Interface | I2C and SPI at IC level; the AK8963 is I2C only | Exposed bus and board wiring - TBD | Register map and board schematic |
+| I2C address | `0x68` or `0x69` based on AD0; AK8963 at `0x0C` behind the pass-through bridge | AD0 wiring and available address - TBD | MPU-9250 register map |
+| `WHO_AM_I` | `0x71` MPU-9250, `0x73` MPU-9255, `0x70` MPU-6500 (no magnetometer) | Value on the delivered board - TBD | MPU-9250 register map |
+| Accelerometer ranges | +/-2, +/-4, +/-8, and +/-16 g | Configured: +/-16 g | Product specification |
+| Gyroscope ranges | +/-250, +/-500, +/-1000, and +/-2000 degrees/s | Configured: +/-2000 deg/s | Product specification |
+| Magnetometer range | +/-4912 uT, 14-bit (0.6 uT/LSB) or 16-bit (0.15 uT/LSB) | Configured: 16-bit, continuous mode 2 at 100 Hz | AK8963 datasheet |
+| Magnetometer sensitivity adjustment | Per-axis ASA values in the AK8963 fuse ROM | Read at initialisation and applied per axis | AK8963 datasheet |
+| Filters | Gyroscope `DLPF_CFG` (register 26) and accelerometer `A_DLPF_CFG` (register 29) are separate | Configured: 4 and 4, giving 20 Hz and 21.2 Hz | Register map |
+| Output data rates | 1 kHz internal with DLPF 1..6, divided by (1 + `SMPLRT_DIV`); magnetometer free-runs | Configured: 200 Hz inertial, 100 Hz magnetic | Register map |
+| Temperature | `TEMP_OUT`/333.87 + 21 degrees C; **not** the MPU-6050 transfer function | Diagnostic use only | Product specification |
+| Interrupt | INT output exists | Header exposure and electrical behavior - TBD | Register map and board schematic |
+| Current | IC and board current under selected mode - TBD | Board current - TBD | Product specification and measurement |
 | Pull-ups | Required bus pull-ups - board-dependent | Fitted values/presence - TBD | Board schematic/inspection |
-| Decoupling | IC requirements from datasheet | Existing board capacitors - TBD | Datasheet and board inspection |
-| Calibration | Bias, scale, axis orientation, and temperature effects require project calibration | Calibration procedure - TBD | Datasheet and test procedure |
+| Decoupling | IC requirements from the product specification | Existing board capacitors - TBD | Product specification and board inspection |
+| Inertial calibration | Gyro bias and an accelerometer scale are estimated on the pad while stationary | Implemented in `startup_calibration.cpp` | Project firmware |
+| Magnetic calibration | Hard and soft iron are properties of the **airframe**, not the sensor, and are only observable while rotating | Figure-of-eight sweep on the assembled vehicle - **NOT YET PERFORMED** | Project procedure |
 
 ### GY-BMP280-3.3
 
@@ -135,7 +146,9 @@ The exact Robu breakout page and board schematic were not resolved. The manufact
 
 ### Sensor Integration Rule
 
-The BMP280 and MPU6050 datasheets document the ICs. They do not establish the purchased breakout-board supply path, level shifting, pull-ups, capacitors, header labels, dimensions, or weight. Those values remain TBD until the exact boards are photographed and identified.
+The BMP280 and MPU-9250 documents describe the ICs. They do not establish the purchased breakout-board supply path, level shifting, pull-ups, capacitors, header labels, dimensions, or weight. Those values remain TBD until the exact boards are photographed and identified.
+
+One value in particular cannot come from any datasheet: the magnetometer's hard and soft iron correction describes the **assembled vehicle** — its battery, its radio, its wiring — not the sensor. It must be measured on the finished airframe and re-measured whenever the layout changes.
 
 ## GPS
 
@@ -174,24 +187,26 @@ GPS is planned as an additional sensor; no scoring result is claimed until it is
 - **Manufacturer:** TBD
 - **Datasheet/schematic:** TBD
 
-This breakout is a blocking electrical item because Micro SD reader boards vary. Before connection, obtain a clear front and back photograph and the exact Robu product documentation, then verify:
+- **Operating voltage:** DC 2.6-3.6 V (VERIFIED FROM HARDWARE, receiving inspection)
+- **Interface:** SPI (VERIFIED FROM HARDWARE, receiving inspection)
 
-- Reader-board input voltage
-- SD-card rail voltage
-- Onboard regulator presence and part number
-- Onboard level shifting presence, direction, and signal limits
-- Host logic voltage
-- SD-card logic voltage
-- SPI/SDIO/other interface
-- Exact pin labels and pin functions
-- Chip-select, clock, data, and any card-detect/write-protect pins
-- Pull-ups and their values
-- Idle, initialization, read, write, and peak current
+The module received is a 3.3 V board. It runs from the vehicle's 3.3 V rail alongside every
+other peripheral, needs no level shifting for supply reasons, and needs no second rail or
+boost stage. Earlier revisions of this database recorded a 4.5-5.5 V requirement taken from
+a supplier listing; the delivered board does not agree with that listing.
+
+Still to be established, by measurement rather than by lookup:
+
+- Idle, initialization, write, and peak current, with the intended card
+- The same with the radio transmitting, since they share the regulator
+- MISO behaviour with CS inactive, on the shared SPI0 bus with the RA-02
+- Pull-up presence and values
 - Required capacitors and their placement
 - Supported card type/capacity limits
+- Exact pin labels and physical pin order
 - Connector and card-retention details
 
-No supply voltage, interface, pinout, current, regulator, or level-shifting claim is made for SKU 11566.
+Full analysis: [sd-module-analysis.md](sd-module-analysis.md).
 
 ## Power
 

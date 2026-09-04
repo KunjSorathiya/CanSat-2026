@@ -8,6 +8,10 @@ namespace flight {
 
 namespace {
 
+// One international nautical mile per hour, exactly 1852 m / 3600 s. NMEA reports speed
+// over ground in knots; every consumer in this project works in SI.
+constexpr double kKnotToMps = 1852.0 / 3600.0;
+
 int hex_value(char c) {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
@@ -145,6 +149,7 @@ bool NmeaParser::apply_sentence() {
         long quality = std::strtol(fields[6], nullptr, 10);
         if (quality <= 0) {
             latest_.valid = false;
+            latest_.course_valid = false;  // no fix means no ground track either
             ++sentences_parsed_;
             return true;
         }
@@ -176,6 +181,7 @@ bool NmeaParser::apply_sentence() {
         const bool active = fields[2][0] == 'A';
         if (!active) {
             latest_.valid = false;
+            latest_.course_valid = false;
             ++sentences_parsed_;
             return true;
         }
@@ -186,10 +192,28 @@ bool NmeaParser::apply_sentence() {
             latest_.latitude = lat;
             latest_.longitude = lon;
             latest_.valid = true;
+
+            // Ground track. Both fields are legitimately empty on a receiver that has a
+            // fix but is not moving, so absence is not an error -- it just means there is
+            // no course to report, and the previous one must not be left standing.
+            latest_.course_valid = false;
+            latest_.speed_mps = 0.0;
+            if (field_count >= 9) {
+                double knots = 0.0;
+                if (parse_double(fields[7], knots) && knots >= 0.0) {
+                    latest_.speed_mps = knots * kKnotToMps;
+                }
+                double course = 0.0;
+                if (parse_double(fields[8], course) && course >= 0.0 && course < 360.0) {
+                    latest_.course_deg = course;
+                    latest_.course_valid = true;
+                }
+            }
             ++sentences_parsed_;
             return true;
         }
         latest_.valid = false;
+        latest_.course_valid = false;
         return false;
     }
 

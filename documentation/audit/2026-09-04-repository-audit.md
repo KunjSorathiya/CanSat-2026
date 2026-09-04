@@ -137,7 +137,7 @@ Compiler: `g++` with `-std=c++17 -O2 -Wall -Wextra -Wpedantic`. **Zero warnings.
 ### Pico syntax check
 
 All 10 translation units returned `OK`: flight `main`, `pico_hal`, `pico_radio`,
-`mpu6050`, `bmp280`, `neo6m`, `sd_card`, `sd_logger`, shared `sx1278`, ground bridge
+`MPU-9250`, `bmp280`, `neo6m`, `sd_card`, `sd_logger`, shared `sx1278`, ground bridge
 `main`.
 
 ### Static checks
@@ -327,7 +327,7 @@ Legend: ✅ verified · 🟡 partially verified · ⬜ content-only review (no e
 |---|---:|---|---|
 | `pico/main.cpp` | 88 | Watchdog 2000 ms and 5 ms tick asserted (tick is 2 ms since cycle 4, see F-15) | 🟡 Syntax only |
 | `pico/pico_hal.cpp` | 146 | Bus speeds asserted: I2C 400 kHz, SPI 400 kHz, UART 9600 | 🟡 Syntax only |
-| `pico/mpu6050.cpp` | 123 | Uses verified scaling from `sensor_math` | 🟡 Syntax only |
+| `pico/MPU-9250.cpp` | 123 | Uses verified scaling from `sensor_math` | 🟡 Syntax only |
 | `pico/bmp280.cpp` | 122 | Uses verified compensation from `sensor_math` | 🟡 Syntax only |
 | `pico/neo6m.cpp` | 50 | Feeds the tested `NmeaParser` | 🟡 Syntax only |
 | `pico/sd_card.cpp` | 253 | Raw block access, no filesystem; command sequence executed against a simulated card (581 assertions) since cycle 10 | 🟡 Never run on real media |

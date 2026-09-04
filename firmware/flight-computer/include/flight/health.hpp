@@ -18,6 +18,13 @@ struct HealthSnapshot {
     bool imu_ok = false;
     bool baro_ok = false;
     bool orientation_ok = false;
+    // Magnetometer state, in the order an operator needs it: is the part there at all,
+    // is it currently producing usable samples, has it been calibrated for this airframe,
+    // and is yaw therefore an absolute magnetic angle rather than a relative one.
+    bool mag_present = false;
+    bool mag_ok = false;
+    bool mag_calibrated = false;
+    bool yaw_is_magnetic = false;
     bool gps_fix = false;
     bool radio_ok = false;
     bool sd_ok = false;
@@ -33,6 +40,12 @@ struct HealthSnapshot {
     double altitude_agl_m = 0.0;      // above the power-on ground baseline
     double altitude_rate_mps = 0.0;   // filtered vertical speed, positive is climbing
     double gyro_bias_dps[3] = {0.0, 0.0, 0.0};
+    double heading_deg = 0.0;      // magnetic heading, meaningless unless yaw_is_magnetic
+    double mag_field_ut = 0.0;     // total measured field; the earth's is 25 to 65 uT
+    // Per-axis sweep the runtime magnetometer calibration has seen so far. This is how an
+    // operator on the pad knows whether the figure-of-eight has covered enough attitudes
+    // for the calibration to be accepted.
+    double mag_cal_span_ut[3] = {0.0, 0.0, 0.0};
     double ground_pressure_pa = 0.0;
     std::uint32_t gps_checksum_errors = 0;
 };

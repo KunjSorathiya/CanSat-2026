@@ -7,6 +7,16 @@
 
 namespace flight::test {
 
+// A stationary, upright, level vehicle facing magnetic north.
+//
+// The default magnetic sample is a real northern-hemisphere field rather than a tidy
+// unit vector: about 40 uT horizontal and 17 uT downward, which in this project's
+// body frame (+Z up) is +Y north and -Z down, for a total of 43.5 uT. That total has to
+// land inside the estimator's earth-field gate, so a made-up field would quietly disable
+// every magnetometer path in the tests that use it.
+inline constexpr double kMockFieldNorthUt = 40.0;
+inline constexpr double kMockFieldDownUt = 17.0;
+
 class MockImu final : public Imu {
 public:
     bool initialize() override {
@@ -19,12 +29,20 @@ public:
         health_.last_update_ms = now_ms;
         out = sample;
         out.valid = true;
+        // A driver never reports a magnetometer sample from a part that has none, so
+        // neither does the mock: `magnetometer` gates the field the same way the real
+        // WHO_AM_I result does.
+        out.mag_valid = magnetometer && sample.mag_valid;
         out.timestamp_ms = now_ms;
         return true;
     }
+    bool has_magnetometer() const override { return magnetometer; }
     SensorHealth health() const override { return health_; }
 
-    ImuSample sample{0.1, 0.2, 9.8, 0.0, 0.0, 0.0, 25.0, true, 0};
+    ImuSample sample{0.1,  0.2, 9.8,  0.0,   0.0,
+                     0.0,  0.0, kMockFieldNorthUt, -kMockFieldDownUt,
+                     25.0, true, true, 0};
+    bool magnetometer = true;
     bool fail_init = false;
     bool fail_read = false;
 

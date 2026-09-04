@@ -91,8 +91,69 @@ bool validate_config(const Configuration& config, std::string& why) {
         why = "reference_pressure_pa must be positive";
         return false;
     }
-    if (!(config.orientation_alpha >= 0.0) || !(config.orientation_alpha <= 1.0)) {
-        why = "orientation_alpha must be in [0, 1]";
+    if (!(config.orientation_kp_accel >= 0.0) || !(config.orientation_kp_mag >= 0.0) ||
+        !(config.orientation_ki_bias >= 0.0)) {
+        why = "orientation feedback gains must be non-negative";
+        return false;
+    }
+    if (!(config.orientation_bias_limit_dps > 0.0)) {
+        why = "orientation_bias_limit_dps must be positive";
+        return false;
+    }
+    if (config.orientation_kp_accel == 0.0 && config.orientation_kp_mag == 0.0) {
+        why = "orientation_kp_accel and orientation_kp_mag cannot both be zero: attitude "
+              "would be a free-running gyro integration with no reference at all";
+        return false;
+    }
+
+    // ---- Inertial sensor timing ---------------------------------------------
+    // Same reasoning as the barometer below: reading the IMU faster than it produces
+    // samples returns the previous conversion, and a repeated gyro sample integrates as
+    // real motion rather than as the nothing it actually is.
+    if (config.imu_gyro_dlpf_cfg > 7 || config.imu_accel_dlpf_cfg > 7) {
+        why = "imu_gyro_dlpf_cfg and imu_accel_dlpf_cfg must be in 0..7 (3-bit fields)";
+        return false;
+    }
+    const double imu_rate_hz =
+        sensors::imu_sample_rate_hz(config.imu_gyro_dlpf_cfg, config.imu_sample_rate_div);
+    const double acquisition_hz = 1000.0 / static_cast<double>(config.sensor_period_ms);
+    if (imu_rate_hz < acquisition_hz) {
+        why = "the IMU's internal sample rate (" + to_int_string(imu_rate_hz) +
+              " Hz at the configured DLPF and SMPLRT_DIV) is below the " +
+              to_int_string(acquisition_hz) + " Hz acquisition rate";
+        return false;
+    }
+    // The anti-alias bandwidth is deliberately NOT rejected here. DLPF 4 puts the gyro
+    // at 20 Hz and the accelerometer at 21.2 Hz against a 30 Hz acquisition, which is
+    // above the 15 Hz Nyquist limit: content between 15 and 21 Hz folds back into the
+    // attitude estimate. That is a known, documented trade -- the next filter down is
+    // 10 Hz, which blurs the launch transient the state machine detects on -- and it is
+    // recorded in documentation/design/sensor-rates.md rather than enforced as a rule,
+    // because the right setting depends on how much the airframe actually vibrates and
+    // that is measured on a shake table, not asserted in software.
+
+    // ---- Magnetometer -------------------------------------------------------
+    const double mag_rate_hz = sensors::mag_output_rate_hz(config.mag_mode);
+    if (mag_rate_hz > 0.0 && mag_rate_hz < acquisition_hz) {
+        why = "the magnetometer's continuous mode runs at " + to_int_string(mag_rate_hz) +
+              " Hz, below the " + to_int_string(acquisition_hz) +
+              " Hz acquisition rate; use continuous mode 2 (100 Hz)";
+        return false;
+    }
+    if (!(config.mag_cal_min_span_ut > 0.0)) {
+        why = "mag_cal_min_span_ut must be positive";
+        return false;
+    }
+    if (config.mag_cal_in_flight && config.mag_cal_min_samples == 0) {
+        why = "mag_cal_min_samples must be non-zero when mag_cal_in_flight is set";
+        return false;
+    }
+    if (!(config.yaw_cog_tolerance_deg > 0.0) || !(config.yaw_cog_tolerance_deg <= 180.0)) {
+        why = "yaw_cog_tolerance_deg must be in (0, 180]";
+        return false;
+    }
+    if (!(config.yaw_cog_min_speed_mps >= 0.0)) {
+        why = "yaw_cog_min_speed_mps must be non-negative";
         return false;
     }
 

@@ -77,7 +77,7 @@ keeps talking through every failure it can survive.
 flowchart LR
     subgraph CANSAT["🛰️ CanSat"]
         direction TB
-        S1["MPU6050<br/>accel + gyro"]
+        S1["MPU-9250<br/>accel + gyro"]
         S2["BMP280<br/>pressure + temp"]
         S3["NEO-6M<br/>GNSS"]
         FC["Raspberry Pi Pico<br/><b>flight computer</b>"]
@@ -287,9 +287,12 @@ priority, and unknown optional fields are ignored by a conforming parser.
 </details>
 
 > [!NOTE]
-> **Yaw is a relative angle.** The vehicle has no magnetometer, so yaw is a gyro-integrated
-> heading relative to power-on, not an absolute magnetic heading. It is implemented and
-> reported honestly as such — whether that satisfies the mandatory yaw field is
+> **Yaw says which kind of yaw it is.** The MPU-9250 carries an AK8963 magnetometer, so
+> yaw can be referenced to magnetic north — but only once the magnetometer has been
+> calibrated for this airframe. Every packet carries a `YR-` tag: `YR-M` means an absolute
+> magnetic yaw, `YR-G` means a relative gyro integration whose zero is arbitrary. The
+> vehicle ships uncalibrated and therefore starts by saying `YR-G`; it never claims an
+> absolute heading it has not earned. See
 > [open question 6](#open-questions-for-the-organizers).
 
 **Radio:** 433 MHz LoRa. Only the sync words are fixed by the rulebook — **`0xF3` for
@@ -340,7 +343,7 @@ receipt time and the reason.
 | Telemetry | SX1278 RA-02 433 MHz LoRa | 2 | Vehicle + ground radio | Confirmed; configuration provisional |
 | Telemetry | 433 MHz antenna, SMA | 2 | Radio antennas | Confirmed; **connector gender disputed** |
 | Telemetry | 10 cm IPEX-to-SMA RG1.13 cable | 2 | Radio to antenna | Confirmed |
-| Sensors | MPU6050 accelerometer + gyroscope | 1 | Acceleration, angular rate | Confirmed; unverified |
+| Sensors | MPU-9250 accelerometer + gyroscope + AK8963 magnetometer | 1 | Acceleration, angular rate, magnetic field | Confirmed; unverified |
 | Sensors | GY-BMP280-3.3 | 1 | Pressure, altitude, temperature | Confirmed; unverified |
 | Sensors | NEO-6M GPS with EEPROM | 1 | Position and timing | Confirmed; unverified |
 | Storage | microSD card reader | 1 | Onboard logging | Confirmed; **highest-risk item** |
@@ -357,13 +360,13 @@ chamber**, **parachute**.
 
 | GPIO | Function | Device |
 |---:|---|---|
-| GP4 / GP5 | I2C0 SDA / SCL | MPU6050 + BMP280 |
+| GP4 / GP5 | I2C0 SDA / SCL | MPU-9250 + BMP280 |
 | GP16 / GP18 / GP19 | SPI0 MISO / SCK / MOSI | RA-02 + microSD |
 | GP17 | Chip select | RA-02 |
 | GP6 | Chip select | microSD |
 | GP20 / GP21 / GP22 | RESET / DIO0 / DIO1 | RA-02 |
 | GP12 / GP13 | UART0 TX / RX | NEO-6M |
-| GP7 | Interrupt | MPU6050 |
+| GP7 | Interrupt | MPU-9250 |
 | GP14 | Status LED | External LED |
 | GP26 | ADC0 | Battery sense — **reservation only** |
 
@@ -430,8 +433,8 @@ requirement is satisfied in flight.
 | Egg payload and cushioned chamber | Not designed | ⬜ Not started |
 | Descent system such as a parachute | Not designed | ⬜ Not started |
 | Altitude, pressure, temperature | BMP280 driver + Bosch compensation, tested against the datasheet vector | 🟡 Implemented, hardware unverified |
-| Gyroscope and accelerometer | MPU6050 driver + datasheet scaling, tested | 🟡 Implemented, hardware unverified |
-| Roll, pitch, yaw, X/Y/Z acceleration fields | Complementary filter; yaw is relative, no magnetometer | 🟡 Implemented; yaw compliance is an open question |
+| Gyroscope and accelerometer | MPU-9250 driver + datasheet scaling, tested | 🟡 Implemented, hardware unverified |
+| Roll, pitch, yaw, X/Y/Z acceleration fields | Mahony quaternion filter over accelerometer, gyroscope and magnetometer; yaw is magnetic once calibrated and labelled `YR-M`/`YR-G` either way | 🟡 Implemented; yaw compliance is an open question |
 | Continuous telemetry, power-on to recovery | Automatic; continues in every state including `FAULT` | 🟡 Implemented, unverified |
 | At least one packet per second | 1 Hz default, chosen from measured packet size and LoRa airtime; `validate_config()` refuses any period the radio cannot sustain | 🟡 Implemented, radio unverified |
 | Correct team identifier in every packet | Formatter enforces it; `CAN-Team-XX` is rejected | 🟢 Implemented and enforced |
@@ -476,7 +479,11 @@ Both block the mechanical design, which is why phase 7 has not started.
 3. Launch altitude — 100 ft or 150 ft?
 4. Are egg-chamber dimensions included in, or added to, the main dimensions?
 5. How is the ≤ 5 m/s descent requirement enforced and scored?
-6. **What constitutes valid yaw data?** Our vehicle has no magnetometer.
+6. **What constitutes valid yaw data?** The vehicle now has a magnetometer and can
+   report an absolute magnetic yaw, but only after a hard/soft-iron calibration on the
+   assembled airframe. Is a magnetic yaw required, is a relative one acceptable, and is
+   the declared reference (`YR-M` / `YR-G`) an acceptable way to say which is being
+   transmitted?
 7. Are any LoRa parameters prescribed beyond the sync words?
 8. What scoring thresholds apply where the rulebook rewards higher performance?
 9. What are the actual report, media, video and arrival deadlines?

@@ -93,7 +93,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **36 / 36 tests** |
 | Pico syntax check | 10 translation units | ✅ All OK |
 
-Translation units syntax-checked: flight `main`, `pico_hal`, `pico_radio`, `mpu6050`,
+Translation units syntax-checked: flight `main`, `pico_hal`, `pico_radio`, `mpu9250`,
 `bmp280`, `neo6m`, `sd_card`, `sd_logger`, shared `sx1278`, ground bridge `main`.
 
 ---
@@ -149,10 +149,18 @@ flowchart LR
 | `test_telemetry_format_exact` | The emitted packet matches the rulebook format byte for byte, including field order, separators and decimal places |
 | `test_packet_numbering_and_padding` | Numbering starts at `P-001`, increments sequentially, and zero-pads to three digits |
 | `test_parser_rejects_precision_and_order` | Wrong decimal precision, wrong field order and malformed fields are all rejected |
-| `test_mpu_scaling` | Raw MPU6050 counts convert to m/s² and °/s using datasheet sensitivities for every full-scale range |
+| `test_imu_scaling` | Raw MPU-9250 counts convert to m/s² and °/s using datasheet sensitivities for every full-scale range, and the on-die temperature uses the MPU-9250's transfer function rather than the MPU-6050's |
+| `test_magnetometer_conversions` | AK8963 quantisation at 14 and 16 bits, the fuse-ROM per-axis sensitivity adjustment, and hard/soft-iron correction — including that an invalid calibration is not applied at all |
+| `test_magnetometer_axes_are_rotated_into_the_body_frame` | The AK8963 die is mounted rotated inside the MPU-9250 package; the mapping into the body frame swaps X and Y and inverts Z, preserves field magnitude, and is its own inverse |
 | `test_bmp280_compensation_datasheet_vector` | The Bosch compensation implementation reproduces the datasheet reference vector |
 | `test_pressure_altitude` | The barometric formula produces the expected altitude for known pressures |
-| `test_orientation_levels_and_yaw` | Roll and pitch converge from the gravity vector; yaw integrates body rate and wraps correctly |
+| `test_orientation_levels_and_yaw` | The first accelerometer sample seeds roll and pitch directly rather than being filtered towards; yaw propagates on the gyroscope and is not claimed as magnetic |
+| `test_magnetic_yaw_is_tilt_compensated` | Tilt-compensated magnetic yaw recovered from fields synthesised at 54 known attitudes — the test that holds all three sensors to one coordinate frame |
+| `test_orientation_yaw_is_disciplined_by_the_magnetometer` | 20 s with a 3 °/s gyro bias: fused yaw holds the magnetic reference while a gyro-only estimate drifts more than 30° |
+| `test_uncalibrated_magnetometer_does_not_claim_absolute_heading` | An uncalibrated magnetometer still stops yaw drifting, but `yaw_is_magnetic` stays false |
+| `test_orientation_rejects_an_implausible_field` | A field outside 20–70 µT is not the earth's, and does not steer the vehicle |
+| `test_orientation_ignores_the_accelerometer_under_high_g` | 6 g along +X for 100 updates does not tip the attitude solution towards the thrust axis |
+| `test_orientation_rejects_unusable_input` | Zero-length accelerometer, non-finite values and an unbounded `dt` are discarded rather than propagated into the quaternion |
 | `test_gps_parser` | GGA and RMC parsing, checksum validation, fix and no-fix handling, malformed sentence rejection |
 | `test_scheduler` | Fires at most once per period, and re-anchors after a stall instead of firing a catch-up burst |
 | `test_fault_manager` | Report, clear, occurrence counting, severity escalation, critical latching |
@@ -170,13 +178,20 @@ flowchart LR
 | `test_formatter_and_parser_agree_at_the_edges` | The formatter never emits a packet this library's own parser rejects, at every boundary value |
 | `test_controller_drops_optional_fields_before_overrunning_the_budget` | An over-long packet sheds its optional fields in rulebook priority order instead of being truncated by the radio into something the ground station can only read as corruption |
 | `test_gps_coordinate_validation` | A checksum-valid sentence carrying an impossible position is rejected: the vehicle transmits no fix rather than a wrong one |
-| `test_orientation_blends_across_the_wrap` | The complementary filter blends angles correctly across the ±180° seam, which a tumbling CanSat crosses on every rotation |
+| `test_orientation_survives_the_wrap_and_the_poles` | The quaternion state stays well formed across the ±180° roll seam and through a 20 s tumble at 100 °/s about all three axes — including the ±90° pitch singularity that broke the previous Euler integration |
+| `test_telemetry_declares_the_yaw_reference` | Every packet carries `YR-M` or `YR-G`, so a receiver never has to guess whether yaw is absolute |
+| `test_a_missing_magnetometer_degrades_rather_than_stops` | A module that is really an MPU-6500 flies on six axes, reports `mag_unavailable`, and still reaches READY |
+| `test_a_magnetometer_that_stops_is_reported_and_survived` | A magnetometer that stops answering costs yaw only; attitude and telemetry continue |
+| `test_gps_course_is_a_cross_check_not_a_yaw_source` | A grossly disagreeing GPS course raises a warning and does **not** move the heading; slowing below the speed gate withdraws the comparison |
+| `test_mag_calibration_requires_real_coverage` | The sweep calibrator refuses to certify itself until every axis has been swept, recovers a known hard-iron offset and soft-iron squash, and rejects saturated samples |
+| `test_accel_calibration_is_rotation_invariant` | The accelerometer correction is a scalar scale, so it still returns 1 g in attitudes the vehicle was never calibrated in |
+| `test_measured_packet_sizes_match_the_link_budget` | The 118 / 167 / 212-byte figures the link budget quotes are the ones the formatter actually produces |
 | `test_calibration_rejects_a_steady_rotation_as_bias` | A vehicle turning at a constant rate on the pad is steady by variance alone; the gate refuses to subtract that real body rate as gyro bias for the whole flight |
 | `test_fault_severity_never_falls_while_active` | Severity is monotonic while a fault is active — escalation is honoured, a later routine report at a lower severity cannot downgrade a fault that still applies, and clearing genuinely resets it |
 | `test_landing_is_not_declared_during_a_steady_descent` | A steady parachute descent reads as 1 g, indistinguishable from resting on the ground; only the vertical rate separates them, and it does |
 | `test_battery_voltage_reports_whether_it_is_scaled` | Battery reporting says which voltage it is showing, so an operator reading 1.6 V off a 3.7 V cell knows it is an unscaled ADC pin voltage before reacting to it |
 | `test_loop_tick_is_bounded_by_the_gps_uart_fifo` | A loop tick too slow to drain the GPS UART before its 32-byte FIFO fills is rejected by `validate_config()` |
-| `test_sensor_timing_model` | The BMP280 and MPU-6050 timing model, pinned to the datasheets' own published presets |
+| `test_sensor_timing_model` | The BMP280, MPU-9250 and AK8963 timing model, pinned to the datasheets' own published presets — including that the MPU-9250's accelerometer and gyroscope bandwidths come from two different registers |
 | `test_config_sensor_rate_guard` | The configured acquisition rate is one the sensors can actually feed at their configured oversampling |
 | `test_controller_ignores_repeated_barometer_samples` | A barometer returning the same conversion twice does not read as zero climb rate |
 | `test_lora_airtime_reference_vectors` | The C++ airtime model matches the same published SX127x reference vectors as `tools/link_budget.py`, so the two cannot drift apart |
@@ -314,7 +329,7 @@ Sequence follows the [bring-up order](../design/wiring.md#bring-up-order).
 | # | Test | Pass criterion | Status |
 |---:|---|---|---|
 | 1 | Pico alone on USB | GP14 LED blinks; USB serial enumerates | ⬜ |
-| 2 | I2C bus scan | Both MPU6050 and BMP280 acknowledge, on distinct addresses | ⬜ |
+| 2 | I2C bus scan | MPU-9250, BMP280 and (with the pass-through bridge enabled) the AK8963 at `0x0C` all acknowledge, on distinct addresses | ⬜ |
 | 3 | IMU read | Stationary vehicle reads about 1 g total, rates near zero | ⬜ |
 | 4 | Barometer read | Pressure within a few hundred Pa of a local reference; temperature plausible | ⬜ |
 | 5 | Calibration | `CAL-1` within the sample budget while stationary | ⬜ |

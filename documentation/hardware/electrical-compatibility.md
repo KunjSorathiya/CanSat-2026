@@ -18,10 +18,10 @@ Sources are separated by evidence level:
 |---|---:|---|---|---|---|---|---|---|
 | Raspberry Pi Pico | 894292 | VSYS/VBUS options are documented; exact project supply path TBD | 3.3 V GPIO; GPIO must remain within documented I/O limits | I2C, SPI, UART, ADC, USB and GPIO capabilities documented | System current TBD; no whole-system rail guarantee assumed | Yes as controller; peripheral power capability requires separate budget | MANUFACTURER DOCUMENTED / CONFIRMED | Controller confirmed; integration not verified |
 | SX1278 RA-02 | 1150780 | SX1278 IC: 1.8-3.7 V; RA-02 carrier supply TBD | IC I/O is supply-dependent; carrier logic level TBD | SPI plus reset, NSS/CS, DIO controls at IC level | IC TX about 120 mA at +20 dBm and RX about 10.3 mA; carrier current TBD | Unknown until carrier board supply, logic, and peak current are verified | MANUFACTURER DOCUMENTED / PHYSICAL VERIFICATION REQUIRED | Carrier blocked |
-| MPU6050 module | 2846 | MPU-6050 IC VDD 2.375-3.46 V; breakout supply TBD | IC VLOGIC 1.71-3.46 V; breakout levels TBD | I2C/SPI at IC level; exposed breakout bus TBD | IC normal-mode current about 3.9 mA; breakout current TBD | Compatible in principle; board voltage and pull-ups must be verified | MANUFACTURER DOCUMENTED / PHYSICAL VERIFICATION REQUIRED | Breakout blocked |
+| MPU-9250 module | 2846 | MPU-9250 IC VDD 2.375-3.46 V; breakout supply TBD | IC VLOGIC 1.71-3.46 V; breakout levels TBD | I2C/SPI at IC level; exposed breakout bus TBD | IC normal-mode current about 3.9 mA; breakout current TBD | Compatible in principle; board voltage and pull-ups must be verified | MANUFACTURER DOCUMENTED / PHYSICAL VERIFICATION REQUIRED | Breakout blocked |
 | NEO-6M GPS module | 11782 | NEO-6 receiver supply 2.7-3.6 V; breakout supply TBD | Receiver interface levels are documented; breakout levels TBD | UART documented for NEO-6; exposed board interface TBD | NEO-6 receiver current is about 37 mA; breakout current TBD | Compatible in principle; board regulator and UART levels must be verified | MANUFACTURER DOCUMENTED / PHYSICAL VERIFICATION REQUIRED | Breakout blocked |
 | GY-BMP280-3.3 | 835813 | BMP280 IC VDD 1.71-3.6 V; breakout supply TBD | IC VDDIO 1.2-3.6 V; breakout levels TBD | I2C/SPI at IC level; exposed breakout bus TBD | IC mode-dependent current; breakout current TBD | Compatible in principle; board wiring and pull-ups must be verified | MANUFACTURER DOCUMENTED / PHYSICAL VERIFICATION REQUIRED | Breakout blocked |
-| Micro SD reader | 11566 | 4.5-5.5 V input; onboard 3.3 V regulator stated by Robu | Host/card logic behavior not stated | GND, VCC, MISO, MOSI, SCK, CS stated by Robu | TBD | Unknown; do not connect Pico signals until level shifting is verified | ROBU DOCUMENTED / PHYSICAL VERIFICATION REQUIRED | Highest-priority blocker |
+| Micro SD reader | 11566 | 2.6-3.6 V, SPI | 3.3 V on a 3.3 V module; no shifting needed | GND, VCC, MISO, MOSI, SCK, CS | TBD; write transient unmeasured | Supply-compatible with the 3.3 V rail; MISO release on the shared bus still to confirm | VERIFIED FROM HARDWARE / current PHYSICAL VERIFICATION REQUIRED | Supply resolved; current and shared-bus behaviour open |
 | 1S 1500mAh 25C LiPo | 1125094 | 3.7 V nominal; approximately 4.2 V full charge; cutoff TBD | Not applicable | Battery connector and polarity TBD | Safe continuous and peak current TBD | Not a direct Pico peripheral supply until input path is verified | CONFIRMED / PHYSICAL VERIFICATION REQUIRED | Battery integration blocked |
 | 433 MHz antenna | 1121334 | Not applicable | Not applicable | RF connector type conflicting | RF power handling TBD | Not a digital Pico connection | ROBU DOCUMENTED / CONFIRMED conflict | RF connector blocked |
 | IPEX-to-SMA cable | 1674982 | Not applicable | Not applicable | IPEX1 to SMA female stated by product name | RF loss/power handling TBD | Not a digital Pico connection | CONFIRMED / PHYSICAL VERIFICATION REQUIRED | Connector mating blocked |
@@ -74,24 +74,27 @@ The Semtech document describes the SX1278 IC, not the complete RA-02 carrier. Th
 
 **RA-02 conclusion:** Compatible with a 3.3 V Pico interface only in principle. Do not connect power or GPIO until the carrier documentation or physical inspection establishes its supply, logic, pinout, and RF connector.
 
-## MPU6050
+## MPU-9250
 
-**Sources:** [InvenSense MPU-6000/6050 datasheet](https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf) and [Robu SKU 2846 reference](https://robu.in/?s=2846&post_type=product).
+**Sources:** InvenSense MPU-9250 Product Specification (PS-MPU-9250A-01), MPU-9250 Register Map (RM-MPU-9250A-00), the AKM AK8963 datasheet, and the [Robu SKU 2846 reference](https://robu.in/?s=2846&post_type=product).
 
 Manufacturer IC documentation includes the following:
 
-- VDD and VLOGIC requirements are specified in the MPU-6050 datasheet.
-- I2C and SPI are supported at IC level.
-- The I2C address is selected by AD0, with the two documented address choices.
+- VDD and VDDIO requirements are specified in the MPU-9250 product specification.
+- I2C and SPI are supported at IC level for the inertial sensors; the AK8963 magnetometer is I2C only.
+- The I2C address is selected by AD0, with the two documented address choices. The AK8963 answers separately at `0x0C`, reachable only once `INT_PIN_CFG.BYPASS_EN` bridges it to the primary bus.
 - SDA, SCL, AD0, and INT are IC signals; exact Robu header labels and wiring are unknown.
 - Accelerometer ranges are +/-2, +/-4, +/-8, and +/-16 g.
 - Gyroscope ranges are +/-250, +/-500, +/-1000, and +/-2000 degrees/s.
-- Output-rate and divider behavior are configurable in the IC.
+- Magnetometer range is +/-4912 uT, at 14-bit or 16-bit resolution.
+- Output-rate and divider behavior are configurable in the IC; the magnetometer free-runs in its own continuous mode.
 - IC current is documented by operating mode; breakout-board current is unknown.
+- **The magnetometer die does not share the inertial axes.** Magnetometer X lies along the MPU's Y, magnetometer Y along the MPU's X, and magnetometer Z is inverted. This is a fact about the package, not about the breakout, and the firmware corrects for it.
+- **A module labelled MPU-9250 may be an MPU-6500 with no magnetometer.** `WHO_AM_I` is the only way to tell: `0x71`/`0x73` versus `0x70`. Read it during bring-up and record the value.
 
 The exact Robu carrier board's supply input, onboard regulator, logic levels, pull-ups, capacitor population, pinout, dimensions, and current remain **PHYSICAL VERIFICATION REQUIRED**. Bias, scale, temperature, axis orientation, and installation calibration remain project verification tasks.
 
-**MPU6050 conclusion:** Compatible with the Pico in principle if the breakout exposes a Pico-safe bus and supply. The board cannot yet be approved for wiring.
+**MPU-9250 conclusion:** Compatible with the Pico in principle if the breakout exposes a Pico-safe bus and supply. The board cannot yet be approved for wiring.
 
 ## BMP280
 
@@ -123,30 +126,34 @@ The purchased NEO-6M breakout's regulator, input range, UART logic levels, TX/RX
 
 ## Micro SD Reader - Highest Priority
 
-**Source:** [Robu SKU 11566 reference](https://robu.in/?s=11566&post_type=product).
+**Source:** receiving inspection of the delivered board, and the
+[Robu SKU 11566 reference](https://robu.in/?s=11566&post_type=product).
 
-The exact Robu listing information supplied for SKU 11566 states:
+The module received is:
 
-- Input supply: 4.5-5.5 V
-- Onboard 3.3 V regulator
+- Operating voltage: DC 2.6-3.6 V
+- Interface: SPI
 - Pins: GND, VCC, MISO, MOSI, SCK, CS
 
-These are **ROBU DOCUMENTED** values. They do not establish that the board's host-side signal pins are safe for direct Pico connection.
+These are **VERIFIED FROM HARDWARE**. The supplier listing this section previously quoted
+said 4.5-5.5 V; the board in hand does not agree with it, and the board wins.
 
-The following are unknown:
+**Supply compatibility: resolved.** 3.3 V sits in the upper half of the module's range, so
+it runs from the vehicle's regulated rail with margin at both ends of a discharge curve. No
+second rail, no boost stage, no supply-driven level shifting.
 
-- Whether resistor, transistor, or dedicated-IC level shifting is present
-- Whether the onboard regulator supplies only the card or also conditions host signals
-- SD-card rail voltage and tolerance
-- Host-side logic voltage
-- Direction and voltage behavior of MISO, MOSI, SCK, and CS
+The following are still unknown and still matter:
+
+- Initialization, read, write, and peak current, and the same with the radio transmitting
+- MISO behaviour with CS inactive, on the shared SPI0 bus with the RA-02
 - Pull-up networks
-- Initialization, read, write, and peak current
 - Required bypass capacitors
 - Exact pinout beyond the supplied labels
 - Board schematic and component markings
 
-**Micro SD conclusion:** The board cannot currently be declared Pico-compatible. Logic-level compatibility: **PHYSICAL VERIFICATION REQUIRED**. Do not wire it to the Pico until the board is identified and its signal path is verified.
+**Micro SD conclusion:** Supply-compatible with the 3.3 V rail. Not yet qualified on
+current or on shared-bus behaviour. Bench-test it on the shared bus before it goes into the
+airframe, and close the power budget with a measured write transient.
 
 ## Power Architecture
 
@@ -161,18 +168,18 @@ The following are unknown:
            |
            +-- Pico - input path TBD
            +-- RA-02 - carrier supply TBD
-           +-- MPU6050 - board supply TBD
+           +-- MPU-9250 - board supply TBD
            +-- BMP280 - board supply TBD
            +-- GPS - board supply TBD
-           +-- SD reader - Robu listing says 4.5-5.5 V input
+           +-- SD reader - 2.6-3.6 V module, runs from the 3.3 V rail
 ```
 
 ### Conceptual Rail Assessment
 
 - The battery rail is variable, not a fixed 3.7 V rail.
 - A regulated 3.3 V rail is electrically plausible for verified 3.3 V-compatible peripheral boards, but it is not yet proven adequate for the total current or transient load.
-- The SD reader's stated 4.5-5.5 V input does not match the planned 3.3 V rail. It must not be connected to 3.3 V based on the current evidence.
-- The SD reader is also not proven safe for direct 3.3 V Pico signals because its level-shifting arrangement is unknown.
+- The SD reader's 2.6-3.6 V range matches the planned 3.3 V rail, so it is one load on that rail like any other. Its **current** contribution, especially the write transient, is still unmeasured and is the open question for the regulator sizing.
+- The SD reader's signal pins are 3.3 V on a 3.3 V module, so no shifting is required. Its MISO behaviour when deselected still needs confirming, because SPI0 is shared with the RA-02.
 - The RA-02, Pico supply path, GPS board, and sensor boards must not be connected directly to the LiPo until their exact board input limits are documented.
 - Known current consumers include the Pico, radio, sensors, GPS, SD reader, regulator losses, and LED branch. Actual typical and peak values remain TBD for the purchased boards.
 - Likely transient loads include RA-02 transmission, GPS startup/acquisition, SD-card initialization and writes, and Pico startup. This is an engineering risk, not a measured result.
@@ -229,7 +236,7 @@ Only the following checks are required to unblock the electrical design:
 - Antenna connector type
 - Any onboard regulator or level-shifter markings
 
-### C. MPU6050 - SKU 2846
+### C. MPU-9250 - SKU 2846
 
 - Front and back photographs
 - Board markings and revision
@@ -270,15 +277,15 @@ No additional photographs are required before these checks are completed. Datash
 ### Already Electrically Understood
 
 - Pico is a suitable 3.3 V-class controller in principle, subject to its documented input path and GPIO limits.
-- BMP280 and MPU6050 IC interfaces and electrical domains are documented at chip level.
+- BMP280 and MPU-9250 IC interfaces and electrical domains are documented at chip level.
 - Semtech documents the SX1278 IC interface and operating limits at chip level.
-- The Robu listing states a 4.5-5.5 V input and onboard 3.3 V regulator for the SD reader.
+- The delivered SD reader is a 2.6-3.6 V SPI module and runs from the 3.3 V rail.
 - The battery is a 3.7 V nominal, approximately 4.2 V full-charge 1S LiPo by project confirmation.
 
 ### Electrically Compatible in Principle
 
 - Raspberry Pi Pico as the controller
-- MPU6050 breakout, if its board is 3.3 V compatible and its bus pull-ups are safe
+- MPU-9250 breakout, if its board is 3.3 V compatible and its bus pull-ups are safe
 - BMP280 breakout, if its board is 3.3 V compatible and its bus pull-ups are safe
 - NEO-6M breakout, if its UART logic and supply path are Pico compatible
 - RA-02, if its carrier board exposes Pico-safe logic and a verified supply
@@ -288,7 +295,7 @@ No additional photographs are required before these checks are completed. Datash
 ### Blocked by Breakout Uncertainty
 
 - RA-02 carrier board
-- MPU6050 breakout
+- MPU-9250 breakout
 - NEO-6M breakout
 - GY-BMP280-3.3 breakout
 - Micro SD reader, especially its host-side logic

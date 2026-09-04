@@ -15,14 +15,24 @@ struct SensorSnapshot {
     double ax_mps2 = 0.0;
     double ay_mps2 = 0.0;
     double az_mps2 = 0.0;
+    // Calibrated magnetic flux density, microtesla, body frame.
+    double mx_ut = 0.0;
+    double my_ut = 0.0;
+    double mz_ut = 0.0;
     double roll_deg = 0.0;
     double pitch_deg = 0.0;
+    // Z-Y-X Euler yaw, right-handed about the body up axis. Absolute magnetic yaw only
+    // while `yaw_is_magnetic`; otherwise a relative, free-running gyro integration.
     double yaw_deg = 0.0;
+    // The same angle as a compass bearing, 0..360 clockwise from magnetic north.
+    double heading_deg = 0.0;
     double altitude_m = 0.0;
     double pressure_pa = 0.0;
     double temperature_c = 0.0;
     bool imu_valid = false;
+    bool mag_valid = false;
     bool orientation_valid = false;
+    bool yaw_is_magnetic = false;
     bool baro_valid = false;
     cansat::GpsData gps{};  // gps.valid == has fix
 };

@@ -93,7 +93,7 @@ had never executed. All are recorded in [CHANGELOG.md](../../CHANGELOG.md) and i
 |---|---|---|
 | Telemetry protocol | Rulebook format, strict parser, precision rules, optional fields | [telemetry-protocol.md](../design/telemetry-protocol.md) |
 | Flight core | Controller, state machine, scheduler, orientation, calibration, faults, builder, block log, NMEA parser, link profile, airtime and sensor-rate guards | 36 C++ suites, 537 assertions |
-| Sensor drivers | MPU6050, BMP280, NEO-6M | Compile-checked against SDK stubs; register encodings and timing model host-tested |
+| Sensor drivers | MPU-9250, BMP280, NEO-6M | Compile-checked against SDK stubs; register encodings and timing model host-tested |
 | Ground bridge | Continuous RX, CRC framing, status lines, watchdog | Framing unit-tested |
 | Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI, end-to-end trace | 76 Python tests |
 | Web console | Framing, parser, validator and link health extracted from `index.html` and run under Node | 30 Node tests |
@@ -145,7 +145,7 @@ gantt
 
 - Photograph and identify every purchased breakout; record the exact variant
 - Confirm supply voltage, logic levels, regulators, level shifters, pull-ups and pinouts
-- Resolve the microSD reader supply (its listing states 4.5–5.5 V input)
+- ~~Resolve the microSD reader supply~~ — done: the delivered module is 2.6–3.6 V and runs from the 3.3 V rail. Measure its write-transient current against the regulator instead
 - Verify the antenna and IPEX cable connector genders
 - Follow the [bring-up order](../design/wiring.md#bring-up-order), one subsystem at a time
 
@@ -248,10 +248,10 @@ resolve.
 |---|---|---|
 | Mechanical design freeze | Contradictory dimension limits (organizer questions 1 and 4) | Organizers |
 | Descent-system sizing | Launch altitude contradiction, 100 ft vs 150 ft (question 3) | Organizers |
-| Yaw compliance claim | No definition of valid yaw data; the vehicle has no magnetometer (question 6) | Organizers |
+| Yaw compliance claim | No definition of valid yaw data (question 6). The vehicle can now produce an absolute magnetic yaw, but only after an airframe calibration that has not yet been performed | Organizers |
 | Radio parameter freeze | Only the sync words are prescribed (question 7) | Organizers |
 | Peripheral rail design | Exact breakout documentation | Team |
-| microSD integration | Reader supply and MISO tri-state behaviour | Team |
+| microSD integration | MISO tri-state behaviour on the shared bus, and the write-transient current | Team |
 | Battery-life estimate | Regulator selection plus a measured load | Team |
 | Report and media schedule | No deadlines in the supplied text (question 9) | Organizers |
 
@@ -261,9 +261,10 @@ resolve.
 
 | Risk | Impact | Current mitigation |
 |---|---|---|
-| microSD reader is incompatible with the available rails | Loses onboard logging | Flagged as the top hardware risk; SD failure already degrades gracefully in firmware |
+| microSD write transient browns out the shared 3.3 V regulator | Loses onboard logging, or resets the flight computer | Supply voltage resolved (2.6–3.6 V module on the 3.3 V rail); the write transient is still unmeasured and shares a regulator with the radio. SD failure already degrades gracefully in firmware |
+| Magnetometer calibration never performed, or performed on a bare board | Yaw stays relative, or an absolute heading is claimed that is wrong by a constant | Calibration ships invalid and the vehicle reports `YR-G` until a real sweep is loaded; the sweep is a named bring-up gate |
 | No regulator selected | Blocks the whole power build | AMS1117-3.3 assessed and rejected with reasoning recorded; replacement still open |
-| Yaw cannot be produced credibly without a magnetometer | Mandatory field may be judged non-compliant | Yaw is implemented and documented as a *relative* gyro-integrated angle, never claimed as magnetic heading |
+| Yaw may be judged non-compliant if a relative angle is not accepted | Mandatory field may be judged non-compliant | The MPU-9250's magnetometer makes an absolute magnetic yaw available once the airframe is calibrated; until then yaw is relative. Every packet declares which it is (`YR-M` / `YR-G`), so an absolute heading is never claimed without one |
 | Antenna connector gender mismatch | Cannot connect the RF chain | Flagged for physical verification before assembly |
 | Dimension contradiction unresolved | Mechanical rework, or disqualification on size | No value invented locally; escalated to the organizers |
 | Radio link untested at range | Telemetry loss during flight | Link testing is a named gate; firmware already recovers from radio failure with bounded back-off |

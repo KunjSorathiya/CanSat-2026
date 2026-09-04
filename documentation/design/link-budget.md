@@ -81,20 +81,32 @@ running the formatter, not estimated:
 |---|---:|
 | Team id + 12 mandatory fields | **118** |
 | \+ GPS latitude, longitude, altitude | **167** |
-| \+ `MODE`, `FAULTS`, `CAL`, `ARM` diagnostic tags | **206** |
-| Absolute worst case: longest team id, widest packet number, extreme values | **247** |
+| \+ `MODE`, `FAULTS`, `CAL`, `ARM`, `YR` diagnostic tags | **212** |
 | Budgeted (`kWorstCasePacketBytes`) | **255** |
 
+The first three rows are asserted by `test_measured_packet_sizes_match_the_link_budget`, so
+a change to the packet format that makes this table wrong fails the build.
+
 The budget is the LoRa FIFO limit itself. That is the only size a packet cannot exceed, so
-it is the only honest basis for an airtime figure — and the margin between the 247-byte
-worst case and the 255-byte hardware limit is eight bytes, far too little to justify
-budgeting against a typical packet instead.
+it is the only honest basis for an airtime figure.
+
+There is no meaningful "absolute worst case" row, and the earlier one was misleading: the
+team identifier has no length limit in the rulebook format, so the worst case a packet can
+reach is not bounded by the format at all. It is bounded by the flight computer, which
+sheds optional content in priority order rather than letting the radio truncate a packet
+silently. A packet built from extreme values with every tag attached does exceed 255 bytes,
+which is exactly why that shedding path exists and is tested.
+
+> **The nine-axis upgrade cost six bytes per packet.** The `YR-` tag says whether the
+> mandatory yaw field is an absolute magnetic angle or a relative gyro integration. Six
+> bytes of airtime to stop a receiver mistaking one for the other is the cheapest part of
+> this whole design.
 
 > **A second finding.** An earlier revision of this document budgeted **200 bytes**, from an
-> estimate rather than a measurement. The real in-flight packet with GPS and all four
-> diagnostic tags is **206 bytes** — so the airtime budget sat below the *typical* packet
+> estimate rather than a measurement. The real in-flight packet with GPS and every
+> diagnostic tag is **212 bytes** — so the airtime budget sat below the *typical* packet
 > and under-estimated occupancy on every single transmission. The numbers above now come
-> from running `format_packet()` and reading the lengths.
+> from running `format_packet()` and reading the lengths, in a test.
 
 Because a packet can approach the FIFO limit, the flight computer sheds optional content
 rather than letting the radio truncate it silently. The rulebook sets the priority —
@@ -175,7 +187,7 @@ Defined once, in [`cansat/link_profile.hpp`](../../firmware/common/include/cansa
 | Telemetry period | 1000 ms | 1 Hz rulebook minimum at ~40 % worst-case channel occupancy |
 
 Resulting budget: **399.6 ms worst-case airtime, 40 % channel duty, 60 % of the channel
-free.** A typical 206-byte in-flight packet costs about 327 ms, or 33 %.
+free.** A typical 212-byte in-flight packet costs about 335 ms, or 34 %.
 
 The 2 Hz option is real but conditional: SF7 at **250 kHz** gives 199.8 ms worst-case
 airtime and a comfortable 40 % duty at a 500 ms period. It costs about 3 dB of receiver sensitivity, which

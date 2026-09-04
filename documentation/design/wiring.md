@@ -54,7 +54,7 @@ flowchart LR
         P26["GP26 · ADC0 battery sense"]
     end
 
-    IMU["MPU6050<br/>accel + gyro"]
+    IMU["MPU-9250<br/>accel + gyro"]
     BARO["BMP280<br/>pressure + temperature"]
     LORA["SX1278 RA-02<br/>433 MHz LoRa"]
     SD["microSD reader"]
@@ -97,11 +97,11 @@ Text form, matching [pico-gpio-map.md](../hardware/pico-gpio-map.md):
 
 ```text
 I2C0                      SPI0 (shared bus)
-  GP4  -> SDA  -> MPU6050   GP18 -> SCK  -> RA-02 + microSD
+  GP4  -> SDA  -> MPU-9250   GP18 -> SCK  -> RA-02 + microSD
   GP4  -> SDA  -> BMP280    GP19 -> MOSI -> RA-02 + microSD
-  GP5  -> SCL  -> MPU6050   GP16 <- MISO <- RA-02 + microSD
+  GP5  -> SCL  -> MPU-9250   GP16 <- MISO <- RA-02 + microSD
   GP5  -> SCL  -> BMP280    GP17 -> CS   -> RA-02   (dedicated)
-  GP7  <- INT  <- MPU6050   GP6  -> CS   -> microSD (dedicated)
+  GP7  <- INT  <- MPU-9250   GP6  -> CS   -> microSD (dedicated)
 
 UART0                     RA-02 control
   GP12 -> TX -> GPS RX      GP20 -> RESET
@@ -158,10 +158,10 @@ and mirror `BoardPins`.
 
 | Pico GPIO | Function | Peripheral | Direction | Device | Required | `BoardPins` field |
 |---:|---|---|---|---|---|---|
-| GP4 | I2C SDA | I2C0 | Bidirectional | MPU6050 + BMP280 | Yes | `i2c_sda` |
-| GP5 | I2C SCL | I2C0 | Output (open-drain bus) | MPU6050 + BMP280 | Yes | `i2c_scl` |
+| GP4 | I2C SDA | I2C0 | Bidirectional | MPU-9250 + AK8963 + BMP280 | Yes | `i2c_sda` |
+| GP5 | I2C SCL | I2C0 | Output (open-drain bus) | MPU-9250 + AK8963 + BMP280 | Yes | `i2c_scl` |
 | GP6 | SD chip select | GPIO | Output | microSD reader | Yes | `sd_cs` |
-| GP7 | IMU interrupt | GPIO | Input | MPU6050 INT | Useful | `imu_int` |
+| GP7 | IMU interrupt | GPIO | Input | MPU-9250 INT | Useful | `imu_int` |
 | GP12 | UART TX | UART0 | Output | NEO-6M RX | Yes | `gps_tx` |
 | GP13 | UART RX | UART0 | Input | NEO-6M TX | Yes | `gps_rx` |
 | GP14 | Status LED | GPIO | Output | External LED | Yes | `status_led` |
@@ -183,11 +183,21 @@ card initialisation, UART0 at 9600 baud for the NEO-6M.
 
 ## Bus sharing rules
 
-**I2C0 — MPU6050 and BMP280 share one bus.** This works only if the two devices answer on
-different addresses and only one set of pull-ups dominates. The MPU6050 address depends on
-its AD0 pin and the BMP280 address depends on its SDO pin; both breakouts commonly carry
-their own pull-ups, and stacking them lowers the effective bus resistance. Confirm the
-addresses and the fitted pull-up values on the physical boards before wiring both.
+**I2C0 carries three devices, not two.** The MPU-9250's magnetometer is a separate AK8963
+die at address `0x0C`, invisible until the firmware sets `INT_PIN_CFG.BYPASS_EN` and bridges
+it onto the primary bus. After that it is an ordinary third device on GP4/GP5, and it
+counts against the bus's capacitance and pull-up budget like any other.
+
+| Device | Address | Selected by |
+|---|---|---|
+| MPU-9250 accelerometer + gyroscope | `0x68` or `0x69` | AD0 strap |
+| AK8963 magnetometer | `0x0C` | Fixed; reachable only through the pass-through bridge |
+| BMP280 | `0x76` or `0x77` | SDO strap |
+
+All three are distinct whichever way the straps are fitted, so sharing the bus works — but
+only if one set of pull-ups dominates. Both breakouts commonly carry their own, and stacking
+them lowers the effective bus resistance. Confirm the addresses and the fitted pull-up
+values on the physical boards before wiring them together.
 
 **SPI0 — RA-02 and microSD share clock, MOSI and MISO.** Two rules make this safe:
 
@@ -197,9 +207,16 @@ addresses and the fitted pull-up values on the physical boards before wiring bot
    properly when deselected; if the RA-02 reads back garbage while a card is inserted,
    this is the first thing to check.
 
-The SD reader's Robu listing specifies a 4.5–5.5 V input, so it cannot simply be hung off
-a 3.3 V rail. See [sd-module-analysis.md](../hardware/sd-module-analysis.md) — this is the
-single highest-risk integration item in the electrical design.
+The SD reader received is a 2.6–3.6 V SPI module, so it runs from the same 3.3 V rail as
+everything else on the vehicle. An earlier revision of this document said the opposite —
+that the reader needed 4.5–5.5 V and a rail of its own — on the strength of a supplier
+listing. The board that arrived does not agree with the listing, which is precisely why
+this project photographs and inspects its boards before designing around them.
+
+What remains open for the reader is current, not voltage: an SD write transient is the
+largest short-duration load on this vehicle and it lands on the same regulator as a radio
+that transmits once a second. See
+[sd-module-analysis.md](../hardware/sd-module-analysis.md).
 
 ---
 
@@ -214,20 +231,19 @@ flowchart TD
     P33["Pico onboard 3.3 V regulator — RP2040 and GPIO"]
     CONV["Peripheral conversion — REGULATOR NOT SELECTED"]
     RAIL["Verified 3.3 V peripheral rail — TBD"]
-    SDRAIL["SD reader input rail, 4.5 to 5.5 V — TBD"]
     PLED["Power LED branch — TBD"]
 
     BAT --> SW --> NODE
     NODE --> VSYS --> P33
     NODE --> CONV
     CONV --> RAIL
-    CONV --> SDRAIL
     NODE --> PLED
 
     RAIL -.-> LORA["RA-02"]
-    RAIL -.-> IMU["MPU6050"]
+    RAIL -.-> IMU["MPU-9250"]
     RAIL -.-> BARO["BMP280"]
     RAIL -.-> GPS["NEO-6M"]
+    RAIL -.-> SD["microSD reader · 2.6 to 3.6 V"]
     SDRAIL -.-> SDM["microSD reader"]
 
     classDef tbd stroke-dasharray: 5 5,stroke-width:2px
@@ -324,7 +340,7 @@ Wire and verify one subsystem at a time. Do not connect everything and power on.
 
 ```mermaid
 flowchart LR
-    S1["1 · Pico alone<br/>USB power, blink GP14"] --> S2["2 · I2C<br/>scan for MPU6050 + BMP280"]
+    S1["1 · Pico alone<br/>USB power, blink GP14"] --> S2["2 · I2C<br/>scan for MPU-9250 + BMP280"]
     S2 --> S3["3 · Sensor reads<br/>compare against known values"]
     S3 --> S4["4 · UART<br/>raw NMEA from the NEO-6M"]
     S4 --> S5["5 · RA-02 alone<br/>read chip version over SPI"]
@@ -342,9 +358,10 @@ results in [documentation/testing](../testing/).
 
 ## Open items before any wiring is built
 
-- [ ] Exact breakout variants documented for the RA-02, MPU6050, NEO-6M, GY-BMP280-3.3 and the microSD reader
+- [ ] Exact breakout variants documented for the RA-02, MPU-9250, NEO-6M, GY-BMP280-3.3 and the microSD reader
 - [ ] I2C addresses and fitted pull-up values confirmed on the physical boards
-- [ ] microSD reader supply resolved (listing states 4.5–5.5 V input)
+- [x] microSD reader supply resolved: 2.6–3.6 V module, runs from the 3.3 V rail
+- [ ] microSD write-transient current measured against the regulator's capability
 - [ ] microSD MISO tri-state behaviour confirmed on the shared SPI bus
 - [ ] Peripheral regulator selected, with a documented load budget
 - [ ] Manual ON/OFF switch selected and placed in the main battery feed

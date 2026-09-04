@@ -9,13 +9,13 @@ include/flight/            hardware-independent flight core (host + Pico)
   controller.hpp           flight loop orchestrator
   state_machine.hpp        INIT -> SELF_TEST -> READY -> FLIGHT -> LANDED -> RECOVERY (+ FAULT)
   scheduler.hpp            non-blocking periodic-task timers
-  orientation.hpp          complementary-filter attitude (roll/pitch fused, relative yaw)
-  sensor_math.hpp          MPU6050 scaling, BMP280 Bosch compensation, pressure altitude
+  orientation.hpp          nine-axis Mahony quaternion attitude (accel + gyro + magnetometer)
+  sensor_math.hpp          MPU-9250 and AK8963 scaling, BMP280 Bosch compensation, pressure altitude
   telemetry_builder.hpp    canonical record + rulebook packet string
   fault_manager.hpp        fixed-size fault store, no allocation
   raw_block_log.hpp        append-only 512-byte-block log (no filesystem)
   health.hpp               health snapshot
-  pico/                    Pico HAL: mpu6050, bmp280, neo6m, sd_card, sx1278 glue
+  pico/                    Pico HAL: mpu9250, bmp280, neo6m, sd_card, sx1278 glue
 src/                       core sources; src/pico/ is Pico-only
 tests/                     host mocks + smoke test + comprehensive suite
 ```

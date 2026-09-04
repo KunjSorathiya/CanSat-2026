@@ -97,6 +97,8 @@ const char* fault_name(FaultCode code) {
         case FaultCode::battery_low: return "battery_low";
         case FaultCode::telemetry_suppressed: return "telemetry_suppressed";
         case FaultCode::orientation_invalid: return "orientation_invalid";
+        case FaultCode::mag_unavailable: return "mag_unavailable";
+        case FaultCode::yaw_reference_disagreement: return "yaw_reference_disagreement";
         case FaultCode::calibration: return "calibration";
         case FaultCode::sensor_implausible: return "sensor_implausible";
         case FaultCode::watchdog_reboot: return "watchdog_reboot";

@@ -8,6 +8,137 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-04 (cycle 32)
+
+### Changed — the IMU is now an MPU-9250, and the vehicle has a magnetometer
+
+The MPU-6050 has been replaced with an MPU-9250. This is not a renaming: the MPU-9250 is a
+different part with a different `WHO_AM_I`, a different temperature transfer function, a
+second filter register the MPU-6050 does not have, and a third die — an AKM AK8963
+magnetometer — behind an I2C pass-through bridge.
+
+- New driver `firmware/flight-computer/src/pico/mpu9250.cpp`, replacing `mpu6050.cpp`.
+  Resets the part and waits out its start-up before configuring anything; clears
+  `FCHOICE_B` so `DLPF_CFG` is actually in circuit; configures the accelerometer filter
+  from `ACCEL_CONFIG 2`, a register the MPU-6050 does not have; enables
+  `INT_PIN_CFG.BYPASS_EN` and brings up the AK8963 through the fuse-ROM sensitivity read.
+- `WHO_AM_I` `0x71`/`0x73` is a real MPU-9250/9255; `0x70` is an MPU-6500 sold as one, with
+  no magnetometer. Both are accepted. A vehicle with a substituted part flies on six axes
+  and says so, rather than refusing to boot or inventing a heading.
+- The AK8963's `ST2` register is read at the end of every measurement burst. It is not
+  optional: a driver that reads only the data registers gets a magnetometer that updates
+  exactly once.
+- **The magnetometer's axes are not the accelerometer's.** The AK8963 die is mounted
+  rotated inside the package — its X lies along the MPU's Y, its Y along the MPU's X, and
+  its Z is inverted. `mag_axes_to_body()` corrects this before any other code sees a
+  sample. Getting it wrong yields a heading that moves smoothly as the vehicle turns and is
+  completely wrong, which is exactly the kind of fault a dashboard cannot show you.
+- Temperature now uses the MPU-9250's transfer function (`raw`/333.87 + 21 °C). Carrying
+  the MPU-6050's `raw`/340 + 36.53 across would have reported room temperature as ~36 °C.
+
+### Changed — nine-axis attitude, and yaw that says what it is
+
+The Euler complementary filter has been replaced with a Mahony complementary filter on the
+unit quaternion.
+
+- The old filter integrated Euler angles directly (`roll += p·dt`), which is only valid for
+  small angles and loses its solution entirely as pitch passes ±90°. A CanSat under a
+  parachute tumbles through exactly that. The quaternion form has no such singularity, and
+  a regression test now tumbles the estimator at 100 °/s about all three axes for 20 s.
+- The gyroscope propagates; the accelerometer corrects roll and pitch and is ignored
+  whenever the specific force is not near 1 g; the magnetometer corrects yaw and only yaw —
+  the reference field is re-levelled every update, so a magnetic disturbance cannot tip the
+  roll/pitch solution.
+- A bias integrator removes gyro drift the pad calibration did not catch, clamped so a long
+  manoeuvre cannot let it wander into the attitude.
+- **Yaw is absolute only when it has been earned.** A magnetometer with no hard/soft-iron
+  calibration still stops yaw drifting, but the estimate is not reported as a magnetic
+  heading. Every packet carries a `YR-M` or `YR-G` tag saying which of the two the
+  mandatory `Ya-` field holds. Six bytes of airtime to stop a receiver mistaking a relative
+  angle for a bearing.
+- GPS course over ground is used as a **cross-check only**, never as an input. It is
+  referenced to true north rather than magnetic, and a payload crabbing under a parachute
+  or spinning on its axis has a course that legitimately differs from its yaw. A gross,
+  sustained disagreement while moving raises a warning that says "suspect the magnetometer
+  calibration" — it does not move the heading.
+
+### Added — magnetometer calibration architecture
+
+- `MagCalibrator` estimates hard iron and diagonal soft iron from a rotation sweep, using
+  min/max bounding rather than an ellipsoid fit: six numbers of state, constant time per
+  sample, and a failure mode that is obvious rather than subtle. It refuses to certify
+  itself until **every** axis has swept a real range, which is what stops the vehicle from
+  claiming an absolute heading it has not earned.
+- `Configuration::mag_calibration` ships invalid on purpose. A bench-measured calibration
+  for the assembled airframe is pasted in; until then the vehicle reports `YR-G`.
+- Hard and soft iron describe the **vehicle**, not the sensor. The battery, the radio and
+  the wiring bias the field by tens of microtesla — the same order as the field being
+  measured — so the sweep must be done on the finished airframe and repeated when the
+  layout changes.
+
+### Fixed — the accelerometer calibration was only correct in one attitude
+
+The pad calibration stored the residual between the measured gravity vector and 1 g as a
+body-frame offset vector, and subtracted it from every later sample.
+
+That is right exactly while the vehicle stays in the attitude it was calibrated in. Once it
+rotates, the same vector is an error of the same size pointing the wrong way. A single
+stationary orientation gives one equation and cannot separate offset from scale, so the
+honest correction is the one that is rotation invariant: a scalar scale, `g / |a_rest|`,
+applied multiplicatively. A new test applies it across five attitudes and checks the
+magnitude still comes back to one standard gravity in all of them.
+
+### Changed — the microSD module is a 3.3 V board
+
+Receiving inspection identified the delivered SKU 11566 as a **2.6–3.6 V SPI module**. Every
+document in this project that said 4.5–5.5 V was repeating a supplier listing that does not
+describe the board that arrived.
+
+- The second rail and the boost converter are removed from the power tree. Every peripheral
+  on this vehicle now runs from one 3.3 V rail.
+- `sd-module-analysis.md` is rewritten: the supply question is answered, and what remains is
+  measurement — write-transient current against a regulator shared with the radio, and MISO
+  release behaviour on the SPI0 bus shared with the RA-02.
+- The SD driver itself needed no functional change: it was already 3.3 V-agnostic, already
+  asks CMD8 for the 2.7–3.6 V range, and already fails rather than blocks. Comments and
+  documentation now state the supply rather than hedging about it.
+- SD failure still cannot cost a telemetry packet. That was true before and is retested.
+
+### Changed — ground station and console
+
+- `YR-` is parsed into `yaw_reference` (`"magnetic"` / `"gyro"` / `None`) and a derived
+  `heading` in degrees clockwise from magnetic north, offered only when the yaw is
+  magnetic. A bearing derived from a relative yaw would be wrong by an unknown constant, so
+  none is offered at all.
+- The web console shows the yaw reference beside the yaw, and drives its compass card from
+  the heading rather than from the Euler yaw — the two run in opposite directions, and
+  conflating them mirrors the display.
+- The CSV log and export carry both new columns, so a log read months later still says
+  which kind of yaw its numbers are.
+
+### Documentation
+
+- `sensor-rates.md`: the MPU-9250's two separate filter registers, the `FCHOICE_B` trap,
+  the AK8963's free-running rate, and an explicit statement that DLPF 4 is **not** fully
+  anti-aliased at 30 Hz — 15 to 21 Hz still folds down, and that residual is accepted
+  knowingly rather than hidden.
+- `link-budget.md`: measured packet sizes are now 118 / 167 / 212 bytes, asserted by a
+  test. The old "absolute worst case" row is removed as misleading — the team identifier has
+  no length limit, so the worst case is bounded by the flight computer's shedding logic
+  rather than by the format.
+- `bring-up-record.md` gate 8 gains the tests that actually decide whether this vehicle can
+  claim a heading: `WHO_AM_I`, field magnitude on the assembled airframe, the calibration
+  sweep, yaw drift either side of that calibration, and yaw against a known bearing.
+
+### Not done
+
+Nothing here has been run on hardware. The parts are in hand, but every claim in this entry
+is a claim about software behaviour verified by host tests. Axis orientation, magnetometer
+health, calibration quality and heading accuracy are bench measurements, and they are
+written up as bring-up gates rather than as results.
+
+---
+
 ## [Unreleased] — 2026-09-04 (cycle 31)
 
 ### Fixed — a portability defect that only a non-Windows build could reveal

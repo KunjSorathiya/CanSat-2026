@@ -44,7 +44,7 @@ flowchart TB
     subgraph V["Vehicle"]
         direction TB
         VM["main.cpp — watchdog, clock, config"]
-        VH["Pico HAL, flight::pico — mpu6050, bmp280, neo6m, sd_card, pico_radio"]
+        VH["Pico HAL, flight::pico — MPU-9250, bmp280, neo6m, sd_card, pico_radio"]
         VC["Flight core, flight:: — controller, state_machine, scheduler, orientation, calibration, faults, builder"]
     end
 
@@ -101,9 +101,9 @@ vehicle substitutes `flight::pico::*`.
 | [`controller.cpp`](../../firmware/flight-computer/src/controller.cpp) | The flight loop orchestrator — the single place mission behaviour is composed |
 | [`state_machine.cpp`](../../firmware/flight-computer/src/state_machine.cpp) | `INIT` to `SELF_TEST` to `READY` to `FLIGHT` to `LANDED` to `RECOVERY`, plus `FAULT` |
 | [`scheduler.cpp`](../../firmware/flight-computer/src/scheduler.cpp) | `PeriodicTask` — fixed-period, non-allocating, stall-tolerant timers |
-| [`orientation.cpp`](../../firmware/flight-computer/src/orientation.cpp) | Complementary-filter roll and pitch, gyro-integrated relative yaw. The filter blends the *wrapped difference* between prediction and measurement, not the raw angles — a plain weighted mean is wrong across the ±180° seam, which a tumbling vehicle crosses on every rotation |
-| [`sensor_math.cpp`](../../firmware/flight-computer/src/sensor_math.cpp) | MPU6050 scaling, Bosch BMP280 compensation, barometric altitude |
-| [`startup_calibration.cpp`](../../firmware/flight-computer/src/startup_calibration.cpp) | Pad calibration: gyro bias, accelerometer offset, barometric ground reference |
+| [`orientation.cpp`](../../firmware/flight-computer/src/orientation.cpp) | Nine-axis attitude: a Mahony complementary filter on the unit quaternion. The gyroscope propagates, the accelerometer corrects roll and pitch (and is ignored whenever the specific force is not near 1 g), the magnetometer corrects yaw and only yaw. Quaternion state rather than Euler integration, because a tumbling CanSat passes through the ±90° pitch singularity that breaks the Euler form |
+| [`sensor_math.cpp`](../../firmware/flight-computer/src/sensor_math.cpp) | MPU-9250 accelerometer/gyroscope/temperature scaling, AK8963 magnetometer sensitivity and hard/soft-iron correction, Bosch BMP280 compensation, barometric altitude |
+| [`startup_calibration.cpp`](../../firmware/flight-computer/src/startup_calibration.cpp) | Pad calibration: gyro bias, a rotation-invariant accelerometer scale, barometric ground reference. `MagCalibrator` estimates hard and soft iron from a rotation sweep and refuses to certify itself until every axis has actually been swept |
 | [`telemetry_builder.cpp`](../../firmware/flight-computer/src/telemetry_builder.cpp) | Snapshot to record to packet string to SD CSV row |
 | [`fault_manager.cpp`](../../firmware/flight-computer/src/fault_manager.cpp) | Fixed-size fault store indexed by enum; never grows |
 | [`raw_block_log.cpp`](../../firmware/flight-computer/src/raw_block_log.cpp) | Append-only 512-byte-block log — no filesystem, no FAT dependency |
