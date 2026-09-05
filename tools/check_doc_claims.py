@@ -724,6 +724,17 @@ def main() -> int:
     checker.check("every Python file compiles without a warning",
                   not python_problems, "; ".join(python_problems[:3]))
 
+    # CI greps the build log for the message build_host.sh prints when it skips the web
+    # console suite, and fails the job if it finds it. The two are coupled by a string
+    # literal in two files: reword the message and the guard stops matching, silently, and
+    # a CI run with no Node passes while testing less than it says it does.
+    ci_workflow = read(".github/workflows/ci.yml")
+    emitted = re.findall(r'echo "(== SKIPPED[^"]*)"', build_script)
+    grepped = re.findall(r"grep -q '([^']*SKIPPED[^']*)'", ci_workflow)
+    checker.check("CI greps for a skip message build_host.sh actually prints",
+                  bool(grepped) and all(any(g in e for e in emitted) for g in grepped),
+                  f"emits {emitted}, greps {grepped}")
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.
