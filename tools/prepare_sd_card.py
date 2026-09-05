@@ -163,8 +163,8 @@ def main() -> int:
         piece = "in one piece - verified"
     elif extents is None:
         piece = ("size verified. Contiguity is not checkable from here on FAT32 - "
-                 "run tools/inspect_sd_log.py from an Administrator prompt to "
-                 "confirm it, or let the firmware report it")
+                 "run tools/inspect_sd_log.py to confirm it, or let the "
+                 "firmware report it")
     else:
         piece = f"in {extents} pieces - FRAGMENTED"
 

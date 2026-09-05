@@ -19,8 +19,9 @@ only on NTFS, so there is no built-in Windows tool that will answer this for a F
 
 WHAT IT NEEDS
 -------------
-Raw access to the volume, which on Windows means an **Administrator** prompt. It only ever
-reads.
+Raw read access to the volume. On Windows a removable volume often opens without
+elevation; a fixed one generally will not. If it reports access denied, re-run from an
+Administrator prompt. It only ever reads.
 
 USAGE
 -----
