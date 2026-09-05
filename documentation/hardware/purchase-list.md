@@ -43,17 +43,17 @@ what stop that happening on the soldered board. Values and reasoning:
 
 | Item | Qty | Where it goes | ~₹ |
 |---|---:|---|---:|
-| **470 µF electrolytic**, ≥ 6.3 V (16 V is what shops stock) — **or 2 × 100 µF ceramic X5R/X7R ≥ 10 V** | 2 | Across the microSD reader's own `3V3` and `GND` pins. Takes the write spike locally so it never reaches the regulator. The requirement is [~50 µF effective](../design/electrical-architecture.md#how-much-bulk-is-actually-needed); the electrolytic is cheap margin, and ceramics work if derated for DC bias | 20 |
-| **100 µF electrolytic**, ≥ 10 V | 2 | Pico `VSYS`, near the battery input. Optional — fit if the rail looks noisy under load | 15 |
-| **10 µF**, ceramic X5R/X7R ≥ 10 V or electrolytic | 4 | Across the RA-02's `3.3V` and `GND`. PA key-up is 1.5 mA to 87 mA in microseconds | 20 |
-| **100 nF ceramic**, marked `104` | 20 | One at **every** module's supply pins. They cost pennies; buy the strip | 30 |
+| **100 µF 25 V electrolytic**, two in parallel | 4 | Across the microSD reader's own `3V3` and `GND` pins — two in parallel gives 200 µF, against a [~50 µF requirement](../design/electrical-architecture.md#how-much-bulk-is-actually-needed). 470 µF is not stocked locally and is not needed. **A 25 V electrolytic on a 3.3 V rail has no DC-bias derating**, unlike a ceramic, so the marking is what you get. Buy four: two fitted, one for `VSYS`, one spare | 12 |
+
+| **10 µF 25 V electrolytic** | 4 | Across the RA-02's `3.3V` and `GND`. PA key-up is 1.5 mA to 87 mA in microseconds. Two fitted, two spare | 12 |
+| **0.1 µF 50 V ceramic**, marked `104` | 20 | One at **every** module's supply pins. Not optional and not substitutable: every bulk capacitor, of every type, is too slow for fast edges | 40 |
 
 > Electrolytics are polarised — the stripe marks the **negative** leg, to GND. Backwards they
 > heat and can vent. Ceramics have no polarity.
 
-**If only some are fitted, fit these two:** the 470 µF at the microSD and the 10 µF at the
-RA-02. They are the two that map to failures this project actually had, and together they are
-about ₹40. The `104`s are ₹30 for twenty and take seconds each. Only the `VSYS` 100 µF is
+**If only some are fitted, fit these two:** the 100 µF pair at the microSD and the 10 µF at
+the RA-02. They are the two that map to failures this project actually had, and together they are
+about ₹15. The `104`s are ₹2 each and take seconds to fit. Only the spare at `VSYS` is
 genuinely optional.
 
 A soldered board has a far better supply path than the breadboard jumper that caused
