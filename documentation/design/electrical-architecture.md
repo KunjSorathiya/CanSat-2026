@@ -288,11 +288,22 @@ project has measured something, the measurement is named.
 
 ### What that totals
 
-| Case | Sum | Against 250 mA |
-|---|---:|---|
-| **Everything at once** — TX, SD write, GPS acquiring, all sensors, LED | **~266 mA** | **over budget** |
-| **Worst case after the fix** — TX, SD write, GPS *tracking*, sensors, LED | **~241 mA** | at the limit |
-| **Steady state** — TX at 33 % duty, RX otherwise, GPS tracking, sensors, LED | **~85 mA** | comfortable |
+| Case | Peripherals | + RP2040 | Against the 300 mA pin guidance |
+|---|---:|---:|---|
+| **Everything at once** — TX, SD write, GPS acquiring, all sensors, LED | **267 mA** | **302 mA** | **over** |
+| **GPS tracking rather than acquiring** — otherwise the same | **242 mA** | **277 mA** | under, with 23 mA to spare |
+| **Steady state** — TX at 33 % duty, RX otherwise, GPS tracking | **92 mA** | **127 mA** | comfortable |
+
+Both columns are given because both get quoted. The peripheral column is what leaves the
+`3V3(OUT)` pin; the second adds the RP2040's own draw, which shares the regulator, and is the
+one to compare against Raspberry Pi's 300 mA figure.
+
+> **An earlier revision of this tally read 316 mA.** The difference is almost entirely the
+> radio: **120 mA is the SX1278's +20 dBm figure and this vehicle transmits at +17 dBm, which
+> is 87 mA** — 33 mA less. Against that, the RP2040 estimate rose from 25 to 35 mA, and the
+> status LED and the reader's pull-ups were missing from the old tally altogether. Net −14 mA,
+> and the conclusion did not change: the all-at-once case exceeds what the pin is rated to
+> supply, either way.
 
 The first row is not hypothetical: a telemetry append writes two blocks immediately around a
 transmit, so radio TX and an SD write genuinely coincide once a second. What makes it
