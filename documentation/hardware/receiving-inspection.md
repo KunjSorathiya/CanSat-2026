@@ -200,10 +200,10 @@ continuity range. Rows needing a live rail belong in the bring-up record instead
 
 > C.1.5 was a purchase, not an observation: two 20-pin strips per Pico. **Both Picos are now
 > headered**, which settles one half of the mounting question — soldering the vehicle Pico
-> flat to the prototype board, castellations down, is no longer an option. Whether its pins
-> are socketed or passed through the prototype board and soldered directly is still open, and
-> is a vibration decision: a socket can walk loose under launch loads, so anything socketed
-> needs mechanical retention of its own.
+> flat to the prototype board, castellations down, is no longer an option. **The other half
+> was settled on 2026-09-05: the pins are passed through the prototype board and soldered
+> directly**, so no socket has to be retained against launch loads. See
+> [Module mounting](../design/wiring.md#module-mounting).
 >
 > This is a **Pico, not a Pico W** — no radio module, and the `DEBUG` pad row sits where the
 > W's antenna would be. Nothing in this project wants Wi-Fi, but it is worth having recorded.

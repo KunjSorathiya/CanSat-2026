@@ -32,9 +32,10 @@ Verified from the delivered board, receiving inspection 2026-09-04:
 Headers were a purchase, not an observation: two 20-pin strips per Pico, bought separately and
 soldered on 2026-09-04. Both Picos now carry them, so mounting the vehicle Pico flat to the
 prototype board is no longer available and the height budget must carry the header stack.
-Whether its pins are socketed or passed through the prototype board and soldered directly is
-still open - a socket can walk loose under launch vibration, so anything socketed needs its
-own mechanical retention.
+**Its pins are passed through the prototype board and soldered directly, decided
+2026-09-05** - so there is no socket to walk loose under launch vibration and no socket
+retention to design. The full mounting split, and what the four jumpered modules owe in its
+place, is in [Module mounting](../design/wiring.md#module-mounting).
 
 The downloaded Raspberry Pi datasheet is the source for the Pico board pinout and power-input details. The following board-level items must be transcribed and checked against the purchased board before design:
 

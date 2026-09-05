@@ -28,6 +28,7 @@ source of truth in code; this page and
 - [Battery monitoring](#battery-monitoring)
 - [RF chain](#rf-chain)
 - [Bring-up order](#bring-up-order)
+- [Module mounting](#module-mounting)
 - [Open items](#open-items-before-any-wiring-is-built)
 
 ---
@@ -463,6 +464,71 @@ results in [documentation/testing](../testing/).
 
 ---
 
+## Module mounting
+
+Decided 2026-09-05, before the first joint was made. Two modules are permanent, four stay
+removable, and the split follows the spares rather than the wiring.
+
+| Module | Delivered | Mounting | Why |
+|---|---:|---|---|
+| Raspberry Pi Pico | 2 | **Header pins through the board, soldered** | Headers were fitted on 2026-09-04, so flat castellation mounting was already off the table. A spare Pico is in the drawer |
+| SX1278 RA-02 | 2 | **Soldered** | One of the two modules whose supply jumper caused [F-10](../testing/bring-up-record.md#findings). Soldering it removes that wire entirely. A spare RA-02 is in the drawer |
+| MPU-6500 IMU | 1 | Jumpered | No spare |
+| GY-BMP280 | 1 | Jumpered | No spare |
+| NEO-6M GPS | 1 | Jumpered | No spare |
+| microSD reader | 1 | Jumpered | No spare |
+
+The two modules held in duplicate are the two made permanent; the four held singly stay
+removable. A destroyed RA-02 costs a module from the drawer. A destroyed IMU costs the
+mission, and there is no second one to fit.
+
+### What the jumpered microSD requires
+
+[F-10](../testing/bring-up-record.md#findings) was a long supply jumper: **every** microSD
+write failed while **every** read passed, across five bench runs, appearing and vanishing with
+the seating. Soldering the RA-02 removes that wire for the radio. It does not remove it for
+the card, which is still on a jumper — so the card is still in the configuration that failed,
+and the capacitor is what stands in for the wire.
+
+Two rules follow, and the first is the one that decides whether this works:
+
+- **The 470 µF and the 100 nF go on the microSD module's own `3V3` and `GND` pins** — the
+  module end of the jumper, not the perfboard end. A capacitor at the board end still has the
+  whole jumper between itself and the current it is meant to supply, which is the path
+  [F-10](../testing/bring-up-record.md#findings) proved is not good enough.
+- **Run the card's supply as short soldered wire even if its signals stay on jumpers.** The
+  signals tolerated the jumper throughout; only the supply failed.
+
+The same rule applies at smaller stakes to the 100 nF at the IMU, barometer and GPS: module
+end, at the pins. Values and reasoning are in
+[electrical-architecture.md](electrical-architecture.md#decoupling).
+
+### What jumpers add mechanically
+
+Four modules on flying leads are four more things that can come loose on a vehicle that is
+launched and lands hard. The [electrical risk table](electrical-architecture.md#electrical-risks)
+already carries impact opening a connector as a failure mode; jumpers make it four times.
+
+- **Retention on every jumper.** Dupont shells back out under vibration on their own. Each
+  needs heat-shrink or a tie at the shell, and an anchor so mechanical load never reaches the
+  connector.
+- **The IMU must be rigidly bonded to the structure regardless of its wiring.** Attitude is
+  referenced to the airframe, so a module that moves relative to the structure degrades roll
+  and pitch directly — and with no magnetometer on the delivered part
+  ([F-1](../hardware/receiving-inspection.md#findings)) there is no second reference to catch
+  it. The jumper solves the electrical connection and nothing else.
+- **The GPS patch antenna faces skyward** wherever the module ends up.
+
+### Still open
+
+How the jumper's board end lands is not decided. Male header strips soldered into the
+perfboard give a plug field and keep both ends serviceable; wire soldered straight into the
+pad has one fewer connector per line to shake loose but makes the board end permanent. The
+current intent is header strips for the four signal groups and soldered wire for the
+microSD's supply pair.
+
+---
+
 ## Open items before any wiring is built
 
 - [x] Exact breakout variants identified and photographed — [receiving-inspection.md](../hardware/receiving-inspection.md)
@@ -484,7 +550,12 @@ results in [documentation/testing](../testing/).
 - [x] **A mating connector for the battery obtained** — JST-RCY pigtail, 2026-09-05
 - [x] **1S charger obtained** — 2026-09-05; none was supplied and none is on the BOM
 - [x] Pico headers obtained and fitted, 2026-09-04 — flat mounting is therefore off the table
-- [ ] Vehicle Pico mounting decided: socketed with retention, or pins soldered through the board
+- [x] **Vehicle Pico mounting decided, 2026-09-05** — pins passed through the board and soldered. No sockets anywhere on this build
+- [x] **Module mounting split decided, 2026-09-05** — RA-02 soldered; IMU, barometer, GPS and microSD jumpered. See [Module mounting](#module-mounting)
+- [ ] Jumper board-end landing decided: male header strips into the perfboard, or wire soldered into the pad
+- [ ] 470 µF and 100 nF fitted at the microSD module's **own** supply pins, not at the perfboard end
+- [ ] Retention and strain relief specified for all four jumpered modules
+- [ ] IMU rigidly bonded to the structure, independently of its wiring
 - [ ] Antenna and cable centre contacts photographed, settling SMA against RP-SMA
 - [ ] 3.3 V and GND bus runs laid out on the single-sided prototype board before placement
 - [ ] Grounding, decoupling and cable-management plan recorded
