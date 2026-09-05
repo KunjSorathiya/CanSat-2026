@@ -26,13 +26,19 @@ USAGE
     python tools/prepare_sd_card.py E:\\
     python tools/prepare_sd_card.py /media/you/CANSAT --size-mb 64
 
-Run it again after every flight, once you have copied the data off. Re-running truncates
-and recreates the file, which resets the log.
+Run it again after every flight, once you have copied the data off. Re-running deletes and
+recreates the file, which resets the log.
+
+If the firmware reports the file as fragmented, free space on the card is broken up. Quick-
+format it FAT32 again and run this on the empty card: contiguity is then guaranteed, because
+the whole volume is one free run.
 """
 
 import argparse
 import os
+import re
 import shutil
+import subprocess
 import sys
 
 FILENAME = "FLIGHT.CSV"
@@ -48,6 +54,35 @@ def human(n: int) -> str:
             return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
         n /= 1024.0
     return str(n)
+
+
+def count_extents(path: str):
+    """How many separate runs of clusters the file occupies, or None if unknown.
+
+    The firmware requires one. Checking here means finding out at a desk, with the card in
+    a reader, rather than at the bench with everything wired up - which is where this was
+    actually discovered, and it cost a rebuild and a re-run to learn.
+
+    Uses Windows `fsutil file layout`, which **requires an elevated prompt** - it returns
+    "Access is denied" otherwise, and this returns None. That is the common case, so treat
+    a definite answer as a bonus rather than the plan.
+
+    Returns None on any other platform too. The firmware checks contiguity regardless and
+    refuses a fragmented file by name, so an unknown answer here costs a bench round trip
+    and never a wrong result.
+    """
+    if os.name != "nt":
+        return None
+    try:
+        out = subprocess.run(["fsutil", "file", "layout", path],
+                             capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    # One "Extent[ n ]:" line per run of clusters.
+    count = len(re.findall(r"^\s*Extent\[\s*\d+\s*\]", out.stdout, re.MULTILINE))
+    return count or None
 
 
 def format_instructions(target: str) -> str:
@@ -107,9 +142,17 @@ def main() -> int:
         print(format_instructions(target), file=sys.stderr)
         return 2
 
-    # Write the file in one continuous pass and never seek. A sparse file created by
-    # seeking would have no allocated clusters at all, and the firmware would refuse it -
-    # correctly, since there would be nothing there to write into.
+    # Delete before recreating rather than truncating in place. Truncating frees the old
+    # clusters and then immediately asks for them back, and the filesystem is under no
+    # obligation to return the same run -- which is exactly how a file that was contiguous
+    # on its first creation came back fragmented after a --force. Deleting first gives the
+    # allocator a clean look at the largest free extent.
+    if os.path.exists(path):
+        os.remove(path)
+
+    # Write in one continuous pass and never seek. A sparse file created by seeking would
+    # have no allocated clusters at all, and the firmware would refuse it - correctly,
+    # since there would be nothing there to write into.
     print(f"Creating {path} ({human(size_bytes)}, {blocks} blocks)...")
     chunk = b" " * (1024 * 1024)
     written = 0
@@ -131,8 +174,30 @@ def main() -> int:
         print(f"error: wrote {human(actual)}, expected {human(size_bytes)}", file=sys.stderr)
         return 2
 
+    extents = count_extents(path)
+    if extents == 1:
+        piece = "in one piece - verified"
+    elif extents is None:
+        piece = ("size verified. Contiguity was not checkable here - run this from an "
+                 "elevated prompt to have it verified, or let the firmware report it")
+    else:
+        piece = f"in {extents} pieces - FRAGMENTED"
+
+    if extents is not None and extents > 1:
+        print(f"""
+PROBLEM: {FILENAME} is {human(actual)} but lands in {extents} separate runs.
+
+The firmware will refuse it, and it is right to: writing linearly into a fragmented
+file would scribble over whatever occupies the gaps.
+
+Free space on this card is broken up. Quick-format it FAT32 again - which empties it
+completely - and run this script on the clean card. Contiguity is then guaranteed,
+because the whole volume is one free run.
+""")
+        return 2
+
     print(f"""
-Done. {FILENAME} is {human(actual)} of spaces, in one piece.
+Done. {FILENAME} is {human(actual)}, {piece}.
 
   1. Eject the card properly, then put it in the vehicle.
   2. The firmware locates this file and writes records into its blocks. It refuses to

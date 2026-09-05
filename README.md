@@ -30,7 +30,7 @@ and streams telemetry from power-on through recovery.**
 |---|---|
 | 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 4395 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
 | 🟡 **Firmware drivers** | The IMU, barometer, GPS and radio drivers **have run on real silicon** and their numbers are recorded. The microSD driver and the flight image as a whole have not |
-| 🟠 **Hardware** | Bring-up under way: **23 of 81 recorded measurements taken** — the bare Pico, the IMU and barometer, the GPS, the radio's airtime, and the bench identification that found the IMU is a six-axis part. **Power is half-answered** — the microSD runs off the Pico's own 3.3 V rail with a 20 mV droop at 100 % write duty, so no separate rail is needed for it. The combined radio-plus-GPS case is untested, and there is still no switch and no divider |
+| 🟠 **Hardware** | Bring-up under way: **27 of 81 recorded measurements taken** — the bare Pico, the IMU and barometer, the GPS, the radio's airtime, and the bench identification that found the IMU is a six-axis part. **Power is half-answered** — the microSD runs off the Pico's own 3.3 V rail with a 20 mV droop at 100 % write duty, so no separate rail is needed for it. The combined radio-plus-GPS case is untested, and there is still no switch and no divider |
 | 🔴 **Mechanical** | Structure, egg chamber and parachute **not started** — blocked on a rulebook contradiction |
 
 > [!IMPORTANT]

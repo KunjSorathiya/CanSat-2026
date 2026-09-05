@@ -468,11 +468,23 @@ bus together.
 
 | # | Quantity | Predicted | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|
-| 7.1 | Radio works with the card present but idle | No change from Gate 5 | Repeat 5.1 and 5.4 | | |
-| 7.2 | Card works with the radio present but idle | No change from Gate 6 | Repeat 6.1 and 6.3 | | |
+| 7.1 | Radio works with the card present but idle | No change from Gate 5 | Repeat 5.1 and 5.4 | **Version `0x12`, unchanged**, re-read over the bus after the card had initialised | ✅ 2026-09-05 / KS |
+| 7.2 | Card works with the radio present but idle | No change from Gate 6 | Repeat 6.1 and 6.3 | **Card initialised with the radio on the bus**, 42 ms in ACMD41, 2 CMD0 attempts | ✅ 2026-09-05 / KS |
 | 7.3 | Radio works *during* card writes | No lost packets | Run both at full rate for 5 minutes | | |
-| 7.4 | MISO released when each device is deselected | Line goes high-impedance | Scope MISO during the other device's transaction | | |
-| 7.5 | SPI clock after an SD transfer | 4 MHz, unchanged for the radio | Scope SCK during a radio transaction | | |
+| 7.4 | MISO released when each device is deselected | Line goes high-impedance | Scope MISO during the other device's transaction | **200 interleaved rounds: 0 card-read failures, 0 radio misreads.** Every radio probe returned `0x12`. Measured rather than scoped — a held MISO would have corrupted the radio read | ✅ 2026-09-05 / KS |
+| 7.5 | SPI clock after an SD transfer | 4 MHz, unchanged for the radio | Scope SCK during a radio transaction | **Radio reads correctly at the 4 MHz the SD driver raises the bus to.** Confirmed by the same version re-read as 7.1 | ✅ 2026-09-05 / KS |
+
+> **Phase A passed on 2026-09-05, and it is the half that matters most.** 200 interleaved
+> rounds with zero card-read failures and zero radio misreads: **the card releases MISO and
+> the radio stays readable.** That is the fault this gate was written for, and the delivered
+> SD board has nothing that could have saved us from it — no buffer, no active component at
+> all.
+>
+> **7.5 came free with 7.1.** The SD driver raises SPI from 400 kHz to 4 MHz once the card is
+> up, and the radio then answered correctly at that clock. Two rows from one register read.
+>
+> **The highest-risk integration in the BOM is now the one with the most evidence behind it.**
+> 7.3 is still open and needs an antenna.
 
 > **`cansat_bringup_firmware` takes this gate in two phases**, because half of it is free
 > and half of it is not.
