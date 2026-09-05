@@ -383,12 +383,16 @@ can sit in the supply track.
 
 ## Required Hardware Before Prototype
 
+The parts themselves are listed, costed and explained in
+[purchase-list.md](../hardware/purchase-list.md). This section records the decisions each one
+settles.
+
 The following items or decisions are required before assembling the onboard electrical prototype:
 
-- 3.3 V voltage regulator or regulated power supply, selected only after the power budget and module requirements are verified.
+- ~~3.3 V voltage regulator~~ — **resolved: none needed.** Every load runs from the Pico's `3V3(OUT)`, and both the radio and the microSD have been measured holding that rail alone at 100 % duty (rows 5.4a, 6.3b). The [power budget](#power-budget) records how little headroom that leaves.
 - Manual power switch with suitable voltage/current and mechanical ratings; exact part TBD.
 - Visible power LED; current-limiting component and branch design TBD.
-- Required resistors and capacitors identified from each exact module's documentation; values TBD until verified.
+- ~~Required resistors and capacitors~~ — **selected**, from the measured load profile rather than from module documentation, which has still not been read. See [Decoupling](#decoupling).
 - Connectors compatible with the selected modules, prototype board, battery, and antenna cable; exact parts TBD.
 - Wiring and suitable strain relief for power, signals, and antenna connections; sizes and types TBD.
 - LiPo charging and protection solution appropriate for the confirmed battery; exact solution TBD.
