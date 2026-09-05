@@ -64,6 +64,27 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Added — the pin table somebody actually wires from is checked too
+
+The GPIO assignment is gated against `config.hpp` in `wiring.md`. The quick start carries a
+**second copy** of that table — the summary, on the page a builder has open with the board
+in front of them — and nothing held it to anything. A pin changed in firmware would have
+left the authoritative table right and the practical one wrong.
+
+All fifteen pins are now checked in both places. Changing one entry in the quick start's
+table fails the build and names the pin.
+
+Doing that needed the checker's document reads hoisted into one block at the top: checks
+get added in whatever order the reasoning arrives in, and one that could not see a document
+because it sat above the line that opened it is a poor reason to reorder a file.
+
+The [continuous review](documentation/audit/2026-09-05-continuous-review.md) is updated with
+the second wave, `F-60` to `F-69`, and with what that wave says about the first: three of
+its findings are the same shape as two from the first wave — a value computed and shown to
+nobody — and **one of those was introduced by this pass**. Fixing four instances by hand did
+not prevent a fifth. A script comparing the whole snapshot against the whole display did,
+and found eight more while it was there.
+
 ### Fixed — the quick start's install step installs nothing, and never said what to install
 
 Step 3 ends *"Python packages: `pip install -r ground-station/software/requirements.txt`"*.

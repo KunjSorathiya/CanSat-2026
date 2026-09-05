@@ -8,9 +8,9 @@ wrong, fix it, prove the fix, prevent the class of defect from returning, commit
 command the documentation tells a reader to run
 **Baseline:** `e87d480`, the last commit of cycle 33 before this pass
 
-**Verdict:** ✅ **Pass. Seventeen findings, all fixed and all covered. Three are defects in
-flight or ground software that would have produced wrong data; the rest are documents that
-had stopped describing the software, or guarantees nothing was holding.**
+**Verdict:** ✅ **Pass. Twenty-seven findings, all fixed and all covered. Three are defects
+in flight or ground software that would have produced wrong data; the rest are documents
+that had stopped describing the software, or guarantees nothing was holding.**
 
 ---
 
@@ -30,7 +30,9 @@ the code still did what it said.
 
 ## Findings
 
-Numbering continues the software audit: the previous pass ended at F-42.
+Numbering continues the software audit: the previous pass ended at F-42. F-43 to F-59 were
+found by reading; [F-60 to F-69](#second-wave--f-60-to-f-69) by comparing one
+machine-readable thing against another.
 
 | # | Finding | Severity | Status |
 |---|---|---|---|
@@ -51,6 +53,41 @@ Numbering continues the software audit: the previous pass ended at F-42.
 | **F-57** | The orientation estimator granted magnetometer confidence whenever a field passed the **magnitude** gate. A field with no horizontal component — a magnetic pole, or a vertical disturbance on the pad — leaves yaw at zero, and the vehicle then transmitted `YR-M`: an absolute magnetic heading of 0° that nothing had measured | **High** | ✅ Fixed |
 | **F-58** | The NMEA coordinate parser accepted any of `N`, `S`, `E`, `W` on either axis, so a latitude field carrying `W` parsed as a **southern** latitude — the fix placed on the wrong side of the equator | **High** | ✅ Fixed |
 | **F-59** | `Sx1278::poll_receive()` cut a payload longer than the caller's buffer and returned the trimmed length silently. The bridge frames and CRCs a truncated payload like a whole one, so it arrives as a valid frame carrying a malformed packet — a diagnosis pointing at the vehicle when the fault is in the receive path | Low | ✅ Fixed |
+
+---
+
+## Second wave — F-60 to F-69
+
+The findings above were reached by reading. Once the obvious classes were closed, the way to
+find more was to stop reading and start **comparing one machine-readable thing against
+another**: the snapshot against the display, one parser's record against the other's, a
+document's numbers against the table beneath them. Every finding below came out of a
+comparison a script can repeat.
+
+| # | Finding | Severity | Status |
+|---|---|---|---|
+| **F-60** | Thirty-four documents, a table of contents in most, cross-references throughout — and nothing checked that any link or heading anchor still pointed anywhere | Low | ✅ Fixed |
+| **F-61** | `TEL-018`, `TEL-019` and `TEL-020` — three of the rulebook's mandatory telemetry fields — cited `test_mpu_scaling` as their compliance evidence. That test was renamed `test_imu_scaling` when the IMU changed, and a requirement pointing at nothing reads exactly like a requirement that is covered | Medium | ✅ Fixed |
+| **F-62** | `TEL-015` (roll transmitted) was `Complete`; `SEN-008` (roll generated and transmitted) was `Not Started`. One page, one fact, two statuses — and the whole `SEN-001`–`SEN-009` block still read "integration - TBD" for drivers written, tested, and since read on the bench | Medium | ✅ Fixed |
+| **F-63** | `PWR-004` and `GEN-008` were `Not Started` for behaviour that is implemented, tested and, in the radio's case, already transmitting on a bench | Low | ✅ Fixed |
+| **F-64** | `FrameDecoder`'s resync and overflow counters were read by nobody — **including the overflow counter added earlier in this same pass**, whose entire justification was that the distinction is worth showing an operator | Medium | ✅ Fixed |
+| **F-65** | The Tk dashboard was missing nine of the values the ground station knows, including **`calibrated` and `armed`** — the two flags an operator stands on a pad waiting for — and the accepted and rejected totals every other validation row is a fraction of | Medium | ✅ Fixed |
+| **F-66** | The Python parser exposed `fault_count`; the JavaScript one exposed `faults`. Reading the wrong name raises in Python and yields `undefined` in JavaScript, which the console renders as an em dash: a fault count of *none reported* where the vehicle said three | Medium | ✅ Fixed |
+| **F-67** | Post-flight step 5 says to compare the onboard SD log against the ground station's CSV. Of their 18 and 23 columns, `packet_number` is the only name they share, and nothing said how to line them up | Medium | ✅ Fixed |
+| **F-68** | The quick start's `pip install -r requirements.txt` installs nothing — the file is entirely comments — and the document never named `pyserial`, which its own step 19 requires | Medium | ✅ Fixed |
+| **F-69** | The quick start carries a second copy of the GPIO table, the one somebody wires from with the board in front of them, and nothing held it to the firmware | Low | ✅ Fixed |
+
+### What the second wave says about the first
+
+Three of these are the same shape as F-53 and F-59 — a value computed and shown to nobody —
+and one of them was **introduced by this pass**. Fixing four instances by hand did not stop
+the fifth; a script comparing the whole snapshot against the whole display did, and found
+eight more in the same pass. That is the difference between fixing instances and closing the
+way in.
+
+Two others, F-61 and F-66, are drift the shared fixtures were built to prevent and cannot
+see: fixtures hold implementations to one definition of *behaviour*, and both of these were
+disagreements about a **name**. Names now have their own checks.
 
 ---
 
@@ -104,9 +141,9 @@ said, which was the subject of F-43.
 
 | | At `e87d480` | Now |
 |---|---:|---:|
-| Documented claims checked | 66 | **159** |
+| Documented claims checked | 66 | **188** |
 | C++ assertions | 4222 | **4260** |
-| Python tests | 131 | **152** |
+| Python tests | 131 | **158** |
 | Node tests | 37 | **49** |
 | Shared cross-implementation fixtures | 1 | **4** |
 

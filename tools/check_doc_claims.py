@@ -91,6 +91,16 @@ class Checker:
 def main() -> int:
     checker = Checker()
 
+    # Every document a check might reach for, read once. Checks get added in whatever order
+    # the reasoning arrives in, and one that could not see a document because it sat above
+    # the line that opened it is a poor reason to reorder the file.
+    readme = read("README.md")
+    quick_start = read("documentation/quick-start.md")
+    test_plan = read("documentation/testing/test-plan.md")
+    timeline = read("documentation/project/timeline.md")
+    runbook = read("documentation/operations/runbook.md")
+    architecture = read("documentation/design/software-architecture.md")
+
     # ---- the radio link profile, quoted throughout the design documents -------------
     profile = read("firmware/common/include/cansat/link_profile.hpp")
     spreading_factor = constant(profile, "kSpreadingFactor")
@@ -172,7 +182,6 @@ def main() -> int:
     checker.check("config: magnetometer calibration ships invalid",
                   "sensors::MagCalibration mag_calibration{};" in config)
 
-    architecture = read("documentation/design/software-architecture.md")
     checker.check("software-architecture.md states the sensor period",
                   f"| {sensor_period} ms |" in architecture)
     checker.check("software-architecture.md states the telemetry period",
@@ -216,6 +225,11 @@ def main() -> int:
         checker.check(f"config: {name} on GP{expected}", actual == expected, str(actual))
         checker.check(f"wiring.md lists GP{expected} for `{name}`",
                       f"| GP{expected} |" in wiring and f"`{name}`" in wiring)
+        # The quick start carries its own copy of this table -- the one somebody actually
+        # wires from, with the board in front of them. A pin changed in the firmware and
+        # not here sends a builder to the wrong hole.
+        checker.check(f"quick-start.md lists GP{expected}",
+                      f"| GP{expected} |" in quick_start, f"GP{expected}")
 
     # ---- the size of the test suites, as the suites themselves report it ------------
     # These counts appear in the README badge, the quick start and the test plan, and they
@@ -223,10 +237,6 @@ def main() -> int:
     # later. tools/build_host.sh writes what every suite reported to build/host/test-output.log
     # on the run that precedes this check, so the documents are held to the current numbers
     # rather than to remembered ones.
-    test_plan = read("documentation/testing/test-plan.md")
-    readme = read("README.md")
-    quick_start = read("documentation/quick-start.md")
-    timeline = read("documentation/project/timeline.md")
 
     # Every suite main() calls must have a row explaining what it proves. A test nobody
     # documented is a test nobody can tell you the purpose of when it fails.
@@ -404,7 +414,6 @@ def main() -> int:
     flight = re.search(r"case MissionState::flight:\s*\n\s*period = (\d+);", body)
     recovery = re.search(r"case MissionState::recovery:\s*\n\s*period = (\d+);", body)
     fault = re.search(r"case MissionState::fault:\s*\n\s*period = (\d+);", body)
-    runbook = read("documentation/operations/runbook.md")
     cadences = [
         ("READY armed", armed.group(1) if armed else None, bring_up),
         ("READY unarmed", armed.group(2) if armed else None, bring_up),
