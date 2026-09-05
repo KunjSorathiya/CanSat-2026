@@ -110,10 +110,14 @@ public:
     // Why initialisation failed, when it did. A missing file and an unformatted card need
     // different fixes, and "SD failed" does not tell an operator which they are looking at.
     FatVolume::Status locate_status() const { return locate_status_; }
+    // How many separate runs the log file occupies. One is ideal; more is
+    // ordinary and costs nothing but a line in the bring-up record.
+    int log_extents() const { return layout_.extent_count; }
 
 private:
     pico::SdCard card_;
     RawBlockLog log_;
+    FatVolume::Layout layout_{};
     FatVolume::Status locate_status_ = FatVolume::Status::ok;
     bool healthy_ = false;
 };

@@ -100,7 +100,7 @@ bool name_matches(const std::uint8_t* entry, const char* name_83) {
 }  // namespace
 
 FatVolume::Status FatVolume::locate(const Io& io, const char* name_83,
-                                    std::uint32_t min_blocks, Region& out) {
+                                    std::uint32_t min_blocks, Layout& out) {
     if (io.read_block == nullptr || name_83 == nullptr) return Status::not_fat32;
     for (int i = 0; i < 11; ++i) {
         if (name_83[i] == '\0') return Status::not_fat32;  // short 8.3 name
@@ -152,9 +152,16 @@ FatVolume::Status FatVolume::locate(const Io& io, const char* name_83,
     if (!found) return Status::file_not_found;
     if (first_cluster < 2) return Status::file_too_small;
 
-    // Follow the file's own chain and insist every link is the next cluster along. A
-    // fragmented file cannot be written linearly: the gap belongs to some other file, and
-    // the log would overwrite it while still reporting success.
+    // Follow the file's chain, coalescing consecutive clusters into runs. Fragmentation is
+    // tracked rather than refused: a file recreated before every flight cannot be relied on
+    // to come back as one unbroken run, and refusing it turns a routine step into a
+    // reformat. What is refused is a file in more runs than can be held.
+    const std::uint32_t blocks_per_cluster = bpb.sectors_per_cluster;
+    out = Layout{};
+    out.extents[0].first_lba = cluster_lba(bpb, first_cluster);
+    out.extents[0].block_count = blocks_per_cluster;
+    out.extent_count = 1;
+
     std::uint32_t clusters = 1;
     std::uint32_t current = first_cluster;
     const std::uint32_t max_clusters =
@@ -163,15 +170,36 @@ FatVolume::Status FatVolume::locate(const Io& io, const char* name_83,
         std::uint32_t next = 0;
         if (!fat_entry(io, bpb, current, next)) return Status::read_failed;
         if (next >= 0x0FFFFFF8u) break;      // end of chain
-        if (next != current + 1) return Status::file_fragmented;
+        if (next == current + 1) {
+            out.extents[out.extent_count - 1].block_count += blocks_per_cluster;
+        } else {
+            if (out.extent_count >= kMaxExtents) return Status::too_fragmented;
+            out.extents[out.extent_count].first_lba = cluster_lba(bpb, next);
+            out.extents[out.extent_count].block_count = blocks_per_cluster;
+            ++out.extent_count;
+        }
         current = next;
         ++clusters;
     }
 
-    out.first_lba = cluster_lba(bpb, first_cluster);
-    out.block_count = clusters * bpb.sectors_per_cluster;
-    if (out.block_count < min_blocks) return Status::file_too_small;
+    out.total_blocks = 0;
+    for (int i = 0; i < out.extent_count; ++i) {
+        out.total_blocks += out.extents[i].block_count;
+    }
+    if (out.total_blocks < min_blocks) return Status::file_too_small;
     return Status::ok;
+}
+
+bool FatVolume::Layout::to_lba(std::uint32_t logical_block, std::uint32_t& lba) const {
+    std::uint32_t remaining = logical_block;
+    for (int i = 0; i < extent_count; ++i) {
+        if (remaining < extents[i].block_count) {
+            lba = extents[i].first_lba + remaining;
+            return true;
+        }
+        remaining -= extents[i].block_count;
+    }
+    return false;  // past the end of the file: full, never wrapping
 }
 
 const char* FatVolume::describe(Status status) {
@@ -182,8 +210,9 @@ const char* FatVolume::describe(Status status) {
             return "no FAT32 volume with 512-byte sectors - reformat with prepare_sd_card.py";
         case Status::file_not_found:
             return "the volume is fine but the pre-allocated log file is not on it";
-        case Status::file_fragmented:
-            return "the log file is fragmented - recreate it on a freshly formatted card";
+        case Status::too_fragmented:
+            return "the log file is in more separate runs than the firmware can track - "
+                   "reformat the card and recreate it on the empty volume";
         case Status::file_too_small:
             return "the log file is smaller than the log region needs";
     }

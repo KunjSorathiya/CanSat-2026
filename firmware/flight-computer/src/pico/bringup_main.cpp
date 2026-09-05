@@ -528,18 +528,23 @@ void report_sd() {
     flight::FatVolume::Io fio;
     fio.ctx = &card;
     fio.read_block = sd_probe_read;
-    flight::FatVolume::Region region;
+    flight::FatVolume::Layout layout;
     const flight::FatVolume::Status st =
-        flight::FatVolume::locate(fio, "FLIGHT  CSV", 128, region);
+        flight::FatVolume::locate(fio, "FLIGHT  CSV", 128, layout);
     if (st != flight::FatVolume::Status::ok) {
         std::printf("   cannot time writes: %s\n", flight::FatVolume::describe(st));
         std::printf("   Run tools/prepare_sd_card.py against this card first. Writing at\n"
                     "   a guessed address would destroy the volume, so this refuses to.\n");
         return;
     }
-    std::printf("   Writing inside FLIGHT.CSV, LBA %lu, %lu blocks available.\n",
-                static_cast<unsigned long>(region.first_lba),
-                static_cast<unsigned long>(region.block_count));
+    std::printf("   Writing inside FLIGHT.CSV: %lu blocks over %d extent(s), first LBA %lu.\n",
+                static_cast<unsigned long>(layout.total_blocks), layout.extent_count,
+                static_cast<unsigned long>(layout.extents[0].first_lba));
+    if (layout.extent_count > 1) {
+        std::printf("   The file is in %d pieces. That is fine - the log maps its own\n"
+                    "   block numbers through the extent list, so a fragmented file\n"
+                    "   costs nothing but this line.\n", layout.extent_count);
+    }
     std::printf("   This overwrites the log file CONTENTS, not the filesystem. The card\n"
                 "   still mounts afterwards, and no hardware is at risk.\n");
     std::printf("\n   Log contents expendable? Press 'w' within 20 s. Anything else skips.\n");
@@ -559,7 +564,7 @@ void report_sd() {
 
     if (do_writes) {
         constexpr int kWrites = 100;
-        const std::uint32_t kBaseLba = region.first_lba;
+        const std::uint32_t kBaseLba = layout.extents[0].first_lba;
         std::uint8_t block[flight::pico::SdCard::kBlockSize];
         for (std::size_t i = 0; i < sizeof(block); ++i) {
             block[i] = static_cast<std::uint8_t>(i & 0xFF);
@@ -635,7 +640,7 @@ void report_sd() {
             }
             // Stay inside the log file. Wrapping is fine: this is a measurement, and the
             // region's contents are already forfeit by the time we are here.
-            if (++lba >= kBaseLba + region.block_count) lba = kBaseLba;
+            if (++lba >= kBaseLba + layout.extents[0].block_count) lba = kBaseLba;
         }
         const double elapsed_ms = static_cast<double>(now_ms() - burst_start);
         const double duty = elapsed_ms > 0.0 ? (busy_us / 1000.0) / elapsed_ms : 0.0;

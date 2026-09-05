@@ -138,24 +138,33 @@ void write_dir_entry(CardImage& img, int slot, const char* name_83,
     img.put32(lba, off + 28, size);
 }
 
-// A volume with FLIGHT.CSV occupying `clusters` consecutive clusters from `first`.
-CardImage make_card(std::uint32_t first, std::uint32_t clusters, bool contiguous = true) {
+// A volume whose FLIGHT.CSV occupies exactly the clusters listed, in that order. Building
+// the chain explicitly is the only way to write a *valid* fragmented file: an earlier
+// version jumped one link and left the rest dangling, which the old code never noticed
+// because it gave up at the first discontinuity.
+CardImage make_card_with_chain(const std::vector<std::uint32_t>& chain) {
     CardImage img;
     write_mbr(img);
     write_bpb(img);
     set_fat(img, kRootCluster, 0x0FFFFFFF);  // root directory: one cluster
-    write_dir_entry(img, 0, "FLIGHT  CSV", first, clusters * kSpc * kSector);
-    for (std::uint32_t i = 0; i < clusters; ++i) {
-        const std::uint32_t c = first + i;
-        if (i + 1 == clusters) {
-            set_fat(img, c, 0x0FFFFFFF);
-        } else if (!contiguous && i == 1) {
-            set_fat(img, c, c + 7);  // a gap: the next cluster is not the next one along
-        } else {
-            set_fat(img, c, c + 1);
-        }
+    write_dir_entry(img, 0, "FLIGHT  CSV", chain.front(),
+                    static_cast<std::uint32_t>(chain.size()) * kSpc * kSector);
+    for (std::size_t i = 0; i + 1 < chain.size(); ++i) {
+        set_fat(img, chain[i], chain[i + 1]);
     }
+    set_fat(img, chain.back(), 0x0FFFFFFF);
     return img;
+}
+
+// `clusters` clusters from `first`. Fragmented splits them into two runs with a gap, which
+// is the shape the delivered card actually produced.
+CardImage make_card(std::uint32_t first, std::uint32_t clusters, bool contiguous = true) {
+    std::vector<std::uint32_t> chain;
+    for (std::uint32_t i = 0; i < clusters; ++i) {
+        const bool second_half = !contiguous && i >= clusters / 2;
+        chain.push_back(first + i + (second_half ? 7 : 0));
+    }
+    return make_card_with_chain(chain);
 }
 
 flight::FatVolume::Io io_for(CardImage& img) {
@@ -168,11 +177,11 @@ flight::FatVolume::Io io_for(CardImage& img) {
 void test_a_contiguous_file_is_located() {
     CardImage img = make_card(10, 4);
     auto io = io_for(img);
-    flight::FatVolume::Region r;
+    flight::FatVolume::Layout r;
     const auto s = flight::FatVolume::locate(io, "FLIGHT  CSV", 1, r);
     CHECK(s == flight::FatVolume::Status::ok);
-    CHECK(r.first_lba == cluster_lba(10));
-    CHECK(r.block_count == 4 * kSpc);
+    CHECK(r.extents[0].first_lba == cluster_lba(10));
+    CHECK(r.total_blocks == 4 * kSpc);
 }
 
 // The log writes into these blocks directly, so the reported range has to be the file's
@@ -180,10 +189,10 @@ void test_a_contiguous_file_is_located() {
 void test_the_reported_range_is_the_files_own_data() {
     CardImage img = make_card(10, 4);
     auto io = io_for(img);
-    flight::FatVolume::Region r;
+    flight::FatVolume::Layout r;
     CHECK(flight::FatVolume::locate(io, "FLIGHT  CSV", 1, r) == flight::FatVolume::Status::ok);
-    CHECK(r.first_lba == kDataLba + (8 * kSpc));
-    CHECK(r.first_lba > kFatLba + (kNumFats * kFatSectors) - 1);  // never inside the FATs
+    CHECK(r.extents[0].first_lba == kDataLba + (8 * kSpc));
+    CHECK(r.extents[0].first_lba > kFatLba + (kNumFats * kFatSectors) - 1);  // never inside the FATs
 }
 
 void test_a_superfloppy_volume_is_accepted() {
@@ -217,25 +226,67 @@ void test_a_superfloppy_volume_is_accepted() {
     set(10, 0x0FFFFFFF);
 
     auto io = io_for(img);
-    flight::FatVolume::Region r;
+    flight::FatVolume::Layout r;
     CHECK(flight::FatVolume::locate(io, "FLIGHT  CSV", 1, r) == flight::FatVolume::Status::ok);
-    CHECK(r.first_lba == data_lba + (8 * kSpc));
+    CHECK(r.extents[0].first_lba == data_lba + (8 * kSpc));
 }
 
-// The one that matters most. Writing linearly into a fragmented file scribbles over
-// whatever owns the gap, and reports success while doing it.
-void test_a_fragmented_file_is_refused() {
+// A fragmented file is mapped, not refused.
+//
+// The card that prompted this returned a 64 MiB file in two runs with a 31 MB hole between
+// them, on a freshly formatted volume, after a routine recreate. Refusing that turns a
+// pre-flight step into "reformat the card and try again" - which is exactly the step that
+// gets skipped, and skipping it costs the whole log.
+void test_a_fragmented_file_is_mapped_rather_than_refused() {
     CardImage img = make_card(10, 4, /*contiguous=*/false);
     auto io = io_for(img);
-    flight::FatVolume::Region r;
+    flight::FatVolume::Layout r;
+    CHECK(flight::FatVolume::locate(io, "FLIGHT  CSV", 1, r) == flight::FatVolume::Status::ok);
+    CHECK(r.extent_count == 2);
+    CHECK(r.total_blocks == 4 * kSpc);   // every cluster is still accounted for
+}
+
+// And the mapping has to be right, or a fragmented file is worse than a refused one: the
+// log would write over whatever occupies the gap while reporting success.
+void test_logical_blocks_map_across_the_gap() {
+    CardImage img = make_card(10, 4, /*contiguous=*/false);
+    auto io = io_for(img);
+    flight::FatVolume::Layout r;
+    CHECK(flight::FatVolume::locate(io, "FLIGHT  CSV", 1, r) == flight::FatVolume::Status::ok);
+
+    std::uint32_t lba = 0;
+    // First block of the file is the first block of the first run.
+    CHECK(r.to_lba(0, lba) && lba == r.extents[0].first_lba);
+    // Last block of the first run.
+    const std::uint32_t last_of_run0 = r.extents[0].block_count - 1;
+    CHECK(r.to_lba(last_of_run0, lba) && lba == r.extents[0].first_lba + last_of_run0);
+    // The very next logical block jumps to the second run rather than running into the gap.
+    CHECK(r.to_lba(last_of_run0 + 1, lba) && lba == r.extents[1].first_lba);
+    // A block past the end is refused, so the log reports full rather than wrapping onto
+    // the start of the file and overwriting its own earliest records.
+    CHECK(!r.to_lba(r.total_blocks, lba));
+    CHECK(!r.to_lba(r.total_blocks + 1000, lba));
+}
+
+// The bound still exists, and a file past it is still refused: the mapping is a fixed-size
+// array in a vehicle with no dynamic allocation.
+void test_a_file_in_more_runs_than_can_be_held_is_refused() {
+    // Every cluster five apart, so every single one starts a new run.
+    std::vector<std::uint32_t> chain;
+    for (int i = 0; i < flight::FatVolume::kMaxExtents + 2; ++i) {
+        chain.push_back(10u + static_cast<std::uint32_t>(i) * 5u);
+    }
+    CardImage img = make_card_with_chain(chain);
+    auto io = io_for(img);
+    flight::FatVolume::Layout r;
     CHECK(flight::FatVolume::locate(io, "FLIGHT  CSV", 1, r) ==
-          flight::FatVolume::Status::file_fragmented);
+          flight::FatVolume::Status::too_fragmented);
 }
 
 void test_a_file_smaller_than_the_log_is_refused() {
     CardImage img = make_card(10, 2);
     auto io = io_for(img);
-    flight::FatVolume::Region r;
+    flight::FatVolume::Layout r;
     CHECK(flight::FatVolume::locate(io, "FLIGHT  CSV", 1000, r) ==
           flight::FatVolume::Status::file_too_small);
 }
@@ -243,7 +294,7 @@ void test_a_file_smaller_than_the_log_is_refused() {
 void test_a_missing_file_is_reported_separately_from_a_bad_volume() {
     CardImage img = make_card(10, 4);
     auto io = io_for(img);
-    flight::FatVolume::Region r;
+    flight::FatVolume::Layout r;
     // A good volume without the file must not be reported as "not FAT32": the operator
     // needs to know whether to reformat or just recreate the file.
     CHECK(flight::FatVolume::locate(io, "OTHER   CSV", 1, r) ==
@@ -253,7 +304,7 @@ void test_a_missing_file_is_reported_separately_from_a_bad_volume() {
 void test_an_unformatted_card_is_reported_as_not_fat32() {
     CardImage img;  // all zeros
     auto io = io_for(img);
-    flight::FatVolume::Region r;
+    flight::FatVolume::Layout r;
     CHECK(flight::FatVolume::locate(io, "FLIGHT  CSV", 1, r) ==
           flight::FatVolume::Status::not_fat32);
 }
@@ -262,7 +313,7 @@ void test_a_card_that_stops_answering_is_reported_as_a_read_failure() {
     CardImage img = make_card(10, 4);
     img.fail_after = 3;  // survive the MBR and BPB, die during the directory walk
     auto io = io_for(img);
-    flight::FatVolume::Region r;
+    flight::FatVolume::Layout r;
     const auto s = flight::FatVolume::locate(io, "FLIGHT  CSV", 1, r);
     CHECK(s == flight::FatVolume::Status::read_failed || s == flight::FatVolume::Status::not_fat32);
 }
@@ -279,15 +330,15 @@ void test_deleted_and_long_name_entries_are_skipped() {
     b[32] = 0x41;
 
     auto io = io_for(img);
-    flight::FatVolume::Region r;
+    flight::FatVolume::Layout r;
     CHECK(flight::FatVolume::locate(io, "FLIGHT  CSV", 1, r) == flight::FatVolume::Status::ok);
-    CHECK(r.first_lba == cluster_lba(10));
+    CHECK(r.extents[0].first_lba == cluster_lba(10));
 }
 
 void test_every_status_has_a_description() {
     using S = flight::FatVolume::Status;
     for (const S s : {S::ok, S::read_failed, S::not_fat32, S::file_not_found,
-                      S::file_fragmented, S::file_too_small}) {
+                      S::too_fragmented, S::file_too_small}) {
         const char* d = flight::FatVolume::describe(s);
         CHECK(d != nullptr && std::string(d) != "unknown");
     }
@@ -299,7 +350,9 @@ int main() {
     test_a_contiguous_file_is_located();
     test_the_reported_range_is_the_files_own_data();
     test_a_superfloppy_volume_is_accepted();
-    test_a_fragmented_file_is_refused();
+    test_a_fragmented_file_is_mapped_rather_than_refused();
+    test_logical_blocks_map_across_the_gap();
+    test_a_file_in_more_runs_than_can_be_held_is_refused();
     test_a_file_smaller_than_the_log_is_refused();
     test_a_missing_file_is_reported_separately_from_a_bad_volume();
     test_an_unformatted_card_is_reported_as_not_fat32();

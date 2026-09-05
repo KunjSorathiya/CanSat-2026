@@ -395,6 +395,18 @@ computed airtime that has never been observed.
 > **The card is an HP mx310 64 GB, which is SDXC**, and 64 GB cards ship formatted exFAT.
 > `FatVolume` reads FAT32 only, so the card had to be reformatted - Windows will not do that
 > above 32 GB through its own dialog, and Rufus's `Large FAT32` mode was used.
+>
+> **A fragmented log file is no longer a failure.** The first version of `FatVolume`
+> demanded one unbroken run and refused anything else. On this card a routine recreate
+> produced a 64 MiB file in **two runs with a 31 MB hole between them**, twice, on a freshly
+> formatted volume — confirmed independently by `tools/inspect_sd_log.py`, which reads the
+> same FAT over a different code path in a different language and reached the same verdict.
+>
+> Refusing that turns a pre-flight step into "reformat the card and try again", which is
+> exactly the step that gets skipped at six in the morning — and skipping it costs the whole
+> log. `FatVolume` now returns a list of extents and the logger maps its own block numbers
+> through it, so a fragmented file costs nothing but a line of output. Only a file in more
+> runs than the sixteen-extent bound is refused.
 
 > ⚠️ **The write test destroys the filesystem on the card.** The vehicle logs raw 512-byte
 > blocks with no filesystem at all, and the log starts at **LBA 2048** — exactly where a

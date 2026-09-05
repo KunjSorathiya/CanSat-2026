@@ -23,12 +23,34 @@ constexpr std::uint32_t kMinLogBlocks = 8192;
 #ifdef PICO_BUILD
 
 namespace {
-bool sd_read_block(void* ctx, std::uint32_t lba, std::uint8_t* out512) {
+// Raw card access, addressed by LBA. Used to read the filesystem itself.
+bool sd_read_raw(void* ctx, std::uint32_t lba, std::uint8_t* out512) {
     return static_cast<pico::SdCard*>(ctx)->read_block(lba, out512);
 }
-bool sd_write_block(void* ctx, std::uint32_t lba, const std::uint8_t* in512) {
-    return static_cast<pico::SdCard*>(ctx)->write_block(lba, in512);
+
+// What RawBlockLog talks to: a flat array of blocks numbered 0..N-1, which is what the log
+// has always assumed it had. The file behind it need not be one run on the card, and the
+// log neither knows nor cares -- the translation happens here and nowhere else.
+struct LogIo {
+    pico::SdCard* card = nullptr;
+    const FatVolume::Layout* layout = nullptr;
+};
+
+bool sd_read_block(void* ctx, std::uint32_t block, std::uint8_t* out512) {
+    auto* io = static_cast<LogIo*>(ctx);
+    std::uint32_t lba = 0;
+    if (!io->layout->to_lba(block, lba)) return false;  // past the end: full, never wraps
+    return io->card->read_block(lba, out512);
 }
+
+bool sd_write_block(void* ctx, std::uint32_t block, const std::uint8_t* in512) {
+    auto* io = static_cast<LogIo*>(ctx);
+    std::uint32_t lba = 0;
+    if (!io->layout->to_lba(block, lba)) return false;
+    return io->card->write_block(lba, in512);
+}
+
+LogIo g_log_io;
 }  // namespace
 
 bool PicoSdLogger::initialize() {
@@ -45,21 +67,24 @@ bool PicoSdLogger::initialize() {
     // way, and takes the operator's confidence with it.
     FatVolume::Io fio;
     fio.ctx = &card_;
-    fio.read_block = sd_read_block;
-    FatVolume::Region region;
+    fio.read_block = sd_read_raw;
     const FatVolume::Status status =
-        FatVolume::locate(fio, kLogFileName83, kMinLogBlocks, region);
+        FatVolume::locate(fio, kLogFileName83, kMinLogBlocks, layout_);
     locate_status_ = status;
     if (status != FatVolume::Status::ok) {
         healthy_ = false;
         return false;
     }
 
+    // Block 0 is the first block of the file, not of the card. Everything RawBlockLog
+    // does is in those terms, so a fragmented file costs it nothing.
+    g_log_io.card = &card_;
+    g_log_io.layout = &layout_;
     RawBlockLog::Io io;
-    io.ctx = &card_;
+    io.ctx = &g_log_io;
     io.read_block = sd_read_block;
     io.write_block = sd_write_block;
-    healthy_ = log_.begin(io, region.first_lba, region.block_count);
+    healthy_ = log_.begin(io, 0, layout_.total_blocks);
     if (healthy_ && log_.record_count() == 0) {
         // A fresh log gets a column header, so the file opens as a spreadsheet rather than
         // as a wall of unlabelled fields. Written as an ordinary record, so it costs one
