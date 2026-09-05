@@ -496,12 +496,30 @@ void report_sd() {
     const bool ok = card.begin(spi0, flight::BoardPins::sd_cs);
     std::printf("   init (CMD0/CMD8/ACMD41/CMD58/CMD16): %s\n", ok ? "ok" : "FAILED");
     if (!ok) {
-        std::printf("   Check CS on GP%d and that a card is actually seated - the holder is\n"
-                    "   friction-fit, so a card can sit in it without making contact.\n"
-                    "   Nothing on this module buffers MISO, and nothing shifts levels.\n",
-                    flight::BoardPins::sd_cs);
+        std::printf("   stopped at: %s\n",
+                    flight::pico::SdCard::describe(card.stage()));
+        std::printf("   last R1 = 0x%02X", card.last_r1());
+        if (card.last_r1() == 0xFF) {
+            std::printf("  (0xFF means the card never drove MISO at all)");
+        } else if ((card.last_r1() & 0x04) != 0) {
+            std::printf("  (illegal command bit set)");
+        }
+        std::printf("\n");
+        if (card.stage() == flight::pico::SdCard::Stage::acmd41_ready) {
+            std::printf("   waited %lu ms in ACMD41; a healthy card leaves idle in tens\n",
+                        static_cast<unsigned long>(card.init_wait_ms()));
+        }
+        std::printf("   Check CS on GP%d and that a card is actually seated - the holder\n"
+                    "   is friction-fit, so a card can sit in it without making contact.\n"
+                    "   MISO and MOSI swapped is the other classic: on this module MISO is\n"
+                    "   the module OUTPUT and belongs on GP%d, MOSI its input on GP%d.\n",
+                    flight::BoardPins::sd_cs, flight::BoardPins::spi_miso,
+                    flight::BoardPins::spi_mosi);
         return;
     }
+    std::printf("   reached: %s, %lu ms in ACMD41\n",
+                flight::pico::SdCard::describe(card.stage()),
+                static_cast<unsigned long>(card.init_wait_ms()));
     std::printf("   6.2 card type: %s\n",
                 card.high_capacity() ? "SDHC/SDXC, block-addressed - as predicted"
                                      : "SDSC, byte-addressed - NOT what Gate 6.2 expects");

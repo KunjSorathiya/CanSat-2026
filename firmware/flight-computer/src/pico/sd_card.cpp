@@ -72,7 +72,11 @@ bool SdCard::begin_with(const SdCardHal& hal) {
     hal_ = hal;
     ok_ = false;
     sdhc_ = false;
+    stage_ = Stage::not_started;
+    last_r1_ = 0xFF;
+    init_wait_ms_ = 0;
     if (!hal_.select || !hal_.transfer) {
+        stage_ = Stage::bad_hal;
         return false;
     }
 
@@ -83,13 +87,17 @@ bool SdCard::begin_with(const SdCardHal& hal) {
     clock_bytes(10);
 
     select(true);
+    stage_ = Stage::cmd0_idle;
     std::uint8_t r1 = command(0, 0, 0x95);  // CMD0: GO_IDLE_STATE
+    last_r1_ = r1;
     if (r1 != R1_IDLE) {
         release();
         return false;
     }
 
+    stage_ = Stage::cmd8_ifcond;
     r1 = command(8, 0x000001AA, 0x87);  // CMD8: SEND_IF_COND
+    last_r1_ = r1;
     bool v2 = false;
     if (r1 == R1_IDLE) {
         std::uint8_t resp[4];
@@ -100,6 +108,7 @@ bool SdCard::begin_with(const SdCardHal& hal) {
 
     // ACMD41 initialisation loop, bounded by wall-clock time rather than iterations so a
     // slow card gets its full allowance and a dead one still gives up.
+    stage_ = Stage::acmd41_ready;
     const std::uint32_t acmd41_arg = v2 ? 0x40000000u : 0u;  // HCS set for v2 cards
     const std::uint32_t start = hal_.millis ? hal_.millis(hal_.ctx) : 0;
     std::uint32_t waited = 0;
@@ -111,14 +120,17 @@ bool SdCard::begin_with(const SdCardHal& hal) {
         waited += 10;
         const std::uint32_t elapsed =
             hal_.millis ? (hal_.millis(hal_.ctx) - start) : waited;
+        init_wait_ms_ = elapsed;
         if (elapsed >= kInitTimeoutMs) break;
     }
+    last_r1_ = r1;
     if (r1 != 0x00) {
         release();
         return false;
     }
 
     if (v2) {
+        stage_ = Stage::cmd58_ocr;
         r1 = command(58, 0, 0xFD);  // CMD58: READ_OCR
         if (r1 == 0x00) {
             std::uint8_t ocr[4];
@@ -130,7 +142,9 @@ bool SdCard::begin_with(const SdCardHal& hal) {
         // CMD16: force 512-byte blocks on a standard-capacity card. If this fails the
         // card may be using a different block length, and every read and write after it
         // would be silently wrong.
-        if (command(16, kBlockSize, 0xFF) != 0x00) {
+        stage_ = Stage::cmd16_blocklen;
+        last_r1_ = command(16, kBlockSize, 0xFF);
+        if (last_r1_ != 0x00) {
             release();
             return false;
         }
@@ -138,8 +152,34 @@ bool SdCard::begin_with(const SdCardHal& hal) {
 
     release();
     if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, kRunBaud);
+    stage_ = Stage::complete;
     ok_ = true;
     return true;
+}
+
+const char* SdCard::describe(Stage stage) {
+    switch (stage) {
+        case Stage::not_started:
+            return "nothing was attempted";
+        case Stage::bad_hal:
+            return "the caller supplied an incomplete hardware binding - a firmware fault";
+        case Stage::cmd0_idle:
+            return "CMD0 got no idle response: the card never answered at all. Wiring, "
+                   "power, or a card that is not seated";
+        case Stage::cmd8_ifcond:
+            return "CMD0 worked but CMD8 did not: the bus is alive and the card is "
+                   "talking, so this is the card rather than the wiring";
+        case Stage::acmd41_ready:
+            return "the card answered but never left idle: ACMD41 timed out. A card fault, "
+                   "or a supply that sags when the card draws current";
+        case Stage::cmd58_ocr:
+            return "READ_OCR failed after the card was ready - unusual, suspect the bus";
+        case Stage::cmd16_blocklen:
+            return "SET_BLOCKLEN was refused on a standard-capacity card";
+        case Stage::complete:
+            return "complete";
+    }
+    return "unknown";
 }
 
 // ---------------------------------------------------------------- transfers --

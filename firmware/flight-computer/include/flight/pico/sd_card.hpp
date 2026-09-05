@@ -53,6 +53,29 @@ public:
     bool ok() const { return ok_; }
     bool high_capacity() const { return sdhc_; }
 
+    // How far initialisation got, and the last R1 the card returned. "The card failed to
+    // initialise" is one bit of information for at least three unrelated faults, and on a
+    // bench they need different fixes: no answer at all is wiring or power, a card that
+    // answers CMD0 but stalls in ACMD41 is a card problem, and one that reaches CMD16 and
+    // fails is a block-length problem. Reported by the bring-up diagnostic; the flight
+    // firmware ignores it and simply flies without a log.
+    enum class Stage : std::uint8_t {
+        not_started,
+        bad_hal,        // the caller supplied an incomplete binding
+        cmd0_idle,      // GO_IDLE_STATE: the first word the card ever says
+        cmd8_ifcond,    // SEND_IF_COND: voltage range and check pattern
+        acmd41_ready,   // SD_SEND_OP_COND: leaving idle, the slow one
+        cmd58_ocr,      // READ_OCR: block- against byte-addressing
+        cmd16_blocklen, // SET_BLOCKLEN: only reached on a standard-capacity card
+        complete,
+    };
+
+    Stage stage() const { return stage_; }
+    std::uint8_t last_r1() const { return last_r1_; }
+    // Milliseconds spent in the ACMD41 loop. A healthy card leaves idle in tens of ms.
+    std::uint32_t init_wait_ms() const { return init_wait_ms_; }
+    static const char* describe(Stage stage);
+
 private:
     void select(bool on);
     std::uint8_t transfer(std::uint8_t value);
@@ -64,6 +87,9 @@ private:
     void release();
 
     SdCardHal hal_{};
+    Stage stage_ = Stage::not_started;
+    std::uint8_t last_r1_ = 0xFF;
+    std::uint32_t init_wait_ms_ = 0;
     bool ok_ = false;
     bool sdhc_ = false;
 };
