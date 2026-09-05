@@ -404,10 +404,10 @@ bash tools/build_host.sh
 | `sd_card_tests` | microSD init sequence, SDHC vs SDSC addressing, block round trip, bus release, timeouts and write-error paths, against a simulated card | ✅ **581 / 581** |
 | `fat_volume_tests` | FAT32 log-file lookup: MBR and superfloppy volumes, contiguity, a missing file, a card that stops answering, against a synthetic image | ✅ **21 / 21** |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
-| Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **130 / 130** |
+| Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **133 / 133** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
-| Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **55 / 55** |
-| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **211 / 211** |
+| Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **57 / 57** |
+| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **214 / 214** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte

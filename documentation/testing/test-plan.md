@@ -102,10 +102,10 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **101 / 101 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **130 / 130 tests** |
+| Python ground station | 8 modules | ✅ **133 / 133 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **211 / 211 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **55 / 55 tests** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **214 / 214 claims** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **57 / 57 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
@@ -247,7 +247,7 @@ and a known GGA sentence parses to the expected latitude with no checksum errors
 
 ## Python test suites
 
-### `test_telemetry.py` — 16 tests
+### `test_telemetry.py` — 19 tests
 
 Rulebook packet parses; the `CAN-Team-XX` placeholder is rejected; empty and corrupt
 packets are rejected; decimal precision is enforced and extra fields are tolerated;
@@ -263,6 +263,17 @@ Two hold the console's markup to its own code: every id the page selects must be
 in the page, and every SVG icon it names must be defined there. A `$("#typo")` returns null
 and the next property access throws, which in this file would stop the render loop on a
 display somebody is watching a vehicle through.
+
+Three hold both ground parsers to
+[`test-data/optional-tag-cases.tsv`](../../test-data/optional-tag-cases.tsv). The optional
+tags are `<key>-<value>` and the keys themselves contain dashes, so both parsers split on
+the last one — which is the separator right up until the value is negative, and then the
+last dash is the minus sign. `GP-Lat--18.5` split to the key `GP-Lat-` and the value
+`18.5`: the sign eaten, the key unrecognisable, and a southern-hemisphere fix vanished from
+the console, the CSV and the map **with no error and no rejection counter**. Both
+implementations were wrong the same way because they were hand-ports of each other and no
+fixture carried a negative coordinate. The web console reads the same file, so the two are
+held to one definition rather than to two sets of similarly-named tests.
 
 Two more hold the two parsers to the same **field names**, by running the console's parser
 under Node and comparing the record it returns with Python's. The shared fixtures already

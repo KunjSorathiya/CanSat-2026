@@ -1114,6 +1114,33 @@ can explain when it fails.
 Run standalone, without the log, the script skips the count checks and reports 69/69 rather
 than inventing a number.
 
+### Fixed — the negative-coordinate fix had no test holding it
+
+`test-data/optional-tag-cases.tsv` was written, and read by nothing. The parser fix it
+existed to pin was in place in both languages, but nothing checked it, so the bug it
+describes could have returned in silence — which is exactly how it arrived.
+
+The bug is worth restating because it is the quiet kind. Optional tags are `<key>-<value>`
+and the keys themselves contain dashes, so both ground parsers split on the last one. That
+is the separator right up until the value is negative, and then the last dash is the minus
+sign: `GP-Lat--18.5` split to the key `GP-Lat-` and the value `18.5`. Sign eaten, key
+unrecognisable, `gps_lat` back to null — **a southern-hemisphere fix vanishing from the
+console, the CSV and the map with no error and no rejection counter.** Both implementations
+were wrong the same way because they were hand-ports of each other and no fixture carried a
+negative coordinate.
+
+- `test_telemetry.py` gains three tests reading the fixture, plus an end-to-end one proving
+  a southern fix reaches `gps_lat` and `gps_lon` rather than merely splitting correctly.
+- `console_core.test.mjs` gains the same two against the console's own parser, reading the
+  same file. **One definition, two languages** — the fixture's stated purpose, finally
+  wired up.
+- `check_doc_claims.py` now requires both suites to read it, and requires the fixture to
+  keep its negative cases. A fixture nothing reads is a comment.
+- The comment in `index.html` pointed at `protocol-fixtures.tsv`, which does not hold these
+  cases. Corrected.
+
+Counts move with it: **166 Python tests, 57 Node tests, 214 documented claims.**
+
 ### Changed — the flight log now lives inside a file a PC can open
 
 The card wrote raw blocks at a fixed LBA and did not mount afterwards. Flight data nobody

@@ -201,3 +201,56 @@ console.log(JSON.stringify(Object.keys(result.record)));
             self.assertIn(name, python, f"{name} is listed as Python-only and Python lacks it")
             self.assertNotIn(name, javascript,
                              f"{name} is listed as Python-only but the console now has it too")
+
+
+class OptionalTagSplittingTests(unittest.TestCase):
+    """Every case in test-data/optional-tag-cases.tsv, as this parser splits it.
+
+    The optional tags are `<key>-<value>` and the keys themselves contain dashes, so both
+    ground parsers split on the last one. That is the separator right up until the value is
+    negative, and then the last dash is the minus sign: `GP-Lat--18.5` split to the key
+    `GP-Lat-` and the value `18.5`, sign eaten and key unrecognisable, so a
+    southern-hemisphere fix vanished from the console, the CSV and the map with no error and
+    no rejection counter.
+
+    Both implementations were wrong the same way because they were hand-ports of each other
+    and no fixture had a negative coordinate. The web console reads this same file, so the
+    two are held to one definition rather than to two sets of similarly-named tests.
+    """
+
+    CASES = Path(__file__).parents[3] / "test-data" / "optional-tag-cases.tsv"
+
+    def _load(self):
+        cases = []
+        with self.CASES.open(encoding="utf-8") as handle:
+            for line in handle:
+                line = line.rstrip("\n").rstrip("\r")
+                if not line.strip() or line.lstrip().startswith("#"):
+                    continue
+                name, field, key, value = line.split("\t", 3)
+                cases.append((name, field, key, value))
+        return cases
+
+    def test_the_fixture_file_is_present_and_covers_negative_values(self):
+        cases = self._load()
+        self.assertGreaterEqual(len(cases), 8)
+        negatives = [c for c in cases if c[3].startswith("-")]
+        self.assertGreaterEqual(len(negatives), 3, "the bug this file exists for is negatives")
+
+    def test_every_case_splits_into_its_recorded_key_and_value(self):
+        for name, field, key, value in self._load():
+            with self.subTest(case=name):
+                packet = PACKET + " " + field + ";"
+                result = parse_packet(packet)
+                self.assertTrue(result, f"{name}: packet rejected outright")
+                self.assertIn(key, result.record.tags, f"{name}: key not recognised")
+                self.assertEqual(result.record.tags[key], value)
+
+    def test_a_southern_hemisphere_fix_survives_the_whole_parser(self):
+        # The end-to-end shape of the original bug: not just the split, but the value
+        # reaching the field the console, the CSV and the map read.
+        packet = (PACKET + " GP-Lat--18.500000; GP-Lon--73.000000; GP-Alt-5.0;")
+        result = parse_packet(packet)
+        self.assertTrue(result)
+        self.assertAlmostEqual(result.record.gps_lat, -18.5, places=6)
+        self.assertAlmostEqual(result.record.gps_lon, -73.0, places=6)

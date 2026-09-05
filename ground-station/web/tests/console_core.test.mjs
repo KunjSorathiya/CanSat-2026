@@ -24,6 +24,7 @@ const REPO_ROOT = join(HERE, "..", "..", "..");
 const CONSOLE_HTML = join(REPO_ROOT, "ground-station", "web", "index.html");
 const FIXTURES = join(REPO_ROOT, "test-data", "protocol-fixtures.tsv");
 const SCENARIOS = join(REPO_ROOT, "test-data", "validator-scenarios.tsv");
+const TAG_CASES = join(REPO_ROOT, "test-data", "optional-tag-cases.tsv");
 
 const BEGIN = "// PORTABLE-CORE:BEGIN";
 const END = "// PORTABLE-CORE:END";
@@ -731,4 +732,52 @@ test("the presentation layer does not substitute a state for an absent one", () 
             "the mission-state chip must render through missionStateView");
   assert.ok(!/\.mode\s*\|\|/.test(below),
             "an absent MODE tag must not fall back to a state the vehicle never claimed");
+});
+
+/* Every case in test-data/optional-tag-cases.tsv, as this console splits it.
+
+   The optional tags are `<key>-<value>` and the keys themselves contain dashes, so both
+   ground parsers split on the last one. That is the separator right up until the value is
+   negative, and then the last dash is the minus sign: "GP-Lat--18.5" split to the key
+   "GP-Lat-" and the value "18.5", sign eaten and key unrecognisable, so a
+   southern-hemisphere fix vanished from the console, the CSV and the map with no error and
+   no rejection counter.
+
+   Both implementations were wrong the same way because they were hand-ports of each other
+   and no fixture had a negative coordinate. test_telemetry.py reads this same file, so the
+   two are held to one definition instead of to two sets of similarly-named tests. */
+function loadTagCases() {
+  const text = readFileSync(TAG_CASES, "utf8");
+  const cases = [];
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.replace(/\r$/, "");
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    const parts = line.split("\t");
+    assert.ok(parts.length >= 4, `malformed tag case: ${line}`);
+    cases.push({ id: parts[0], field: parts[1], key: parts[2], value: parts[3] });
+  }
+  assert.ok(cases.length >= 8, `expected the full tag-case set, got ${cases.length}`);
+  assert.ok(cases.filter((c) => c.value.startsWith("-")).length >= 3,
+            "the bug this file exists for is negative values");
+  return cases;
+}
+
+test("every optional-tag case splits into its recorded key and value", () => {
+  const base = "CAN-Team-01; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; " +
+               "Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;";
+  for (const c of loadTagCases()) {
+    const { record } = M.parsePacket(`${base} ${c.field};`, null);
+    assert.ok(record, `${c.id}: packet rejected outright`);
+    assert.strictEqual(record.tags[c.key], c.value, `${c.id}: wrong split`);
+  }
+});
+
+test("a southern-hemisphere fix survives the whole console parser", () => {
+  const base = "CAN-Team-01; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; " +
+               "Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;";
+  const { record } = M.parsePacket(
+    `${base} GP-Lat--18.500000; GP-Lon--73.000000; GP-Alt-5.0;`, null);
+  assert.ok(record);
+  assert.ok(Math.abs(record.gps_lat - -18.5) < 1e-6, "latitude lost its sign");
+  assert.ok(Math.abs(record.gps_lon - -73.0) < 1e-6, "longitude lost its sign");
 });

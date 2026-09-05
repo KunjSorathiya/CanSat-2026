@@ -463,6 +463,19 @@ def main() -> int:
                    "ground-station/web/tests/console_core.test.mjs"):
         checker.check(f"{reader} reads the shared validator scenarios",
                       "validator-scenarios.tsv" in read(reader))
+    # The optional-tag fixture exists because both ground parsers ate the minus sign off a
+    # negative coordinate in the same way -- they were hand-ports of each other, and no
+    # fixture carried one. A fixture nothing reads would let that regress in silence, which
+    # is how it got in.
+    for reader in ("ground-station/software/tests/test_telemetry.py",
+                   "ground-station/web/tests/console_core.test.mjs"):
+        checker.check(f"{reader} reads the optional-tag cases",
+                      "optional-tag-cases.tsv" in read(reader))
+    tag_rows = [ln for ln in read("test-data/optional-tag-cases.tsv").splitlines()
+                if ln.strip() and not ln.lstrip().startswith("#")]
+    negatives = [ln for ln in tag_rows if ln.split("	")[-1].startswith("-")]
+    checker.check(f"the optional-tag fixture keeps its {len(negatives)} negative-value cases",
+                  len(negatives) >= 3, str(len(negatives)))
     # The escaping fixture guards the same kind of divergence, between the logger that
     # writes a raw log and the console that replays one.
     escapes = read("test-data/raw-log-escapes.tsv")

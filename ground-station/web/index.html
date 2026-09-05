@@ -819,7 +819,7 @@ function parsePacket(str, team) {
        eaten, key unrecognisable, so gps_lat read back as null and a southern-hemisphere
        fix vanished with no error and no rejection counter. A key never ends in "-", so a
        key that does means the separator was the value's sign. Mirrors parse_packet() in
-       telemetry.py; test-data/protocol-fixtures.tsv holds both to one definition. */
+       telemetry.py; test-data/optional-tag-cases.tsv holds both to one definition. */
     if (k > 1 && of[k - 1] === "-") k -= 1;
     if (k > 0) rec.tags[of.slice(0, k)] = of.slice(k + 1);
   }
