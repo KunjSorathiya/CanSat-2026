@@ -400,15 +400,63 @@ void gps_raw_echo(const flight::Configuration& config, std::uint32_t seconds) {
 // and the DIO0 round trip. The predicted figure comes from lora_time_on_air_ms() rather
 // than a literal, so this comparison cannot drift away from the model the link budget and
 // the build-time static_assert both use.
-// A transmit that fails looks identical whatever caused it. IRQ_FLAGS, read at the moment
-// of the timeout and before it is cleared, separates the two candidates - and they want
-// opposite investigations, so guessing between them wastes an evening.
-void describe_tx_failure(const flight::PicoRadio& radio) {
+
+// A counted snapshot of the radio's failure counters, so a test reports what happened
+// during it rather than everything since boot. The counters are cumulative, and printing
+// them raw made 5.3 announce "8 timeout(s)" when three of its five failed and the other
+// five belonged to 5.2 - a test looking twice as bad as it was.
+struct TxFailures {
+    std::uint32_t timeouts = 0;
+    std::uint32_t impossibly_fast = 0;
+};
+
+TxFailures tx_counters(const flight::PicoRadio& radio) {
+    TxFailures c;
+    c.timeouts = radio.tx_timeouts();
+    c.impossibly_fast = radio.tx_impossibly_fast();
+    return c;
+}
+
+TxFailures tx_failures_since(const flight::PicoRadio& radio, const TxFailures& before) {
+    TxFailures d;
+    d.timeouts = radio.tx_timeouts() - before.timeouts;
+    d.impossibly_fast = radio.tx_impossibly_fast() - before.impossibly_fast;
+    return d;
+}
+
+// A transmit that fails looks identical whatever caused it. Three registers, read at the
+// moment of the failure and before anything is cleared, separate the candidates - and they
+// want completely different investigations, so guessing between them wastes an evening.
+void describe_tx_failure(const flight::PicoRadio& radio, const TxFailures& here) {
     const std::uint8_t irq = radio.last_tx_irq_flags();
-    std::printf("       IRQ_FLAGS = 0x%02X, %lu timeout(s), %lu impossibly fast\n", irq,
-                static_cast<unsigned long>(radio.tx_timeouts()),
-                static_cast<unsigned long>(radio.tx_impossibly_fast()));
-    if (radio.tx_impossibly_fast() != 0) {
+    const std::uint8_t op = radio.last_tx_op_mode();
+    const std::uint8_t ver = radio.last_tx_version();
+    std::printf("       in this test: %lu timeout(s), %lu impossibly fast\n",
+                static_cast<unsigned long>(here.timeouts),
+                static_cast<unsigned long>(here.impossibly_fast));
+    std::printf("       at the last failure: IRQ_FLAGS = 0x%02X, OP_MODE = 0x%02X, "
+                "VERSION = 0x%02X\n", irq, op, ver);
+
+    // Order matters. Each check rules out everything below it, so the first one that fires
+    // is the one to act on - and the top two say the RF side is not implicated at all.
+    if (ver != 0x12) {
+        std::printf("       VERSION is not 0x12: SPI to the radio was broken at that\n"
+                    "       instant, so nothing about the transmit is implicated. Look at\n"
+                    "       CS on GP%d, SCK, MOSI and MISO - and at the microSD, which\n"
+                    "       shares this bus and corrupts the radio rather than itself.\n",
+                    flight::BoardPins::lora_cs);
+        return;
+    }
+    if ((op & 0x80) == 0) {
+        std::printf("       OP_MODE bit 7 is CLEAR: the modem is no longer in LoRa mode.\n"
+                    "       It only leaves LoRa on a reset, so the module lost power or was\n"
+                    "       reset mid-transmit and took its configuration with it. Suspect\n"
+                    "       its 3V3 and GND, and the RESET line on GP%d, before anything\n"
+                    "       about the RF side.\n",
+                    flight::BoardPins::lora_reset);
+        return;
+    }
+    if (here.impossibly_fast != 0) {
         std::printf("       Transmits reported done faster than their own airtime.\n"
                     "       DIO0 is floating HIGH - reading done the instant it is\n"
                     "       polled. Same loose wire on GP%d as a timeout, opposite\n"
@@ -420,12 +468,13 @@ void describe_tx_failure(const flight::PicoRadio& radio) {
         std::printf("       TxDone IS set: the radio finished and DIO0 never said so.\n"
                     "       That is the wire on GP%d, not the radio.\n",
                     flight::BoardPins::lora_dio0);
-    } else {
-        std::printf("       TxDone is CLEAR: the transmission never completed.\n"
-                    "       The radio or its supply, not the DIO0 wire. Watch the\n"
-                    "       3V3 rail on DC volts during a burst: the PA pulls about\n"
-                    "       120 mA at +17 dBm.\n");
+        return;
     }
+    std::printf("       TxDone is CLEAR, and the chip is still the one we configured and\n"
+                "       still in LoRa mode (0x83 is LoRa TX). It accepted the transmit and\n"
+                "       never finished it: the PLL, the PA, or the rail behind them.\n"
+                "       Watch 3V3 on DC volts through a burst - the PA pulls about 120 mA\n"
+                "       at +17 dBm - and check the antenna is actually on the SMA.\n");
 }
 
 void radio_airtime(flight::PicoRadio& radio, std::size_t bytes, const char* label) {
@@ -433,6 +482,7 @@ void radio_airtime(flight::PicoRadio& radio, std::size_t bytes, const char* labe
     const std::string payload(bytes, 'A');
     const double predicted = cansat::lora_time_on_air_ms(bytes, cansat::link::kModem);
 
+    const TxFailures before = tx_counters(radio);
     double sum = 0.0;
     int sent = 0;
     for (int i = 0; i < kBursts; ++i) {
@@ -448,13 +498,13 @@ void radio_airtime(flight::PicoRadio& radio, std::size_t bytes, const char* labe
     if (sent == 0) {
         std::printf("   %s: every transmit FAILED after %lu ms\n", label,
                     static_cast<unsigned long>(2000));
-        describe_tx_failure(radio);
+        describe_tx_failure(radio, tx_failures_since(radio, before));
         return;
     }
     const double mean = sum / sent;
     std::printf("   %s: %.1f ms measured, %.1f ms predicted (%+.1f ms), %d/%d sent\n", label,
                 mean, predicted, mean - predicted, sent, kBursts);
-    if (sent < kBursts) describe_tx_failure(radio);
+    if (sent < kBursts) describe_tx_failure(radio, tx_failures_since(radio, before));
 }
 
 // A long enough burst to watch a meter, and enough samples to see a pattern.
@@ -483,6 +533,7 @@ void radio_sustained(flight::PicoRadio& radio, std::size_t bytes, std::uint32_t 
     sleep_ms(3000);
 
     const std::string payload(bytes, 'A');
+    const TxFailures before = tx_counters(radio);
     const std::uint64_t start = now_ms();
     int attempts = 0, ok = 0;
     int first_failure_at = -1;
@@ -516,7 +567,7 @@ void radio_sustained(flight::PicoRadio& radio, std::size_t bytes, std::uint32_t 
                         "   That shape is heat or a supply falling away, not a bad wire -\n"
                         "   a bad wire fails from the first attempt.\n", first_failure_at);
         }
-        describe_tx_failure(radio);
+        describe_tx_failure(radio, tx_failures_since(radio, before));
     }
 }
 
@@ -911,6 +962,7 @@ void report_shared_bus(const flight::Configuration& config) {
 
     constexpr int kBursts = 30;
     const std::string packet(206, 'A');
+    const TxFailures before_tx = tx_counters(radio);
     int tx_fail = 0, wr_fail = 0;
     radio_wrong = 0;
     for (int i = 0; i < kBursts; ++i) {
@@ -922,7 +974,7 @@ void report_shared_bus(const flight::Configuration& config) {
     std::printf("   7.3 %d transmit-then-write rounds: %d TX failures, %d write failures,\n"
                 "       %d radio misreads afterwards\n",
                 kBursts, tx_fail, wr_fail, radio_wrong);
-    if (tx_fail != 0) describe_tx_failure(radio);
+    if (tx_fail != 0) describe_tx_failure(radio, tx_failures_since(radio, before_tx));
     if (wr_fail != 0) describe_write_failure(card);
     if (tx_fail == 0 && wr_fail == 0 && radio_wrong == 0) {
         std::printf("       PASS - both devices work while the other is active.\n");

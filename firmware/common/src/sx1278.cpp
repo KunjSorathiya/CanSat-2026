@@ -220,6 +220,26 @@ bool Sx1278::set_sync_word(std::uint8_t sync_word) {
     return read_reg(REG_SYNC_WORD) == sync_word;
 }
 
+// Everything worth knowing about a transmit that did not work, read at the moment it went
+// wrong and before anything is cleared or reset.
+//
+// IRQ_FLAGS alone answers only one question - did the radio finish and DIO0 fail to say so.
+// It cannot tell a chip that is trying and failing from a chip that is no longer the chip we
+// configured, and those want completely different investigations:
+//
+//   VERSION not 0x12   SPI to the radio is broken at this instant. Nothing about the RF
+//                      side is implicated; the fault is CS, SCK, MOSI, MISO or contention.
+//   OP_MODE bit 7 low  the modem is out of LoRa mode, which it only leaves on a reset. The
+//                      module lost power or was reset mid-transmit, taking the whole
+//                      configuration with it.
+//   OP_MODE 0x83       still sitting in LoRa TX after the full timeout: the chip accepted
+//                      the job and never finished it. PLL, PA or the supply behind them.
+void Sx1278::capture_tx_state() {
+    last_tx_irq_flags_ = read_reg(REG_IRQ_FLAGS);
+    last_tx_op_mode_ = read_reg(REG_OP_MODE);
+    last_tx_version_ = read_reg(REG_VERSION);
+}
+
 bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t timeout_ms) {
     if (!healthy_ || data == nullptr || len == 0) {
         return false;
@@ -252,7 +272,7 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
                 // is set here, the radio finished and DIO0 failed to tell us -- a wiring
                 // problem. If it is clear, the transmission never completed, which is the
                 // radio or its supply.
-                last_tx_irq_flags_ = read_reg(REG_IRQ_FLAGS);
+                capture_tx_state();
                 ++tx_timeouts_;
                 set_mode(MODE_STDBY);
                 write_reg(REG_IRQ_FLAGS, 0xFF);
@@ -266,7 +286,7 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
             sleep(2);
             waited += 2;
             if (waited >= timeout_ms) {
-                last_tx_irq_flags_ = read_reg(REG_IRQ_FLAGS);
+                capture_tx_state();
                 ++tx_timeouts_;
                 set_mode(MODE_STDBY);
                 write_reg(REG_IRQ_FLAGS, 0xFF);
@@ -291,7 +311,7 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
     const std::uint32_t elapsed = hal_.millis ? (now_ms() - start) : waited;
     const double airtime_ms = lora_time_on_air_ms(len, modem_params());
     if (elapsed + 1 < static_cast<std::uint32_t>(airtime_ms * 0.5)) {
-        last_tx_irq_flags_ = read_reg(REG_IRQ_FLAGS);
+        capture_tx_state();
         ++tx_impossibly_fast_;
         write_reg(REG_IRQ_FLAGS, 0xFF);
         set_mode(MODE_STDBY);

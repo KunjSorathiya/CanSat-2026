@@ -10,6 +10,36 @@ development cycle.
 
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
+### Added — three registers, so a failed transmit says which fault it was
+
+The same 206-byte transmit failed 5 of 5 in bring-up row 5.2 and then succeeded 45 of 45 in
+row 5.4a, minutes later on the same power cycle: same code, same length, same antenna. At
+the failures `IRQ_FLAGS` read `0x00`, so `TxDone` was never set and the packets did not
+complete rather than merely going unreported.
+
+`IRQ_FLAGS` answers one question — did the radio finish and DIO0 fail to say so — and it
+cannot answer this one. It cannot tell a chip that is trying and failing from a chip that
+is no longer the chip we configured, and those want opposite investigations.
+
+- `Sx1278` now captures **`RegOpMode` and `RegVersion` alongside `RegIrqFlags`**, all three
+  read at the moment of the failure and before anything is cleared or reset.
+- The diagnostic decodes them in the order that matters. A version that is not `0x12` means
+  SPI was broken at that instant, so nothing about the RF side is implicated — and on this
+  vehicle the microSD shares that bus and corrupts the radio rather than itself. `OP_MODE`
+  bit 7 clear means the modem left LoRa mode, which only a reset does: the module lost power
+  and took its configuration with it. `0x83` means it accepted the transmit and never
+  finished it, which is the PLL, the PA or the rail behind them.
+- Three host tests pin the three cases, including a `FakeRadio` that browns out mid-transmit.
+
+### Fixed — a test reporting failures that belonged to the test before it
+
+The radio's failure counters are cumulative, and the diagnostic printed them raw. Row 5.3
+therefore announced "8 timeout(s)" when three of its five had failed and the other five
+belonged to row 5.2 — a test looking twice as bad as it was, in the one place a number is
+read to decide whether something is worth chasing. Each test now snapshots the counters and
+reports its own.
+
+
 ### Fixed — the post-flight command ate the flight log it was meant to read
 
 The runbook's step 2 told an operator to replay `logs/raw_packets.tsv`, and left `--output`

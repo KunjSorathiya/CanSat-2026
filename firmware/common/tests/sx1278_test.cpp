@@ -52,6 +52,12 @@ struct FakeRadio {
     int reset_pulses = 0;
     std::uint32_t total_delay_ms = 0;
 
+    // A module that loses power mid-transmit comes back reset: out of LoRa mode with its
+    // whole configuration gone. From outside that is indistinguishable from a radio that is
+    // simply slow, which is exactly why the driver reads RegOpMode at the failure. Zero
+    // disables. Non-zero makes every access after that simulated time see a reset part.
+    std::uint32_t brownout_after_ms = 0;
+
     // Address latched at the start of the current transfer.
     int pending_addr = -1;
     bool pending_write = false;
@@ -62,6 +68,9 @@ struct FakeRadio {
     }
 
     void transfer(const std::uint8_t* tx, std::uint8_t* rx, std::size_t len) {
+        if (brownout_after_ms != 0 && millis >= brownout_after_ms) {
+            reg[0x01] = 0x09;  // FSK standby - the reset default, with the LoRa bit clear
+        }
         for (std::size_t i = 0; i < len; ++i) {
             const std::uint8_t out_byte = tx ? tx[i] : 0x00;
             if (pending_addr < 0) {
@@ -551,6 +560,55 @@ void test_a_normal_transmit_is_still_accepted() {
     CHECK(sx.tx_timeouts() == 0);
 }
 
+// "The transmit failed" is one sentence for three faults that want opposite
+// investigations, and the registers read at the moment of the failure are what separate
+// them. This pins the healthy-bus, still-trying case: the chip is the one we configured,
+// still in LoRa TX, and simply never finished. That points at the PLL, the PA or the rail.
+void test_a_timeout_captures_the_registers_that_name_the_fault() {
+    FakeRadio radio;   // DIO0 never asserts
+    cansat::Sx1278 sx;
+    CHECK(sx.begin(make_hal(radio), cansat::Sx1278Settings{}));
+
+    const std::uint8_t payload[206] = {};
+    CHECK(!sx.transmit(payload, sizeof(payload), 500));
+    CHECK(sx.tx_timeouts() == 1);
+    CHECK(sx.last_tx_irq_flags() == 0x00);  // TxDone never set: it did not finish
+    CHECK(sx.last_tx_op_mode() == 0x83);    // LoRa TX: the chip accepted the job
+    CHECK(sx.last_tx_version() == 0x12);    // and SPI was working throughout
+}
+
+// The second of the three: the module browned out mid-transmit and came back reset. The
+// IRQ flags look identical to the case above - nothing set, nothing finished - and only
+// RegOpMode says the part is no longer in the mode we put it in. Without this the evening
+// goes into the RF side of a fault that is actually a power connection.
+void test_a_module_that_resets_mid_transmit_is_visible_in_op_mode() {
+    FakeRadio radio;
+    radio.brownout_after_ms = 200;
+    cansat::Sx1278 sx;
+    CHECK(sx.begin(make_hal(radio), cansat::Sx1278Settings{}));
+
+    const std::uint8_t payload[206] = {};
+    CHECK(!sx.transmit(payload, sizeof(payload), 500));
+    CHECK(sx.tx_timeouts() == 1);
+    CHECK((sx.last_tx_op_mode() & 0x80) == 0);  // no longer in LoRa mode: it was reset
+    CHECK(sx.last_tx_version() == 0x12);        // the bus itself is fine
+}
+
+// The third: SPI to the radio was broken at that instant, so nothing about the transmit is
+// implicated at all. On this vehicle the microSD shares the bus, and a card that keeps
+// driving MISO corrupts the radio rather than itself - which presents as a dead radio.
+void test_a_broken_bus_at_the_failure_shows_in_the_version() {
+    FakeRadio radio;
+    cansat::Sx1278 sx;
+    CHECK(sx.begin(make_hal(radio), cansat::Sx1278Settings{}));
+    radio.reg[0x42] = 0x00;  // MISO stuck low from the moment the transmit starts
+
+    const std::uint8_t payload[206] = {};
+    CHECK(!sx.transmit(payload, sizeof(payload), 500));
+    CHECK(sx.tx_timeouts() == 1);
+    CHECK(sx.last_tx_version() == 0x00);
+}
+
 int main() {
     test_begin_requires_the_right_silicon();
     test_begin_requires_a_complete_hal();
@@ -574,6 +632,9 @@ int main() {
     test_probe_version_reads_the_bus_rather_than_a_cached_value();
     test_a_transmit_that_finishes_faster_than_its_airtime_is_refused();
     test_a_normal_transmit_is_still_accepted();
+    test_a_timeout_captures_the_registers_that_name_the_fault();
+    test_a_module_that_resets_mid_transmit_is_visible_in_op_mode();
+    test_a_broken_bus_at_the_failure_shows_in_the_version();
 
     std::cout << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
     if (g_failures != 0) {

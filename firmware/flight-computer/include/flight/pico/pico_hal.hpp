@@ -85,6 +85,8 @@ public:
     std::uint8_t last_tx_irq_flags() const { return radio_.last_tx_irq_flags(); }
     std::uint32_t tx_timeouts() const { return radio_.tx_timeouts(); }
     std::uint32_t tx_impossibly_fast() const { return radio_.tx_impossibly_fast(); }
+    std::uint8_t last_tx_op_mode() const { return radio_.last_tx_op_mode(); }
+    std::uint8_t last_tx_version() const { return radio_.last_tx_version(); }
 
 private:
     Configuration config_;

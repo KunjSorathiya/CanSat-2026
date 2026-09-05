@@ -87,6 +87,15 @@ public:
     // completed at all, which is the modem or the supply feeding it.
     std::uint8_t last_tx_irq_flags() const { return last_tx_irq_flags_; }
     std::uint32_t tx_timeouts() const { return tx_timeouts_; }
+    // RegOpMode and RegVersion, read in the same breath as the IRQ flags above.
+    //
+    // These separate three faults that all present as "the transmit failed". A version that
+    // is not 0x12 means SPI itself was broken at that instant. An OpMode with bit 7 clear
+    // means the modem left LoRa mode, which only a reset does - the module browned out and
+    // lost its configuration. An OpMode still reading LoRa TX means the chip took the job
+    // and never finished it, which is the PLL, the PA, or the rail feeding them.
+    std::uint8_t last_tx_op_mode() const { return last_tx_op_mode_; }
+    std::uint8_t last_tx_version() const { return last_tx_version_; }
     // Transmits that reported done faster than their own airtime allows, and were refused
     // for it. Non-zero means the completion signal is lying - in practice a DIO0 line that
     // is not connected and floats high. Worse than a timeout, because it is silent.
@@ -99,6 +108,7 @@ private:
     void write_fifo(const std::uint8_t* data, std::size_t len);
     void read_fifo(std::uint8_t* out, std::size_t len);
     void set_mode(std::uint8_t mode);
+    void capture_tx_state();
     bool apply_settings(const Sx1278Settings& settings);
     std::uint32_t now_ms();
     LoraModemParams modem_params() const;
@@ -110,6 +120,8 @@ private:
     bool receiving_ = false;
     std::uint8_t version_ = 0;
     std::uint8_t last_tx_irq_flags_ = 0;
+    std::uint8_t last_tx_op_mode_ = 0;
+    std::uint8_t last_tx_version_ = 0;
     std::uint32_t tx_timeouts_ = 0;
     std::uint32_t tx_impossibly_fast_ = 0;
     std::uint32_t truncated_receives_ = 0;

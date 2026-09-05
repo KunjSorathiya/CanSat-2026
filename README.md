@@ -6,7 +6,7 @@
 and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml)
-[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-4355%20assertions-1b5e20)](documentation/testing/test-plan.md)
+[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-4370%20assertions-1b5e20)](documentation/testing/test-plan.md)
 [![Python tests](https://img.shields.io/badge/Python%20tests-37%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
@@ -30,7 +30,7 @@ and streams telemetry from power-on through recovery.**
 |---|---|
 | 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 4395 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
 | 🟡 **Firmware drivers** | The IMU, barometer, GPS and radio drivers **have run on real silicon** and their numbers are recorded. The microSD driver and the flight image as a whole have not |
-| 🟠 **Hardware** | Bring-up under way: **27 of 82 recorded measurements taken** — the bare Pico, the IMU and barometer, the GPS, the radio's airtime, and the bench identification that found the IMU is a six-axis part. **Power is half-answered** — the microSD runs off the Pico's own 3.3 V rail with a 20 mV droop at 100 % write duty, so no separate rail is needed for it. The combined radio-plus-GPS case is untested, and there is still no switch and no divider |
+| 🟠 **Hardware** | Bring-up under way: **29 of 82 recorded measurements taken** — the bare Pico, the IMU and barometer, the GPS, the radio's airtime and sustained output, the shared SPI0 bus, and the bench identification that found the IMU is a six-axis part. **Power is largely answered** — the Pico's own 3.3 V rail held 3.28–3.30 V at 100 % microSD write duty and 3.26–3.27 V at 100 % radio transmit duty, both far harsher than the mission, so no separate rail is needed. **Two intermittents are open** ([F-5 and F-6](documentation/testing/bring-up-record.md#findings)): transmits that fail in bursts and then run flawlessly, and a set of write failures that vanished without being understood. There is still no switch and no divider |
 | 🔴 **Mechanical** | Structure, egg chamber and parachute **not started** — blocked on a rulebook contradiction |
 
 > [!IMPORTANT]
@@ -400,7 +400,7 @@ bash tools/build_host.sh
 |---|---|---|
 | `flight_tests` | 63 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math, IMU range encoding, sensor timing, calibration, faults, scheduler, block log and torn-header recovery, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **3606 / 3606** |
 | `flight_smoke_test` | Boot, first three packets, GPS parse | ✅ Passed |
-| `sx1278_tests` | LoRa driver register sequence, TX timeout, RX and CRC handling, RSSI conversion, against a fake register bank | ✅ **114 / 114** |
+| `sx1278_tests` | LoRa driver register sequence, TX timeout, RX and CRC handling, RSSI conversion, against a fake register bank | ✅ **129 / 129** |
 | `sd_card_tests` | microSD init sequence, SDHC vs SDSC addressing, block round trip, bus release, timeouts and write-error paths, against a simulated card | ✅ **605 / 605** |
 | `fat_volume_tests` | FAT32 log-file lookup: MBR and superfloppy volumes, contiguity, a missing file, a card that stops answering, against a synthetic image | ✅ **30 / 30** |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
