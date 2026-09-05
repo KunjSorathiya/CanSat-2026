@@ -64,6 +64,34 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — post-flight step 5 told an operator to compare two files that share one column name
+
+*"Compare the transmitted stream against the onboard SD log: differences are radio loss,
+not sensor loss."* Good instruction. The two files are written by different programs on
+different sides of the link, and of their 18 and 23 columns, **`packet_number` is the only
+name they share**. Altitude is `altitude_m` on one side and `altitude` on the other; the
+mission clock is integer milliseconds in one and `HH:MM:SS:MS` in the other. Nothing said
+how to line them up.
+
+The runbook now carries the mapping, joined on `packet_number`, and says which columns exist
+on one side only **and why that is the point of the exercise rather than a defect**:
+`receipt_time`, `valid`, `error`, `seq_missing` and `seq_note` are what the ground station
+observed about the link; `state` and `fault_total` are what the vehicle knew about itself
+when it transmitted.
+
+The names are left as they are. The onboard columns carry their units because the flight
+computer writes them, and a number without a unit is how a wrong number gets believed.
+
+Both column sets are now read off the source and held to that table, and the check earned
+itself on its first run by naming two columns the table had missed — `yaw_reference` and
+`heading`, both ground-side derivations from the `YR-` tag. Writing them up then tripped the
+magnetometer rule from earlier in this pass, which required the new sentence to name the
+delivered part. Two gates catching a third change is the arrangement working.
+
+The C++ record was compared for names in the same pass and deliberately left alone. It is
+the transmitter's struct, it names its units, and unlike the Python and JavaScript pair it
+is nobody's hand-port — the reasoning is recorded beside the test rather than acted on.
+
 ### Fixed — the two parsers disagreed about what a field is called
 
 The same comparison, pointed at the web console. Its display turned out to reference every

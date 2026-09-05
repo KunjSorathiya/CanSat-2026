@@ -299,6 +299,38 @@ and pressure, each against time or packet number.
 5. Compare the transmitted stream against the onboard SD log: differences are radio loss,
    not sensor loss, and the difference itself is a useful result.
 
+   The two files are written by different programs on different sides of the link, so their
+   columns do not line up by name. **Join on `packet_number`**, which means the same thing
+   in both, and read across:
+
+   | Quantity | Onboard SD log | Ground `telemetry.csv` |
+   |---|---|---|
+   | Packet number — **the join key** | `packet_number` | `packet_number` |
+   | Mission clock | `mission_ms` (integer milliseconds) | `timestamp` (`HH:MM:SS:MS`, the same clock, formatted) |
+   | Altitude, pressure, temperature | `altitude_m`, `pressure_pa`, `temperature_c` | `altitude`, `pressure`, `temperature` |
+   | Attitude | `roll_deg`, `pitch_deg`, `yaw_deg` | `roll`, `pitch`, `yaw` |
+   | Acceleration | `ax_mps2`, `ay_mps2`, `az_mps2` | `ax`, `ay`, `az` |
+   | GPS | `gps_valid`, `gps_lat`, `gps_lon`, `gps_alt` | `gps_lat`, `gps_lon`, `gps_alt` (blank when there was no fix) |
+   | Mission state and faults | `state`, `fault_total` | not carried as columns — they are inside `raw_packet` as `MODE` and `FAULTS` |
+   | The packet itself | `packet` | `raw_packet` |
+
+   The onboard names carry their units because they are written by the flight computer,
+   where a number without a unit is how a wrong number gets believed. The ground columns
+   are named for the fields of the rulebook packet they came from.
+
+   Columns that exist on one side only are the point of the exercise, not a defect:
+   `receipt_time`, `valid`, `error`, `seq_missing` and `seq_note` are what the **ground
+   station** observed about the link, and have no meaning on the vehicle. `state` and
+   `fault_total` are what the **vehicle** knew about itself at the moment it transmitted.
+
+   Two more are ground-side derivations rather than observations: `yaw_reference` says
+   whether the `yaw` column is magnetic or gyro-integrated, read from the packet's `YR-`
+   tag, and `heading` is that yaw converted to a compass bearing — present only when the
+   reference is magnetic, and therefore empty for every packet this vehicle sends, since
+   the delivered IMU is a six-axis MPU-6500 with no magnetometer
+   ([F-1](../hardware/receiving-inspection.md#findings)). `team_id` is on the ground side because the
+   vehicle already knows whose log it is writing.
+
 ---
 
 ## Troubleshooting

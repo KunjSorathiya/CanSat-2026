@@ -563,6 +563,25 @@ def main() -> int:
     checker.check("every Complete requirement names its evidence",
                   not unevidenced, ", ".join(unevidenced[:5]))
 
+    # ---- the two logs the runbook tells an operator to compare ------------------------
+    # Post-flight step 5 joins the onboard SD log against the ground station's CSV. They are
+    # written by different programs and their columns do not line up by name, so the runbook
+    # carries the mapping. A column added to either file and left out of that table makes
+    # the instruction a little more wrong every time.
+    builder = read("firmware/flight-computer/src/telemetry_builder.cpp")
+    header_literal = builder[builder.index("std::string TelemetryBuilder::sd_header()"):]
+    header_literal = header_literal[:header_literal.index("}")]
+    sd_columns = re.findall(r"[a-z_]+(?=,|\")", "".join(re.findall(r'"([^"]*)"', header_literal)))
+    sd_columns = [c for c in "".join(re.findall(r'"([^"]*)"', header_literal)).split(",") if c]
+    ground_columns = re.findall(r'"([a-z_]+)"', read("ground-station/software/src/logger.py")
+                                .split("CSV_FIELDS = [")[1].split("]")[0])
+    missing_from_runbook = [c for c in sd_columns if f"`{c}`" not in runbook]
+    checker.check(f"runbook.md maps all {len(sd_columns)} onboard SD log columns",
+                  not missing_from_runbook, ", ".join(missing_from_runbook))
+    missing_ground = [c for c in ground_columns if f"`{c}`" not in runbook]
+    checker.check(f"runbook.md maps all {len(ground_columns)} ground CSV columns",
+                  not missing_ground, ", ".join(missing_ground))
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.

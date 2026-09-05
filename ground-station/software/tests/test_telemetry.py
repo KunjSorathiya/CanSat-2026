@@ -132,6 +132,12 @@ class RecordSurfaceTests(unittest.TestCase):
 
     CONSOLE = Path(__file__).parents[3] / "ground-station" / "web" / "index.html"
 
+    # The C++ record is deliberately not part of this comparison. It is the transmitter's
+    # struct, it names its units -- `altitude_m`, `acceleration_x_mps2` -- and that is worth
+    # more on an embedded target than matching a receiver's field names. The two compared
+    # here are both receivers, one a documented hand-port of the other, which is what makes
+    # a name mismatch between them a porting hazard rather than a convention difference.
+    #
     # Names that exist on one side only, on purpose.
     PYTHON_ONLY = {
         # Python exposes booleans the console derives at the point of use instead.
