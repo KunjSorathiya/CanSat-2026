@@ -178,7 +178,16 @@ private:
         switch (current_cmd_) {
             case 0:  // GO_IDLE_STATE
                 idle_ = true;
-                response_ = {0x01};
+                // A real card latches R1's error bits onto whatever it made of the noise
+                // on an undriven bus while the rail was coming up, and holds them until a
+                // response is read. Modelled here: the first CMD0 answers idle with those
+                // bits still set, and reading it clears them.
+                if (sticky_first_r1_ != 0) {
+                    response_ = {sticky_first_r1_};
+                    sticky_first_r1_ = 0;
+                } else {
+                    response_ = {0x01};
+                }
                 break;
             case 8:  // SEND_IF_COND
                 if (kind_ == Kind::sdsc_v1) {
@@ -250,6 +259,10 @@ private:
     }
 
     Kind kind_;
+    // Set by a test to make the first CMD0 answer with sticky error bits set.
+public:
+    std::uint8_t sticky_first_r1_ = 0;
+private:
     State state_ = State::idle;
     State next_after_response_ = State::idle;
     std::uint8_t current_cmd_ = 0;
@@ -495,11 +508,45 @@ void test_a_v1_card_still_initialises() {
 
 }  // namespace
 
+// A card whose first CMD0 answers with sticky error bits set must still initialise.
+//
+// This is not hypothetical. On the bench a 64 GB SDXC card answered its first CMD0 with
+// 0x1F: idle, plus illegal-command, CRC-error, erase-sequence and erase-reset. All four are
+// sticky bits latched from bus noise while the rail came up, and all four clear when the
+// response is read -- so the second CMD0 is clean. The driver tried once, saw something that
+// was not exactly 0x01, and reported a dead card. A perfectly healthy card was rejected.
+void test_a_card_whose_first_cmd0_carries_stale_error_bits_still_initialises() {
+    for (const std::uint8_t dirty : {0x1Fu, 0x05u, 0x0Du, 0x09u}) {
+        FakeCard card(FakeCard::Kind::sdhc_v2);
+        card.sticky_first_r1_ = dirty;
+        flight::pico::SdCard sd;
+        CHECK(sd.begin_with(make_hal(card)));
+        CHECK(sd.ok());
+        CHECK(sd.high_capacity());
+        // It took more than one attempt, and the driver says so rather than hiding it.
+        CHECK(sd.cmd0_attempts() >= 2);
+        CHECK(sd.stage() == flight::pico::SdCard::Stage::complete);
+    }
+}
+
+// The retry must not paper over a card that never answers: an undriven bus reads 0xFF, bit 7
+// set, which is not an R1 at all. That has to stay a failure, and it has to stop at CMD0.
+void test_a_bus_that_never_answers_still_fails_at_cmd0() {
+    FakeCard card(FakeCard::Kind::dead);
+    flight::pico::SdCard sd;
+    CHECK(!sd.begin_with(make_hal(card)));
+    CHECK(!sd.ok());
+    CHECK(sd.stage() == flight::pico::SdCard::Stage::cmd0_idle);
+    CHECK(sd.last_r1() == 0xFF);
+}
+
 int main() {
     test_initialisation_sequence_follows_the_specification();
     test_initialisation_runs_slowly_then_speeds_up();
     test_a_standard_capacity_card_is_addressed_in_bytes();
     test_a_high_capacity_card_is_addressed_in_blocks();
+    test_a_card_whose_first_cmd0_carries_stale_error_bits_still_initialises();
+    test_a_bus_that_never_answers_still_fails_at_cmd0();
     test_a_block_round_trips();
     test_the_bus_is_released_after_every_transaction();
     test_a_dead_card_fails_instead_of_hanging();

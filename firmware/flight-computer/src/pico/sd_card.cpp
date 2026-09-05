@@ -16,6 +16,13 @@ constexpr std::uint8_t TOKEN_START_BLOCK = 0xFE;
 // Bounded retry counts. Every loop here has a ceiling: a card that never answers must
 // fail the operation, never stall the flight loop.
 constexpr int kR1Attempts = 16;        // R1 arrives within 8 bytes on a healthy card
+// CMD0 is retried, because the first one after power-up is frequently not clean. R1's error
+// bits -- illegal command, CRC error, erase sequence, erase reset -- are STICKY: they latch
+// onto whatever the card made of the noise on an undriven bus while the rail came up, and
+// they stay latched until a response is read. So a first CMD0 can legitimately return idle
+// with several error bits set, which is what 0x1F is, and the act of reading it clears them.
+// A single attempt reads that as a dead card and gives up on a healthy one.
+constexpr int kCmd0Attempts = 10;
 constexpr int kTokenAttempts = 50000;  // ~100 ms at 4 MHz
 constexpr int kReadyAttempts = 50000;
 constexpr std::uint32_t kInitTimeoutMs = 2000;
@@ -75,6 +82,7 @@ bool SdCard::begin_with(const SdCardHal& hal) {
     stage_ = Stage::not_started;
     last_r1_ = 0xFF;
     init_wait_ms_ = 0;
+    cmd0_attempts_ = 0;
     if (!hal_.select || !hal_.transfer) {
         stage_ = Stage::bad_hal;
         return false;
@@ -82,13 +90,27 @@ bool SdCard::begin_with(const SdCardHal& hal) {
 
     if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, kInitBaud);
 
-    // >= 74 clocks with CS high to enter native SPI mode.
+    // The specification asks for at least 74 clocks with CS high to enter native SPI mode.
+    // 80 was the old figure and is the bare minimum; a card whose internal supply is still
+    // settling wants more, and extra idle clocks cost microseconds.
     select(false);
-    clock_bytes(10);
+    clock_bytes(20);
 
     select(true);
     stage_ = Stage::cmd0_idle;
-    std::uint8_t r1 = command(0, 0, 0x95);  // CMD0: GO_IDLE_STATE
+    std::uint8_t r1 = 0xFF;
+    for (cmd0_attempts_ = 1; cmd0_attempts_ <= kCmd0Attempts; ++cmd0_attempts_) {
+        r1 = command(0, 0, 0x95);  // CMD0: GO_IDLE_STATE
+        if (r1 == R1_IDLE) break;
+        // Not clean yet. If the card answered at all -- bit 7 clear makes it a real R1
+        // rather than an undriven line -- then reading that response has just cleared the
+        // sticky error bits, and the next attempt gets a clean answer. If it did not
+        // answer, a few more idle clocks give a slow card longer to wake.
+        select(false);
+        clock_bytes(2);
+        select(true);
+        if (hal_.delay_ms) hal_.delay_ms(hal_.ctx, 1);
+    }
     last_r1_ = r1;
     if (r1 != R1_IDLE) {
         release();

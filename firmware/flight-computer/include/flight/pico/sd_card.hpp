@@ -74,6 +74,9 @@ public:
     std::uint8_t last_r1() const { return last_r1_; }
     // Milliseconds spent in the ACMD41 loop. A healthy card leaves idle in tens of ms.
     std::uint32_t init_wait_ms() const { return init_wait_ms_; }
+    // How many CMD0 attempts it took. More than one is normal and not a fault: the
+    // first response after power-up carries sticky error bits latched from bus noise.
+    int cmd0_attempts() const { return cmd0_attempts_; }
     static const char* describe(Stage stage);
 
 private:
@@ -90,6 +93,7 @@ private:
     Stage stage_ = Stage::not_started;
     std::uint8_t last_r1_ = 0xFF;
     std::uint32_t init_wait_ms_ = 0;
+    int cmd0_attempts_ = 0;
     bool ok_ = false;
     bool sdhc_ = false;
 };

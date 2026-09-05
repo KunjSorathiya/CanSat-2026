@@ -164,7 +164,7 @@ The rulebook explicitly permits any outer material (PVC, plastic, 3D print) and 
 | Data analysis | 20 | ~0 | Tooling ready; needs flight data |
 
 **Code originality — 9 or 10 of 10.** Self-written, no third-party libraries anywhere in the
-flight path, heavily commented, and held by 4309 assertions across 166 Python and 57 Node
+flight path, heavily commented, and held by 4333 assertions across 166 Python and 57 Node
 tests. The drivers for the MPU-9250, BMP280, NEO-6M, SX1278 and the SD card are all written
 here against their datasheets and register maps. This section rewards exactly what this
 repository is.

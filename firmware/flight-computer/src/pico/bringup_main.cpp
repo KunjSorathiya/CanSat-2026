@@ -517,9 +517,9 @@ void report_sd() {
                     flight::BoardPins::spi_mosi);
         return;
     }
-    std::printf("   reached: %s, %lu ms in ACMD41\n",
+    std::printf("   reached: %s, %lu ms in ACMD41, %d CMD0 attempt(s)\n",
                 flight::pico::SdCard::describe(card.stage()),
-                static_cast<unsigned long>(card.init_wait_ms()));
+                static_cast<unsigned long>(card.init_wait_ms()), card.cmd0_attempts());
     std::printf("   6.2 card type: %s\n",
                 card.high_capacity() ? "SDHC/SDXC, block-addressed - as predicted"
                                      : "SDSC, byte-addressed - NOT what Gate 6.2 expects");
