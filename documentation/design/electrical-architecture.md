@@ -258,21 +258,73 @@ No final GPIO assignments are made in this document. Bus sharing, chip-select al
 
 ## Power Budget
 
-No typical or peak current values have been provided for the confirmed boards. Values are intentionally left `TBD`; they must come from the exact board/module documentation and then be checked by measurement.
+Every load in this vehicle runs from the Pico's `3V3(OUT)` pin. The binding constraint is
+therefore not the battery and not a regulator selection - it is what that pin is allowed to
+supply, and the design sits close enough to that limit that the number matters.
 
-| Device | Voltage | Typical Current | Peak Current | Source | Status |
-|---|---:|---:|---:|---|---|
-| Raspberry Pi Pico | TBD | TBD | TBD | Exact Pico board documentation and measurement | Requires verification |
-| SX1278 RA-02 | TBD | TBD | TBD | Exact RA-02/module documentation and radio test | Requires verification |
-| MPU-9250 board | TBD | TBD | TBD | Exact board documentation and sensor test | Requires verification |
-| NEO-6M GPS board | TBD | TBD | TBD | Exact board documentation and GPS test | Requires verification |
-| GY-BMP280-3.3 board | TBD | TBD | TBD | Exact board documentation and sensor test | Requires verification |
-| Micro SD card reader and card | TBD | TBD | TBD | Exact reader documentation and read/write test | Requires verification; breakout variation is significant |
-| Power LED branch | TBD | TBD | TBD | Selected LED documentation and measurement | Hardware not selected |
-| Regulator losses and quiescent current | TBD | TBD | TBD | Selected regulator documentation and measurement | Regulator not selected |
-| Complete onboard system | Battery input TBD | TBD | TBD | Sum of verified loads and representative measurement | Cannot budget yet |
+**Raspberry Pi's guidance for `3V3(OUT)` is 300 mA**, and the RP2040 and the rest of the
+Pico board draw from the same RT6150 buck-boost. The RP2040 at 125 MHz with peripherals
+running is roughly 35 mA, so **about 250 mA is available to everything else.**
 
-The power budget must include startup, radio transmission, SD writes, sensor operation, regulator losses, and measurement uncertainty before the regulator is selected. No battery-life estimate is made.
+### Per-device worst case
+
+Datasheet figures are the chip manufacturer's; the carrier boards add pull-ups, an LED or a
+regulator that these do not include, so they are floors rather than ceilings. Where this
+project has measured something, the measurement is named.
+
+| Device | Worst-case draw | Condition | Duty in flight | Source |
+|---|---:|---|---|---|
+| **SX1278 / RA-02** | **87 mA** | TX, +17 dBm on PA_BOOST | **33 %** — 333.7 ms of every 1000 ms (row 5.2) | SX1276/78 datasheet, Table 10. +20 dBm would be 120 mA; this vehicle transmits at +17 |
+| | 12 mA | RX continuous | the other 67 % | Same |
+| | 1.5 mA | standby | — | Same |
+| **microSD card + reader** | **~100 mA** | block write | **~1 %** — 2 writes ≈ 10 ms per telemetry second | SD Physical Layer spec permits 100 mA in default speed. The HP mx310 has no published figure. **Sub-millisecond spikes run higher** |
+| | ~1.3 mA | the reader's four 10 kΩ pull-ups | continuous | [F-3](../hardware/receiving-inspection.md#findings) — 3.3 V board, no regulator, two capacitors |
+| **NEO-6M module** | **~70 mA** | acquisition, cold start | **startup only** | u-blox NEO-6 datasheet, ~67 mA peak at 3.0 V; the carrier adds an LED |
+| | ~45 mA | tracking | continuous once fixed | Same |
+| **MPU-6500** | **~4 mA** | gyro + accel active | continuous | MPU-6500 datasheet: 3.2 mA gyro, 450 µA accel |
+| **BMP280** | **~1 mA** | 83 Hz, high oversampling (row 3.5) | continuous | BMP280 datasheet, 720 µA at maximum rate |
+| **Status LED, 330 Ω** | **~4 mA** | lit | ≤ 50 % duty, it blinks | (3.3 − 2.0) / 330 |
+| **Battery divider, GP26** | ~21 µA | continuous | continuous | 100 kΩ / 100 kΩ from 4.2 V. Draws from the **battery**, not this rail |
+
+### What that totals
+
+| Case | Sum | Against 250 mA |
+|---|---:|---|
+| **Everything at once** — TX, SD write, GPS acquiring, all sensors, LED | **~266 mA** | **over budget** |
+| **Worst case after the fix** — TX, SD write, GPS *tracking*, sensors, LED | **~241 mA** | at the limit |
+| **Steady state** — TX at 33 % duty, RX otherwise, GPS tracking, sensors, LED | **~85 mA** | comfortable |
+
+The first row is not hypothetical: a telemetry append writes two blocks immediately around a
+transmit, so radio TX and an SD write genuinely coincide once a second. What makes it
+survivable is that GPS acquisition is a startup condition and the SD spike lasts
+milliseconds.
+
+### What this requires of the board
+
+1. **The 470 µF bulk capacitor across the microSD module's own 3V3 and GND.** Its job is to
+   supply the write spike locally so it never reaches the Pico's regulator and never adds to
+   the radio's peak. [F-10](../testing/bring-up-record.md#findings) is the evidence that this
+   module's supply path is the weak point: a long jumper was enough to make every write fail
+   while every read passed.
+2. **A local capacitor at the RA-02's supply pins too** - 100 nF plus 10 µF. The same fault
+   killed the radio, on the same kind of wire.
+3. **Short, direct supply tracks to both.** Not a design nicety: it cost five bench runs.
+4. **Do not add a load to this rail without re-doing this table.** There is no headroom left
+   for one.
+
+### What has been measured
+
+| Measurement | Result | Row |
+|---|---|---|
+| Rail under 100 % radio TX duty | **3.26–3.27 V**, from 3.30 V idle | 5.4a |
+| Rail under 100 % microSD write duty | **3.28–3.30 V** | 6.3b |
+| Both together | **not taken** | Gate 2 |
+
+Each load has been shown to be carried alone, at a duty far harsher than the mission's. The
+combined case is the one still open, and it is the one the table says is tight. A current
+figure has never been taken for any device - only rail voltage - because the series
+connection would not hold on a breadboard. **Take it on the soldered board**, where a meter
+can sit in the supply track.
 
 ## Electrical Risks
 

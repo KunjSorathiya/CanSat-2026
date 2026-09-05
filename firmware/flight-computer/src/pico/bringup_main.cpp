@@ -473,7 +473,7 @@ void describe_tx_failure(const flight::PicoRadio& radio, const TxFailures& here)
     std::printf("       TxDone is CLEAR, and the chip is still the one we configured and\n"
                 "       still in LoRa mode (0x83 is LoRa TX). It accepted the transmit and\n"
                 "       never finished it: the PLL, the PA, or the rail behind them.\n"
-                "       Watch 3V3 on DC volts through a burst - the PA pulls about 120 mA\n"
+                "       Watch 3V3 on DC volts through a burst - the PA pulls about 87 mA\n"
                 "       at +17 dBm - and check the antenna is actually on the SMA.\n");
 }
 
@@ -526,7 +526,7 @@ void radio_sustained(flight::PicoRadio& radio, std::size_t bytes, std::uint32_t 
     std::printf("\n-- 5.4 Sustained transmit, %lu s, for a rail measurement --\n",
                 static_cast<unsigned long>(window_ms / 1000));
     std::printf("   Put the meter on DC volts across pin 36 (3V3) and pin 38 (GND) and\n"
-                "   watch it through the burst. The PA pulls about 120 mA at +17 dBm, so\n"
+                "   watch it through the burst. The PA pulls about 87 mA at +17 dBm, so\n"
                 "   a rail that sags below ~3.1 V here is the answer to Gate 2.\n");
     std::printf("   Back-to-back transmission - far harsher than the 1 Hz the mission\n"
                 "   sends. Starting in 3 s.\n");
