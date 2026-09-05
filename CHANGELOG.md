@@ -1114,6 +1114,35 @@ can explain when it fails.
 Run standalone, without the log, the script skips the count checks and reports 69/69 rather
 than inventing a number.
 
+### Added — a sustained write burst, so the Gate 2 current is actually measurable
+
+Gate 6.3 timed 100 block writes and finished in under half a second. A handheld multimeter
+samples two or three times a second, so pointed at that it averaged a window that was mostly
+idle and reported a number far below the truth. **The measurement Gate 2 has been waiting on
+was not takeable with the instrument anyone actually owns.**
+
+Row **6.3b** now holds the card writing continuously for **10 seconds**, with a three-second
+warning first so there is time to look at the meter.
+
+What it reports alongside is the **duty cycle**, and that is what makes the reading mean
+anything: near 100 % the meter is reading the write current itself rather than an average of
+writes and gaps, and below 80 % the true figure is higher by 1/duty. The diagnostic says
+which case you are in rather than leaving it to be assumed.
+
+This measures **sustained** write current, not the instantaneous spike, and that is
+deliberate — sustained is the figure a regulator is sized against, and the spike is what the
+bulk capacitor is for.
+
+Two things the bring-up record now says out loud. **Take the idle reading first**, because
+the write cost is the difference and not the absolute. And **the card is the whole
+variable**: the module has no active component at all, so what is being measured is flash
+programming inside the card, and write current varies enormously between cards. Measure the
+one that will fly.
+
+For anyone who would rather not break the circuit, the go/no-go question has a simpler
+answer that needs no series connection: watch the 3V3 rail on DC volts during the burst. If
+it holds, the regulator is coping.
+
 ### Fixed — the negative-coordinate fix had no test holding it
 
 `test-data/optional-tag-cases.tsv` was written, and read by nothing. The parser fix it

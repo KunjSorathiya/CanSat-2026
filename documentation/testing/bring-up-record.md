@@ -359,10 +359,27 @@ computed airtime that has never been observed.
 > destroying data silently is its own kind of failure. **6.1 and 6.2 run unprompted; they are
 > read-only.**
 >
-> **What Gate 2 needs from this gate is a current, and firmware cannot measure it.** The
-> diagnostic reports the write *duration*, which tells you how long the transient lasts. Its
-> magnitude needs a meter in series with the module's `3V3` lead, and it is the last number
-> standing between this project and a chosen regulator.
+> **What Gate 2 needs from this gate is a current, and firmware cannot measure it** — a
+> board cannot see its own supply. The diagnostic makes the measurement *takeable*
+> instead: after the timed 100-write burst it holds the card writing for a continuous
+> **10 seconds** (row 6.3b), because a handheld meter samples two or three times a second
+> and would otherwise average a window that is mostly idle.
+>
+> It prints the **duty cycle** alongside, which is what makes the reading mean anything:
+> near 100 % the meter is reading the write current itself rather than an average of
+> writes and gaps. Below 80 % the true figure is higher than it reads, by 1/duty.
+>
+> **Take the idle reading first.** The write cost is the difference, not the absolute.
+>
+> **The card is the whole variable.** The module has no active component at all — four
+> 10 kΩ pull-ups and two capacitors is its entire parts list ([C.6.6](../hardware/receiving-inspection.md#c6--micro-sd-card-reader-sku-11566))
+> — so what is being measured is flash programming inside the card. Write current varies
+> enormously between cards, so measure the one that will fly.
+>
+> **If you would rather not break the circuit**, the go/no-go question has a simpler
+> answer: meter on DC volts across the 3V3 rail during the burst. If it holds 3.3 V the
+> regulator is coping. That does not size a replacement part, but it does decide whether
+> one is needed.
 >
 > **Wiring for Gate 6** — the microSD shares SCK, MOSI and MISO with the RA-02 and has its
 > own chip select, so this is the same bus with one more wire:
@@ -383,6 +400,7 @@ computed airtime that has never been observed.
 | 6.1 | Card initialises | CMD0/CMD8/ACMD41 succeed | `sd_ok` in the health snapshot, or `cansat_bringup_firmware` | | |
 | 6.2 | Card type detected | SDHC (block-addressed) for any modern card | `high_capacity()` | | |
 | 6.3 | Single block write time | — | Time 100 `write_block` calls | | |
+| 6.3b | **Sustained write current** | — (this is the Gate 2 input) | Meter in series with the module `3V3`, current range; note idle, run the 10 s burst, subtract | | |
 | 6.4 | Records written per telemetry packet | 2 (record + header) | Count blocks after N packets | | |
 | 6.5 | Log survives a power cut | Resumes at the right block, no data lost | Pull power mid-flight-test, reboot, read back | | |
 | 6.6 | Boot count increments | +1 per power session | `boot_count()` | | |
