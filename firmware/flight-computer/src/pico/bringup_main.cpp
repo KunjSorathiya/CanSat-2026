@@ -927,8 +927,10 @@ void report_shared_bus(const flight::Configuration& config) {
     if (!radio_ok || !card_ok) {
         if (card_ok && !radio_ok) {
             std::printf("\n   The card initialised on this same bus and read from it, so\n"
-                        "   SCK (GP%d), MOSI (GP%d), MISO (GP%d), GND and the 3V3 rail are\n"
-                        "   all working. The radio's fault is therefore in what it does NOT\n"
+                        "   SCK (GP%d), MOSI (GP%d) and MISO (GP%d) all carry data, and the\n"
+                        "   card's supply is sound. (That does not prove MISO reaches a\n"
+                        "   clean idle HIGH - only writes need that.) The radio's fault is\n"
+                        "   therefore in what it does NOT\n"
                         "   share: NSS on GP%d, RESET on GP%d, or the module's own VCC and\n"
                         "   GND pins. Check those three and nothing else.\n",
                         flight::BoardPins::spi_sck, flight::BoardPins::spi_mosi,
