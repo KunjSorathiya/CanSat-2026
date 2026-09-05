@@ -381,6 +381,39 @@ def main() -> int:
             any("TBD" not in row.split("|")[3] for row in rows),
             f"{len(rows)} row(s)")
 
+    # A question the bench closed must not survive as an open one anywhere else. The bring-up
+    # record settled the barometer variant and both I2C straps on 2026-09-05; four documents
+    # went on asking for them -- one calling the variant "blocking", one asking for a die
+    # photograph the register made unnecessary, and two unticked checkboxes. Somebody working
+    # a checklist would have redone work already done, or treated a cleared blocker as one.
+    #
+    # Keyed on the measured value, so each entry disarms itself if the measurement is ever
+    # withdrawn: no evidence in the record, no obligation on the documents.
+    settled = (
+        ("0x58", "the barometer variant",
+         ("BMP280 or BME280** | **Unresolved",
+          "[ ] **BMP280 confirmed against BME280",
+          "**Resolve BMP280 against BME280.**",
+          "BMP280-against-BME280 still unresolved",
+          "- The **BMP280 die**, to settle BMP280 against BME280.")),
+        ("0x76", "the I2C strap directions",
+         ("[ ] **I2C strap directions read",
+          "- Confirm BMP280 SDO/address wiring and MPU-9250 AD0 strap direction.")),
+    )
+    for value, subject, stale_phrases in settled:
+        if value not in bringup:
+            continue  # not measured: the documents are entitled to keep asking
+        survivors = []
+        for doc in markdown:
+            if "audit" in doc.parts or doc.name == "CHANGELOG.md":
+                continue
+            text = doc.read_text(encoding="utf-8", errors="replace")
+            for phrase in stale_phrases:
+                if phrase in text:
+                    survivors.append(f"{doc.relative_to(REPO_ROOT).as_posix()}: {phrase[:40]}")
+        checker.check(f"no document still asks for {subject}",
+                      not survivors, "; ".join(survivors[:3]))
+
     # A document that talks about the magnetometer has to say that this vehicle does not
     # have one. The nine-axis design is still worth documenting -- the code implements it
     # and a real MPU-9250 would run it -- but a reader must never be left believing the

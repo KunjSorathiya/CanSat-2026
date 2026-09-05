@@ -14,7 +14,7 @@ The architecture is based on the confirmed hardware list and the current require
 | SX1278 RA-02 433 MHz LoRa module | 1 | Onboard telemetry radio | Confirmed hardware; electrical integration TBD |
 | MPU-9250 (delivered: **MPU-6500**) | 1 | Gyroscope and accelerometer | Sold as a nine-axis MPU-9250; `WHO_AM_I` read `0x70` on 2026-09-05, an MPU-6500 with six axes and no magnetometer ([F-1](../hardware/receiving-inspection.md#findings)). Answers at `0x68`; `0x0C` never does |
 | NEO-6M GPS with EEPROM | 1 | GPS sensor and possible additional telemetry source | Confirmed hardware; exact board documentation TBD |
-| GY-BMP280-3.3 | 1 | Pressure, altitude-related, and temperature measurement | Confirmed hardware; answers at `0x76`, so SDO is strapped low. BMP280-against-BME280 still unresolved |
+| GY-BMP280-3.3 | 1 | Pressure, altitude-related, and temperature measurement | Confirmed hardware. Chip ID `0x58` on 2026-09-05 — a BMP280, not a BME280 ([F-4](../hardware/receiving-inspection.md#findings)); answers at `0x76`, so SDO is strapped low |
 | Micro SD card reader | 1 | Onboard data storage | Confirmed hardware; breakout variant and documentation TBD |
 | Orange 3.7 V 1500 mAh 25C 1S LiPo | 1 | Primary power source | Confirmed hardware |
 | AMS1117-3.3 regulator module | TBD | Previously planned 3.3 V peripheral rail | Not recommended for direct 1S-to-3.3 V regulation |

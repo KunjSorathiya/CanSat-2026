@@ -470,8 +470,8 @@ results in [documentation/testing](../testing/).
 - [x] microSD reader supply resolved: 3.3 V board, no regulator, no level shifter, one rail
 - [x] Antenna, cable and RA-02 shown to mate with no adapter
 - [x] Fitted pull-up values read: 10 kΩ on both I2C breakouts, 10 kΩ on the microSD reader
-- [ ] **I2C strap directions read** — AD0 and SDO decide `0x68`/`0x69` and `0x76`/`0x77`
-- [ ] **BMP280 confirmed against BME280** — die photograph or chip-ID read
+- [x] **I2C strap directions read, 2026-09-05** — the bus scan answers it without a meter: the IMU replies at `0x68` and the barometer at `0x76`, so AD0 and SDO are both strapped low
+- [x] **BMP280 confirmed against BME280, 2026-09-05** — chip ID `0xD0` returned `0x58`; a BME280 answers `0x60` ([F-4](../hardware/receiving-inspection.md#findings))
 - [x] **NEO-6M supply resolved by operation, 2026-09-05** — clean NMEA on the Pico's 3.3 V rail
 - [ ] MPU-9250 and NEO-6M regulator part numbers still unread — a curiosity now, not a blocker
 - [ ] microSD write-transient current measured against the regulator's capability

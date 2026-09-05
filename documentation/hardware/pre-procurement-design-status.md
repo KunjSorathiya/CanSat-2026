@@ -102,15 +102,15 @@ These items genuinely require the delivered boards, markings, photographs, schem
 - ~~Confirm exposed interfaces and pin labels.~~ **Transcribed for all three** - see [wiring.md](../design/wiring.md#module-header-pinouts-as-printed).
 - Confirm onboard regulators, pull-ups, level shifting, and capacitors. **Partly done:** the MPU-9250 and NEO-6M each carry an unidentified SOT-23-5 regulator; the barometer carries none; pull-ups are 10 kOhm on both I2C boards; no level shifting anywhere. **The two regulator part numbers are still unread, so two input ranges are still unknown.**
 - ~~Confirm MPU-9250 INT exposure.~~ **`INT` is on the header.**
-- **Resolve BMP280 against BME280.** The variant tick box is unmarked and the die text illegible. Blocking.
-- Confirm BMP280 SDO/address wiring and MPU-9250 AD0 strap direction. *(Meter - neither is visible.)*
+- ~~Resolve BMP280 against BME280.~~ **A BMP280.** Chip ID `0xD0` returned `0x58` on 2026-09-05; a BME280 answers `0x60`. The variant tick box is unmarked and the die text illegible, so the register settled what the silkscreen could not.
+- ~~Confirm BMP280 SDO/address wiring and MPU-9250 AD0 strap direction.~~ **Both strapped low**, answered by bus scan rather than by meter: the barometer replies at `0x76` and the IMU at `0x68`, 2026-09-05.
 - ~~Confirm GPS TX/RX arrangement.~~ **4 pins, `VCC RX TX GND`**, naming the board's own pins. Logic levels still unmeasured.
 
 ### Battery and RF Hardware
 
 - ~~Confirm battery label and connector.~~ **Pro-Range, not Orange**; `1 Cell 3.7V 25C`, 1500 mAh; red JST-RCY main lead and white 2-pin JST-XH balance lead, **neither of which mates with anything in this project**.
-- Confirm battery polarity. *(Meter. Lead colour is a convention, not evidence.)*
-- Confirm protection and charging information. **No protection board is visible, and the label states no charge current and no cutoff voltage.** No Pro-Range document has been located, and **no 1S charger was supplied or is on the BOM**.
+- ~~Confirm battery polarity.~~ **Red is positive**, read on a meter at 3.92 V open-circuit, 2026-09-05. Lead colour is a convention, not evidence, and now it is not the evidence being relied on.
+- Confirm protection and charging information. **Partly done.** No protection board is visible, the label states no charge current and no cutoff voltage, and no Pro-Range document has been located. A 1S charger was bought separately on 2026-09-05 ([F-7](receiving-inspection.md#findings)) — none was supplied and none is on the BOM — and its model still has to reach the Part A tools table. **The absent charge parameters are what keeps this item open.**
 - **Resolve SMA versus RP-SMA.** The antenna shell is female and the cable's is male - agreeing with the supplier listing, contradicting the BOM - but neither centre contact was photographed. Open.
 - ~~Confirm IPEX connector variant and mating with the RA-02.~~ **IPEX-1 / u.FL, mated.**
 - Check connector retention and continuity before power or RF operation. *(Meter.)*

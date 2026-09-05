@@ -10,6 +10,35 @@ development cycle.
 
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
+### Fixed — questions the bench closed that four documents went on asking
+
+The barometer variant was settled on 2026-09-05 by the only method that settles it: chip ID
+`0xD0` returned `0x58`, and a BME280 answers `0x60`. The finding was written up and closed.
+Four documents never heard.
+
+- `hardware.md` listed the variant as **Unresolved**, status `TBD - blocking`, and its
+  explanatory paragraph still instructed the reader to resolve it by die photograph or
+  chip-ID read.
+- `pre-procurement-design-status.md` listed it as **Blocking**.
+- `wiring.md` carried it as an unticked box under *Open items before any wiring is built*.
+- `photos/README.md` still asked for a macro photograph of the die.
+
+The same bus scan settled both I2C strap directions — the IMU replies at `0x68` and the
+barometer at `0x76`, so `AD0` and `SDO` are both low — and two documents still asked for
+them, one specifying a meter for a question the scan had already answered without one.
+Battery polarity and the 1S charger were closed too, and still listed as open; the charger
+item was genuinely half-open, and now says which half — the label's absent charge current
+and cutoff voltage.
+
+Somebody working that checklist would have redone work already done, or treated a cleared
+blocker as one.
+
+**The gate is keyed on the measurement, not on the date.** `check_doc_claims.py` now holds
+a short table of settled values against the phrases that must not survive them: if the
+bring-up record carries `0x58`, no document may still ask which variant this is. Each entry
+disarms itself if the measurement is ever withdrawn — no evidence in the record, no
+obligation on the documents.
+
 ### Fixed — three measurements that never reached the table they were taken for
 
 The bench settled the IMU's `WHO_AM_I`, its I2C address and the barometer's on 2026-09-05,

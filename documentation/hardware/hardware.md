@@ -235,7 +235,7 @@ Verified from the delivered board, receiving inspection 2026-09-04:
 | Item | Observed | Status |
 |---|---|---|
 | Board marking | The shared purple artwork `GY-BM ☐E/☐P 280`, one tick box per variant | VERIFIED FROM HARDWARE |
-| **BMP280 or BME280** | **Unresolved.** Neither variant box is legibly marked and the die text is below the photograph's resolution | TBD - blocking |
+| **BMP280 or BME280** | **BMP280, settled by register on 2026-09-05.** Chip ID `0xD0` returned `0x58`; a BME280 answers `0x60`. Neither variant box is legibly marked and the die text is below the photograph's resolution, so the silkscreen never settled it | VERIFIED FROM HARDWARE ([F-4](receiving-inspection.md#findings)) |
 | Pin count and labels | **Six pins**: `VCC  GND  SCL  SDA  CSB  SDO` - the I2C/SPI variant, not the 4-pin I2C-only board | VERIFIED FROM HARDWARE |
 | Onboard regulator | **None.** The board carries the sensor, four resistors and two capacitors, and nothing else | VERIFIED FROM HARDWARE |
 | Fitted pull-ups | Four resistors marked `103` (10 kΩ) | VERIFIED FROM HARDWARE |
@@ -245,10 +245,11 @@ Verified from the delivered board, receiving inspection 2026-09-04:
 design intends; a 5 V source would destroy it. That is now a verified constraint rather than
 an inference from the product name.
 
-The BMP280-or-BME280 question is not cosmetic. A BME280 answers chip-ID `0x60` where a
+The BMP280-or-BME280 question was not cosmetic. A BME280 answers chip-ID `0x60` where a
 BMP280 answers `0x58`, and it reports a humidity channel the telemetry format has no field
-for. Resolve it by a macro photograph of the die or by reading the chip-ID register at
-bring-up - **not from the product name**.
+for. It was settled the only way that settles it - by reading the chip-ID register, **not
+from the product name**: `0xD0` returned `0x58` on 2026-09-05. The die photograph was never
+needed.
 
 | Item | IC-level documented value or status | Breakout-board status | Source |
 |---|---|---|---|

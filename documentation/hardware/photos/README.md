@@ -26,7 +26,7 @@ Taken 2026-09-04, on delivery. Transcribed in
 Outstanding re-shoots, all macro:
 
 - Both RF **mating faces**, straight on — the only way to settle SMA against RP-SMA.
-- The **BMP280 die**, to settle BMP280 against BME280.
+- ~~The **BMP280 die**, to settle BMP280 against BME280.~~ Settled by register instead on 2026-09-05: chip ID `0xD0` returned `0x58` ([F-4](../receiving-inspection.md#findings)). A photograph is no longer needed for this.
 - The **MPU-9250, NEO-6M and microSD regulator markings** — all SOT-23 parts whose text is
   below these photographs' resolution.
 
