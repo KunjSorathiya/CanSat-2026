@@ -165,7 +165,7 @@ class Transport:
         pass
 
 
-# A raw-log line is "<ISO 8601 receipt time>	<escaped payload>". No telemetry packet
+# A raw-log line is "<ISO 8601 receipt time> TAB <escaped payload>". No telemetry packet
 # begins with a date, so a line in this shape is unambiguously one of ours.
 _RAW_LOG_LINE = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\t]*\t(.*)$")
 

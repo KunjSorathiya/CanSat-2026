@@ -172,5 +172,6 @@ know where this pass has already been.
 | Documented commands | run as written, from the directory each document names | All pass |
 | Internal links | every relative Markdown link resolved | 0 broken |
 | Web console | driven in a browser, demo and injected packets | No console errors |
+| Fresh clone | `git clone`, then the whole suite and a documented command, with no prior build state | All pass — every fixture and sample this pass added is tracked, and nothing depends on a built artefact |
 
 Each fix was additionally verified by reverting the change and confirming its test fails.
