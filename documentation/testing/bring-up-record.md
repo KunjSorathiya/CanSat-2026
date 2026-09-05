@@ -355,6 +355,17 @@ computed airtime that has never been observed.
 
 ## Gate 6 · Storage
 
+> **6.6 is the dual-header resume mechanism, proved on hardware.** The log came back from a
+> power cycle at the right place: boot count up by exactly one, and the CSV column header
+> still written once rather than once per boot. That is `RawBlockLog` reading its header off
+> the card, believing it, and continuing — which is the whole reason the header is written
+> after *every* record and kept in two alternating copies. A brownout mid-flight must not
+> make the next boot overwrite the flight it just recorded.
+>
+> Note that the boot count tracks **logger initialisations, not power cycles.** A run that
+> never reaches the logger does not increment it, which is why the sequence read 1 then 2
+> across three sessions.
+
 > **Gate 2's SD question is answered, and the answer is decisive.** The rail was watched on
 > DC volts through the 10-second sustained burst — **100 % duty, 324 writes per second** — and
 > held **3.28–3.30 V**. A 20 mV droop on a 3.3 V rail is 0.6 %, against a card specified to
@@ -440,7 +451,7 @@ computed airtime that has never been observed.
 | 6.3b | **Sustained write load** | — (this is the Gate 2 input) | Meter in series for a current; **or DC volts across the rail for the go/no-go** | **3246 writes in 10.0 s — 324 writes/s, 162 KiB/s, at 100.0 % duty.** Current not taken; the series connection would not hold. **Instead the 3V3 rail was watched under that load and held 3.28–3.30 V** | ✅ 2026-09-05 / KS — decisive for the design question, though not a current figure |
 | 6.4 | Records written per telemetry packet | 2 (record + header) | Count blocks after N packets | | |
 | 6.5 | Log survives a power cut | Resumes at the right block, no data lost | Pull power mid-flight-test, reboot, read back | | |
-| 6.6 | Boot count increments | +1 per power session | `boot_count()` | **boot_count = 1, records = 1, truncated = 0.** The one record is the CSV column header a fresh log writes, so that path works. **Still to do: power-cycle and confirm it reads 2** | ⚠️ 2026-09-05 / KS — first half only |
+| 6.6 | Boot count increments | +1 per power session | `boot_count()` | **1 on the fresh log, 2 after a power cycle — exactly one increment.** `records` stayed at **1** across both, so the CSV column header was written once and not repeated. `truncated = 0` | ✅ 2026-09-05 / KS |
 | 6.6a | Records cut to fit a block | **0** — the widest possible row is 402 bytes against a 511-byte limit, 109 to spare | `truncated_records()`, reported by `cansat_bringup_firmware` at 6.6 | | |
 | 6.7 | Records recovered after impact | All up to the last write | Read the card after a drop test | | |
 
