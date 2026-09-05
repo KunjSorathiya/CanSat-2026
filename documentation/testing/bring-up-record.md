@@ -348,6 +348,15 @@ computed airtime that has never been observed.
 
 ## Gate 6 · Storage
 
+> **The log file was located successfully on 2026-09-05**, which is the first exercise of the
+> FAT32 lookup on real hardware: `FLIGHT.CSV` at **LBA 33152, 131072 blocks available**. That
+> is exactly the 64 MiB the prep script allocated, so the contiguity check passed across every
+> cluster - the file is in one piece and the log can be written linearly into it.
+>
+> **The card is an HP mx310 64 GB, which is SDXC**, and 64 GB cards ship formatted exFAT.
+> `FatVolume` reads FAT32 only, so the card had to be reformatted - Windows will not do that
+> above 32 GB through its own dialog, and Rufus's `Large FAT32` mode was used.
+
 > ⚠️ **The write test destroys the filesystem on the card.** The vehicle logs raw 512-byte
 > blocks with no filesystem at all, and the log starts at **LBA 2048** — exactly where a
 > FAT32 partition begins on a card formatted the usual way. After any write test the card
@@ -397,8 +406,8 @@ computed airtime that has never been observed.
 
 | # | Quantity | Predicted | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|
-| 6.1 | Card initialises | CMD0/CMD8/ACMD41 succeed | `sd_ok` in the health snapshot, or `cansat_bringup_firmware` | | |
-| 6.2 | Card type detected | SDHC (block-addressed) for any modern card | `high_capacity()` | | |
+| 6.1 | Card initialises | CMD0/CMD8/ACMD41 succeed | `sd_ok` in the health snapshot, or `cansat_bringup_firmware` | **Complete.** 32 ms in ACMD41, 1 CMD0 attempt, on an HP mx310 64 GB. Reached only after [the CMD0 fix](#gate-6--storage) - the first attempt on this card returned `0x1F` | ✅ 2026-09-05 / KS |
+| 6.2 | Card type detected | SDHC (block-addressed) for any modern card | `high_capacity()` | **Block-addressed.** The delivered card is an HP mx310 64 GB, so SDXC rather than SDHC - the same addressing mode, which is what this row actually tests | ✅ 2026-09-05 / KS |
 | 6.3 | Single block write time | — | Time 100 `write_block` calls | | |
 | 6.3b | **Sustained write current** | — (this is the Gate 2 input) | Meter in series with the module `3V3`, current range; note idle, run the 10 s burst, subtract | | |
 | 6.4 | Records written per telemetry packet | 2 (record + header) | Count blocks after N packets | | |
