@@ -88,6 +88,19 @@ class Checker:
         return 1 if failed else 0
 
 
+# A note on how these checks are written, learned the hard way in this file.
+#
+# A check that asks "does this string appear in that document" passes a document whose
+# facts have come apart from each other. Two hardware documents named the delivered IMU in
+# one section and asserted the opposite in another; the wiring gate would have passed a
+# table whose pins and signal names had been shuffled against each other, since every pin
+# and every name was still present. Where a claim is really about two things belonging
+# together -- a pin and its signal, a column and its mapping, a part and the paragraph
+# discussing it -- the check is scoped to the row or the paragraph, not the file.
+#
+# Where a check is genuinely file-wide, it is because the claim is: this document mentions
+# this thing at all.
+
 def main() -> int:
     checker = Checker()
 
@@ -229,8 +242,14 @@ def main() -> int:
         match = re.search(rf"\b{name}\s*=\s*(\d+)", config)
         actual = int(match.group(1)) if match else None
         checker.check(f"config: {name} on GP{expected}", actual == expected, str(actual))
+        # Both on the same row, not merely both somewhere in the file. The file-wide form
+        # of this check would pass a table whose pins and signal names had been shuffled
+        # against each other, which is the one way this table can be wrong and still look
+        # right.
+        row = next((ln for ln in wiring.splitlines()
+                    if ln.startswith(f"| GP{expected} |")), "")
         checker.check(f"wiring.md lists GP{expected} for `{name}`",
-                      f"| GP{expected} |" in wiring and f"`{name}`" in wiring)
+                      bool(row) and f"`{name}`" in row, row[:70])
         # The quick start carries its own copy of this table -- the one somebody actually
         # wires from, with the board in front of them. A pin changed in the firmware and
         # not here sends a builder to the wrong hole.
@@ -614,10 +633,14 @@ def main() -> int:
     sd_columns = [c for c in "".join(re.findall(r'"([^"]*)"', header_literal)).split(",") if c]
     ground_columns = re.findall(r'"([a-z_]+)"', read("ground-station/software/src/logger.py")
                                 .split("CSV_FIELDS = [")[1].split("]")[0])
-    missing_from_runbook = [c for c in sd_columns if f"`{c}`" not in runbook]
+    # In a table row, not merely somewhere in the document. `packet_number` appears in the
+    # runbook's prose as well, and a column that is only mentioned in passing is not mapped
+    # -- which is the whole point of the table this checks.
+    runbook_rows = "\n".join(ln for ln in runbook.splitlines() if ln.lstrip().startswith("|"))
+    missing_from_runbook = [c for c in sd_columns if f"`{c}`" not in runbook_rows]
     checker.check(f"runbook.md maps all {len(sd_columns)} onboard SD log columns",
                   not missing_from_runbook, ", ".join(missing_from_runbook))
-    missing_ground = [c for c in ground_columns if f"`{c}`" not in runbook]
+    missing_ground = [c for c in ground_columns if f"`{c}`" not in runbook_rows]
     checker.check(f"runbook.md maps all {len(ground_columns)} ground CSV columns",
                   not missing_ground, ", ".join(missing_ground))
 

@@ -64,6 +64,36 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Changed — the checks that asked the wrong question
+
+The nine-axis rule failed because it asked *does this file mention the delivered part*
+rather than *does this paragraph contradict itself*. Two other checks written in this pass
+had the same shape, so they were re-examined rather than left to fail the same way later.
+
+**The wiring gate.** It checked that `| GP4 |` appeared in `wiring.md` and that `i2c_sda`
+appeared in `wiring.md` — separately. Swapping two signal names between rows leaves every
+pin and every name still present in the file, and the check passed it. Confirmed by doing
+exactly that:
+
+```text
+FAIL  wiring.md lists GP4 for `i2c_sda`   [| GP4 | I2C SDA | I2C0 | Bidirectional | ...]
+FAIL  wiring.md lists GP5 for `i2c_scl`   [| GP5 | I2C SCL | I2C0 | Output ...]
+```
+
+Both now have to be on the same row. That is the one way a pin table can be wrong and
+still look right, and it was the way the check could not see.
+
+**The log column mapping.** It checked that each column name appeared anywhere in the
+runbook — and `packet_number` appears in its prose too. Scoped to table rows, it
+immediately reported seven ground-side columns that were explained in a paragraph rather
+than mapped in a table. The check was right to insist: somebody joining two files wants a
+complete column list, not a paragraph to read around. Those seven are a table now, each
+saying which side it belongs to and what it records.
+
+The reasoning is written at the top of `check_doc_claims.py`, because the next person to
+add a check will reach for the file-wide form first — it is shorter, and it is wrong
+whenever the claim is really about two things belonging together.
+
 ### Fixed — the hardware documents still said the part was nine-axis, in the sections nobody reread
 
 The rule added earlier in this pass required any document mentioning the magnetometer to

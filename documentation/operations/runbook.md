@@ -328,17 +328,23 @@ and pressure, each against time or packet number.
    where a number without a unit is how a wrong number gets believed. The ground columns
    are named for the fields of the rulebook packet they came from.
 
-   Columns that exist on one side only are the point of the exercise, not a defect:
-   `receipt_time`, `valid`, `error`, `seq_missing` and `seq_note` are what the **ground
-   station** observed about the link, and have no meaning on the vehicle. `state` and
-   `fault_total` are what the **vehicle** knew about itself at the moment it transmitted.
+   Columns that exist on one side only are the point of the exercise, not a defect. Each
+   one answers a question the other side could not have been asked:
 
-   Two more are ground-side derivations rather than observations: `yaw_reference` says
-   whether the `yaw` column is magnetic or gyro-integrated, read from the packet's `YR-`
-   tag, and `heading` is that yaw converted to a compass bearing — present only when the
-   reference is magnetic, and therefore empty for every packet this vehicle sends, since
-   the delivered IMU is a six-axis MPU-6500 with no magnetometer
-   ([F-1](../hardware/receiving-inspection.md#findings)). `team_id` is on the ground side because the
+   | Column | Only in | What it records |
+   |---|---|---|
+   | `receipt_time` | ground | When the **ground station** received the packet, which is not when the vehicle sent it |
+   | `valid` | ground | Whether the packet parsed |
+   | `error` | ground | Why it did not, when it did not |
+   | `seq_missing` | ground | How many packets never arrived before this one |
+   | `seq_note` | ground | What the validator said about it — duplicate, out of order, reboot |
+   | `yaw_reference` | ground | Whether the `yaw` column is magnetic or gyro-integrated, read from the packet's `YR-` tag |
+   | `heading` | ground | That yaw as a compass bearing. Present only when the reference is magnetic, so **empty for every packet this vehicle sends** — the delivered IMU is a six-axis MPU-6500 with no magnetometer ([F-1](../hardware/receiving-inspection.md#findings)) |
+   | `state` | onboard | The mission state the **vehicle** was in when it transmitted |
+   | `fault_total` | onboard | Every fault it had raised by then, not just the active ones |
+
+   `team_id` is on the ground side because the vehicle already knows whose log it is
+   writing. `team_id` is on the ground side because the
    vehicle already knows whose log it is writing.
 
 ---
