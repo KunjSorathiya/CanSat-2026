@@ -8,7 +8,7 @@ wrong, fix it, prove the fix, prevent the class of defect from returning, commit
 command the documentation tells a reader to run
 **Baseline:** `e87d480`, the last commit of cycle 33 before this pass
 
-**Verdict:** ✅ **Pass. Twenty-nine findings, all fixed and all covered. Four would have cost
+**Verdict:** ✅ **Pass. Thirty-one findings, all fixed and all covered. Four would have cost
 a mission or a diagnosis: three produce wrong data, and one leaves a vehicle refusing to fly
 without saying why. The rest are documents that had stopped describing the software, or
 guarantees nothing was holding.**
@@ -32,7 +32,7 @@ the code still did what it said.
 ## Findings
 
 Numbering continues the software audit: the previous pass ended at F-42. F-43 to F-59 were
-found by reading; [F-60 to F-71](#second-wave--f-60-to-f-71) by comparing one
+found by reading; [F-60 to F-73](#second-wave--f-60-to-f-73) by comparing one
 machine-readable thing against another.
 
 | # | Finding | Severity | Status |
@@ -57,7 +57,7 @@ machine-readable thing against another.
 
 ---
 
-## Second wave — F-60 to F-71
+## Second wave — F-60 to F-73
 
 The findings above were reached by reading. Once the obvious classes were closed, the way to
 find more was to stop reading and start **comparing one machine-readable thing against
@@ -79,6 +79,8 @@ comparison a script can repeat.
 | **F-69** | The quick start carries a second copy of the GPIO table, the one somebody wires from with the board in front of them, and nothing held it to the firmware | Low | ✅ Fixed |
 | **F-70** | Two of the nineteen fault codes the firmware can raise appeared in no document. One of them, `mag_unavailable`, is **standing on this vehicle right now** | Low | ✅ Fixed |
 | **F-71** | `validate_config()` names which of its thirty rules refused a configuration. The controller replaced that with `"configuration invalid"`, then latched a critical fault — leaving an operator a vehicle that will not fly and thirty candidates for why | **High** | ✅ Fixed |
+| **F-72** | The bring-up diagnostic's second I2C scan is headed *"AK8963 at `0x0C` **SHOULD** now appear"* — two lines after the same program prints *"SIX axes: there is no magnetometer in this package at all"*. An operator with the board in front of them goes hunting a wiring fault that does not exist | Medium | ✅ Fixed |
+| **F-73** | Both hardware documents named the delivered six-axis part in one section and asserted a *"genuine nine-axis part"* in another. **Both passed the rule written earlier in this pass to prevent exactly that**, because it asked whether the file mentions the delivered part rather than whether a paragraph contradicts itself | Medium | ✅ Fixed |
 
 ### What the second wave says about the first
 
@@ -91,6 +93,15 @@ way in.
 Two others, F-61 and F-66, are drift the shared fixtures were built to prevent and cannot
 see: fixtures hold implementations to one definition of *behaviour*, and both of these were
 disagreements about a **name**. Names now have their own checks.
+
+And F-73 is the one worth reading twice, because **a check written in this pass failed to
+catch what it was written for**. It asked whether a document mentions the delivered part
+anywhere, which two documents did while contradicting it three screens away. Re-examining
+the other checks written the same way found the wiring gate would have passed a table whose
+pins and signal names had been shuffled against each other — every pin and every name still
+present, none of them together. Where a claim is about two things *belonging together*, the
+check has to be scoped to the row or the paragraph, and that reasoning is now written at the
+top of `check_doc_claims.py` where the next person will meet it.
 
 ---
 
@@ -150,7 +161,7 @@ said, which was the subject of F-43.
 
 | | At `e87d480` | Now |
 |---|---:|---:|
-| Documented claims checked | 66 | **189** |
+| Documented claims checked | 66 | **191** |
 | C++ assertions | 4222 | **4268** |
 | Python tests | 131 | **158** |
 | Node tests | 37 | **49** |
@@ -206,6 +217,33 @@ know where this pass has already been.
 | Everything the [bring-up record](../testing/bring-up-record.md) still has blank | 61 of 79 rows. Needs hardware, and Gate 2 — power — has not been started at all |
 
 ---
+
+## What this pass would do differently
+
+Recorded because the method mattered more than any single finding.
+
+**Reading found the first seventeen. Comparison found the rest, faster.** Once the obvious
+classes were closed, reading the same code again returned almost nothing, while a script
+comparing the snapshot against the display found eight defects in one run. The transferable
+part is not *read everything* but: **find two representations of the same fact and diff
+them.** The snapshot against the dashboard, one parser's record against another's, the
+`FaultCode` enum against the fault table, the `add_test` calls against the documented count.
+
+**Executing a document beats reading it.** Four findings came from typing a documented
+command exactly as written — `packets.txt` did not exist, the raw-log replay returned
+`received=0`, the headless monitor printed nothing through a pipe, the install step
+installed nothing. None would have been found by reading the code those commands reach,
+and none by reading the document either.
+
+**A check can be wrong in the shape of the thing it checks.** F-73 was missed by a rule
+written in this same pass to prevent it. The rule asked whether a file mentions a fact;
+the defect was a paragraph contradicting it elsewhere in the same file. When a claim is
+about two things belonging together, scope the check to where they belong together.
+
+**Reverting the fix to watch the test fail is worth the minute it costs.** Every fix here
+was confirmed that way, and one of them — the raw-log replay — proved the test was checking
+something the old code already satisfied, which meant writing a sharper one.
+
 
 ## Audit trail
 
