@@ -504,7 +504,10 @@ def main() -> int:
 
     dangling: list[str] = []
     for doc in markdown:
-        if "audit" in doc.parts:
+        # The changelog is excluded for the same reason the audits are: an entry recording
+        # that `test_mpu_scaling` became `test_imu_scaling` has to be able to write the old
+        # name down.
+        if "audit" in doc.parts or doc.name == "CHANGELOG.md":
             continue
         body = doc.read_text(encoding="utf-8", errors="replace")
         rel = doc.relative_to(REPO_ROOT).as_posix()
@@ -539,6 +542,24 @@ def main() -> int:
                 stale_paths.append(f"{rel}:{line} {named}")
     checker.check("every repository path named in the documentation exists",
                   not stale_paths, "; ".join(stale_paths[:3]))
+
+    # The requirements checklist opens by saying how many rows are marked Complete. That
+    # sentence is the first thing a reader of a compliance document sees, and it is a count
+    # of the table directly beneath it -- which is exactly the kind of number that is
+    # updated once and then never again.
+    requirements = read("documentation/requirements/requirements.md")
+    complete_rows = len(re.findall(r"^\| [A-Z]{3}-[0-9a-z]+ \|.*\| Complete \|",
+                                   requirements, re.MULTILINE))
+    checker.check(f"requirements.md counts its own {complete_rows} Complete rows",
+                  f"{complete_rows} of the requirements" in requirements, str(complete_rows))
+    # And no row may claim Complete without naming its evidence, which is the rule the
+    # document states about itself two paragraphs earlier.
+    unevidenced = [row.split("|")[1].strip()
+                   for row in re.findall(r"^\| [A-Z]{3}-[0-9a-z]+ \|.*\| Complete \|.*$",
+                                         requirements, re.MULTILINE)
+                   if not row.rstrip().rstrip("|").rsplit("|", 1)[-1].strip()]
+    checker.check("every Complete requirement names its evidence",
+                  not unevidenced, ", ".join(unevidenced[:5]))
 
     counts = suite_counts()
     if counts is None:

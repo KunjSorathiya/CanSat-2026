@@ -15,11 +15,17 @@ Confirmed hardware is recorded in the implementation column, but possession does
 
 ## Requirements Checklist
 
-**Status as of 2026-09-04:** 23 of the requirements whose acceptance can be judged from
-software are marked `Complete`, each with a named test in the Evidence column. None is
-marked `Verified`: that word is reserved for evidence from hardware, and the vehicle has
-never been powered. Every remaining row depends on procurement, the power design, the
-mechanical build or a launch.
+**Status as of 2026-09-05:** 32 of the requirements whose acceptance can be judged
+from software are marked `Complete`, each with a named test in the Evidence column. None is
+marked `Verified`: that word is reserved for evidence from hardware, and while the IMU, the
+barometer, the GPS and the radio have now each read on the bench, no requirement has been
+demonstrated end to end on a powered vehicle. Every remaining row depends on procurement,
+the power design, the mechanical build or a launch.
+
+The sensor rows were the last block still describing the pre-implementation project —
+`SEN-001` to `SEN-009` said "integration - TBD" while the telemetry rows carrying the same
+quantities were already `Complete`, so the same fact held two statuses on one page. They now
+carry the implementation that exists and the tests that cover it.
 
 
 | ID | Requirement | Source | Priority | Implementation | Verification Method | Status | Evidence |
@@ -64,18 +70,18 @@ mechanical build or a launch.
 | TEL-024 | Pre-launch testing LoRa sync word must be `0xF3`. | Rulebook - LoRa Configuration | Mandatory | `0xF3` selected by `RadioMode::test`, the default | Test using `0xF3` and confirm isolation from launch mode. | Complete | `test_link_profile_is_shared_by_both_ends`; `flight_smoke_test` asserts the sync word |
 | TEL-025 | The launch configuration must not use another team's sync word during its launch. | Rulebook - LoRa Configuration | Mandatory | Launch configuration procedure - TBD | Review procedure and inspect configured sync word. | Not Started | |
 | TEL-026 | Other CanSats must remain powered off during another team's launch. | Rulebook - LoRa Configuration | Mandatory | Team operating procedure - TBD | Review and rehearse launch-day procedure. | Not Started | |
-| SEN-001 | The CanSat must measure altitude. | Rulebook - Sensor Requirements | Mandatory | GY-BMP280-3.3; integration and altitude method - TBD | Sensor test, calibration, and altitude validation. | Not Started | |
-| SEN-002 | The CanSat must measure pressure. | Rulebook - Sensor Requirements | Mandatory | GY-BMP280-3.3; interface - TBD | Compare readings against a controlled pressure test. | Not Started | |
-| SEN-003 | The CanSat must measure temperature. | Rulebook - Sensor Requirements | Mandatory | BMP280 temperature reading intended; integration - TBD | Validate readings and required telemetry formatting. | Not Started | |
-| SEN-004 | The CanSat must measure angular motion with a gyroscope. | Rulebook - Sensor Requirements | Mandatory | MPU-9250 gyroscope, +/-2000 deg/s, bias estimated on the pad | Verify all axes and calibration in a sensor test. | Not Started | |
+| SEN-001 | The CanSat must measure altitude. | Rulebook - Sensor Requirements | Mandatory | BMP280 pressure through the Bosch compensation, then the barometric formula against a pad reference taken at calibration | Sensor test, calibration, and altitude validation. | Complete | `test_bmp280_compensation_datasheet_vector`, `test_pressure_altitude` |
+| SEN-002 | The CanSat must measure pressure. | Rulebook - Sensor Requirements | Mandatory | BMP280 over I2C0 at `0x76`, compensated by the datasheet's 64-bit integer path | Sensor test and reading validation. | Complete | `test_bmp280_compensation_datasheet_vector` reproduces the datasheet reference vector |
+| SEN-003 | The CanSat must measure temperature. | Rulebook - Sensor Requirements | Mandatory | BMP280 temperature, from the same compensated burst read as pressure | Validate readings and required telemetry formatting. | Complete | `test_bmp280_compensation_datasheet_vector` |
+| SEN-004 | The CanSat must measure angular motion with a gyroscope. | Rulebook - Sensor Requirements | Mandatory | IMU gyroscope at +/-2000 deg/s, datasheet sensitivities, bias estimated on the pad | Verify all axes and calibration in a sensor test. | Complete | `test_imu_scaling`, `test_imu_range_bits_match_their_sensitivities`, `test_startup_calibrator_stationary_and_moving`; bias and noise measured on hardware, bring-up rows 3.3 and 3.4 |
 | SEN-004a | The CanSat measures the magnetic field, for yaw reference. | Project addition | Supporting | Designed around the AK8963 inside an MPU-9250 — 16-bit, 100 Hz, axis-mapped into the body frame. **The delivered part is an MPU-6500 with no magnetometer** (`WHO_AM_I` `0x70`; `0x0C` never answers), so nothing implements this on the current hardware | Blocked on a nine-axis part. The driver, axis mapping and calibration are tested against a simulated device. | **Blocked — part absent** ([F-1](../hardware/receiving-inspection.md#findings)) | `test_magnetometer_conversions`, `test_magnetometer_axes_are_rotated_into_the_body_frame` |
-| SEN-005 | The CanSat must measure X acceleration. | Rulebook - Sensor Requirements | Mandatory | MPU-9250; pin/interface - TBD | Static and controlled-motion test. | Not Started | |
-| SEN-006 | The CanSat must measure Y acceleration. | Rulebook - Sensor Requirements | Mandatory | MPU-9250; pin/interface - TBD | Static and controlled-motion test. | Not Started | |
-| SEN-007 | The CanSat must measure Z acceleration. | Rulebook - Sensor Requirements | Mandatory | MPU-9250; pin/interface - TBD | Static and controlled-motion test. | Not Started | |
-| SEN-008 | Roll data must be generated and transmitted. | Rulebook - Mandatory Telemetry Fields | Mandatory | MPU-9250 orientation processing - TBD | Validate against known orientations. | Not Started | |
-| SEN-009 | Pitch data must be generated and transmitted. | Rulebook - Mandatory Telemetry Fields | Mandatory | MPU-9250 orientation processing - TBD | Validate against known orientations. | Not Started | |
+| SEN-005 | The CanSat must measure X acceleration. | Rulebook - Sensor Requirements | Mandatory | IMU accelerometer over I2C0 at `0x68`, GP4/GP5 | Static and controlled-motion test. | Complete | `test_imu_scaling`, `test_imu_range_bits_match_their_sensitivities` |
+| SEN-006 | The CanSat must measure Y acceleration. | Rulebook - Sensor Requirements | Mandatory | Same device and interface as SEN-005 | Static and controlled-motion test. | Complete | `test_imu_scaling` |
+| SEN-007 | The CanSat must measure Z acceleration. | Rulebook - Sensor Requirements | Mandatory | Same device and interface as SEN-005 | Static and controlled-motion test. | Complete | `test_imu_scaling`; stationary magnitude measured at 1 g on hardware, bring-up row 3.2 |
+| SEN-008 | Roll data must be generated and transmitted. | Rulebook - Mandatory Telemetry Fields | Mandatory | Mahony quaternion filter, roll seeded directly from the first accelerometer sample and corrected by gravity thereafter | Validate against known orientations. | Complete | `test_orientation_levels_and_yaw`, `test_orientation_survives_the_wrap_and_the_poles` |
+| SEN-009 | Pitch data must be generated and transmitted. | Rulebook - Mandatory Telemetry Fields | Mandatory | Same filter as SEN-008; pitch is absolutely referenced by gravity | Validate against known orientations. | Complete | `test_orientation_levels_and_yaw`, `test_orientation_survives_the_wrap_and_the_poles` |
 | SEN-010 | Yaw data must be generated and transmitted in an organizer-acceptable form. | Rulebook - Mandatory Telemetry Fields | Mandatory | Yaw is generated and transmitted, declared `YR-G`. Nine-axis fusion to an absolute magnetic yaw is implemented and would run on an MPU-9250; **the delivered MPU-6500 has no magnetometer**, so this vehicle transmits a relative yaw only | Obtain clarification; bring-up gates 8.11 to 8.14 test it on hardware. | Implemented; acceptance TBD | `test_magnetic_yaw_is_tilt_compensated` |
-| SEN-011 | Additional working sensors may be used for scoring. | Rulebook - Sensor Requirements | Scoring | NEO-6M GPS is available as an additional sensor; integration - TBD | Demonstrate working GPS and document transmitted or logged data. | Not Started | |
+| SEN-011 | Additional working sensors may be used for scoring. | Rulebook - Sensor Requirements | Scoring | NEO-6M GPS, parsed from NMEA and transmitted as optional `GP-Lat`/`GP-Lon`/`GP-Alt` fields after every mandatory field | Demonstrate working GPS and document transmitted or logged data. | Implemented; **not yet demonstrated with a fix** | `test_gps_parser`, `test_gps_coordinate_validation`, `test_a_hemisphere_from_the_wrong_axis_is_rejected`; NMEA confirmed at 9600 baud on hardware (bring-up 4.1), but no fix has been acquired |
 | PWR-001 | The CanSat must have a manual ON/OFF switch. | Rulebook - Power / Functional Requirements | Mandatory | Switch hardware - TBD | Inspect hardware and perform repeated power-cycle test. | Blocked | |
 | PWR-002 | The CanSat must have a visible LED power indicator. | Rulebook - Power / Functional Requirements | Mandatory | LED hardware - TBD | Confirm visibility and measure immediate power-on behavior. | Blocked | |
 | PWR-003 | The power LED must turn on immediately when the CanSat is powered. | Rulebook - Power / Functional Requirements | Mandatory | LED power path - TBD | Observe startup across repeated power cycles. | Blocked | |

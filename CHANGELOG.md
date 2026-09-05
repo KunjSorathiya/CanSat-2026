@@ -64,6 +64,34 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — the requirements checklist held two statuses for the same fact
+
+`TEL-015` says roll must be transmitted, and was marked `Complete` with a named test.
+`SEN-008` says roll must be generated and transmitted, and was marked `Not Started` with an
+implementation column reading *"MPU-9250 orientation processing - TBD"*. One page, one
+fact, two statuses.
+
+`SEN-001` through `SEN-009` were the last block still describing the project as it was
+before the flight software existed: altitude, pressure, temperature, gyroscope, all three
+acceleration axes, roll and pitch, every one of them *"integration - TBD"* or
+*"pin/interface - TBD"*. The pins have been fixed and gated for weeks, the drivers are
+written and tested, and four of those sensors have since read on the bench.
+
+All nine now carry the implementation that exists and the tests that cover it, and the
+count in the opening paragraph moves from 23 to **32**. `SEN-011` gets the honest middle
+answer rather than either extreme: the GPS is implemented, parsed, transmitted and
+confirmed at 9600 baud on hardware, and **has never had a fix** — implemented, not
+demonstrated.
+
+Nothing moved to `Verified`. That word is reserved for hardware evidence, and no
+requirement has been demonstrated end to end on a powered vehicle.
+
+Two checks keep the page honest about itself: the count in that opening sentence is now
+read from the table beneath it, and **no row may claim `Complete` without naming its
+evidence** — which is the rule the document states about itself two paragraphs earlier, and
+was until now enforced by nobody. Emptying one evidence cell fails the build and names the
+requirement.
+
 ### Fixed — three mandatory requirements cited a test that does not exist
 
 `requirements.md` names a test for each requirement. That citation is the only thing
