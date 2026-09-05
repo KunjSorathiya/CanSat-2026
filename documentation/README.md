@@ -21,7 +21,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | Understand why telemetry runs at 1 Hz | [Link Budget](design/link-budget.md) |
 | Understand why sensors run at 30 Hz | [Sensor Rates](design/sensor-rates.md) |
 | See what changed recently | [Changelog](../CHANGELOG.md) |
-| Check the project against its own claims | [Repository Audit](audit/2026-09-04-repository-audit.md) |
+| Check the project against its own claims | [Repository Audit](audit/2026-09-04-repository-audit.md) · [Continuous Review](audit/2026-09-05-continuous-review.md) |
 
 ---
 
@@ -92,6 +92,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | Document | Contents |
 |---|---|
 | [2026-09-04-repository-audit.md](audit/2026-09-04-repository-audit.md) | File-by-file verification of code, documentation and claims |
+| [2026-09-05-continuous-review.md](audit/2026-09-05-continuous-review.md) | Seventeen findings from one continuous pass: what the repository claimed, and whether each claim was still true |
 
 ---
 
