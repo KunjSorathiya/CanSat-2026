@@ -173,7 +173,7 @@ bool SdCard::begin_with(const SdCardHal& hal) {
     }
 
     release();
-    if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, kRunBaud);
+    if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, run_baud_);
     stage_ = Stage::complete;
     ok_ = true;
     return true;
@@ -213,7 +213,7 @@ bool SdCard::read_block(std::uint32_t lba, std::uint8_t* out512) {
 
     // The bus is shared with the radio, which may have changed the clock. Set the rate
     // this transfer needs rather than assuming whatever the last user left behind.
-    if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, kRunBaud);
+    if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, run_baud_);
 
     select(true);
     if (command(17, addr, 0xFF) != 0x00) {  // CMD17: READ_SINGLE_BLOCK
@@ -240,7 +240,7 @@ bool SdCard::write_block(std::uint32_t lba, const std::uint8_t* in512) {
     if (!ok_ || in512 == nullptr) return false;
     const std::uint32_t addr = sdhc_ ? lba : lba * kBlockSize;
 
-    if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, kRunBaud);
+    if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, run_baud_);
 
     // Clear the captured bytes as well as the stage. A write that stops early never reaches
     // the later fields, and leaving the previous attempt's values in them presents a stale

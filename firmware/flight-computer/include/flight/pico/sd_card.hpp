@@ -42,6 +42,14 @@ public:
     static constexpr std::uint32_t kInitBaud = 400000;
     static constexpr std::uint32_t kRunBaud = 4000000;
 
+    // The clock reads and writes actually run at. It is kRunBaud unless something moves it,
+    // and the only thing that does is the bring-up diagnostic: a card that fails a write at
+    // 4 MHz and passes the same write at 400 kHz has a signal-integrity problem, and one
+    // that fails at both does not. That is a question a handheld meter cannot answer and
+    // this can, so the rate has to be reachable from outside.
+    void set_run_baud(std::uint32_t hz) { run_baud_ = hz; }
+    std::uint32_t run_baud() const { return run_baud_; }
+
     // Vehicle entry point: builds the Pico SDK bindings and calls begin_with().
     bool begin(spi_bus_t spi, std::uint32_t cs_gpio);
 
@@ -101,6 +109,7 @@ public:
     static const char* describe(Stage stage);
 
 private:
+    std::uint32_t run_baud_ = kRunBaud;
     void select(bool on);
     std::uint8_t transfer(std::uint8_t value);
     void clock_bytes(std::size_t n);

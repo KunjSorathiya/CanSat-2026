@@ -817,8 +817,54 @@ void report_sd() {
                     std::printf("   ...and a fresh init BROUGHT IT BACK. The card is not\n"
                                 "   damaged - it dropped out and recovered. Something took\n"
                                 "   it away at the first write, the first moment in this\n"
-                                "   run that it draws programming current. Put the meter on\n"
-                                "   3V3 at the module's OWN VCC pin, not at the Pico.\n");
+                                "   run that it draws programming current.\n");
+
+                    // Two probes, because "it dropped out" still has two causes and they
+                    // want opposite fixes. A write straight after a fresh init, with no
+                    // reads in between, asks whether the card is broken by the write itself
+                    // or by something before it. If that fails, the same write at 400 kHz
+                    // asks whether 4 MHz is the problem: a card that writes slowly and not
+                    // quickly has a signal-integrity fault, and one that fails at both has
+                    // a supply fault. A handheld meter cannot see a collapse that lasts a
+                    // few milliseconds; this can.
+                    std::uint8_t one[flight::pico::SdCard::kBlockSize];
+                    for (std::size_t k = 0; k < sizeof(one); ++k) {
+                        one[k] = static_cast<std::uint8_t>(k & 0xFF);
+                    }
+                    const bool fast_ok = card.write_block(kBaseLba, one);
+                    std::printf("\n   PROBE 1, one write straight after that init, at %lu Hz: %s\n",
+                                static_cast<unsigned long>(card.run_baud()),
+                                fast_ok ? "OK" : "FAILED");
+                    if (fast_ok) {
+                        std::printf("   So the card writes when freshly initialised. What\n"
+                                    "   breaks it is something between the init and the\n"
+                                    "   hundredth write, not the first write itself.\n");
+                    } else {
+                        describe_write_failure(card);
+                        card.begin(spi0, flight::BoardPins::sd_cs);
+                        card.set_run_baud(flight::pico::SdCard::kInitBaud);
+                        const bool slow_ok = card.write_block(kBaseLba, one);
+                        std::printf("\n   PROBE 2, the same write at %lu Hz: %s\n",
+                                    static_cast<unsigned long>(card.run_baud()),
+                                    slow_ok ? "OK" : "FAILED");
+                        card.set_run_baud(flight::pico::SdCard::kRunBaud);
+                        if (slow_ok) {
+                            std::printf("   It writes at 400 kHz and not at 4 MHz. That is\n"
+                                        "   SIGNAL INTEGRITY, not power: shorten the SPI\n"
+                                        "   jumpers, keep them off long breadboard runs, and\n"
+                                        "   give the card module its own ground wire back to\n"
+                                        "   Pico pin 38 rather than sharing a rail.\n");
+                        } else {
+                            describe_write_failure(card);
+                            std::printf("   It fails at both clocks, so the clock is not it.\n"
+                                        "   That leaves the module's SUPPLY: this board has\n"
+                                        "   no regulator and only two capacitors, so a write\n"
+                                        "   current spike arrives down whatever the 3V3 and\n"
+                                        "   GND jumpers can deliver. Re-seat both, use short\n"
+                                        "   ones, and fit the 470 uF bulk capacitor across\n"
+                                        "   the module's own 3V3 and GND.\n");
+                        }
+                    }
                 } else {
                     std::printf("   ...and a fresh init did not bring it back either.\n"
                                 "   Power-cycle the board before concluding anything about\n"
