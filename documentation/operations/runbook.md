@@ -296,10 +296,14 @@ and pressure, each against time or packet number.
    location — work only on copies.
 2. Export a clean CSV if needed. `replay` reads the raw log directly — it recognises the
    receipt timestamp and the escaping, so the file the flight produced is the file you
-   replay:
+   replay. **Send the output somewhere other than the directory being read**, or the
+   station appends to the log it is reading and the replay never ends:
    ```bash
-   python src/main.py replay logs/raw_packets.tsv --team CAN-Team-25 --export analysis/flight.csv
+   python src/main.py replay logs/raw_packets.tsv --team CAN-Team-25 --output analysis --export analysis/flight.csv
    ```
+   Leaving `--output` at its default of `logs` is refused rather than allowed to run, with
+   a message saying so — but the refusal is a stop, not a rescue, so pass `--output`.
+
    The summary line it prints (`received=… accepted=… rejected=…`) is worth reading before
    the graphs: `received=0` means the file is not what the command thinks it is.
 3. Produce the three mandatory graphs.

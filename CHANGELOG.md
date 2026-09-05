@@ -10,6 +10,33 @@ development cycle.
 
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
+### Fixed — the post-flight command ate the flight log it was meant to read
+
+The runbook's step 2 told an operator to replay `logs/raw_packets.tsv`, and left `--output`
+at its default of `logs`. The station therefore opened the file it was reading for append.
+The reader kept finding the lines the writer had just written, so the replay never ended,
+the flight's only forensic record filled with re-logged copies of itself, and the disk
+filled behind it. Run as written it reached **69 MB in under two minutes**, with the
+parsed CSV at 99 MB, before it was killed.
+
+This is the one documented command that is run over a real flight's only record. It is the
+one that must not damage it.
+
+- **The station refuses.** A replay whose input resolves to a file the logger would write
+  under the chosen `--output` is rejected before anything is opened, with a message naming
+  the conflict and the flag that resolves it. `main.py` prints that refusal rather than a
+  traceback and exits `2` — it is read by somebody standing over a recovered vehicle.
+- **The runbook passes `--output analysis`**, and says why. A test holds the document to
+  it, so the refusal never becomes the only thing standing between an operator and the
+  log.
+- **Three tests**: the refusal leaves the log byte-for-byte unchanged; the corrected
+  command still returns `30 / 30 / 0` and does not touch the input; and the runbook's own
+  line carries a separate `--output`.
+
+Refusing was the whole fix. Quietly writing somewhere else would lose the operator's chosen
+output location, and quietly snapshotting the input would still append rubbish to the
+flight log.
+
 ### Fixed — questions the bench closed that four documents went on asking
 
 The barometer variant was settled on 2026-09-05 by the only method that settles it: chip ID

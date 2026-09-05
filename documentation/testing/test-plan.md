@@ -100,7 +100,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **101 / 101 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **127 / 127 tests** |
+| Python ground station | 8 modules | ✅ **130 / 130 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **208 / 208 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **55 / 55 tests** |
@@ -352,7 +352,7 @@ fixture the web console reads too: every case escapes to its recorded form, unes
 to the original, and no escaped form contains a separator. The plain text is stored as hex
 because it is allowed to contain tabs and newlines — the same reason the log escapes it.
 
-### `test_documented_commands.py` — 5 tests
+### `test_documented_commands.py` — 8 tests
 
 The commands the documentation tells a reader to run, run. Two defects were found by typing
 documented commands in exactly the form the documents give them, and neither would have been

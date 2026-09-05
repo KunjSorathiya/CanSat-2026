@@ -132,3 +132,72 @@ class DocumentedCommandsAreRealTests(unittest.TestCase):
                     parser.parse_args(args)
                 except SystemExit:
                     self.fail(f"{source} documents a command argparse rejects: {argument_text}")
+
+
+class SelfFeedingReplayTests(unittest.TestCase):
+    """A replay must never append to the file it is reading.
+
+    The runbook's post-flight step read `logs/raw_packets.tsv` and left `--output` at its
+    default of `logs`, so the station opened the file it was reading for append. The reader
+    kept finding the lines the writer had just written: the replay never ended, the flight's
+    forensic log filled with re-logged copies of itself, and the disk filled behind it. It
+    reached 69 MB in under two minutes before the run was killed.
+
+    This is the one command in the documentation that is run over a real flight's only
+    record, so it is the one that must not damage it.
+    """
+
+    def test_a_replay_that_would_append_to_its_own_input_is_refused(self):
+        with tempfile.TemporaryDirectory() as work:
+            logs = Path(work) / "logs"
+            logs.mkdir()
+            raw = logs / "raw_packets.tsv"
+            raw.write_text(SAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
+            before = raw.read_bytes()
+
+            result = run_main("replay", str(raw), "--team", "CAN-Team-01",
+                              "--output", str(logs))
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("refusing to replay", result.stderr)
+            self.assertIn("--output", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            # The refusal must be a refusal: the log is byte-for-byte what it was.
+            self.assertEqual(raw.read_bytes(), before)
+
+    def test_the_same_replay_with_a_separate_output_directory_completes(self):
+        # The corrected form the runbook now documents. Without this the test above would
+        # pass for a station that refused every replay.
+        with tempfile.TemporaryDirectory() as work:
+            logs = Path(work) / "logs"
+            logs.mkdir()
+            raw = logs / "raw_packets.tsv"
+            log = PacketLog(raw_path=raw, parsed_path=logs / "telemetry.csv")
+            for line in SAMPLE.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    log.append(line.strip(), parse_packet(line.strip()).record, 0, "")
+            before = raw.read_bytes()
+
+            analysis = Path(work) / "analysis"
+            result = run_main("replay", str(raw), "--team", "CAN-Team-01",
+                              "--output", str(analysis),
+                              "--export", str(analysis / "flight.csv"))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            received, accepted, rejected = summary(result.stdout)
+            self.assertEqual((received, accepted, rejected), (30, 30, 0))
+            self.assertEqual(raw.read_bytes(), before, "the flight log was modified")
+
+    def test_the_runbook_sends_the_post_flight_replay_somewhere_else(self):
+        # The document half. The refusal protects an operator who types the old command;
+        # this keeps the document from telling them to.
+        runbook = (REPO_ROOT / "documentation" / "operations" / "runbook.md").read_text(
+            encoding="utf-8")
+        for line in runbook.splitlines():
+            if "replay logs/raw_packets.tsv" in line:
+                self.assertIn("--output", line,
+                              "the runbook replays the raw log back into logs/")
+                self.assertNotIn("--output logs", line)
+                break
+        else:
+            self.fail("the runbook no longer documents replaying the raw log")

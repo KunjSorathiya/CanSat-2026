@@ -38,7 +38,30 @@ class GroundStation:
         self.validator = StreamValidator(expected_team)
         self.health = LinkHealth()
         log_dir = Path(log_dir)
-        self.log = PacketLog(log_dir / "raw_packets.tsv", log_dir / "telemetry.csv")
+        # Replaying a file into the directory that file lives in makes the station append to
+        # the file it is reading. The reader keeps finding the lines the writer just wrote,
+        # so the replay never ends, the flight's forensic log fills with re-logged copies of
+        # itself, and the disk fills behind it. The runbook documented exactly that command
+        # for post-flight analysis -- read logs/raw_packets.tsv, write to the default logs
+        # directory -- and it destroys the record it was meant to examine.
+        #
+        # Refusing is the whole fix. Quietly writing somewhere else would still lose the
+        # operator's chosen output location, and quietly snapshotting the input would still
+        # append rubbish to the flight log.
+        source = getattr(transport, "path", None)
+        raw_log_path = log_dir / "raw_packets.tsv"
+        telemetry_path = log_dir / "telemetry.csv"
+        if source is not None:
+            source_path = Path(source).resolve()
+            for destination in (raw_log_path, telemetry_path):
+                if destination.resolve() == source_path:
+                    raise ValueError(
+                        f"refusing to replay {source}: it is the file this station would "
+                        f"write to with --output {log_dir}, so the replay would append to "
+                        f"its own input and never finish. Give --output a different "
+                        f"directory (for example --output analysis) to leave the flight "
+                        f"log as it was recorded.")
+        self.log = PacketLog(raw_log_path, telemetry_path)
         self.events: "queue.Queue[Event]" = queue.Queue(maxsize=event_queue_size)
 
         self._lock = threading.Lock()

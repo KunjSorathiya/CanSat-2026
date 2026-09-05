@@ -107,7 +107,7 @@ top of `check_doc_claims.py` where the next person will meet it.
 
 ---
 
-## Third wave — F-76 to F-84
+## Third wave — F-76 to F-85
 
 The pass resumed after being stopped, with the working copy green and every earlier gate
 passing. The findings below came from the same comparison as the second wave: hold two
@@ -124,6 +124,7 @@ representations of one fact side by side and see which one is lying.
 | **F-82** | The bench settled the barometer variant on 2026-09-05 — chip ID `0x58`, a BMP280 — and four documents went on asking for it. `hardware.md` called it `TBD - blocking`, `pre-procurement-design-status.md` called it `Blocking`, `wiring.md` left the checkbox unticked, and `photos/README.md` still asked for a die photograph the register had made unnecessary | Medium | ✅ Fixed |
 | **F-83** | The same bus scan settled both I2C strap directions — the IMU at `0x68` and the barometer at `0x76`, so AD0 and SDO are both low — and two documents still asked for them, one of them specifying a meter for a question the scan had already answered | Low | ✅ Fixed |
 | **F-84** | Two more items the bench closed were still listed as open: the battery polarity, read on a meter at 3.92 V with red positive, and the 1S charger, bought on 2026-09-05. The charger item was genuinely half-open — the absent charge parameters — and now says which half | Low | ✅ Fixed |
+| **F-85** | The runbook's post-flight command replayed `logs/raw_packets.tsv` with `--output` left at its default of `logs`, so the station opened the file it was reading for append. The reader kept finding the lines the writer had just written: the replay never ends, the flight's only forensic record fills with re-logged copies of itself, and the disk fills behind it. Reached 69 MB in under two minutes | **High** | ✅ Fixed |
 
 ### F-76 in detail
 

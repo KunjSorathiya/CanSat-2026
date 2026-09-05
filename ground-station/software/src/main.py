@@ -122,7 +122,14 @@ def main() -> int:
     if args.command == "live" and not args.replay and not args.port:
         print("live: provide --port <serial> or --replay <file>")
         return 2
-    return args.func(args)
+    try:
+        return args.func(args)
+    except ValueError as refusal:
+        # A refusal the station raised on purpose, with an operator-readable reason. A
+        # traceback would bury it, and this one is read by somebody standing over a
+        # recovered vehicle rather than over a debugger.
+        print(f"error: {refusal}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
