@@ -84,7 +84,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
 | `flight_tests` | 61 suites across the whole flight core | ✅ **3578 / 3578 assertions** |
-| `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **94 / 94 assertions** |
+| `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **101 / 101 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 8 modules | ✅ **119 / 119 tests** |

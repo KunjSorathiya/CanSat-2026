@@ -55,6 +55,30 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+### Changed — a cut LoRa payload is counted, like a cut log record
+
+`poll_receive()` trims a payload longer than the caller's buffer and returns the trimmed
+length, with nothing to say it did. That is the third instance of one shape this cycle --
+after the log record cut to fit a block and the number too wide for its buffer -- and it is
+the one with the most misleading consequence: **the bridge frames and CRCs a truncated
+payload exactly like a whole one**, so it reaches the ground station as a valid frame
+carrying a malformed packet. The diagnosis points at the vehicle, and the fault is in the
+receive path.
+
+Not reachable with the buffers this project uses -- the bridge passes 256 bytes and a LoRa
+payload cannot exceed 255. `truncated_receives()` exists so it cannot become silent if one
+of those buffers ever shrinks, and a test holds both halves: a payload that overruns is cut
+and counted, one that fits is neither.
+
+Two other things in the radio driver were read and deliberately left alone. The RSSI offset
+selection is correct and already carries the reasoning that fixed it. And `poll_receive()`
+clears the IRQ flags before reading the FIFO, where Semtech's own examples read first --
+a race whose window is microseconds against a 1 Hz packet rate, in the one path on this
+radio that **hardware has never exercised**. Reordering a register sequence on a part that
+passed its bench gate with the current order, to close a race that cannot be observed at
+this rate, is a change to make with the radio in front of you. It is written down here
+instead.
+
 ### Fixed — a latitude marked `W` was read as a southern one
 
 `parse_coordinate()` handles both NMEA coordinate fields, and accepted any of `N`, `S`, `E`

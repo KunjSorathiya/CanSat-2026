@@ -57,6 +57,13 @@ public:
     // Non-blocking: returns payload length (0 if nothing) into `out` (capacity `cap`).
     std::size_t poll_receive(std::uint8_t* out, std::size_t cap);
 
+    // Packets that arrived longer than the caller's buffer and were cut to fit. A
+    // truncated payload is framed and CRC'd by the bridge like any other, so it reaches
+    // the ground station looking like a valid frame carrying a malformed packet -- the
+    // wrong diagnosis, pointing at the vehicle rather than at the receive path. Never
+    // reached with the buffers this project uses; counted so it cannot become silent if
+    // one of them shrinks.
+    std::uint32_t truncated_receives() const { return truncated_receives_; }
     int last_rssi_dbm() const { return last_rssi_dbm_; }
     float last_snr_db() const { return last_snr_db_; }
     std::uint8_t chip_version() const { return version_; }
@@ -77,6 +84,7 @@ private:
     bool healthy_ = false;
     bool receiving_ = false;
     std::uint8_t version_ = 0;
+    std::uint32_t truncated_receives_ = 0;
     int last_rssi_dbm_ = 0;
     float last_snr_db_ = 0.0f;
 };

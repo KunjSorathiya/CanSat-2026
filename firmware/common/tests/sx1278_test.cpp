@@ -360,6 +360,36 @@ void test_receive_returns_a_payload_and_drops_a_crc_failure() {
     CHECK(radio.reg[0x12] == 0x00);
 }
 
+void test_a_payload_longer_than_the_buffer_is_cut_and_counted() {
+    // A truncated payload is framed and CRC'd by the bridge exactly like a whole one, so
+    // it reaches the ground station as a valid frame carrying a malformed packet -- a
+    // diagnosis pointing at the vehicle when the fault is in the receive path. The buffers
+    // this project uses make it unreachable; the counter is what keeps it from ever being
+    // silent if one of them shrinks.
+    FakeRadio radio;
+    cansat::Sx1278 driver;
+    CHECK(driver.begin(make_hal(radio), cansat::Sx1278Settings{}));
+    driver.start_receive();
+    CHECK(driver.truncated_receives() == 0);
+
+    for (int i = 0; i < 40; ++i) radio.fifo[i] = static_cast<std::uint8_t>('a' + (i % 26));
+    radio.reg[0x13] = 40;    // RX_NB_BYTES: forty bytes waiting
+    radio.reg[0x12] = 0x40;  // RxDone
+
+    std::uint8_t small[8] = {};
+    const std::size_t got = driver.poll_receive(small, sizeof(small));
+    CHECK(got == sizeof(small));
+    CHECK(driver.truncated_receives() == 1);
+    CHECK(std::memcmp(small, radio.fifo, sizeof(small)) == 0);
+
+    // A packet that fits is not counted, and does not reset the count of ones that did not.
+    radio.reg[0x13] = 4;
+    radio.reg[0x12] = 0x40;
+    std::uint8_t room[64] = {};
+    CHECK(driver.poll_receive(room, sizeof(room)) == 4);
+    CHECK(driver.truncated_receives() == 1);
+}
+
 void test_receive_needs_receive_mode_and_a_buffer() {
     FakeRadio radio;
     cansat::Sx1278 driver;
@@ -464,6 +494,7 @@ int main() {
     test_transmit_is_bounded_without_a_clock_too();
     test_transmit_rejects_nonsense_and_an_unhealthy_radio();
     test_receive_returns_a_payload_and_drops_a_crc_failure();
+    test_a_payload_longer_than_the_buffer_is_cut_and_counted();
     test_receive_needs_receive_mode_and_a_buffer();
     test_rssi_uses_the_low_frequency_offset_at_433_mhz();
     test_sync_word_can_be_switched_for_the_official_launch();

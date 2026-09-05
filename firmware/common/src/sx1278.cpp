@@ -293,7 +293,10 @@ std::size_t Sx1278::poll_receive(std::uint8_t* out, std::size_t cap) {
     }
 
     std::size_t len = read_reg(REG_RX_NB_BYTES);
-    if (len > cap) len = cap;
+    if (len > cap) {
+        ++truncated_receives_;
+        len = cap;
+    }
     write_reg(REG_FIFO_ADDR_PTR, read_reg(REG_FIFO_RX_CURRENT_ADDR));
     read_fifo(out, len);
 
