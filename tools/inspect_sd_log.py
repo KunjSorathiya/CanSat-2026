@@ -3,16 +3,15 @@
 
 WHY THIS EXISTS
 ---------------
-The firmware refuses a log file whose clusters are not consecutive, because writing linearly
-into a fragmented file would scribble over whatever occupies the gaps. When it refuses, the
-only information available is "fragmented" - and that leaves two possibilities that need
-completely different responses: the card really is fragmented, or the firmware's FAT walk is
-wrong.
+The firmware maps the log file through its cluster chain, so a fragmented file is handled
+rather than refused - up to MAX_EXTENTS separate runs, past which it gives up. This reports
+what the chain actually looks like, so a card can be checked at a desk instead of at the
+bench with everything wired.
 
-This is the second implementation that settles it. It reads the same structures over a
+It is also the second implementation of that walk. It reads the same structures over a
 different code path in a different language, exactly as the three telemetry parsers are held
-to one fixture. If this and the firmware disagree, one of them has a bug and the disagreement
-says so out loud. If they agree, the answer is the card's.
+to one fixture. If this and the firmware disagree about a card, one of them has a bug and the
+disagreement says so out loud. If they agree, the answer is the card's.
 
 It is also the pre-flight check `prepare_sd_card.py` cannot do: `fsutil file layout` works
 only on NTFS, so there is no built-in Windows tool that will answer this for a FAT32 card.
@@ -34,6 +33,9 @@ import os
 import sys
 
 SECTOR = 512
+# Must match FatVolume::kMaxExtents in
+# firmware/flight-computer/include/flight/fat_volume.hpp.
+MAX_EXTENTS = 16
 DEFAULT_NAME_83 = "FLIGHT  CSV"  # eight name bytes, three extension bytes, space padded
 
 
