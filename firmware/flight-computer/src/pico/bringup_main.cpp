@@ -400,6 +400,25 @@ void gps_raw_echo(const flight::Configuration& config, std::uint32_t seconds) {
 // and the DIO0 round trip. The predicted figure comes from lora_time_on_air_ms() rather
 // than a literal, so this comparison cannot drift away from the model the link budget and
 // the build-time static_assert both use.
+// A transmit that fails looks identical whatever caused it. IRQ_FLAGS, read at the moment
+// of the timeout and before it is cleared, separates the two candidates - and they want
+// opposite investigations, so guessing between them wastes an evening.
+void describe_tx_failure(const flight::PicoRadio& radio) {
+    const std::uint8_t irq = radio.last_tx_irq_flags();
+    std::printf("       IRQ_FLAGS at timeout = 0x%02X, %lu timeout(s) so far\n", irq,
+                static_cast<unsigned long>(radio.tx_timeouts()));
+    if (irq & 0x08) {
+        std::printf("       TxDone IS set: the radio finished and DIO0 never said so.\n"
+                    "       That is the wire on GP%d, not the radio.\n",
+                    flight::BoardPins::lora_dio0);
+    } else {
+        std::printf("       TxDone is CLEAR: the transmission never completed.\n"
+                    "       The radio or its supply, not the DIO0 wire. Watch the\n"
+                    "       3V3 rail on DC volts during a burst: the PA pulls about\n"
+                    "       120 mA at +17 dBm.\n");
+    }
+}
+
 void radio_airtime(flight::PicoRadio& radio, std::size_t bytes, const char* label) {
     constexpr int kBursts = 5;
     const std::string payload(bytes, 'A');
@@ -418,12 +437,15 @@ void radio_airtime(flight::PicoRadio& radio, std::size_t bytes, const char* labe
         sleep_ms(200);
     }
     if (sent == 0) {
-        std::printf("   %s: every transmit FAILED - no TxDone from DIO0\n", label);
+        std::printf("   %s: every transmit FAILED after %lu ms\n", label,
+                    static_cast<unsigned long>(2000));
+        describe_tx_failure(radio);
         return;
     }
     const double mean = sum / sent;
     std::printf("   %s: %.1f ms measured, %.1f ms predicted (%+.1f ms), %d/%d sent\n", label,
                 mean, predicted, mean - predicted, sent, kBursts);
+    if (sent < kBursts) describe_tx_failure(radio);
 }
 
 void report_radio(const flight::Configuration& config) {
@@ -780,6 +802,7 @@ void report_shared_bus(const flight::Configuration& config) {
     std::printf("   7.3 %d transmit-then-write rounds: %d TX failures, %d write failures,\n"
                 "       %d radio misreads afterwards\n",
                 kBursts, tx_fail, wr_fail, radio_wrong);
+    if (tx_fail != 0) describe_tx_failure(radio);
     if (tx_fail == 0 && wr_fail == 0 && radio_wrong == 0) {
         std::printf("       PASS - both devices work while the other is active.\n");
     } else {

@@ -245,6 +245,13 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
         }
         if (hal_.millis) {
             if (now_ms() - start >= timeout_ms) {
+                // Read the IRQ register before clearing it. This is the one measurement
+                // that separates two faults which look identical from outside: if TxDone
+                // is set here, the radio finished and DIO0 failed to tell us -- a wiring
+                // problem. If it is clear, the transmission never completed, which is the
+                // radio or its supply.
+                last_tx_irq_flags_ = read_reg(REG_IRQ_FLAGS);
+                ++tx_timeouts_;
                 set_mode(MODE_STDBY);
                 write_reg(REG_IRQ_FLAGS, 0xFF);
                 return false;
@@ -257,6 +264,8 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
             sleep(2);
             waited += 2;
             if (waited >= timeout_ms) {
+                last_tx_irq_flags_ = read_reg(REG_IRQ_FLAGS);
+                ++tx_timeouts_;
                 set_mode(MODE_STDBY);
                 write_reg(REG_IRQ_FLAGS, 0xFF);
                 return false;

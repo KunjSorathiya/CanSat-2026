@@ -80,6 +80,10 @@ public:
     // A fresh read of register 0x42 over the bus. Used by Gate 7 to check that the
     // radio is still readable while the microSD is active on the same SPI0.
     std::uint8_t probe_version() { return radio_.probe_version(); }
+    // Why a transmit failed: TxDone set means the radio finished and DIO0 did not say
+    // so; clear means it never finished. Different faults, identical symptom.
+    std::uint8_t last_tx_irq_flags() const { return radio_.last_tx_irq_flags(); }
+    std::uint32_t tx_timeouts() const { return radio_.tx_timeouts(); }
 
 private:
     Configuration config_;

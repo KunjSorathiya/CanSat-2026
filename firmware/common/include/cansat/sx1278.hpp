@@ -78,6 +78,15 @@ public:
     // diagnostic to interleave radio reads with card activity; the flight firmware does not
     // call it.
     std::uint8_t probe_version();
+
+    // IRQ_FLAGS as it stood when a transmit last timed out, and how many have timed out.
+    //
+    // A failed transmit looks the same from outside whatever caused it, and the two causes
+    // want opposite investigations. IRQ_TX_DONE (0x08) set here means the radio finished
+    // and DIO0 did not report it: a wiring fault. Clear means the transmission never
+    // completed at all, which is the modem or the supply feeding it.
+    std::uint8_t last_tx_irq_flags() const { return last_tx_irq_flags_; }
+    std::uint32_t tx_timeouts() const { return tx_timeouts_; }
     bool healthy() const { return healthy_; }
 
 private:
@@ -95,6 +104,8 @@ private:
     bool healthy_ = false;
     bool receiving_ = false;
     std::uint8_t version_ = 0;
+    std::uint8_t last_tx_irq_flags_ = 0;
+    std::uint32_t tx_timeouts_ = 0;
     std::uint32_t truncated_receives_ = 0;
     int last_rssi_dbm_ = 0;
     float last_snr_db_ = 0.0f;
