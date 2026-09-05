@@ -112,7 +112,18 @@ is installed, nothing is connected.
 | **Pico SDK** | Building Pico firmware | See [step 13](#13-pico-sdk-setup) |
 | **A browser** | Web console | Chrome or Edge for live USB (Web Serial); any browser for demo and file replay |
 
-Python packages: `pip install -r ground-station/software/requirements.txt`.
+Python packages: **none, for everything in step 4**. The parser, validator, logger, link
+health, file replay and the whole test suite are standard library only, and
+`ground-station/software/requirements.txt` is a file of commented-out lines saying so —
+running `pip install -r` against it installs nothing, which is the correct outcome and an
+alarming one if you were not expecting it.
+
+Two things do need a package, and only once you have hardware:
+
+```bash
+pip install pyserial     # step 19: live telemetry from the bridge Pico over USB
+pip install matplotlib   # optional: live plots in the Tk dashboard, which runs without them
+```
 
 ## 4. Build and test the software
 
@@ -131,7 +142,7 @@ compiler warnings.**
 bash tools/check_pico_syntax.sh
 ```
 
-Syntax-checks all ten Pico translation units against minimal SDK stubs — it proves the
+Syntax-checks all eleven Pico translation units against minimal SDK stubs — it proves the
 firmware compiles, not that it runs.
 
 The same suites also build through CMake, which is what CI uses:
@@ -140,8 +151,11 @@ The same suites also build through CMake, which is what CI uses:
 cmake -S . -B build/host-cmake && cmake --build build/host-cmake --parallel && ctest --test-dir build/host-cmake --output-on-failure
 ```
 
-31 targets, 5 CTest tests. On a machine with neither CMake nor a build tool,
-`pip install cmake ninja` supplies both.
+**5 CTest tests** — the same C++ suites `build_host.sh` runs, reached through CMake instead.
+How many *targets* get built depends on whether the Pico SDK is present: without it the
+firmware images are skipped and only the host libraries and tests configure, which is the
+path CI takes. On a machine with neither CMake nor a build tool, `pip install cmake ninja`
+supplies both.
 
 Replay a packet file through the real ground-station pipeline:
 
@@ -469,8 +483,12 @@ outdoors with a clear view before concluding anything is broken.
 🟡 With both Picos flashed and the vehicle powered:
 
 ```bash
+pip install pyserial     # if you have not already; the live path needs it
 cd ground-station/software && python src/main.py live --port COM5 --team CAN-Team-25
 ```
+
+Without `pyserial` this stops with `pyserial is required for SerialTransport`, which is the
+program telling you exactly what to install rather than failing obscurely.
 
 Replace `COM5` with your bridge Pico's port (`/dev/ttyACM0` on Linux, `/dev/cu.usbmodem*`
 on macOS). Or open the web console and connect over Web Serial in Chrome or Edge.

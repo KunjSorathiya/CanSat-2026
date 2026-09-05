@@ -64,6 +64,39 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — the quick start's install step installs nothing, and never said what to install
+
+Step 3 ends *"Python packages: `pip install -r ground-station/software/requirements.txt`"*.
+That file is **entirely commented out** — the core is standard library only, and the file
+exists to say so. Running the command installs nothing, which is the correct outcome and an
+alarming one if you were not told to expect it.
+
+Meanwhile the two things that *do* need a package were named nowhere in this document.
+A reader following it reaches step 19, the end-to-end telemetry test, and stops with
+`pyserial is required for SerialTransport` — a good error message for a situation the
+document should not have walked them into.
+
+Step 3 now says plainly that step 4 needs nothing installed and why the file looks empty,
+and names `pyserial` and `matplotlib` with what each one buys. Step 19 installs `pyserial`
+in its own code block and says what happens without it.
+
+Two more numbers in the same document:
+
+- *"all **ten** Pico translation units"* — it is eleven, and has been since the bring-up
+  diagnostic was added. The existing check missed it because this page spells the number
+  out in words; it now checks both spellings.
+- *"**31 targets**, 5 CTest tests"* — the CMake files declare thirteen targets, and a host
+  configure without the Pico SDK builds fewer still. The figure could not be reproduced
+  here, so rather than replace one unverifiable number with another it is **gone**: the
+  sentence now states the 5 CTest tests, which is read off the `add_test` calls, and
+  explains that the target count depends on whether the SDK is present.
+
+Fewer numbers, each of them checked, beats a confident one nobody can reproduce.
+
+Also gated: that `requirements.txt` still has nothing uncommented in it. The claim "no
+packages needed" is true only while that stays true, and a dependency added there would
+turn a correct sentence into an `ImportError` for the next reader.
+
 ### Fixed — post-flight step 5 told an operator to compare two files that share one column name
 
 *"Compare the transmitted stream against the onboard SD log: differences are radio loss,

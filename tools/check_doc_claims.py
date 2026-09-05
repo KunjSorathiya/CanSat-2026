@@ -251,8 +251,13 @@ def main() -> int:
     unchecked = [q for q in on_disk if q not in listed]
     checker.check(f"every one of the {len(on_disk)} Pico source files is syntax-checked",
                   not unchecked, ", ".join(unchecked))
+    words = {9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen"}
+    spelled = words.get(len(listed), str(len(listed)))
     checker.check(f"test-plan.md states {len(listed)} syntax-checked translation units",
                   f"{len(listed)} translation units" in test_plan, str(len(listed)))
+    # The quick start spells the number out, which is why it was still saying "ten".
+    checker.check(f"quick-start.md states {spelled} syntax-checked translation units",
+                  f"{spelled} Pico translation units" in quick_start, spelled)
     unnamed = [Path(q).stem for q in listed if f"`{Path(q).stem}`" not in test_plan]
     checker.check("test-plan.md names every syntax-checked translation unit",
                   not unnamed, ", ".join(unnamed))
@@ -581,6 +586,29 @@ def main() -> int:
     missing_ground = [c for c in ground_columns if f"`{c}`" not in runbook]
     checker.check(f"runbook.md maps all {len(ground_columns)} ground CSV columns",
                   not missing_ground, ", ".join(missing_ground))
+
+    # The quick start says the core needs no Python packages, which is true only while
+    # requirements.txt has nothing uncommented in it. A real dependency added there makes
+    # that sentence wrong, and the reader who believes it gets an ImportError instead.
+    requirements_txt = read("ground-station/software/requirements.txt")
+    active = [ln.strip() for ln in requirements_txt.splitlines()
+              if ln.strip() and not ln.strip().startswith("#")]
+    checker.check("the ground station core still needs no installed packages",
+                  not active, ", ".join(active))
+    checker.check("quick-start.md names pyserial for the live serial path",
+                  "pip install pyserial" in quick_start)
+
+    # CTest reaches the same C++ suites as build_host.sh, and the quick start says how many.
+    # A suite added to one and not the other is a gap in whichever CI job people trust.
+    ctest_names = []
+    for cmake_file in sorted(REPO_ROOT.glob("firmware/*/CMakeLists.txt")):
+        ctest_names += re.findall(r"add_test\(NAME (\w+)",
+                                  cmake_file.read_text(encoding="utf-8"))
+    checker.check(f"quick-start.md states the {len(ctest_names)} CTest tests",
+                  f"**{len(ctest_names)} CTest tests**" in quick_start,
+                  ", ".join(ctest_names))
+    checker.check(f"test-plan.md states the {len(ctest_names)} CTest tests",
+                  f"{len(ctest_names)} CTest tests" in test_plan, str(len(ctest_names)))
 
     counts = suite_counts()
     if counts is None:
