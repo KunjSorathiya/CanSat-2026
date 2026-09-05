@@ -551,113 +551,116 @@ void report_sd() {
         if (key != PICO_ERROR_TIMEOUT) break;
         sleep_ms(50);
     }
-    if (key != 'w' && key != 'W') {
-        std::printf("   skipped. 6.3 stays open, and the card stays readable.\n");
-        return;
+    const bool do_writes = (key == 'w' || key == 'W');
+    if (!do_writes) {
+        std::printf("   skipped. 6.3 stays open, and the log file keeps its\n"
+                    "   contents. 6.6 below still runs - it is not destructive.\n");
     }
 
-    constexpr int kWrites = 100;
-    const std::uint32_t kBaseLba = region.first_lba;
-    std::uint8_t block[flight::pico::SdCard::kBlockSize];
-    for (std::size_t i = 0; i < sizeof(block); ++i) {
-        block[i] = static_cast<std::uint8_t>(i & 0xFF);
-    }
-
-    std::uint64_t total_us = 0, worst_us = 0;
-    int written = 0;
-    for (int i = 0; i < kWrites; ++i) {
-        block[0] = static_cast<std::uint8_t>(i);
-        const std::uint64_t t0 = to_us_since_boot(get_absolute_time());
-        const bool w = card.write_block(kBaseLba + static_cast<std::uint32_t>(i), block);
-        const std::uint64_t dt = to_us_since_boot(get_absolute_time()) - t0;
-        if (w) {
-            total_us += dt;
-            if (dt > worst_us) worst_us = dt;
-            ++written;
+    if (do_writes) {
+        constexpr int kWrites = 100;
+        const std::uint32_t kBaseLba = region.first_lba;
+        std::uint8_t block[flight::pico::SdCard::kBlockSize];
+        for (std::size_t i = 0; i < sizeof(block); ++i) {
+            block[i] = static_cast<std::uint8_t>(i & 0xFF);
         }
-    }
-    if (written == 0) {
-        std::printf("   every write FAILED.\n");
-        return;
-    }
-    std::printf("   %d/%d written. mean %.3f ms, worst %.3f ms\n", written, kWrites,
-                (total_us / static_cast<double>(written)) / 1000.0, worst_us / 1000.0);
 
-    // A write that reports success and does not land is the failure mode worth catching:
-    // the log would look healthy all the way to a card with nothing on it.
-    std::uint8_t check[flight::pico::SdCard::kBlockSize];
-    const bool read_ok = card.read_block(kBaseLba + kWrites - 1, check);
-    bool match = read_ok;
-    for (std::size_t i = 1; match && i < sizeof(check); ++i) {
-        if (check[i] != static_cast<std::uint8_t>(i & 0xFF)) match = false;
-    }
-    if (match && check[0] == static_cast<std::uint8_t>(kWrites - 1)) {
-        std::printf("   read-back of the last block matches - the writes landed\n");
-    } else {
-        std::printf("   READ-BACK MISMATCH. Writes reported success without landing,\n"
-                    "   which is worse than an honest failure. Do not fly this card.\n");
-    }
-
-    // ---- sustained burst, for the meter ----
-    //
-    // The burst above finishes in well under a second, and a handheld multimeter samples
-    // two or three times a second: pointed at that, it averages a window that is mostly
-    // idle and reports a number far below the truth. So the card is kept writing long
-    // enough for a needle to settle.
-    //
-    // What this measures is the SUSTAINED write current, not the instantaneous spike, and
-    // that is deliberate - it is the figure a regulator is sized against. The duty cycle
-    // is printed alongside because it is what makes the reading meaningful: at a duty near
-    // 100 % the meter is reading the write current itself rather than an average of writes
-    // and gaps.
-    constexpr std::uint32_t kBurstMs = 10000;
-    std::printf("\n-- 6.3b Sustained write, %lu s, for a current measurement --\n",
-                static_cast<unsigned long>(kBurstMs / 1000));
-    std::printf("   Put the meter in series with the module's 3V3 lead, on a current\n"
-                "   range. Note the IDLE reading first - the write cost is the difference,\n"
-                "   not the absolute. Starting in 3 s; watch the meter.\n");
-    sleep_ms(3000);
-
-    const std::uint64_t burst_start = now_ms();
-    std::uint64_t busy_us = 0;
-    std::uint32_t burst_writes = 0, burst_failures = 0;
-    std::uint32_t lba = kBaseLba;
-    while (now_ms() - burst_start < kBurstMs) {
-        block[0] = static_cast<std::uint8_t>(burst_writes);
-        const std::uint64_t t0 = to_us_since_boot(get_absolute_time());
-        const bool w = card.write_block(lba, block);
-        busy_us += to_us_since_boot(get_absolute_time()) - t0;
-        if (w) {
-            ++burst_writes;
+        std::uint64_t total_us = 0, worst_us = 0;
+        int written = 0;
+        for (int i = 0; i < kWrites; ++i) {
+            block[0] = static_cast<std::uint8_t>(i);
+            const std::uint64_t t0 = to_us_since_boot(get_absolute_time());
+            const bool w = card.write_block(kBaseLba + static_cast<std::uint32_t>(i), block);
+            const std::uint64_t dt = to_us_since_boot(get_absolute_time()) - t0;
+            if (w) {
+                total_us += dt;
+                if (dt > worst_us) worst_us = dt;
+                ++written;
+            }
+        }
+        if (written == 0) {
+            std::printf("   every write FAILED. Skipping the rest of 6.3.\n");
         } else {
-            ++burst_failures;
+        std::printf("   %d/%d written. mean %.3f ms, worst %.3f ms\n", written, kWrites,
+                    (total_us / static_cast<double>(written)) / 1000.0, worst_us / 1000.0);
+
+        // A write that reports success and does not land is the failure mode worth catching:
+        // the log would look healthy all the way to a card with nothing on it.
+        std::uint8_t check[flight::pico::SdCard::kBlockSize];
+        const bool read_ok = card.read_block(kBaseLba + kWrites - 1, check);
+        bool match = read_ok;
+        for (std::size_t i = 1; match && i < sizeof(check); ++i) {
+            if (check[i] != static_cast<std::uint8_t>(i & 0xFF)) match = false;
         }
-        // Stay inside the log file. Wrapping is fine: this is a measurement, and the
-        // region's contents are already forfeit by the time we are here.
-        if (++lba >= kBaseLba + region.block_count) lba = kBaseLba;
+        if (match && check[0] == static_cast<std::uint8_t>(kWrites - 1)) {
+            std::printf("   read-back of the last block matches - the writes landed\n");
+        } else {
+            std::printf("   READ-BACK MISMATCH. Writes reported success without landing,\n"
+                        "   which is worse than an honest failure. Do not fly this card.\n");
+        }
+
+        // ---- sustained burst, for the meter ----
+        //
+        // The burst above finishes in well under a second, and a handheld multimeter samples
+        // two or three times a second: pointed at that, it averages a window that is mostly
+        // idle and reports a number far below the truth. So the card is kept writing long
+        // enough for a needle to settle.
+        //
+        // What this measures is the SUSTAINED write current, not the instantaneous spike, and
+        // that is deliberate - it is the figure a regulator is sized against. The duty cycle
+        // is printed alongside because it is what makes the reading meaningful: at a duty near
+        // 100 % the meter is reading the write current itself rather than an average of writes
+        // and gaps.
+        constexpr std::uint32_t kBurstMs = 10000;
+        std::printf("\n-- 6.3b Sustained write, %lu s, for a current measurement --\n",
+                    static_cast<unsigned long>(kBurstMs / 1000));
+        std::printf("   Put the meter in series with the module's 3V3 lead, on a current\n"
+                    "   range. Note the IDLE reading first - the write cost is the difference,\n"
+                    "   not the absolute. Starting in 3 s; watch the meter.\n");
+        sleep_ms(3000);
+
+        const std::uint64_t burst_start = now_ms();
+        std::uint64_t busy_us = 0;
+        std::uint32_t burst_writes = 0, burst_failures = 0;
+        std::uint32_t lba = kBaseLba;
+        while (now_ms() - burst_start < kBurstMs) {
+            block[0] = static_cast<std::uint8_t>(burst_writes);
+            const std::uint64_t t0 = to_us_since_boot(get_absolute_time());
+            const bool w = card.write_block(lba, block);
+            busy_us += to_us_since_boot(get_absolute_time()) - t0;
+            if (w) {
+                ++burst_writes;
+            } else {
+                ++burst_failures;
+            }
+            // Stay inside the log file. Wrapping is fine: this is a measurement, and the
+            // region's contents are already forfeit by the time we are here.
+            if (++lba >= kBaseLba + region.block_count) lba = kBaseLba;
+        }
+        const double elapsed_ms = static_cast<double>(now_ms() - burst_start);
+        const double duty = elapsed_ms > 0.0 ? (busy_us / 1000.0) / elapsed_ms : 0.0;
+        std::printf("   %lu writes in %.1f s -> %.0f writes/s, %.1f KiB/s\n",
+                    static_cast<unsigned long>(burst_writes), elapsed_ms / 1000.0,
+                    burst_writes / (elapsed_ms / 1000.0),
+                    (burst_writes * 512.0 / 1024.0) / (elapsed_ms / 1000.0));
+        std::printf("   duty cycle %.1f %% - the fraction of that time the card was writing\n",
+                    duty * 100.0);
+        if (burst_failures != 0) {
+            std::printf("   %lu writes FAILED during the burst\n",
+                        static_cast<unsigned long>(burst_failures));
+        }
+        if (duty < 0.8) {
+            std::printf("   NOTE: below 80 %% duty the meter is averaging writes with gaps, so\n"
+                        "   the true write current is higher than it reads. Scale by 1/duty.\n");
+        } else {
+            std::printf("   At this duty the meter is reading the write current itself, near\n"
+                        "   enough, rather than an average of writes and idle.\n");
+        }
+        std::printf("   Record it in bring-up row 2.5's neighbourhood and in the Gate 2 load\n"
+                    "   budget. Under ~100 mA and a 470 uF bulk capacitor covers it; well over,\n"
+                    "   and the peripherals want their own buck-boost rail.\n");
+        }
     }
-    const double elapsed_ms = static_cast<double>(now_ms() - burst_start);
-    const double duty = elapsed_ms > 0.0 ? (busy_us / 1000.0) / elapsed_ms : 0.0;
-    std::printf("   %lu writes in %.1f s -> %.0f writes/s, %.1f KiB/s\n",
-                static_cast<unsigned long>(burst_writes), elapsed_ms / 1000.0,
-                burst_writes / (elapsed_ms / 1000.0),
-                (burst_writes * 512.0 / 1024.0) / (elapsed_ms / 1000.0));
-    std::printf("   duty cycle %.1f %% - the fraction of that time the card was writing\n",
-                duty * 100.0);
-    if (burst_failures != 0) {
-        std::printf("   %lu writes FAILED during the burst\n",
-                    static_cast<unsigned long>(burst_failures));
-    }
-    if (duty < 0.8) {
-        std::printf("   NOTE: below 80 %% duty the meter is averaging writes with gaps, so\n"
-                    "   the true write current is higher than it reads. Scale by 1/duty.\n");
-    } else {
-        std::printf("   At this duty the meter is reading the write current itself, near\n"
-                    "   enough, rather than an average of writes and idle.\n");
-    }
-    std::printf("   Record it in bring-up row 2.5's neighbourhood and in the Gate 2 load\n"
-                "   budget. Under ~100 mA and a 470 uF bulk capacitor covers it; well over,\n"
-                "   and the peripherals want their own buck-boost rail.\n");
 
     std::printf("\n-- 6.6 Log boot count --\n");
     flight::PicoSdLogger logger;
