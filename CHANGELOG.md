@@ -10,6 +10,26 @@ development cycle.
 
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
+### Closed — both bench intermittents were the same fault, on two wires
+
+The radio that failed eight transmits and then sent seventy-five (F-5), and the microSD
+whose writes failed and then did not (F-6), were one fault on two modules: **the 3V3 jumper
+feeding each of them.** Shortening both fixed both, and produced the first run in which
+every row of Gates 5, 6 and 7 passed together.
+
+Neither module has a regulator and the microSD reader has two capacitors, so the supply
+jumper is the whole delivery path. Idle draw crosses a marginal one; a transmitting PA and
+a programming flash die do not. That is why reads always passed and writes never did, and
+why the radio's timing was identical to 0.1 ms on the packets that did get out.
+
+On the soldered board this is a short track to each module's supply pin and a **470 µF bulk
+capacitor** across the microSD's own 3V3 and GND — a requirement now, not a precaution.
+
+Still open: worst-case block-write latency reached 29.8 ms in one of three sessions against
+a 33 ms sensor period, and one telemetry append is two writes. Loop jitter has never been
+measured with the logger running.
+
+
 ### Fixed — a diagnostic that read "nobody answered" as five simultaneous card faults
 
 A bench run reported `R1 = 0xFF, R2 = 0xFF` on a failed write, and the decoder walked the
