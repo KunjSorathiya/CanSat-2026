@@ -87,7 +87,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **101 / 101 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **123 / 123 tests** |
+| Python ground station | 8 modules | ✅ **125 / 125 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **165 / 165 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **49 / 49 tests** |
@@ -230,7 +230,7 @@ and a known GGA sentence parses to the expected latitude with no checksum errors
 
 ## Python test suites
 
-### `test_telemetry.py` — 14 tests
+### `test_telemetry.py` — 16 tests
 
 Rulebook packet parses; the `CAN-Team-XX` placeholder is rejected; empty and corrupt
 packets are rejected; decimal precision is enforced and extra fields are tolerated;
@@ -241,6 +241,13 @@ Five further tests cover the yaw reference: a magnetic yaw is reported as a comp
 bearing, a relative one yields no bearing, a packet without the tag says nothing either
 way, the bearing wraps into `[0, 360)`, and the CSV row records which kind of yaw it
 holds — the same distinction the C++ formatter and the web console make.
+
+Two more hold the two parsers to the same **field names**, by running the console's parser
+under Node and comparing the record it returns with Python's. The shared fixtures already
+hold both to one definition of a valid packet; they say nothing about what the parsed record
+is called afterwards, and a name is what a hand-port gets wrong. A short list covers the
+names that exist on one side by design, and a second test fails if an entry on that list
+stops describing reality.
 
 ### `test_validator.py` — 22 tests
 
@@ -374,6 +381,7 @@ Three things exist in more than one language and must not drift:
 | Packet format and parsing | [`telemetry.cpp`](../../firmware/common/src/telemetry.cpp), [`telemetry.py`](../../ground-station/software/src/telemetry.py), `index.html` | All three read [`test-data/protocol-fixtures.tsv`](../../test-data/protocol-fixtures.tsv) — 32 packets, each with a recorded accept/reject verdict. A parser that disagrees fails the build |
 | CRC-16/CCITT framing | [`framing.cpp`](../../firmware/ground-station/src/framing.cpp), [`transport.py`](../../ground-station/software/src/transport.py), `index.html` | All three read [`test-data/framing-cases.tsv`](../../test-data/framing-cases.tsv) — 14 byte streams with the exact events and counters each must produce, including every recovery path: a torn header, a truncated length, a `$` inside a CRC field, an oversized length. The known-answer vector `0x29B1` is asserted on top of it |
 | Raw-log escaping | [`logger.py`](../../ground-station/software/src/logger.py), `index.html` | Both read [`test-data/raw-log-escapes.tsv`](../../test-data/raw-log-escapes.tsv) — 16 cases including a literal backslash before `t`, the one an unescaper a character out of step reads as a tab. The console replays raw logs, so a disagreement here invents payloads the vehicle never sent |
+| Parsed record field names | [`telemetry.py`](../../ground-station/software/src/telemetry.py), `index.html` | The console's parser is run under Node and the keys of the record it returns are compared with Python's. `fault_count` was `faults` on one side, which in JavaScript reads as `undefined` rather than raising |
 | Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Both read [`test-data/validator-scenarios.tsv`](../../test-data/validator-scenarios.tsv) — 11 scenarios, 29 packets, each with the verdict the validator must reach: gaps, duplicates, out-of-order arrivals, a vehicle reboot and the corrupted `P-001` that is not one, wrong team, clock regression and an implausible fix. A validator that disagrees fails the build |
 | LoRa airtime model | [`lora_airtime.hpp`](../../firmware/common/include/cansat/lora_airtime.hpp), [`link_budget.py`](../../tools/link_budget.py) | Both are asserted against the same two published SX127x reference vectors (46.336 ms and 1155.072 ms) |
 | Sensor timing model | [`sensor_timing.hpp`](../../firmware/flight-computer/include/flight/sensor_timing.hpp) — register encoding *and* the rate guard | The model reproduces three published BMP280 datasheet figures, so the registers written and the rate validated cannot disagree |

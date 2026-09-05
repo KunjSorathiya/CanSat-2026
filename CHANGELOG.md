@@ -64,6 +64,28 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — the two parsers disagreed about what a field is called
+
+The same comparison, pointed at the web console. Its display turned out to reference every
+field its parser produces — but comparing the two *parsers* found something the shared
+fixtures cannot see.
+
+`test-data/protocol-fixtures.tsv` holds all three parsers to one definition of a valid
+packet. It says nothing about what the parsed record is **called** afterwards, and a name is
+exactly what a hand-port gets wrong. Python exposed `fault_count`; JavaScript exposed
+`faults`. Both worked. The asymmetry is in how they fail: reading the wrong name in Python
+raises `AttributeError` on the spot, and in JavaScript yields `undefined`, which this
+console renders as an em dash — a fault count of *none reported* where the vehicle said
+three.
+
+The console now uses `fault_count`, and a test runs its parser under Node and compares the
+record's keys with Python's. Three names exist on the Python side by design — `has_gps` and
+`yaw_is_magnetic`, which the console derives where it needs them, and `optional`, which the
+CSV writer uses — and they are listed rather than glossed over, with a second test that
+fails if a listed name stops describing reality.
+
+Renaming it back fails the check with `Lists differ: ['fault_count'] != []`.
+
 ### Fixed — the live dashboard was missing nine of the values the ground station knows
 
 Having found the shape three times by hand, the fourth was found by comparing the whole

@@ -819,7 +819,9 @@ function parsePacket(str, team) {
   const g = k => rec.tags[k] !== undefined ? parseFloat(rec.tags[k]) : null;
   rec.gps_lat = g("GP-Lat"); rec.gps_lon = g("GP-Lon"); rec.gps_alt = g("GP-Alt");
   rec.mode = rec.tags["MODE"] || null;
-  rec.faults = rec.tags["FAULTS"] !== undefined ? parseInt(rec.tags["FAULTS"], 10) : null;
+  /* fault_count, not faults: the Python parser exposes this quantity under that name, and
+     a hand-port that reads the wrong one gets `undefined` here rather than an error. */
+  rec.fault_count = rec.tags["FAULTS"] !== undefined ? parseInt(rec.tags["FAULTS"], 10) : null;
   rec.calibrated = rec.tags["CAL"] !== undefined ? rec.tags["CAL"] === "1" : null;
   rec.armed = rec.tags["ARM"] !== undefined ? rec.tags["ARM"] === "1" : null;
   // What the mandatory Ya- field means in this packet. "M": referenced to magnetic north
@@ -2391,7 +2393,8 @@ function render(force) {
   if (latest && latest.armed !== null && latest.armed !== undefined) {
     setStat(armEl, latest.armed ? "ARMED" : "safe", latest.armed ? "critv" : "", latest.armed ? "i-bolt" : "i-lock");
   } else setStat(armEl, "—", "", "");
-  const fc = latest && latest.faults !== null ? latest.faults : null;
+  const fc = latest && latest.fault_count !== undefined && latest.fault_count !== null
+    ? latest.fault_count : null;
   setStat($("#kv-faults"), fc === null ? "—" : fc, fc ? "critv" : "", fc ? "i-warn" : "");
 
   /* ---- tiles ---- */

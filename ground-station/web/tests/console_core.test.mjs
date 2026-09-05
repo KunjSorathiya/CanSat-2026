@@ -203,14 +203,14 @@ test("optional GPS and diagnostic fields are read, not ignored", () => {
   assert.equal(record.gps_lon, 73.0);
   assert.equal(record.gps_alt, 20.0);
   assert.equal(record.mode, "READY");
-  assert.equal(record.faults, 0);
+  assert.equal(record.fault_count, 0);
 });
 
 test("all four diagnostic tags are decoded", () => {
   const fixture = FIXTURE_CASES.find((c) => c.id === "diagnostics_only");
   const { record } = M.parsePacket(fixture.packet, null);
   assert.equal(record.mode, "FLIGHT");
-  assert.equal(record.faults, 3);
+  assert.equal(record.fault_count, 3);
   assert.equal(record.calibrated, true);
   assert.equal(record.armed, true);
 });

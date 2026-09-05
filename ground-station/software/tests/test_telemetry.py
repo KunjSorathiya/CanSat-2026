@@ -1,4 +1,7 @@
 import csv
+import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -115,3 +118,80 @@ class YawReferenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RecordSurfaceTests(unittest.TestCase):
+    """The Python and JavaScript parsers expose the same record under the same names.
+
+    The shared fixtures hold the two parsers to one definition of a *valid packet*. They say
+    nothing about what the parsed record is called afterwards, and a name is exactly what a
+    hand-port gets wrong: reading `record.fault_count` in JavaScript when the field is
+    `record.faults` yields `undefined` and renders as a dash, where the same mistake in
+    Python raises immediately. `fault_count` was that mismatch.
+    """
+
+    CONSOLE = Path(__file__).parents[3] / "ground-station" / "web" / "index.html"
+
+    # Names that exist on one side only, on purpose.
+    PYTHON_ONLY = {
+        # Python exposes booleans the console derives at the point of use instead.
+        "has_gps",          # JavaScript tests `gps_lat !== null`
+        "yaw_is_magnetic",  # JavaScript tests `yaw_reference === "magnetic"`
+        # The raw optional-field list, kept by the Python parser for the CSV writer.
+        "optional",
+    }
+
+    NODE_SCRIPT = """
+const {readFileSync} = require("fs");
+const html = readFileSync(process.argv[2], "utf8");
+const core = html.split("// PORTABLE-CORE:BEGIN")[1].split("// PORTABLE-CORE:END")[0];
+const {parsePacket} = new Function(core + "\\nreturn {parsePacket};")();
+const result = parsePacket(process.argv[3], null);
+if (result.error) { console.error("parse failed: " + result.error); process.exit(1); }
+console.log(JSON.stringify(Object.keys(result.record)));
+"""
+
+    def _javascript_fields(self):
+        node = shutil.which("node")
+        if node is None:
+            raise unittest.SkipTest("node not found - the console's parser cannot be run here")
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "fields.js"
+            script.write_text(self.NODE_SCRIPT, encoding="utf-8")
+            result = subprocess.run(
+                [node, str(script), str(self.CONSOLE), self.PACKET],
+                capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            raise AssertionError(f"could not read the console's record: {result.stderr}")
+        return set(json.loads(result.stdout))
+
+    PACKET = ("CAN-Team-01; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; "
+              "Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80; "
+              "GP-Lat-18.000000; GP-Lon-73.000000; GP-Alt-20.0; "
+              "MODE-READY; FAULTS-2; CAL-1; ARM-1; YR-M;")
+
+    def _python_fields(self):
+        record = parse_packet(self.PACKET).record
+        self.assertIsNotNone(record)
+        return {name for name in dir(record)
+                if not name.startswith("_") and not callable(getattr(record, name))}
+
+    def test_the_two_parsers_agree_on_field_names(self):
+        python = self._python_fields()
+        javascript = self._javascript_fields()
+        self.assertGreater(len(javascript), 15, "the JavaScript parser should assign many fields")
+        only_python = sorted(python - javascript - self.PYTHON_ONLY)
+        only_javascript = sorted(javascript - python)
+        self.assertEqual(only_python, [], f"exposed by Python and not by the console: {only_python}")
+        self.assertEqual(only_javascript, [],
+                         f"exposed by the console and not by Python: {only_javascript}")
+
+    def test_the_exception_list_still_describes_reality(self):
+        # A name that has since appeared on both sides should leave the list, not sit in it
+        # claiming a difference that no longer exists.
+        python = self._python_fields()
+        javascript = self._javascript_fields()
+        for name in self.PYTHON_ONLY:
+            self.assertIn(name, python, f"{name} is listed as Python-only and Python lacks it")
+            self.assertNotIn(name, javascript,
+                             f"{name} is listed as Python-only but the console now has it too")
