@@ -100,7 +100,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `flight_tests` | 63 suites across the whole flight core | ✅ **3606 / 3606 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
-| `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **605 / 605 assertions** |
+| `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 8 modules | ✅ **133 / 133 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |

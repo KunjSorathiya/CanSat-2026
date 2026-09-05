@@ -636,12 +636,54 @@ void report_radio(const flight::Configuration& config) {
 // the CMD13 status byte, because that is the only place a card admits to being write
 // protected -- and a card that has gone read-only looks exactly like bad wiring until you
 // ask it.
+// 0xFF is not a status byte. It is the absence of one: MISO idling high with nothing
+// driving it. Every valid R1 has bit 7 clear, and every R2 arrives behind one.
+//
+// This check exists because the decode below did not have it, and read 0xFF as five
+// simultaneous catastrophes - write protection, a lock, a controller fault, an ECC failure
+// and an out-of-range address. Five unrelated faults at once is not a card in trouble, it
+// is a card that never answered, and the report sent an evening after a healthy card. The
+// init path had this guard from the start; the write path did not inherit it.
+bool report_no_answer(const char* what, std::uint8_t value) {
+    if (value != 0xFF) return false;
+    std::printf("       %s = 0xFF: NO RESPONSE, not a status byte - a valid response\n"
+                "       always has bit 7 clear. The card drove nothing at all here, so\n"
+                "       there is nothing to decode: it was not refusing the write, it\n"
+                "       had stopped answering.\n", what);
+    return true;
+}
+
 void describe_write_failure(const flight::pico::SdCard& card) {
-    std::printf("       stopped at: %s\n",
-                flight::pico::SdCard::describe(card.write_stage()));
-    std::printf("       CMD R1 = 0x%02X, CMD13 R2 = 0x%02X, data token = 0x%02X\n",
-                card.last_write_r1(), card.last_write_r2(), card.last_data_response());
+    using WriteStage = flight::pico::SdCard::WriteStage;
+    const WriteStage stage = card.write_stage();
+    std::printf("       stopped at: %s\n", flight::pico::SdCard::describe(stage));
+
+    // Only report what the write actually reached. A stage that stopped before CMD13 has no
+    // R2 to show, and printing the field anyway presents a leftover byte as a measurement.
+    if (stage == WriteStage::busy_before) {
+        std::printf("       No command was sent, so there is no R1 to report. The card was\n"
+                    "       still busy - or not driving MISO high - before the write began.\n");
+        return;
+    }
+
+    std::printf("       CMD R1 = 0x%02X\n", card.last_write_r1());
+    if (report_no_answer("R1", card.last_write_r1())) return;
+
+    if (stage != WriteStage::cmd24_rejected) {
+        const std::uint8_t tok = card.last_data_response();
+        std::printf("       data token = 0x%02X\n", tok);
+        if ((tok & 0x1F) == 0x0B) {
+            std::printf("       Data token 0x0B: CRC error on the data block - the bus.\n");
+        } else if ((tok & 0x1F) == 0x0D) {
+            std::printf("       Data token 0x0D: write error - the card, not the bus.\n");
+        }
+    }
+
+    if (stage != WriteStage::status_error) return;
+
     const std::uint8_t r2 = card.last_write_r2();
+    std::printf("       CMD13 R2 = 0x%02X\n", r2);
+    if (report_no_answer("R2", r2)) return;
     if (r2 & 0x20) {
         std::printf("       R2 bit 5: WRITE PROTECT VIOLATION. The card is refusing to be\n"
                     "       written, and that is the card's decision, not the wiring.\n");
@@ -650,13 +692,7 @@ void describe_write_failure(const flight::pico::SdCard& card) {
     if (r2 & 0x08) std::printf("       R2 bit 3: CC error - internal controller fault.\n");
     if (r2 & 0x10) std::printf("       R2 bit 4: ECC failed - the card could not correct it.\n");
     if (r2 & 0x80) std::printf("       R2 bit 7: out of range, or CSD overwrite.\n");
-    const std::uint8_t tok = card.last_data_response();
-    if ((tok & 0x1F) == 0x0B) {
-        std::printf("       Data token 0x0B: CRC error on the data block - a bus problem.\n");
-    } else if ((tok & 0x1F) == 0x0D) {
-        std::printf("       Data token 0x0D: write error - the card, not the bus.\n");
-    }
-    if (card.write_stage() == flight::pico::SdCard::WriteStage::status_error && r2 == 0x00) {
+    if (r2 == 0x00) {
         std::printf("       R2 clear but R1 was not: re-read the R1 value above.\n");
     }
 }
@@ -769,9 +805,25 @@ void report_sd() {
             // costs one transaction.
             std::uint8_t check[flight::pico::SdCard::kBlockSize];
             if (!card.read_block(kBaseLba + kWrites - 1, check)) {
-                std::printf("   the read-back of that block ALSO failed, so the card has\n"
-                            "   stopped answering entirely - this is no longer a\n"
-                            "   write-specific fault, and the bus is the place to look.\n");
+                std::printf("   the read-back of that block ALSO failed: the card has\n"
+                            "   stopped answering entirely, so this is not a\n"
+                            "   write-specific fault. It read perfectly seconds ago.\n");
+                // Whether a fresh initialisation brings it back is the whole question. A
+                // damaged card stays damaged. A card that lost its supply for a moment
+                // comes back the instant it is re-initialised -- and CMD24 is the first
+                // thing in this run that makes it draw programming current, which is
+                // exactly when a marginal supply would let go.
+                if (card.begin(spi0, flight::BoardPins::sd_cs)) {
+                    std::printf("   ...and a fresh init BROUGHT IT BACK. The card is not\n"
+                                "   damaged - it dropped out and recovered. Something took\n"
+                                "   it away at the first write, the first moment in this\n"
+                                "   run that it draws programming current. Put the meter on\n"
+                                "   3V3 at the module's OWN VCC pin, not at the Pico.\n");
+                } else {
+                    std::printf("   ...and a fresh init did not bring it back either.\n"
+                                "   Power-cycle the board before concluding anything about\n"
+                                "   the card itself.\n");
+                }
             } else {
                 bool landed = check[0] == static_cast<std::uint8_t>(kWrites - 1);
                 for (std::size_t i = 1; landed && i < sizeof(check); ++i) {
@@ -929,10 +981,10 @@ void report_shared_bus(const flight::Configuration& config) {
             std::printf("\n   The card initialised on this same bus and read from it, so\n"
                         "   SCK (GP%d), MOSI (GP%d) and MISO (GP%d) all carry data, and the\n"
                         "   card's supply is sound. (That does not prove MISO reaches a\n"
-                        "   clean idle HIGH - only writes need that.) The radio's fault is\n"
-                        "   therefore in what it does NOT\n"
-                        "   share: NSS on GP%d, RESET on GP%d, or the module's own VCC and\n"
-                        "   GND pins. Check those three and nothing else.\n",
+                        "   clean idle HIGH - only writes need that.) The radio's fault\n"
+                        "   is therefore in what it does NOT share: NSS on GP%d, RESET on\n"
+                        "   GP%d, or the module's own VCC and GND pins. Check those\n"
+                        "   three and nothing else.\n",
                         flight::BoardPins::spi_sck, flight::BoardPins::spi_mosi,
                         flight::BoardPins::spi_miso, flight::BoardPins::lora_cs,
                         flight::BoardPins::lora_reset);

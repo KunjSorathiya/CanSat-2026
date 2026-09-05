@@ -10,6 +10,27 @@ development cycle.
 
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
+### Fixed — a diagnostic that read "nobody answered" as five simultaneous card faults
+
+A bench run reported `R1 = 0xFF, R2 = 0xFF` on a failed write, and the decoder walked the
+bits and announced a write-protect violation, a locked card, a controller fault, an ECC
+failure and an out-of-range address — all at once, about a card that was working.
+
+`0xFF` is not a status byte. Every valid R1 has bit 7 clear, and `0xFF` is MISO idling high
+with nothing driving it: the card had gone silent, not refused. Five unrelated
+catastrophes appearing together is the tell. The init path has refused to decode `0xFF`
+since it was written; the write path did not inherit that guard.
+
+- A `0xFF` in either byte is now reported as no response, and no bit is decoded behind it.
+- Fields the write never reached are no longer printed. The same run showed
+  `data token = 0xE5` for a write refused at `CMD24`, which never sends a data token — a
+  leftover from an earlier attempt presented as this one's measurement. The capture is
+  cleared per attempt, and a host test holds it against a fake card that goes silent.
+- On a total write failure row 6.3 now re-initialises the card and says whether it comes
+  back. A damaged card stays damaged; one that recovers was dropping out, and `CMD24` is
+  the first moment in the run that it draws programming current.
+
+
 ### Added — three registers, so a failed transmit says which fault it was
 
 The same 206-byte transmit failed 5 of 5 in bring-up row 5.2 and then succeeded 45 of 45 in

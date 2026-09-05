@@ -58,6 +58,10 @@ public:
     bool fail_write_response = false;
     bool fail_status = false;
     bool never_sends_data_token = false;
+    // A card that has stopped answering: MISO idles high and every byte reads 0xFF. This is
+    // what a supply that let go looks like from the driver's side, and it is not the same as
+    // a card that answers and refuses.
+    bool dead = false;
 
     void set_select(bool on) {
         if (!on && selected) {
@@ -89,6 +93,7 @@ private:
                        write_response, busy };
 
     std::uint8_t exchange(std::uint8_t value) {
+        if (dead) return 0xFF;
         switch (state_) {
             case State::idle:
                 if ((value & 0xC0) == 0x40) {  // command frame: 01xxxxxx
@@ -481,6 +486,28 @@ void test_a_write_error_reported_by_cmd13_is_not_treated_as_success() {
     CHECK(!sd.write_block(4, block));
 }
 
+// A write that stops early never reaches the later fields, and whatever the previous write
+// left in them is not a measurement of this one. On the bench a write that was refused at
+// CMD24 printed "data token = 0xE5" - a byte from an attempt that had nothing to do with it -
+// alongside an R1 of 0xFF, and the pair read as a card in a specific and diagnosable state
+// rather than a card that had gone silent.
+void test_a_failed_write_does_not_report_the_previous_write_bytes() {
+    FakeCard card;
+    flight::pico::SdCard sd;
+    CHECK(sd.begin_with(make_hal(card)));
+
+    std::uint8_t block[kBlock] = {};
+    CHECK(sd.write_block(7, block));
+    CHECK(sd.last_data_response() == 0x05);   // accepted, and recorded
+
+    card.dead = true;                          // the card stops answering entirely
+    CHECK(!sd.write_block(8, block));
+    CHECK(sd.write_stage() == flight::pico::SdCard::WriteStage::cmd24_rejected);
+    CHECK(sd.last_write_r1() == 0xFF);         // 0xFF is no answer, not a status byte
+    CHECK(sd.last_data_response() == 0x00);    // NOT the 0x05 from the write before
+    CHECK(sd.last_write_r2() == 0x00);         // CMD13 was never sent
+}
+
 void test_a_missing_data_token_fails_the_read() {
     FakeCard card;
     flight::pico::SdCard sd;
@@ -556,6 +583,7 @@ int main() {
     test_an_incomplete_hal_is_refused();
     test_a_rejected_write_is_reported();
     test_a_write_error_reported_by_cmd13_is_not_treated_as_success();
+    test_a_failed_write_does_not_report_the_previous_write_bytes();
     test_a_missing_data_token_fails_the_read();
     test_a_v1_card_still_initialises();
 

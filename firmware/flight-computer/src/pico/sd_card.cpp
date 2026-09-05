@@ -242,7 +242,14 @@ bool SdCard::write_block(std::uint32_t lba, const std::uint8_t* in512) {
 
     if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, kRunBaud);
 
+    // Clear the captured bytes as well as the stage. A write that stops early never reaches
+    // the later fields, and leaving the previous attempt's values in them presents a stale
+    // byte as this attempt's measurement -- which is how a data token from an earlier write
+    // came to be printed for a write that never sent one.
     write_stage_ = WriteStage::none;
+    last_write_r1_ = 0;
+    last_write_r2_ = 0;
+    last_data_response_ = 0;
     select(true);
     // A card still busy from the previous write ignores commands, so wait for it first.
     if (wait_ready() != 0xFF) {
