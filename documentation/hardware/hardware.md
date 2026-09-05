@@ -187,9 +187,12 @@ The board carries a regulator, so `VCC` is not necessarily the die's supply and 
 accept more than 3.3 V. **Its input range is unknown until that SOT-23-5 is identified**, so
 feed it 3.3 V — which the design intends anyway — rather than assuming 5 V tolerance.
 
-The die marking makes this a genuine nine-axis part, so the AK8963 and the absolute-yaw path
-apply. `WHO_AM_I` at bring-up remains the final word: a photograph of a package is not a
-register read.
+The die marking suggested a genuine nine-axis part. **The register read disagreed, and the
+register read wins.** `WHO_AM_I` returned `0x70` on 2026-09-05: an MPU-6500, six axes, no
+AK8963, and `0x0C` answers in neither bus scan
+([F-1](receiving-inspection.md#findings)). The absolute-yaw path does not apply to this
+board. That sentence used to end *"a photograph of a package is not a register read"* — it
+was right, and this is what happened when the register was finally read.
 
 **The MPU-9250 is two dies in one package.** The accelerometer and gyroscope answer at the module's own address; the AK8963 magnetometer is a separate I2C slave at `0x0C` that is invisible from outside until the MPU is told to bridge to it. Two consequences that are easy to get wrong and hard to notice afterwards:
 

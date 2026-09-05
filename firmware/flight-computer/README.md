@@ -9,7 +9,8 @@ include/flight/            hardware-independent flight core (host + Pico)
   controller.hpp           flight loop orchestrator
   state_machine.hpp        INIT -> SELF_TEST -> READY -> FLIGHT -> LANDED -> RECOVERY (+ FAULT)
   scheduler.hpp            non-blocking periodic-task timers
-  orientation.hpp          nine-axis Mahony quaternion attitude (accel + gyro + magnetometer)
+  orientation.hpp          nine-axis Mahony quaternion attitude (accel + gyro + magnetometer);
+                           runs six-axis on the delivered MPU-6500, which has no magnetometer
   sensor_math.hpp          MPU-9250 and AK8963 scaling, BMP280 Bosch compensation, pressure altitude
   telemetry_builder.hpp    canonical record + rulebook packet string
   fault_manager.hpp        fixed-size fault store, no allocation

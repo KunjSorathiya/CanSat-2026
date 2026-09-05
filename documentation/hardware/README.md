@@ -25,7 +25,7 @@ Chip-level documents are not treated as breakout-board documentation. Board-leve
 
 The Raspberry Pi Pico and Bosch BMP280 manufacturer PDFs are stored locally in `datasheets/`. The exact breakout-board documentation for the RA-02, MPU-9250, NEO-6M, GY-BMP280-3.3, and Micro SD reader is incomplete. The Micro SD reader, SKU 11566, is a blocking item because breakout boards can differ in supply voltage, regulation, level shifting, interface, and pinout.
 
-The IMU is a nine-axis MPU-9250: accelerometer, gyroscope and an AK8963 magnetometer on a second die at I2C address `0x0C`. Two things about it must be confirmed physically rather than assumed — that the part is a real MPU-9250 and not an MPU-6500 sold as one, and which way the board's printed axes point.
+The IMU was bought as a nine-axis MPU-9250 and **is not one**: `WHO_AM_I` returns `0x70`, an MPU-6500 with an accelerometer and a gyroscope and no magnetometer die at all, and `0x0C` answers in neither bus scan ([F-1](receiving-inspection.md#findings)). What follows describes the nine-axis part the design was written around, and is kept because the firmware still implements it and a genuine MPU-9250 would run it. Two things about it must be confirmed physically rather than assumed — that the part is a real MPU-9250 and not an MPU-6500 sold as one, and which way the board's printed axes point.
 
 The antenna description also requires physical confirmation: the supplied BOM says SMA male, while the live Robu page title observed for SKU 1121334 says RP-SMA female.
 

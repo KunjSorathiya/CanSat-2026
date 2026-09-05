@@ -101,6 +101,12 @@ def main() -> int:
     runbook = read("documentation/operations/runbook.md")
     architecture = read("documentation/design/software-architecture.md")
 
+    # Every Markdown file in the repository, for the checks that sweep all of them. Built
+    # here for the same reason the reads are: a check should not have to care where in this
+    # function it happens to sit.
+    markdown = [q for q in REPO_ROOT.rglob("*.md")
+                if not {".git", "build", ".claude"} & set(q.parts)]
+
     # ---- the radio link profile, quoted throughout the design documents -------------
     profile = read("firmware/common/include/cansat/link_profile.hpp")
     spreading_factor = constant(profile, "kSpreadingFactor")
@@ -328,6 +334,27 @@ def main() -> int:
         acknowledged = "MPU-6500" in text or "receiving-inspection.md#findings" in text
         checker.check(f"{rel} says the delivered IMU has no magnetometer", acknowledged)
 
+    # Acknowledging it somewhere in the file is not enough. Two hardware documents named
+    # the delivered part in one section and still asserted, in another, that this vehicle
+    # is a nine-axis one -- so the rule is per paragraph: talk about nine axes all you
+    # like, and say in the same breath that this is not one.
+    hedges = ("MPU-6500", "0x70", "six-axis", "six axes", "is not one", "does not apply",
+              "would", "if a nine-axis part", "ever fitted", "cannot exercise")
+    unhedged: list[str] = []
+    for doc in markdown:
+        if "audit" in doc.parts or doc.name == "CHANGELOG.md":
+            continue
+        rel = doc.relative_to(REPO_ROOT).as_posix()
+        for paragraph in doc.read_text(encoding="utf-8", errors="replace").split("\n\n"):
+            if "nine-axis" not in paragraph and "nine axes" not in paragraph:
+                continue
+            if not any(h in paragraph for h in hedges):
+                unhedged.append(f"{rel}: {' '.join(paragraph.split())[:60]}")
+    checker.check("no document claims this vehicle has nine axes",
+                  not unhedged, "; ".join(unhedged[:3]))
+
+
+
     # The validator scenarios only guard anything while both implementations actually read
     # them. A suite that quietly stops loading the file would leave the fixture sitting in
     # the tree looking like a guarantee.
@@ -473,8 +500,6 @@ def main() -> int:
         text = re.sub(r"[`*_]", "", heading.strip().lower())
         return re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE).replace(" ", "-")
 
-    markdown = [q for q in REPO_ROOT.rglob("*.md")
-                if not {".git", "build", ".claude"} & set(q.parts)]
     missing_targets: list[str] = []
     missing_anchors: list[str] = []
     for doc in markdown:

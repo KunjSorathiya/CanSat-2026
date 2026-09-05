@@ -64,6 +64,32 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — the hardware documents still said the part was nine-axis, in the sections nobody reread
+
+The rule added earlier in this pass required any document mentioning the magnetometer to
+name the delivered `MPU-6500` or link the finding. Both hardware documents passed it — and
+both still asserted, somewhere else on the page, that this vehicle has nine axes:
+
+- `hardware.md`: *"The die marking makes this a genuine nine-axis part, so the AK8963 and
+  the absolute-yaw path apply."* The sentence right after it said `WHO_AM_I` at bring-up
+  would be the final word — and it was, and it said `0x70`.
+- `hardware/README.md`: *"The IMU is a nine-axis MPU-9250."*
+
+**The gate was too weak, and the weakness is instructive.** Acknowledging a fact once in a
+file says nothing about the paragraph three screens away that contradicts it. The rule is
+now per paragraph: nine axes may be discussed anywhere, and the same paragraph must say
+this is not one.
+
+That immediately caught two more, both describing code rather than the vehicle and neither
+distinguishable as such by a reader: the link budget's note that the nine-axis upgrade cost
+six bytes per packet, and the flight core's file listing describing `orientation.hpp`. Both
+now say what runs here. The link-budget one is worth the sentence it gained — those six
+bytes are still spent on a tag that always reads `YR-G`, and that is still worth paying,
+because the tag says the yaw is relative and a receiver would otherwise assume.
+
+Four places, one fact, found only because the first version of the rule was not strict
+enough to catch its own hardest cases.
+
 ### Fixed — the bring-up diagnostic asked an operator to find a chip that is not there
 
 `cansat_bringup_firmware` scans the I2C bus twice, before and after the IMU is

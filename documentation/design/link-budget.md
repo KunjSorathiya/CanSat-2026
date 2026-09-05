@@ -101,6 +101,11 @@ which is exactly why that shedding path exists and is tested.
 > mandatory yaw field is an absolute magnetic angle or a relative gyro integration. Six
 > bytes of airtime to stop a receiver mistaking one for the other is the cheapest part of
 > this whole design.
+>
+> Those six bytes are still spent on the delivered hardware, which is an MPU-6500 with no
+> magnetometer ([F-1](../hardware/receiving-inspection.md#findings)) and therefore always
+> sends `YR-G`. A tag that always says the same thing still earns its airtime: it says the
+> yaw is relative, which is the fact a receiver most needs and would otherwise assume.
 
 > **A second finding.** An earlier revision of this document budgeted **200 bytes**, from an
 > estimate rather than a measurement. The real in-flight packet with GPS and every
