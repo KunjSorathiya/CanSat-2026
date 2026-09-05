@@ -700,6 +700,30 @@ def main() -> int:
     checker.check("every shell script is LF in the working tree, as .gitattributes requires",
                   not crlf_scripts, ", ".join(crlf_scripts))
 
+    # Every Python file in the repository compiles without a warning. The one that matters
+    # is the invalid escape sequence -- "\d" in a plain string is a SyntaxWarning today and
+    # a SyntaxError in a later Python, and it arrives most often in a regex someone forgot
+    # to mark raw. It costs a few hundredths of a second to be sure.
+    import warnings as _warnings
+
+    python_problems: list[str] = []
+    for source in sorted(REPO_ROOT.rglob("*.py")):
+        if {".git", "build", ".claude", "__pycache__"} & set(source.parts):
+            continue
+        rel = source.relative_to(REPO_ROOT).as_posix()
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            try:
+                compile(source.read_text(encoding="utf-8"), rel, "exec")
+            except SyntaxError as exc:
+                python_problems.append(f"{rel}: {exc}")
+                continue
+            for warning in caught:
+                python_problems.append(
+                    f"{rel}:{warning.lineno} {warning.category.__name__}: {warning.message}")
+    checker.check("every Python file compiles without a warning",
+                  not python_problems, "; ".join(python_problems[:3]))
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.
