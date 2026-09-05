@@ -163,7 +163,7 @@ said, which was the subject of F-43.
 
 | | At `e87d480` | Now |
 |---|---:|---:|
-| Documented claims checked | 66 | **198** |
+| Documented claims checked | 66 | **199** |
 | C++ assertions | 4222 | **4268** |
 | Python tests | 131 | **160** |
 | Node tests | 37 | **51** |
@@ -278,6 +278,8 @@ correct by design.
 
 
 ## Audit trail
+
+Final state, re-run from a fresh `git clone` with no build directory:
 
 | Step | Command | Result |
 |---|---|---|
