@@ -121,6 +121,11 @@ public:
     // ordinary and costs nothing but a line in the bring-up record.
     int log_extents() const { return layout_.extent_count; }
 
+    // The card itself, so a failed initialise can be asked WHERE it failed. A located file
+    // and a failed init means the failure was a write - the log's first act is to put a
+    // header down - and only the card knows which of the five write stages stopped it.
+    const pico::SdCard& card() const { return card_; }
+
 private:
     pico::SdCard card_;
     RawBlockLog log_;

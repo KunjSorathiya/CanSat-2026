@@ -759,10 +759,37 @@ void report_sd() {
             }
         }
         if (written == 0) {
-            std::printf("   every write FAILED. Skipping the rest of 6.3.\n");
+            std::printf("   every write FAILED. Skipping the timing.\n");
+            describe_write_failure(card);
+
+            // A write can fail and still land. CMD13 reporting an error after the data was
+            // programmed returns false while the block on the card is correct, and that is a
+            // different fault from a card that refused - one is a report, the other is the
+            // storage. Reading the block back is the only thing that separates them, and it
+            // costs one transaction.
+            std::uint8_t check[flight::pico::SdCard::kBlockSize];
+            if (!card.read_block(kBaseLba + kWrites - 1, check)) {
+                std::printf("   the read-back of that block ALSO failed, so the card has\n"
+                            "   stopped answering entirely - this is no longer a\n"
+                            "   write-specific fault, and the bus is the place to look.\n");
+            } else {
+                bool landed = check[0] == static_cast<std::uint8_t>(kWrites - 1);
+                for (std::size_t i = 1; landed && i < sizeof(check); ++i) {
+                    if (check[i] != static_cast<std::uint8_t>(i & 0xFF)) landed = false;
+                }
+                if (landed) {
+                    std::printf("   ...but the data IS on the card. The write happened and\n"
+                                "   the report of it failed. Look at the stage above, not\n"
+                                "   at the wiring.\n");
+                } else {
+                    std::printf("   and the block does not hold what was written, so the\n"
+                                "   data genuinely did not land.\n");
+                }
+            }
         } else {
         std::printf("   %d/%d written. mean %.3f ms, worst %.3f ms\n", written, kWrites,
                     (total_us / static_cast<double>(written)) / 1000.0, worst_us / 1000.0);
+        if (written < kWrites) describe_write_failure(card);
 
         // A write that reports success and does not land is the failure mode worth catching:
         // the log would look healthy all the way to a card with nothing on it.
@@ -847,8 +874,11 @@ void report_sd() {
     if (!logger.initialize()) {
         std::printf("   logger init FAILED: %s\n",
                     flight::FatVolume::describe(logger.locate_status()));
-        std::printf("   If the file was located, the failure is a write: the\n"
-                    "   log first act is to put a header down.\n");
+        std::printf("   If the file was located, the failure is a write: the log's\n"
+                    "   first act is to put a header down.\n");
+        if (logger.locate_status() == flight::FatVolume::Status::ok) {
+            describe_write_failure(logger.card());
+        }
         return;
     }
     std::printf("   boot_count = %lu, records = %lu, %s\n",
@@ -890,8 +920,29 @@ void report_shared_bus(const flight::Configuration& config) {
     const bool card_ok = card.begin(spi0, flight::BoardPins::sd_cs);
     std::printf("   7.2 card init with the radio present: %s\n", card_ok ? "ok" : "FAILED");
 
+    // One of the two working is not nothing. Both devices share SCK, MOSI, MISO and the
+    // ground, so whichever one answered has just proved those four are good - and that
+    // narrows the other one's fault to the lines it does not share. Saying so here saves
+    // an evening spent re-seating wires that have already been shown to work.
     if (!radio_ok || !card_ok) {
-        std::printf("   Gate 7 needs BOTH on the bus. Wire the missing one and re-run.\n");
+        if (card_ok && !radio_ok) {
+            std::printf("\n   The card initialised on this same bus and read from it, so\n"
+                        "   SCK (GP%d), MOSI (GP%d), MISO (GP%d), GND and the 3V3 rail are\n"
+                        "   all working. The radio's fault is therefore in what it does NOT\n"
+                        "   share: NSS on GP%d, RESET on GP%d, or the module's own VCC and\n"
+                        "   GND pins. Check those three and nothing else.\n",
+                        flight::BoardPins::spi_sck, flight::BoardPins::spi_mosi,
+                        flight::BoardPins::spi_miso, flight::BoardPins::lora_cs,
+                        flight::BoardPins::lora_reset);
+        } else if (radio_ok && !card_ok) {
+            std::printf("\n   The radio answered on this same bus, so SCK (GP%d), MOSI\n"
+                        "   (GP%d), MISO (GP%d), GND and the 3V3 rail are all working. The\n"
+                        "   card's fault is in what it does not share: CS on GP%d, the\n"
+                        "   module's own supply, or the card not being seated.\n",
+                        flight::BoardPins::spi_sck, flight::BoardPins::spi_mosi,
+                        flight::BoardPins::spi_miso, flight::BoardPins::sd_cs);
+        }
+        std::printf("   Gate 7 itself needs BOTH on the bus. Fix the one above and re-run.\n");
         return;
     }
 
