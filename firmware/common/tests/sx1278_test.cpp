@@ -480,6 +480,27 @@ void test_reconfigure_reapplies_every_setting() {
 
 }  // namespace
 
+// probe_version() must go to the bus, not return a cached value.
+//
+// It exists so Gate 7 can ask the radio "are you still readable?" while the microSD is
+// active on the same SPI0. A cached answer would always say yes and the check would be
+// worthless -- the failure it guards against is precisely the bus going wrong after
+// begin() succeeded.
+void test_probe_version_reads_the_bus_rather_than_a_cached_value() {
+    FakeRadio radio;
+    cansat::Sx1278 sx;
+    CHECK(sx.begin(make_hal(radio), cansat::Sx1278Settings{}));
+    CHECK(sx.chip_version() == 0x12);
+
+    // Corrupt the register behind the driver's back, exactly as a card holding MISO would.
+    radio.reg[0x42] = 0x00;
+    CHECK(sx.probe_version() == 0x00);
+    CHECK(sx.chip_version() == 0x00);  // and the cached value follows the bus
+
+    radio.reg[0x42] = 0x12;
+    CHECK(sx.probe_version() == 0x12);
+}
+
 int main() {
     test_begin_requires_the_right_silicon();
     test_begin_requires_a_complete_hal();
@@ -499,6 +520,8 @@ int main() {
     test_rssi_uses_the_low_frequency_offset_at_433_mhz();
     test_sync_word_can_be_switched_for_the_official_launch();
     test_reconfigure_reapplies_every_setting();
+
+    test_probe_version_reads_the_bus_rather_than_a_cached_value();
 
     std::cout << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
     if (g_failures != 0) {

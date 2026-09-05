@@ -67,6 +67,17 @@ public:
     int last_rssi_dbm() const { return last_rssi_dbm_; }
     float last_snr_db() const { return last_snr_db_; }
     std::uint8_t chip_version() const { return version_; }
+    // Re-read register 0x42 over the bus, right now, and return what came back.
+    //
+    // chip_version() returns what was read at begin(). This asks again, which is a
+    // different question: it is one small SPI transaction whose correct answer is known in
+    // advance, so it doubles as a probe of whether the bus is still trustworthy. The
+    // microSD shares SPI0 and has nothing buffering MISO, so a card that keeps driving the
+    // line after its chip select goes high corrupts the radio's next transaction -- and the
+    // symptom looks like a dead radio rather than a storage problem. Used by the bring-up
+    // diagnostic to interleave radio reads with card activity; the flight firmware does not
+    // call it.
+    std::uint8_t probe_version();
     bool healthy() const { return healthy_; }
 
 private:

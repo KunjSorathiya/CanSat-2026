@@ -680,6 +680,109 @@ void report_sd() {
     std::printf("   Power-cycle and re-run: boot_count must increase by exactly one.\n");
 }
 
+// ---- Gate 7 ------------------------------------------------------------------
+//
+// The radio and the microSD share SPI0, and they have never been on a bus together.
+//
+// The failure this gate exists for is specific. Nothing on the microSD breakout buffers
+// MISO -- C.6.4 found no active component on it at all -- so nothing but the card itself
+// releases that line when its chip select goes high. A card that keeps driving it corrupts
+// the RADIO's next transaction, and the symptom looks like a dead radio. Someone would
+// spend a day on the wrong subsystem.
+//
+// Phase A is non-destructive and needs no antenna: card reads interleaved with radio
+// register reads. The radio's version register is the ideal probe because its correct
+// answer is known in advance, so a wrong one is unambiguous corruption rather than a
+// judgement call. Phase B adds real transmits and real writes, and is prompted for
+// separately because it needs an antenna and it overwrites the log.
+void report_shared_bus(const flight::Configuration& config) {
+    std::printf("\n-- Gate 7: radio and microSD sharing SPI0 --\n");
+
+    flight::PicoRadio radio(config);
+    const bool radio_ok = radio.initialize(cansat::link::kTestSyncWord);
+    std::printf("   radio init: %s, version 0x%02X\n", radio_ok ? "ok" : "FAILED",
+                radio.chip_version());
+
+    flight::pico::SdCard card;
+    const bool card_ok = card.begin(spi0, flight::BoardPins::sd_cs);
+    std::printf("   7.2 card init with the radio present: %s\n", card_ok ? "ok" : "FAILED");
+
+    if (!radio_ok || !card_ok) {
+        std::printf("   Gate 7 needs BOTH on the bus. Wire the missing one and re-run.\n");
+        return;
+    }
+
+    // 7.1 and 7.5 together. The SD driver raises SPI from 400 kHz to 4 MHz once the card is
+    // initialised, and the radio inherits that clock. Asking the radio to identify itself
+    // again is the cheapest way to find out whether it still can.
+    const std::uint8_t after = radio.probe_version();
+    std::printf("   7.1/7.5 radio version re-read after the card raised SPI to %lu Hz: 0x%02X %s\n",
+                static_cast<unsigned long>(flight::pico::SdCard::kRunBaud), after,
+                after == 0x12 ? "- unchanged" : "- CHANGED, the faster clock is not safe");
+
+    // 7.4. Read a block, then immediately ask the radio who it is. If the card is still
+    // driving MISO when the radio is selected, this is where it shows.
+    constexpr int kRounds = 200;
+    std::uint8_t block[flight::pico::SdCard::kBlockSize];
+    int card_fail = 0, radio_wrong = 0;
+    std::uint8_t worst = 0x12;
+    for (int i = 0; i < kRounds; ++i) {
+        if (!card.read_block(33152u + static_cast<std::uint32_t>(i % 32), block)) ++card_fail;
+        const std::uint8_t v = radio.probe_version();
+        if (v != 0x12) {
+            ++radio_wrong;
+            worst = v;
+        }
+    }
+    std::printf("   7.4 %d interleaved card-read / radio-read rounds:\n", kRounds);
+    std::printf("       card read failures : %d\n", card_fail);
+    std::printf("       radio misreads     : %d", radio_wrong);
+    if (radio_wrong != 0) std::printf("  (last bad value 0x%02X)", worst);
+    std::printf("\n");
+    if (card_fail == 0 && radio_wrong == 0) {
+        std::printf("       PASS - the card releases MISO and the radio stays readable.\n");
+    } else {
+        std::printf("       FAIL - this is the shared-bus fault Gate 7 exists to catch.\n"
+                    "       A card still driving MISO corrupts the radio, not itself, so\n"
+                    "       do not go looking at the radio first.\n");
+    }
+
+    // Phase B: real transmits interleaved with real writes.
+    std::printf("\n   7.3 needs an antenna on the RA-02 and overwrites the log file.\n");
+    std::printf("   Both ready? Press 'g' within 20 s. Anything else skips.\n");
+    const std::uint64_t deadline = now_ms() + 20000;
+    int key = -1;
+    while (now_ms() < deadline) {
+        key = getchar_timeout_us(0);
+        if (key != PICO_ERROR_TIMEOUT) break;
+        sleep_ms(50);
+    }
+    if (key != 'g' && key != 'G') {
+        std::printf("   skipped. 7.3 stays open.\n");
+        return;
+    }
+
+    constexpr int kBursts = 30;
+    const std::string packet(206, 'A');
+    int tx_fail = 0, wr_fail = 0;
+    radio_wrong = 0;
+    for (int i = 0; i < kBursts; ++i) {
+        if (!radio.transmit(packet)) ++tx_fail;
+        block[0] = static_cast<std::uint8_t>(i);
+        if (!card.write_block(33152u + static_cast<std::uint32_t>(i), block)) ++wr_fail;
+        if (radio.probe_version() != 0x12) ++radio_wrong;
+    }
+    std::printf("   7.3 %d transmit-then-write rounds: %d TX failures, %d write failures,\n"
+                "       %d radio misreads afterwards\n",
+                kBursts, tx_fail, wr_fail, radio_wrong);
+    if (tx_fail == 0 && wr_fail == 0 && radio_wrong == 0) {
+        std::printf("       PASS - both devices work while the other is active.\n");
+    } else {
+        std::printf("       FAIL - record which of the three counters moved; they point at\n"
+                    "       different faults.\n");
+    }
+}
+
 void gps_status(flight::PicoGps& gps, std::uint64_t boot_fix_ms) {
     cansat::GpsData d;
     const bool have = gps.latest(d) && d.valid;
@@ -760,6 +863,7 @@ int main() {
     // so everything that can be measured without it is already on the record by now.
     report_radio(config);
     report_sd();
+    report_shared_bus(config);
 
     gps_raw_echo(config, 5);
     flight::PicoGps gps(config);

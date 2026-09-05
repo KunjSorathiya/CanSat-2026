@@ -191,7 +191,7 @@ confident wrong number.
 > vertical-speed estimate degrades — the firmware detects and handles it, but the
 > configuration should be corrected rather than relied on to degrade gracefully.
 
-> **Rows 3.1–3.5, 3.7, 3.8, 4.1–4.3, 5.1–5.3, 6.1–6.3, 6.6 and 8.8 are taken with `cansat_bringup_firmware`**, a separate image
+> **Rows 3.1–3.5, 3.7, 3.8, 4.1–4.3, 5.1–5.3, 6.1–6.3, 6.6, 7.1–7.5 and 8.8 are taken with `cansat_bringup_firmware`**, a separate image
 > that prints over USB. The flight firmware speaks only over LoRa, so a vehicle with no radio
 > attached produces nothing to read — that is why this gate had no observable until the
 > diagnostic existed. Flash it exactly like the flight image, open the port at any baud rate,
@@ -473,6 +473,24 @@ bus together.
 | 7.3 | Radio works *during* card writes | No lost packets | Run both at full rate for 5 minutes | | |
 | 7.4 | MISO released when each device is deselected | Line goes high-impedance | Scope MISO during the other device's transaction | | |
 | 7.5 | SPI clock after an SD transfer | 4 MHz, unchanged for the radio | Scope SCK during a radio transaction | | |
+
+> **`cansat_bringup_firmware` takes this gate in two phases**, because half of it is free
+> and half of it is not.
+>
+> **Phase A is non-destructive and needs no antenna.** It initialises both devices, then
+> re-reads the radio's version register *after* the SD driver has raised SPI from 400 kHz to
+> 4 MHz — that single read covers 7.1 and 7.5 together. It then runs **200 rounds of
+> card-read followed immediately by radio-register-read**. The version register is the ideal
+> probe precisely because its correct answer is known in advance: `0x12` or the bus is
+> lying. Any other value is unambiguous corruption rather than a judgement call, and that is
+> 7.4 measured rather than scoped.
+>
+> **Phase B is prompted separately**, because it transmits and it overwrites the log: 30
+> rounds of transmit-then-write, checking the radio is still readable after each. That is
+> 7.3.
+>
+> The three counters are reported separately — card failures, radio misreads, transmit
+> failures — because they point at different faults and a single pass/fail would lose that.
 
 > 7.4 is the specific failure the driver was fixed for: a card that keeps driving MISO
 > corrupts the **radio's** next transaction, and the symptom looks like a dead radio.

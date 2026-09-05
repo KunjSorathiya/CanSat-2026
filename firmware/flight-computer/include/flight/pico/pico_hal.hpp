@@ -77,6 +77,9 @@ public:
     // or 0xFF means the SPI transaction itself failed rather than the modem answering
     // wrongly. Worth reporting on the bench, like the IMU's WHO_AM_I.
     std::uint8_t chip_version() const { return radio_.chip_version(); }
+    // A fresh read of register 0x42 over the bus. Used by Gate 7 to check that the
+    // radio is still readable while the microSD is active on the same SPI0.
+    std::uint8_t probe_version() { return radio_.probe_version(); }
 
 private:
     Configuration config_;

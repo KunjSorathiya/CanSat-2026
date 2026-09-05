@@ -314,4 +314,10 @@ std::size_t Sx1278::poll_receive(std::uint8_t* out, std::size_t cap) {
     return len;
 }
 
+std::uint8_t Sx1278::probe_version() {
+    if (hal_.transfer == nullptr) return 0xFF;
+    version_ = read_reg(REG_VERSION);
+    return version_;
+}
+
 }  // namespace cansat
