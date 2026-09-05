@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+from urllib.parse import unquote
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
@@ -447,6 +448,43 @@ def main() -> int:
     # Every gate blocks: an advisory job is a gate that has stopped being one.
     checker.check("no CI job is allowed to fail without failing the workflow",
                   "continue-on-error" not in workflow)
+
+    # ---- documentation that still points where it says -------------------------------
+    # Every relative link and every same-document anchor, across every Markdown file. A
+    # renamed heading or a moved file breaks navigation silently: the document still reads
+    # correctly, and the link simply goes nowhere. Two aggregate checks rather than one per
+    # link, so the claim count stays a measure of what is checked rather than of how much
+    # prose there is.
+    def heading_slug(heading: str) -> str:
+        text = re.sub(r"[`*_]", "", heading.strip().lower())
+        return re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE).replace(" ", "-")
+
+    markdown = [q for q in REPO_ROOT.rglob("*.md")
+                if not {".git", "build", ".claude"} & set(q.parts)]
+    missing_targets: list[str] = []
+    missing_anchors: list[str] = []
+    for doc in markdown:
+        body = doc.read_text(encoding="utf-8", errors="replace")
+        anchors = {heading_slug(h)
+                   for h in re.findall(r"^#{1,6}\s+(.+?)\s*$", body, re.MULTILINE)}
+        rel = doc.relative_to(REPO_ROOT).as_posix()
+        for match in re.finditer(r"\]\(([^)]+)\)", body):
+            target = match.group(1).strip()
+            if target.startswith(("http://", "https://", "mailto:")):
+                continue
+            line = body[:match.start()].count("\n") + 1
+            path_part, _, fragment = target.partition("#")
+            if not path_part:
+                if fragment not in anchors:
+                    missing_anchors.append(f"{rel}:{line} #{fragment}")
+                continue
+            if not (doc.parent / unquote(path_part)).resolve().exists():
+                missing_targets.append(f"{rel}:{line} {path_part}")
+
+    checker.check(f"every relative link in {len(markdown)} documents resolves",
+                  not missing_targets, "; ".join(missing_targets[:3]))
+    checker.check("every same-document anchor resolves to a heading",
+                  not missing_anchors, "; ".join(missing_anchors[:3]))
 
     counts = suite_counts()
     if counts is None:

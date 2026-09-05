@@ -55,6 +55,38 @@ and **stay blank**. They are not on the critical path: the Gate 3 bus scan answe
 question from the address a device actually replies at, which is better evidence than a
 strap measurement.
 
+> [!NOTE]
+> **Everything from here down to [Gate 6 on the diagnostic](#added--gate-6-on-the-diagnostic-with-the-destructive-half-behind-a-prompt)
+> is one continuous review pass**, run in a single session on 2026-09-05 and summarised as a
+> whole in [documentation/audit/2026-09-05-continuous-review.md](documentation/audit/2026-09-05-continuous-review.md).
+> Seventeen findings, `F-43` to `F-59`. Three are defects in flight or ground software that
+> would have produced wrong data; the rest are documents that had stopped describing the
+> software, or guarantees nothing was holding. Read the audit for the shape of it; these
+> entries are the detail.
+
+### Added — every link and heading anchor in the documentation is checked
+
+Thirty-four documents, a table of contents in most of them, and cross-references between
+them throughout. Nothing checked that any of it still pointed anywhere. A renamed heading
+or a moved file breaks navigation in the quietest way there is: the document still reads
+correctly, and the link simply goes nowhere.
+
+Two aggregate checks now cover all of it — every relative link resolves to a file that
+exists, and every same-document anchor resolves to a heading in that document. Aggregate
+rather than one per link, so the claim count stays a measure of what is checked rather than
+of how much prose there is.
+
+Both were clean on the first run, which is the answer this pass wanted. Breaking one
+deliberately — dropping a hyphen from the quick start's `#10-the-power-problem--read-before-wiring`,
+the double hyphen an em dash produces — fails the check and names the file and line.
+
+This one started as a mistake. A grouping note added to the changelog above needed a link
+to a heading with an em dash in it; the throwaway script written to confirm the anchor said
+it was wrong, because it collapsed runs of whitespace where GitHub does not. The repository's
+own conventions settled it — the anchor was right — and the episode is the argument for the
+check: if a hand-written verification of one link can be wrong, the several hundred nobody
+has verified deserve better than trust.
+
 ### Changed — a cut LoRa payload is counted, like a cut log record
 
 `poll_receive()` trims a payload longer than the caller's buffer and returns the trimmed
