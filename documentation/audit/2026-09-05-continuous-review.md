@@ -207,7 +207,7 @@ said, which was the subject of F-43.
 
 | | At `e87d480` | Now |
 |---|---:|---:|
-| Documented claims checked | 66 | **214** |
+| Documented claims checked | 66 | **215** |
 | C++ assertions | 4222 | **4268** |
 | Python tests | 131 | **160** |
 | Node tests | 37 | **51** |
@@ -330,7 +330,7 @@ Final state, re-run from a fresh `git clone` with no build directory:
 | Host build and tests | `bash tools/build_host.sh` | All pass, zero warnings |
 | Strict warning set | `CXXFLAGS="… -Werror" bash tools/build_host.sh` | Clean |
 | Firmware syntax | `bash tools/check_pico_syntax.sh` | 11 / 11 `OK` |
-| Documented claims | `python tools/check_doc_claims.py` | 214 / 214 |
+| Documented claims | `python tools/check_doc_claims.py` | 215 / 215 |
 | Documented commands | run as written, from the directory each document names | All pass |
 | Internal links | every relative Markdown link resolved | 0 broken |
 | Web console | driven in a browser, demo and injected packets | No console errors |

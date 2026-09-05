@@ -407,7 +407,7 @@ bash tools/build_host.sh
 | Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **133 / 133** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
 | Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **57 / 57** |
-| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **214 / 214** |
+| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **215 / 215** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
@@ -463,37 +463,35 @@ Full checklist with evidence columns and development gates:
 [requirements.md](documentation/requirements/requirements.md)
 </details>
 
-### Rulebook contradictions
+### Rulebook contradictions — resolved by the 2026 revision
 
-The supplied rulebook contradicts itself in two places. **No value has been chosen
-locally** — both are escalated to the organizers.
+The original rulebook contradicted itself on dimensions and launch altitude, and both were
+escalated rather than guessed. **The updated 2026 guidelines settle both**, and the figures
+below are now single-valued:
 
-| Conflict | The problem |
+| Was contradictory | Now stated |
 |---|---|
-| **Dimensions** | Page 1 says max width 12 cm with an egg chamber; page 4 says ≤ 21 × 9 cm and ≤ 500 g; page 10 says 21 cm (+8 cm for the egg chamber) × 12.5 cm |
-| **Launch altitude** | The mission section says 100 ft; the launch guidelines say a drone launch at 150 ft |
+| **Dimensions** | **21 cm (+7 cm max for the egg chamber) × 12 cm**, stated identically on page 4 and page 10 |
+| **Launch altitude** | **100 ft, released from a drone**, stated identically in the mission profile and the launch guidelines |
+| **Mass** | **500 g (±10%)**; exceeding size or mass by more than 10% is a disqualification |
 
-Both block the mechanical design, which is why phase 7 has not started.
+The mechanical design is no longer blocked on the organizers.
 
 ---
 
 ## Open questions for the organizers
 
-1. Which dimensional limit applies, given three conflicting statements?
-2. Is ≤ 500 g the mass limit, and how does the >10% disqualification threshold apply?
-3. Launch altitude — 100 ft or 150 ft?
-4. Are egg-chamber dimensions included in, or added to, the main dimensions?
-5. How is the ≤ 5 m/s descent requirement enforced and scored?
-6. **What constitutes valid yaw data?** This question now has a hardware answer behind it:
+1. How is the ≤ 5 m/s descent requirement enforced and scored?
+2. **What constitutes valid yaw data?** This question now has a hardware answer behind it:
    the delivered IMU is a six-axis MPU-6500 with no magnetometer, so the vehicle can
    transmit only a relative, gyro-integrated yaw, declared `YR-G`. Is a relative yaw
    acceptable, and is the declared reference (`YR-M` / `YR-G`) an acceptable way to say
    which is being transmitted? **If an absolute magnetic yaw is required, this is a part
    the vehicle does not have** — a procurement item, not a software change.
-7. Are any LoRa parameters prescribed beyond the sync words?
-8. What scoring thresholds apply where the rulebook rewards higher performance?
-9. What are the actual report, media, video and arrival deadlines?
-10. What interface and data format do the official dual ground stations use?
+3. Are any LoRa parameters prescribed beyond the sync words?
+4. What scoring thresholds apply where the rulebook rewards higher performance? The 2026 revision rewards packet rates above 1 Hz and longer stable descents, but names no thresholds
+5. What are the actual report, media, video and arrival deadlines?
+6. What interface and data format do the official dual ground stations use? The 2026 revision names the radios — SX1278 RA-02 or nRF24L01 — but not the framing or the host-side format
 
 ---
 

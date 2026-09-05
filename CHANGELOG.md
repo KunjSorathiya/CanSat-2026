@@ -1114,6 +1114,69 @@ can explain when it fails.
 Run standalone, without the log, the script skips the count checks and reports 69/69 rather
 than inventing a number.
 
+### Changed — the 2026 rulebook revision, and three contradictions it closes
+
+`documentation/requirements/updated CanSat Final Guidelines 2026.pdf` supersedes the earlier
+extract. Diffed against it rather than read fresh, so what changed is recorded rather than
+re-derived.
+
+**Three open questions to the organizers are answered**, and each was a genuine
+self-contradiction in the old document rather than an omission:
+
+- **Dimensions: 21 cm (+7 cm maximum, egg chamber) x 12 cm.** The old rulebook said 12 cm
+  width on page 1, 21 x 9 cm on page 4 and 21 (+8) x 12.5 cm on page 10. The revision states
+  one figure in both places it appears.
+- **Launch altitude: 100 ft, released from a drone.** The old one said 100 ft in the mission
+  profile and 150 ft from a drone in the launch guidelines, and mentioned an 8-story rooftop.
+  The rooftop is gone.
+- **Mass: 500 g (+/-10%)**, with >10% on either size or mass a disqualification.
+
+`GEN-004`, `GEN-005`, `GEN-006` and `MIS-001` move from `TBD` to locked, and the descent
+system is no longer blocked on the organizers.
+
+**Two changes make the rules harsher or different in ways worth acting on:**
+
+- **Stray-transmission penalty is five times harsher: -1 point per 2 packets**, where the
+  old rulebook said per 10. At this vehicle's 1 Hz that is half a point per second, so ninety
+  seconds of a CanSat left on during another team's launch costs more than the whole
+  25-point telemetry section. The firmware is *required* to transmit on power-up, so the
+  manual switch is the only control - recorded in the runbook and the protocol document.
+- **Ground-station compatibility is now an explicit rule**, satisfied by two named radios:
+  433 MHz LoRa SX1278 RA-02, or nRF24L01. This vehicle carries the RA-02, confirmed on the
+  bench at Gate 5. New requirement `GS-002`.
+
+**And one change is straightforwardly in our favour:** the mandatory sensor set is now worth
+**15 points**, where the previous rulebook awarded it nothing.
+
+### Added — a scoring assessment against the 200-point rulebook
+
+`documentation/project/scoring-assessment.md` works through all six sections.
+
+**~47 points secured today, ~177 achievable** with the current design competently built. The
+entire gap is mechanical and procedural: every point in payload safety, descent and
+structural innovation waits on a chamber, a parachute, a switch and an LED, none of which
+exist. Nothing in the gap is electronic or software.
+
+The four cheapest points remaining, in order:
+
+1. **Manual switch and power LED - 5 points, one evening.** The LED must light on power-on,
+   so it belongs across the rail through a resistor, not on a GPIO the firmware drives.
+2. **A magnetometer - 5 points, ~150 rupees.** It caps the sensor section at 25, restores the
+   absolute yaw the MPU-6500 cannot provide, and closes an open question with the organizers
+   about whether a relative yaw is acceptable. The firmware's magnetometer path already
+   exists and is tested; it needs a source.
+3. **2 Hz telemetry - 2 to 3 points, no new hardware.** Measured airtime is 333.7 ms at
+   33.4% occupancy, so 2 Hz naively costs 66.8%. Moving to 250 kHz bandwidth halves airtime
+   and puts 2 Hz back at today's duty, against a link that only has to cross 30 m. Only
+   after a range test: the rulebook subtracts for loss, and a clean 1 Hz beats a lossy 2 Hz.
+4. **A custom PCB - up to 10 points.** 15 points sit in a section a perfboard forfeits
+   entirely, and it feeds the build-quality and PCB-imaging marks too. The pin map has been
+   frozen and hardware-verified since Gate 5, so a schematic could be drawn today.
+
+Worth stating plainly because it is not intuitive: **15 of section D's 30 points are
+aesthetics and build quality** - neatness, cable management, labelling, finish. That is won
+during assembly, not design.
+
 ### Added — a sustained write burst, so the Gate 2 current is actually measurable
 
 Gate 6.3 timed 100 block writes and finished in under half a second. A handheld multimeter

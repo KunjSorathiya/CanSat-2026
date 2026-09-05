@@ -73,6 +73,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | Document | Contents |
 |---|---|
 | [timeline.md](project/timeline.md) | History, phase plan, gate status, critical path, blocked work, risk register |
+| [scoring-assessment.md](project/scoring-assessment.md) | Where the project stands against the 200-point rulebook, section by section, and the cheapest points left |
 | [../CHANGELOG.md](../CHANGELOG.md) | What changed, when, and why |
 
 ## Testing

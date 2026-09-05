@@ -245,7 +245,16 @@ document requires a documented consumer and a bandwidth assessment before one is
 | Official launch | `0xA5` | Required competition configuration |
 | Pre-launch testing | `0xF3` | Required test configuration |
 
-Wrong sync-word use during another team's launch can result in penalties. The operating procedure must ensure that CanSats remain powered off during another team's launch as required by the rulebook.
+Wrong sync-word use during another team's launch is penalised, and **the 2026 revision made
+the penalty five times harsher: -1 point per 2 stray packets received, where the earlier
+rulebook said per 10.** At this vehicle's 1 Hz rate that is half a point per second of
+accidental transmission, so a CanSat left powered on through another team's launch can
+burn more points than the entire telemetry section is worth in under a minute.
+
+The operating procedure must therefore ensure that CanSats remain powered off during
+another team's launch. This is a switch discipline problem, not a firmware one: the
+firmware transmits automatically on power-up by rulebook requirement, so the only
+control is the manual switch.
 
 ### Parameters Still TBD
 

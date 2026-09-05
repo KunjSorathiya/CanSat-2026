@@ -40,9 +40,9 @@ software produces the behaviour and no one has yet watched it happen.
 | GEN-001 | Team must consist of 3 to 5 students. | Rulebook - General Rules | Mandatory | Team membership - TBD | Confirm team roster against registration records. | TBD | |
 | GEN-002 | The CanSat must be self-built during the build phase. | Rulebook - General Rules | Mandatory | Team fabrication and assembly - TBD | Review build records, photographs, and assembled hardware. | Not Started | |
 | GEN-003 | Prefabricated kits are not permitted. | Rulebook - General Rules | Mandatory | Component-level BOM is confirmed; kit status - TBD | Review procurement records and fabrication evidence. | Not Started | |
-| GEN-004 | The CanSat must remain within the applicable physical size limit. | Rulebook - General Rules; conflicting pages | Mandatory | Dimensions - TBD pending organizer clarification | Measure the completed CanSat against the clarified limit. | TBD | |
-| GEN-005 | The CanSat must remain within the applicable mass limit. | Rulebook - Page 4 extract | Mandatory | Mass - TBD; one stated limit is 500 g | Weigh the completed CanSat using a documented scale and clarified limit. | TBD | |
-| MIS-001 | The CanSat must be lifted to the specified launch altitude. | Rulebook - Mission and Launch Guidelines | Mandatory | Launch altitude - TBD | Confirm organizer clarification and document the lift profile. | TBD | |
+| GEN-004 | The CanSat must remain within the applicable physical size limit. | Rulebook 2026 - General Rules and section 8 | Mandatory | **21 cm (+7 cm maximum, egg chamber) x 12 cm.** Both pages of the 2026 revision agree; the earlier three-way contradiction is gone. Exceeding by >10% is a disqualification | Measure the completed CanSat against 21/28 cm x 12 cm. | **Requirement locked; hardware not built** | |
+| GEN-005 | The CanSat must remain within the applicable mass limit. | Rulebook 2026 - General Rules | Mandatory | **500 g (+/-10%).** Exceeding by >10% is a disqualification | Weigh the completed CanSat on a documented scale. | **Requirement locked; hardware not built** | |
+| MIS-001 | The CanSat must be lifted to the specified launch altitude. | Rulebook 2026 - Mission and section 2A | Mandatory | **100 ft (~30.5 m), released from a drone.** Both statements in the 2026 revision agree; the 150 ft figure and the 8-story rooftop are gone | Document the lift profile against a 100 ft release. | **Requirement locked** | |
 | MIS-002 | The CanSat must be powered on before launch. | Rulebook - Mission | Mandatory | Manual power system - TBD | Observe and record power-on before launch. | Not Started | |
 | MIS-003 | Initial ground-floor telemetry should report approximately zero altitude. | Rulebook - Mission | Mandatory | Altitude is relative to a pad reference: the startup calibrator averages barometer samples on the ground and every later altitude is computed against that pressure | Compare startup telemetry with the ground-floor baseline. | Implemented; **awaiting a lift test** | `test_startup_calibrator_stationary_and_moving`, `test_pressure_altitude` |
 | MIS-004 | Telemetry must reflect the altitude change during lifting. | Rulebook - Mission | Mandatory | Continuous altitude in every packet, from the same compensated barometer reading the flight core uses for its state machine | Review logged packets during a lift test. | Implemented; **awaiting a lift test** | `test_altitude_varies_over_the_mission` runs the real controller through a scripted ascent and descent and checks the altitude the ground station reads back |
@@ -113,7 +113,8 @@ software produces the behaviour and no one has yet watched it happen.
 | REC-007 | The structure should remain intact after landing. | Rulebook - Post-Landing | Mandatory | Structure and recovery design - TBD | Post-impact inspection and documented test. | Not Started | |
 | REC-008 | The CanSat must transmit for at least 5 seconds after impact. | Rulebook - Post-Landing | Mandatory | Post-impact firmware and power system - TBD | Impact simulation and packet timestamp analysis. | Not Started | |
 | REC-009 | The egg must be cushioned and securely retained during impact. | Rulebook - Egg Payload | Mandatory | Egg chamber and cushioning - TBD | Impact test with inspection of egg and chamber. | Blocked | |
-| GS-001 | A ground station must receive CanSat telemetry. | Rulebook - Ground Station / Telemetry | Mandatory | Second Pico and RA-02; software path - TBD | End-to-end transmission and reception test. | Not Started | |
+| GS-001 | A ground station must receive CanSat telemetry. | Rulebook - Ground Station / Telemetry | Mandatory | Second Pico and RA-02; software path complete, link untested end to end | End-to-end transmission and reception test. | Not Started | |
+| GS-002 | **The CanSat must be compatible with one of the two official ground stations.** | Rulebook 2026 - General Rules | Mandatory | **Satisfied by design.** The 2026 revision names 433 MHz LoRa using the SX1278 RA-02, or nRF24L01. This vehicle carries the SX1278 RA-02, confirmed on the bench: version register `0x12`, and airtime measured within 1.8% of the model ([Gate 5](../testing/bring-up-record.md)) | Receive on an official ground station at the venue. | **Radio confirmed; interoperability untested** | Gate 5 rows 5.1-5.3 |
 | GS-002 | Ground-station telemetry must be compatible with the official dual ground-station evaluation. | Rulebook - Telemetry Evaluation | Mandatory | Protocol implementation - TBD | Test with the official evaluation setup. | Not Started | |
 | GS-003 | Ground station must preserve and identify missing or corrupted telemetry data. | Rulebook - Telemetry | Mandatory | Receiver validation and logging - TBD | Inject loss/corruption and inspect output. | Not Started | |
 | GS-004 | Ground station must support data needed for the required post-flight analysis. | Rulebook - Data Analysis | Mandatory | Ground-station data export - TBD | Export a complete test dataset and load it into analysis tools. | Not Started | |
@@ -155,7 +156,7 @@ software produces the behaviour and no one has yet watched it happen.
 | SUB-005 | A project video must be posted to a team member's Instagram page as a post or reel. | Rulebook - Submission | Mandatory | Video production - TBD | Inspect post/reel and record URL. | Not Started | |
 | SUB-006 | Physics Club, SVNIT must be tagged on both project video posts. | Rulebook - Submission | Mandatory | Social-media submission process - TBD | Inspect both posts. | Not Started | |
 | SUB-007 | Both project video links must be submitted through the Google Form. | Rulebook - Submission | Mandatory | Submission process - TBD | Review form confirmation. | Not Started | |
-| GEN-006 | The team must avoid disqualification for exceeding the applicable size or mass limit by more than 10%. | Rulebook - Disqualification | Mandatory | Compliance measurement - TBD | Measure against clarified limits and retain records. | TBD | |
+| GEN-006 | The team must avoid disqualification for exceeding the applicable size or mass limit by more than 10%. | Rulebook 2026 - Disqualification | Mandatory | Limits now single-valued: **21 cm (+7) x 12 cm, 500 g**. The >10% threshold applies to both | Measure and weigh the completed CanSat, and retain the records. | **Limits locked; hardware not built** | |
 | GEN-007 | The team must avoid unsafe deployment, projectile motion, uncontrolled crash, and other unsafe operation. | Rulebook - Disqualification | Mandatory | Safety and recovery procedures - TBD | Safety review and controlled tests. | Not Started | |
 | GEN-008 | The CanSat must include an attempted communication system. | Rulebook - Scoring / Functional | Mandatory | Paired RA-02 SX1278 modules on one shared link profile, vehicle to ground bridge to PC, with CRC framing over USB | Demonstrate a working or attempted telemetry link. | Complete | `test_link_profile_is_shared_by_both_ends`, the SX1278 driver suite, and the radio answering `0x12` and transmitting on hardware with airtime within 1.8 % of the model (bring-up rows 5.1 to 5.3) |
 | GEN-009 | The team must meet arrival and conduct requirements. | Rulebook - Disqualification | Mandatory | Team procedure - TBD | Confirm schedule, attendance, and conduct requirements. | TBD | |
@@ -203,16 +204,21 @@ The following comparison is against the confirmed project BOM. A component is no
 
 ## Open Questions for Organizers
 
-1. **Dimensions:** Page 1 states 12 cm width with an egg chamber; page 4 states <=21 cm x 9 cm; page 10 states 21 cm (+8 cm maximum for the egg chamber) x 12.5 cm. Which dimensional limit applies?
-2. **Mass:** Is the <=500 g value the applicable mass limit, and how does the stated more-than-10% disqualification threshold apply?
-3. **Launch altitude:** The mission section states 100 ft, while the launch guidelines state 150 ft from a drone. Which altitude applies?
-4. Are egg chamber dimensions included in or added to the main CanSat dimensions?
+**Questions 1 to 4 are closed by the 2026 revision of the guidelines**
+([`updated CanSat Final Guidelines 2026.pdf`](updated%20CanSat%20Final%20Guidelines%202026.pdf)),
+which states each figure identically wherever it appears. They are kept here, struck through,
+because the answers are design inputs and the record of how they were obtained matters:
+
+1. ~~Dimensions~~ **CLOSED: 21 cm (+7 cm maximum, for the egg chamber) x 12 cm.** Page 4 and page 10 now agree; the earlier 9 cm, 12.5 cm and +8 cm figures are gone.
+2. ~~Mass~~ **CLOSED: 500 g (+/-10%).** Exceeding size or mass by more than 10% is a disqualification condition.
+3. ~~Launch altitude~~ **CLOSED: 100 ft, released from a drone.** The mission profile and the launch guidelines now agree; the 150 ft figure is gone, as is the 8-story rooftop.
+4. ~~Egg chamber inclusion~~ **CLOSED: added, not included.** The +7 cm is explicitly an allowance on top of the 21 cm body.
 5. How is the <=5 m/s descent requirement enforced and scored?
 6. What constitutes valid yaw data for the mandatory telemetry field?
 7. Are any LoRa frequency, bandwidth, spreading factor, coding rate, power, bandwidth, preamble, CRC, or other radio settings prescribed beyond the stated sync words?
-8. What scoring thresholds apply where the rulebook says higher performance is rewarded, including packet rate and stable descent?
+8. What scoring thresholds apply where the rulebook says higher performance is rewarded, including packet rate and stable descent? The 2026 revision rewards rates above 1 Hz and longer stable descents but names no thresholds for either.
 9. What are the actual report, media, video, arrival, and other submission deadlines?
-10. What exact interface and data format will be used by the official dual ground stations?
+10. **Partly closed.** The 2026 revision names the two official ground stations by radio - 433 MHz LoRa SX1278 RA-02, and nRF24L01 - which settles that this vehicle's radio is compatible. The framing and host-side data format they expect are still unstated.
 
 ## Development Gates
 

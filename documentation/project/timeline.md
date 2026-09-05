@@ -247,7 +247,7 @@ resolve.
 | Blocked | Blocked by | Owner |
 |---|---|---|
 | Mechanical design freeze | Contradictory dimension limits (organizer questions 1 and 4) | Organizers |
-| Descent-system sizing | Launch altitude contradiction, 100 ft vs 150 ft (question 3) | Organizers |
+| Descent-system sizing | **Unblocked 2026-09-05** — the updated rulebook states 100 ft from a drone in both places | — |
 | Yaw compliance claim | No definition of valid yaw data (question 6) — and the vehicle can no longer answer it either way: the delivered IMU has no magnetometer, so yaw is relative and declared `YR-G`. If an absolute yaw is required this becomes a procurement item, not a calibration one | Organizers |
 | Radio parameter freeze | Only the sync words are prescribed (question 7) | Organizers |
 | Peripheral rail design | Exact breakout documentation | Team |

@@ -55,9 +55,17 @@ config.radio_mode = flight::RadioMode::test;  // ::official for the launch
 
 > [!CAUTION]
 > **The sync words must match on both ends, and the wrong one during another team's launch
-> can incur penalties.** `0xF3` is for pre-launch testing only; `0xA5` is the official
+> incurs penalties.** `0xF3` is for pre-launch testing only; `0xA5` is the official
 > launch configuration. Changing the vehicle without changing the bridge produces a silent
 > total loss of telemetry — the receiver simply never sees a packet.
+>
+> **The 2026 revision made stray transmission five times more expensive: -1 point per 2
+> packets, where the earlier rulebook said per 10.** This vehicle transmits at 1 Hz, so that
+> is half a point per second. Ninety seconds of a CanSat accidentally left on during someone
+> else's launch costs more than the entire 25-point telemetry section is worth.
+>
+> The firmware cannot help here — it is *required* to transmit automatically on power-up.
+> **The manual switch is the only control, and switch discipline is a scored activity.**
 
 The firmware refuses to run with the placeholder identity: `validate_config()` rejects
 `CAN-Team-XX`, raises a critical `config_invalid` fault, and the vehicle enters `FAULT`.
@@ -106,12 +114,13 @@ cmake -S . -B build/pico
 cmake --build build/pico --parallel
 ```
 
-Two targets appear only when the SDK is present:
+Three targets appear only when the SDK is present:
 
 | Target | Image for |
 |---|---|
 | `cansat_pico_firmware` | The vehicle |
 | `cansat_ground_bridge_firmware` | The ground-station bridge |
+| `cansat_bringup_firmware` | The vehicle, temporarily, for bring-up only — a USB diagnostic, never flight software |
 
 Flash by holding BOOTSEL while connecting USB, then copying the `.uf2` onto the
 `RPI-RP2` drive that appears.
