@@ -6,6 +6,7 @@ add_subdirectory(../common common_build)
 # Hardware-independent flight core. Builds on the host toolchain and on the Pico.
 set(FLIGHT_CORE_SOURCES
     src/config.cpp
+    src/fat_volume.cpp
     src/controller.cpp
     src/state_machine.cpp
     src/gps_parser.cpp
@@ -118,6 +119,14 @@ add_executable(emit_mission tests/emit_mission.cpp)
 target_include_directories(emit_mission PRIVATE tests)
 target_link_libraries(emit_mission PRIVATE flight_core)
 target_compile_options(emit_mission PRIVATE -Wall -Wextra -Wpedantic)
+
+# The FAT32 locator, against a synthetic card image. Read-only and SDK-free, so the same
+# code that runs on the vehicle runs here.
+add_executable(fat_volume_tests tests/fat_volume_test.cpp)
+target_include_directories(fat_volume_tests PRIVATE include tests)
+target_link_libraries(fat_volume_tests PRIVATE flight_core)
+target_compile_options(fat_volume_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME fat_volume_tests COMMAND fat_volume_tests)
 
 # The microSD driver's command sequence, against a simulated card. sd_card.cpp compiles
 # for the host too: without PICO_BUILD it carries no SDK dependency.

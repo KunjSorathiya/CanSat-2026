@@ -1,0 +1,35 @@
+# CanSat 2026 — optional-tag splitting cases
+#
+# The mandatory block is positional and every parser agrees about it. The optional tags
+# after it are `<key>-<value>`, and the key itself contains dashes: GP-Lat, GP-Lon,
+# GP-Alt. Both ground parsers split on the last dash, which is the separator right up
+# until the value is negative -- and then the last dash is the minus sign. `GP-Lat--18.5`
+# split to the key `GP-Lat-` and the value `18.5`: the sign eaten, the key unrecognisable,
+# so `gps_lat` read back as null and a southern-hemisphere fix vanished from the console,
+# the CSV and the map with no error and no rejection counter.
+#
+# Both implementations were wrong in the same way, which is why no test caught it: they
+# were hand-ports of one another and the fixtures had no negative coordinate. This file
+# is the shared definition.
+#
+#   ground-station/software/src/telemetry.py (Python, PC ground station)
+#   ground-station/web/index.html            (JavaScript, web console)
+#
+# Format: <id> TAB <optional field as transmitted> TAB <expected key> TAB <expected value>
+# Blank lines and lines starting with '#' are ignored.
+#
+plain	MODE-READY	MODE	READY
+single_dash_key	FAULTS-3	FAULTS	3
+dashed_key	GP-Lat-18.500000	GP-Lat	18.500000
+dashed_key_zero	GP-Alt-0.0	GP-Alt	0.0
+
+# The cases that were broken. A southern latitude, a western longitude, an altitude below
+# sea level, and a negative diagnostic value.
+negative_latitude	GP-Lat--18.500000	GP-Lat	-18.500000
+negative_longitude	GP-Lon--73.000000	GP-Lon	-73.000000
+negative_altitude	GP-Alt--5.0	GP-Alt	-5.0
+negative_plain_key	TREND--1	TREND	-1
+
+# A value that is only a minus sign is not a number, but it must not be mis-split either:
+# the key stays the key.
+lone_minus	GP-Alt--	GP-Alt	-

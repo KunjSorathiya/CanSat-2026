@@ -165,7 +165,8 @@ bool NmeaParser::apply_sentence() {
         double alt = 0.0;
         if (parse_coordinate(fields[2], fields[3][0], 90.0, 'N', 'S', lat) &&
             parse_coordinate(fields[4], fields[5][0], 180.0, 'E', 'W', lon) &&
-            parse_double(fields[9], alt)) {
+            parse_double(fields[9], alt) &&
+            alt >= kMinGpsAltitudeM && alt <= kMaxGpsAltitudeM) {
             latest_.latitude = lat;
             latest_.longitude = lon;
             latest_.altitude = alt;

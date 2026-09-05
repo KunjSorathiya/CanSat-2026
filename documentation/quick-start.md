@@ -135,7 +135,7 @@ bash tools/build_host.sh
 
 This compiles the shared telemetry library, the whole flight core, the ground-station
 framing library and every host test, runs them, then runs the Python and Node suites.
-Expect **4288 C++ assertions, 163 Python tests and 55 Node tests, all passing, with zero
+Expect **4309 C++ assertions, 163 Python tests and 55 Node tests, all passing, with zero
 compiler warnings.**
 
 ```bash
@@ -151,7 +151,7 @@ The same suites also build through CMake, which is what CI uses:
 cmake -S . -B build/host-cmake && cmake --build build/host-cmake --parallel && ctest --test-dir build/host-cmake --output-on-failure
 ```
 
-**5 CTest tests** — the same C++ suites `build_host.sh` runs, reached through CMake instead.
+**6 CTest tests** — the same C++ suites `build_host.sh` runs, reached through CMake instead.
 How many *targets* get built depends on whether the Pico SDK is present: without it the
 firmware images are skipped and only the host libraries and tests configure, which is the
 path CI takes. On a machine with neither CMake nor a build tool, `pip install cmake ninja`
@@ -181,7 +181,7 @@ The confirmed BOM, with supplier SKUs, is in
 | 6 | GY-BMP280-3.3 | 1 | Pressure + temperature → altitude |
 | 7 | NEO-6M GPS module | 1 | Position (optional telemetry fields) |
 | 8 | microSD card reader module | 1 | Onboard logging — **see the warning in [step 10](#10-the-power-problem--read-before-wiring)** |
-| 9 | microSD card | 1 | Any small card; the firmware writes raw blocks, no filesystem |
+| 9 | microSD card | 1 | FAT32, prepared with `tools/prepare_sd_card.py`. The firmware writes raw blocks *inside* a pre-allocated `FLIGHT.CSV`, so the card still mounts on a PC |
 | 10 | 1S LiPo battery, 3.7 V | 1 | Vehicle power |
 | 11 | Universal prototype PCB, 10×10 cm | 1–2 | Mounting |
 | 12 | Regulator | 1 | 🔴 **Not selected — see [step 10](#10-the-power-problem--read-before-wiring)** |

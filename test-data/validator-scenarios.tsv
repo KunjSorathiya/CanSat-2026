@@ -85,3 +85,16 @@ implausible_gps	CAN-Team-07	ok	CAN-Team-07; P-002; Ti-00:00:02:000; A-11.0; Pr-1
 
 # With no expected team configured, any well-formed team id is accepted.
 no_team_filter	-	ok	CAN-Team-42; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80;
+
+# GPS altitude. Latitude and longitude have mathematical bounds and were always checked;
+# altitude has none, so nothing checked it -- in any of the three implementations. A
+# corrupted altitude field reads as a place, and lands on the barometric-against-GPS
+# correlation graph the runbook scores. The bounds are loose on purpose: -1000 m to
+# 80000 m catches corruption without second-guessing the receiver.
+gps_altitude	CAN-Team-07	gpsrej	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80; GP-Lat-18.000000; GP-Lon-73.000000; GP-Alt-99999999.0;
+gps_altitude	CAN-Team-07	gpsrej	CAN-Team-07; P-002; Ti-00:00:02:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80; GP-Lat-18.000000; GP-Lon-73.000000; GP-Alt--5000.0;
+gps_altitude	CAN-Team-07	ok	CAN-Team-07; P-003; Ti-00:00:03:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80; GP-Lat-18.000000; GP-Lon-73.000000; GP-Alt-80000.0;
+gps_altitude	CAN-Team-07	ok	CAN-Team-07; P-004; Ti-00:00:04:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80; GP-Lat-18.000000; GP-Lon-73.000000; GP-Alt--1000.0;
+
+# A fix is a latitude and a longitude. An absent altitude is not an implausible fix.
+gps_altitude_absent	CAN-Team-07	ok	CAN-Team-07; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; Ro-1.0; Pi-2.0; Ya-30.0; AX-0.10; AY-0.20; AZ-9.80; GP-Lat-18.000000; GP-Lon-73.000000;

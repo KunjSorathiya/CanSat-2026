@@ -2,6 +2,7 @@
 
 #include "cansat/sx1278.hpp"
 #include "flight/config.hpp"
+#include "flight/fat_volume.hpp"
 #include "flight/interfaces.hpp"
 #include "flight/pico/bmp280.hpp"
 #include "flight/pico/mpu9250.hpp"
@@ -103,10 +104,14 @@ public:
     // record has to be visible as one -- and it was counted by RawBlockLog and read by
     // nothing, which is the same as not counting it.
     std::uint32_t truncated_records() const { return log_.truncated_records(); }
+    // Why initialisation failed, when it did. A missing file and an unformatted card need
+    // different fixes, and "SD failed" does not tell an operator which they are looking at.
+    FatVolume::Status locate_status() const { return locate_status_; }
 
 private:
     pico::SdCard card_;
     RawBlockLog log_;
+    FatVolume::Status locate_status_ = FatVolume::Status::ok;
     bool healthy_ = false;
 };
 

@@ -29,6 +29,7 @@ COMMON_SRC=(
 )
 FLIGHT_CORE_SRC=(
   "$ROOT/firmware/flight-computer/src/config.cpp"
+  "$ROOT/firmware/flight-computer/src/fat_volume.cpp"
   "$ROOT/firmware/flight-computer/src/controller.cpp"
   "$ROOT/firmware/flight-computer/src/state_machine.cpp"
   "$ROOT/firmware/flight-computer/src/gps_parser.cpp"
@@ -71,6 +72,9 @@ echo "== compiling sx1278_tests =="
 # shellcheck disable=SC2068
 $CXX $CXXFLAGS ${INC[@]}   "$ROOT/firmware/common/src/sx1278.cpp"   "$ROOT/firmware/common/tests/sx1278_test.cpp"   -o "$OUT/sx1278_tests"
 
+echo "== compiling fat_volume_tests =="
+$CXX $CXXFLAGS ${INC[@]}   "$ROOT/firmware/flight-computer/src/fat_volume.cpp"   "$ROOT/firmware/flight-computer/tests/fat_volume_test.cpp"   -o "$OUT/fat_volume_tests"
+
 echo "== compiling sd_card_tests =="
 # The microSD driver also reaches hardware through a callback struct, so its command
 # sequence runs against a simulated card built from the SD SPI-mode specification.
@@ -95,6 +99,7 @@ echo "== running C++ tests =="
 log "$OUT/flight_smoke_test"
 log "$OUT/flight_tests" "$ROOT"
 log "$OUT/sx1278_tests"
+log "$OUT/fat_volume_tests"
 log "$OUT/sd_card_tests"
 log "$OUT/ground_station_tests" "$ROOT"
 

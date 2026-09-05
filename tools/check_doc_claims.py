@@ -55,7 +55,8 @@ def suite_counts() -> dict[str, int] | None:
     counts: dict[str, int] = {}
     # Each C++ suite prints its assertion total, then a line naming itself.
     for total, name in re.findall(r"(\d+)/\d+ checks passed\s*\n(\S+)", log):
-        key = {"flight_tests": "flight_tests", "sx1278": "sx1278", "sd_card": "sd_card"}.get(name)
+        key = {"flight_tests": "flight_tests", "sx1278": "sx1278", "sd_card": "sd_card",
+               "fat_volume": "fat_volume"}.get(name)
         if key:
             counts[key] = int(total)
     # unittest prints "Ran N tests" once per discovery run: ground station first, tooling second.
@@ -66,7 +67,8 @@ def suite_counts() -> dict[str, int] | None:
     if node:
         counts["node"] = int(node.group(1))
 
-    required = {"flight_tests", "sx1278", "sd_card", "python_ground", "python_tools", "node"}
+    required = {"flight_tests", "sx1278", "sd_card", "fat_volume", "python_ground",
+                "python_tools", "node"}
     return counts if required <= counts.keys() else None
 
 
@@ -819,8 +821,9 @@ def main() -> int:
         checker.check("test counts checked against build/host/test-output.log", True,
                       "log absent -- run tools/build_host.sh")
     else:
-        cpp_total = counts["flight_tests"] + counts["sx1278"] + counts["sd_card"]
-        for suite in ("flight_tests", "sx1278", "sd_card"):
+        cpp_total = (counts["flight_tests"] + counts["sx1278"] + counts["sd_card"] +
+                     counts["fat_volume"])
+        for suite in ("flight_tests", "sx1278", "sd_card", "fat_volume"):
             n = counts[suite]
             checker.check(f"test-plan.md states {suite} ran {n} assertions",
                           f"**{n} / {n} assertions**" in test_plan, str(n))
@@ -838,7 +841,7 @@ def main() -> int:
                       f"C%2B%2B%20tests-{cpp_total}%20assertions" in readme, str(cpp_total))
         # The README carries the same results table as the test plan, in shorter form. It
         # is the first page anyone reads, so it is the worst place for a stale figure.
-        for suite in ("flight_tests", "sx1278", "sd_card", "python_ground",
+        for suite in ("flight_tests", "sx1278", "sd_card", "fat_volume", "python_ground",
                       "python_tools", "node"):
             n = counts[suite]
             checker.check(f"README's results table states {suite} at {n}",

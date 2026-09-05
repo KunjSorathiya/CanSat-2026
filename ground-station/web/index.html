@@ -813,7 +813,14 @@ function parsePacket(str, team) {
     rec[MAND_NAME[i]] = v;
   }
   for (const of of f.slice(12)) {
-    const k = of.lastIndexOf("-");
+    let k = of.lastIndexOf("-");
+    /* A negative value carries its own "-", and the last one is then the sign rather than
+       the separator: "GP-Lat--18.5" gave the key "GP-Lat-" and the value "18.5" -- sign
+       eaten, key unrecognisable, so gps_lat read back as null and a southern-hemisphere
+       fix vanished with no error and no rejection counter. A key never ends in "-", so a
+       key that does means the separator was the value's sign. Mirrors parse_packet() in
+       telemetry.py; test-data/protocol-fixtures.tsv holds both to one definition. */
+    if (k > 1 && of[k - 1] === "-") k -= 1;
     if (k > 0) rec.tags[of.slice(0, k)] = of.slice(k + 1);
   }
   const g = k => rec.tags[k] !== undefined ? parseFloat(rec.tags[k]) : null;
@@ -843,6 +850,10 @@ function parsePacket(str, team) {
 /* ================================================================
    3. Stream validator (mirror of validator.py)
    ================================================================ */
+/* Matches kMinGpsAltitudeM / kMaxGpsAltitudeM in the vehicle's NMEA parser and
+   StreamValidator.GPS_ALT_RANGE in the Python station. One rule, three places. */
+const GPS_ALT_MIN = -1000, GPS_ALT_MAX = 80000;
+
 class StreamValidator {
   constructor(team) {
     this.team = team || null;
@@ -892,7 +903,15 @@ class StreamValidator {
     }
     if (this._lastTs !== null && rec.timestamp_ms < this._lastTs) { r.notes.push("timestamp regression"); this.stats.tsReg++; }
     if (rec.gps_lat !== null && rec.gps_lon !== null) {
-      const ok = rec.gps_lat >= -90 && rec.gps_lat <= 90 && rec.gps_lon >= -180 && rec.gps_lon <= 180;
+      /* Latitude and longitude have mathematical bounds; altitude does not, and so had
+         none -- the one coordinate of the three nothing checked, in any of the three
+         implementations. A corrupted altitude reads as a place. The bounds are loose on
+         purpose: they catch corruption, not a receiver being unusual. An absent altitude
+         is not a fault, because a fix is latitude and longitude. */
+      const ok = rec.gps_lat >= -90 && rec.gps_lat <= 90 &&
+                 rec.gps_lon >= -180 && rec.gps_lon <= 180 &&
+                 (rec.gps_alt === null ||
+                  (rec.gps_alt >= GPS_ALT_MIN && rec.gps_alt <= GPS_ALT_MAX));
       if (!ok) { r.notes.push("implausible GPS fix ignored"); this.stats.gpsRej++; }
     }
     this._remember(n);

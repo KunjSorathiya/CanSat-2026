@@ -55,7 +55,14 @@ std::uint32_t header_checksum(const std::uint8_t* block) {
 
 bool RawBlockLog::write_header() {
     std::uint8_t block[kBlockSize];
-    std::memset(block, 0, sizeof(block));
+    // Space-pad and newline-terminate the unused tail. The log now lives inside a
+    // pre-allocated .csv on a FAT32 card so it can be read on a PC, and these two header
+    // blocks are the first two lines of that file. Padding with spaces rather than NULs
+    // makes them one printable line each instead of a wall of NULs that some editors
+    // truncate the file at. The checksum covers only bytes 0..23, so the padding is free.
+    std::memset(block, ' ', sizeof(block));
+    block[kBlockSize - 1] = '\n';
+    std::memset(block, 0, kOffChecksum + 4);
     put_u32(block + kOffMagic, kMagic);
     put_u16(block + kOffVersion, kVersion);
     put_u16(block + kOffBlockSize, static_cast<std::uint16_t>(kBlockSize));

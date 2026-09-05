@@ -486,6 +486,10 @@ void report_radio(const flight::Configuration& config) {
 // Initialisation and the card-type read are non-destructive. The write test is not, and it
 // is behind its own prompt for a different reason from the radio's: it cannot damage
 // hardware, but it destroys the filesystem.
+bool sd_probe_read(void* ctx, std::uint32_t lba, std::uint8_t* out512) {
+    return static_cast<flight::pico::SdCard*>(ctx)->read_block(lba, out512);
+}
+
 void report_sd() {
     std::printf("\n-- 6.1 / 6.2 microSD --\n");
     flight::pico::SdCard card;
@@ -503,12 +507,24 @@ void report_sd() {
                                      : "SDSC, byte-addressed - NOT what Gate 6.2 expects");
 
     std::printf("\n-- 6.3 Block write time --\n");
-    std::printf("   ***  THIS DESTROYS THE FILESYSTEM ON THE CARD.  ***\n");
-    std::printf("   The vehicle logs raw blocks with no filesystem, and the log starts at\n");
-    std::printf("   LBA 2048 - exactly where a FAT32 partition begins. After this the card\n");
-    std::printf("   will not mount on a PC until it is reformatted. That is by design, not\n");
-    std::printf("   a fault. No hardware is at risk; only the card's contents.\n");
-    std::printf("\n   Card expendable? Press 'w' within 20 s to write. Anything else skips.\n");
+    flight::FatVolume::Io fio;
+    fio.ctx = &card;
+    fio.read_block = sd_probe_read;
+    flight::FatVolume::Region region;
+    const flight::FatVolume::Status st =
+        flight::FatVolume::locate(fio, "FLIGHT  CSV", 128, region);
+    if (st != flight::FatVolume::Status::ok) {
+        std::printf("   cannot time writes: %s\n", flight::FatVolume::describe(st));
+        std::printf("   Run tools/prepare_sd_card.py against this card first. Writing at\n"
+                    "   a guessed address would destroy the volume, so this refuses to.\n");
+        return;
+    }
+    std::printf("   Writing inside FLIGHT.CSV, LBA %lu, %lu blocks available.\n",
+                static_cast<unsigned long>(region.first_lba),
+                static_cast<unsigned long>(region.block_count));
+    std::printf("   This overwrites the log file CONTENTS, not the filesystem. The card\n"
+                "   still mounts afterwards, and no hardware is at risk.\n");
+    std::printf("\n   Log contents expendable? Press 'w' within 20 s. Anything else skips.\n");
 
     const std::uint64_t deadline = now_ms() + 20000;
     int key = -1;
@@ -523,7 +539,7 @@ void report_sd() {
     }
 
     constexpr int kWrites = 100;
-    constexpr std::uint32_t kBaseLba = 2048;
+    const std::uint32_t kBaseLba = region.first_lba;
     std::uint8_t block[flight::pico::SdCard::kBlockSize];
     for (std::size_t i = 0; i < sizeof(block); ++i) {
         block[i] = static_cast<std::uint8_t>(i & 0xFF);

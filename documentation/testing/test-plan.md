@@ -38,6 +38,7 @@ Compiles and runs everything that does not need hardware, in one pass:
 |---|---|
 | `flight_smoke_test` | boot, the first three packets, a GPS parse |
 | `flight_tests` | the whole flight core |
+| `fat_volume_tests` | the FAT32 log-file locator against a synthetic card image |
 | `sx1278_tests` | the LoRa driver against a fake register bank |
 | `sd_card_tests` | the microSD driver against a simulated card |
 | `ground_station_tests` | framing, and the shared framing fixtures |
@@ -97,12 +98,13 @@ earlier version of this workflow discarded exactly the lines that named the erro
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
 | `flight_tests` | 63 suites across the whole flight core | ✅ **3606 / 3606 assertions** |
+| `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **21 / 21 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **101 / 101 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 8 modules | ✅ **130 / 130 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **208 / 208 claims** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **211 / 211 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **55 / 55 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
@@ -407,7 +409,7 @@ Three things exist in more than one language and must not drift:
 | CRC-16/CCITT framing | [`framing.cpp`](../../firmware/ground-station/src/framing.cpp), [`transport.py`](../../ground-station/software/src/transport.py), `index.html` | All three read [`test-data/framing-cases.tsv`](../../test-data/framing-cases.tsv) — 14 byte streams with the exact events and counters each must produce, including every recovery path: a torn header, a truncated length, a `$` inside a CRC field, an oversized length. The known-answer vector `0x29B1` is asserted on top of it |
 | Raw-log escaping | [`logger.py`](../../ground-station/software/src/logger.py), `index.html` | Both read [`test-data/raw-log-escapes.tsv`](../../test-data/raw-log-escapes.tsv) — 16 cases including a literal backslash before `t`, the one an unescaper a character out of step reads as a tab. The console replays raw logs, so a disagreement here invents payloads the vehicle never sent |
 | Parsed record field names | [`telemetry.py`](../../ground-station/software/src/telemetry.py), `index.html` | The console's parser is run under Node and the keys of the record it returns are compared with Python's. `fault_count` was `faults` on one side, which in JavaScript reads as `undefined` rather than raising |
-| Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Both read [`test-data/validator-scenarios.tsv`](../../test-data/validator-scenarios.tsv) — 11 scenarios, 29 packets, each with the verdict the validator must reach: gaps, duplicates, out-of-order arrivals, a vehicle reboot and the corrupted `P-001` that is not one, wrong team, clock regression and an implausible fix. A validator that disagrees fails the build |
+| Validation semantics | [`validator.py`](../../ground-station/software/src/validator.py), `index.html` | Both read [`test-data/validator-scenarios.tsv`](../../test-data/validator-scenarios.tsv) — 13 scenarios, 34 packets, each with the verdict the validator must reach: gaps, duplicates, out-of-order arrivals, a vehicle reboot and the corrupted `P-001` that is not one, wrong team, clock regression and an implausible fix. A validator that disagrees fails the build |
 | LoRa airtime model | [`lora_airtime.hpp`](../../firmware/common/include/cansat/lora_airtime.hpp), [`link_budget.py`](../../tools/link_budget.py) | Both are asserted against the same two published SX127x reference vectors (46.336 ms and 1155.072 ms) |
 | Sensor timing model | [`sensor_timing.hpp`](../../firmware/flight-computer/include/flight/sensor_timing.hpp) — register encoding *and* the rate guard | The model reproduces three published BMP280 datasheet figures, so the registers written and the rate validated cannot disagree |
 | Radio modem parameters | [`link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp) — read by the vehicle *and* the bridge | `test_link_profile_is_shared_by_both_ends()` compares the two ends field by field; a mismatch is a silent, total link failure |
@@ -428,7 +430,7 @@ Three things exist in more than one language and must not drift:
 | SX1278 register driver **on real silicon** | Needs the real modem | Medium — the register sequence now executes against a fake register bank (94 assertions), so the driver's own logic is covered; what remains unproven is that the RA-02 responds as the datasheet says |
 | Web console **rendering** | No headless browser in the repository | Low — the logic is now tested under Node (30 tests); only the DOM layer is manual. Verified by hand in a browser on 2026-09-04: demo mission ran to `RECOVERY`, rate steady through the injected drop and duplicate, no console errors, both themes legible |
 | Tk dashboard | Needs a display | Low |
-| CMake build | — | ✅ **Covered.** Verified locally on 2026-09-04: the host tree configures, all 31 targets build, and all 5 CTest tests pass. CMake and Ninja are available through `pip install cmake ninja` when the system has neither |
+| CMake build | — | ✅ **Covered.** Verified locally on 2026-09-04: the host tree configures, all 31 targets build, and all 6 CTest tests pass. CMake and Ninja are available through `pip install cmake ninja` when the system has neither |
 | Timing under real load | Host tests use a synthetic clock | Medium — the 1 Hz airtime budget is arithmetic ([link-budget.md](../design/link-budget.md)); nothing has been measured on a radio |
 
 ---

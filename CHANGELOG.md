@@ -1114,6 +1114,40 @@ can explain when it fails.
 Run standalone, without the log, the script skips the count checks and reports 69/69 rather
 than inventing a number.
 
+### Changed — the flight log now lives inside a file a PC can open
+
+The card wrote raw blocks at a fixed LBA and did not mount afterwards. Flight data nobody
+can read is not evidence, so the log now lands **inside a pre-allocated `FLIGHT.CSV` on a
+FAT32 card**, and the card still mounts and opens in a spreadsheet.
+
+**The power-cut safety is kept in full, which is the whole point of doing it this way.** A
+filesystem in firmware would have thrown it away: FAT metadata updates are not atomic, and a
+brownout or hard landing during one can cost the entire recording. Instead the filesystem
+work happens once, on a PC, before the flight — `tools/prepare_sd_card.py` creates the file
+— and none of it happens in the air. `FatVolume` finds where that file's blocks physically
+live and `RawBlockLog` writes into them exactly as before. The directory entry, the FAT chain
+and the file size never change in flight, so there is no metadata to corrupt, and the dual
+alternating headers still resume correctly after a torn write.
+
+- **Contiguity is checked, not assumed.** Writing linearly into a fragmented file would
+  scribble over whatever occupies the gap while still reporting success. A file whose FAT
+  chain is not strictly sequential is refused.
+- **There is no fallback to a guessed address.** A missing, fragmented or undersized file
+  fails initialisation and says which. Falling back to a fixed LBA would destroy the very
+  filesystem this arrangement exists to preserve — and a vehicle with no log still flies and
+  still transmits, while a vehicle that silently ate the card gets nothing back either way.
+- **A fresh log writes a CSV column header as its first record**, so the file opens as a
+  spreadsheet rather than a wall of unlabelled fields.
+- **The log's two header blocks are now space-padded and newline-terminated.** They are the
+  first two lines of the CSV; padding with spaces rather than NULs keeps them one printable
+  line each instead of a wall of NULs that some editors truncate the file at. The checksum
+  covers bytes 0–23, so the padding is free.
+
+21 new assertions cover the lookup, one per way it can go wrong: no volume, no file, a
+fragmented file, one too small, a card that stops answering, and deleted or long-name
+directory entries that must be skipped. The fragmentation case is the dangerous one and is
+tested directly.
+
 ### Added — Gate 6 on the diagnostic, with the destructive half behind a prompt
 
 `cansat_bringup_firmware` now brings up the microSD reader — the item

@@ -48,8 +48,9 @@ class TelemetryRecord:
     az: float
     # Legacy view kept for backwards compatibility: {"GP-Lat": "GP-Lat-18.5", ...}
     optional: dict[str, str] = field(default_factory=dict)
-    # Preferred view: prefix before the last '-' maps to the value after it.
-    #   "GP-Lat-18.5" -> {"GP-Lat": "18.5"}, "MODE-READY" -> {"MODE": "READY"}
+    # Preferred view: the key maps to the value after the separating '-'.
+    #   "GP-Lat-18.5" -> {"GP-Lat": "18.5"}, "MODE-READY" -> {"MODE": "READY"},
+    #   "GP-Lat--18.5" -> {"GP-Lat": "-18.5"} -- the value keeps its sign.
     tags: dict[str, str] = field(default_factory=dict)
 
     # ---- derived / typed optional data ----
@@ -237,6 +238,14 @@ def parse_packet(packet: str, expected_team: Optional[str] = None) -> ParseResul
             head, tail = optional_field.split("-", 1)
             optional[f"{head}-{tail.split('-', 1)[0]}"] = optional_field
             key, _, value = optional_field.rpartition("-")
+            # A negative value carries its own '-', and rpartition takes that one as the
+            # separator: "GP-Lat--18.5" split to the key "GP-Lat-" and the value "18.5" --
+            # the sign eaten and the key unrecognisable, so gps_lat read back as None and
+            # a southern-hemisphere fix vanished with no error and no rejection counter.
+            # A key never ends in '-', so a key that does means the separator was the
+            # value's sign.
+            if key.endswith("-"):
+                key, value = key[:-1], "-" + value
             tags[key] = value
 
     return ParseResult(

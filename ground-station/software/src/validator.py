@@ -45,13 +45,23 @@ class StreamValidator:
     # a useful thing to report anyway. At 1 Hz this covers over eight hours of flight.
     SEEN_WINDOW = 32768
 
+    # Latitude and longitude have mathematical bounds. Altitude does not, and so had none
+    # here -- the one coordinate of the three that nothing checked, on either side of the
+    # link. A corrupted altitude is transmitted as a reading, accepted as a reading, and
+    # plotted on the barometric-against-GPS correlation the runbook scores. These bounds
+    # are deliberately loose: their job is to catch corruption, not to second-guess the
+    # receiver. They match kMinGpsAltitudeM and kMaxGpsAltitudeM in the vehicle's parser.
+    GPS_ALT_RANGE = (-1000.0, 80000.0)
+
     def __init__(self, expected_team: Optional[str] = None,
                  gps_lat_range: tuple[float, float] = (-90.0, 90.0),
                  gps_lon_range: tuple[float, float] = (-180.0, 180.0),
-                 seen_window: Optional[int] = None) -> None:
+                 seen_window: Optional[int] = None,
+                 gps_alt_range: Optional[tuple[float, float]] = None) -> None:
         self.expected_team = expected_team
         self.gps_lat_range = gps_lat_range
         self.gps_lon_range = gps_lon_range
+        self.gps_alt_range = gps_alt_range or self.GPS_ALT_RANGE
         self.seen_window = seen_window or self.SEEN_WINDOW
         self.stats = ValidationStats()
         self._last_number: Optional[int] = None
@@ -61,7 +71,7 @@ class StreamValidator:
 
     def reset(self) -> None:
         self.__init__(self.expected_team, self.gps_lat_range, self.gps_lon_range,
-                      self.seen_window)
+                      self.seen_window, self.gps_alt_range)
 
     def _remember(self, number: int) -> None:
         if number in self._seen_numbers:
@@ -137,12 +147,16 @@ class StreamValidator:
 
         # GPS sanity (optional field): reject an implausible fix but keep the packet.
         if record.has_gps:
-            lat, lon = record.gps_lat, record.gps_lon
+            lat, lon, alt = record.gps_lat, record.gps_lon, record.gps_alt
             lo_lat, hi_lat = self.gps_lat_range
             lo_lon, hi_lon = self.gps_lon_range
-            if lat is None or lon is None or not (lo_lat <= lat <= hi_lat) or not (
-                lo_lon <= lon <= hi_lon
-            ):
+            lo_alt, hi_alt = self.gps_alt_range
+            # has_gps is true on latitude and longitude alone, so an absent altitude is
+            # not a fault here -- only a present one that is not a place.
+            if (lat is None or lon is None
+                    or not (lo_lat <= lat <= hi_lat)
+                    or not (lo_lon <= lon <= hi_lon)
+                    or (alt is not None and not (lo_alt <= alt <= hi_alt))):
                 report.notes.append("implausible GPS fix ignored")
                 self.stats.gps_rejected += 1
 
