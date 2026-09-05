@@ -15,8 +15,8 @@ Confirmed hardware is recorded in the implementation column, but possession does
 
 ## Requirements Checklist
 
-**Status as of 2026-09-05:** 32 of the requirements whose acceptance can be judged
-from software are marked `Complete`, each with a named test in the Evidence column. None is
+**Status as of 2026-09-05:** 34 of the 112 requirement rows are marked
+`Complete`, each with a named test in the Evidence column. None is
 marked `Verified`: that word is reserved for evidence from hardware, and while the IMU, the
 barometer, the GPS and the radio have now each read on the bench, no requirement has been
 demonstrated end to end on a powered vehicle. Every remaining row depends on procurement,
@@ -26,6 +26,13 @@ The sensor rows were the last block still describing the pre-implementation proj
 `SEN-001` to `SEN-009` said "integration - TBD" while the telemetry rows carrying the same
 quantities were already `Complete`, so the same fact held two statuses on one page. They now
 carry the implementation that exists and the tests that cover it.
+
+Four rows outside that block were stale for the same reason. `PWR-004` (telemetry begins
+automatically at power-on) and `GEN-008` (the vehicle includes a communication system) were
+`Not Started` for behaviour that is implemented, tested, and in the radio's case already
+transmitting on a bench. `MIS-003` and `MIS-004` are about what telemetry *shows during a
+lift*, so they are marked implemented and awaiting that lift rather than complete: the
+software produces the behaviour and no one has yet watched it happen.
 
 
 | ID | Requirement | Source | Priority | Implementation | Verification Method | Status | Evidence |
@@ -37,8 +44,8 @@ carry the implementation that exists and the tests that cover it.
 | GEN-005 | The CanSat must remain within the applicable mass limit. | Rulebook - Page 4 extract | Mandatory | Mass - TBD; one stated limit is 500 g | Weigh the completed CanSat using a documented scale and clarified limit. | TBD | |
 | MIS-001 | The CanSat must be lifted to the specified launch altitude. | Rulebook - Mission and Launch Guidelines | Mandatory | Launch altitude - TBD | Confirm organizer clarification and document the lift profile. | TBD | |
 | MIS-002 | The CanSat must be powered on before launch. | Rulebook - Mission | Mandatory | Manual power system - TBD | Observe and record power-on before launch. | Not Started | |
-| MIS-003 | Initial ground-floor telemetry should report approximately zero altitude. | Rulebook - Mission | Mandatory | BMP280 baseline and altitude calculation - TBD | Compare startup telemetry with the ground-floor baseline. | Not Started | |
-| MIS-004 | Telemetry must reflect the altitude change during lifting. | Rulebook - Mission | Mandatory | Continuous altitude telemetry - TBD | Review logged packets during a lift test. | Not Started | |
+| MIS-003 | Initial ground-floor telemetry should report approximately zero altitude. | Rulebook - Mission | Mandatory | Altitude is relative to a pad reference: the startup calibrator averages barometer samples on the ground and every later altitude is computed against that pressure | Compare startup telemetry with the ground-floor baseline. | Implemented; **awaiting a lift test** | `test_startup_calibrator_stationary_and_moving`, `test_pressure_altitude` |
+| MIS-004 | Telemetry must reflect the altitude change during lifting. | Rulebook - Mission | Mandatory | Continuous altitude in every packet, from the same compensated barometer reading the flight core uses for its state machine | Review logged packets during a lift test. | Implemented; **awaiting a lift test** | `test_altitude_varies_over_the_mission` runs the real controller through a scripted ascent and descent and checks the altitude the ground station reads back |
 | MIS-005 | Parachute deployment must be demonstrated after release. | Rulebook - Mission and Descent | Mandatory | Parachute and deployment hardware - TBD | Demonstrate release and deployment in a controlled test. | Blocked | |
 | MIS-006 | The CanSat must descend safely after release. | Rulebook - Mission | Mandatory | Descent system - TBD | Conduct a controlled descent test and inspect results. | Blocked | |
 | MIS-007 | The egg must survive descent and landing. | Rulebook - Mission and Egg Payload | Mandatory | Egg chamber and cushioning - TBD | Perform documented impact and recovery tests. | Blocked | |
@@ -85,7 +92,7 @@ carry the implementation that exists and the tests that cover it.
 | PWR-001 | The CanSat must have a manual ON/OFF switch. | Rulebook - Power / Functional Requirements | Mandatory | Switch hardware - TBD | Inspect hardware and perform repeated power-cycle test. | Blocked | |
 | PWR-002 | The CanSat must have a visible LED power indicator. | Rulebook - Power / Functional Requirements | Mandatory | LED hardware - TBD | Confirm visibility and measure immediate power-on behavior. | Blocked | |
 | PWR-003 | The power LED must turn on immediately when the CanSat is powered. | Rulebook - Power / Functional Requirements | Mandatory | LED power path - TBD | Observe startup across repeated power cycles. | Blocked | |
-| PWR-004 | Telemetry transmission must begin automatically when powered on. | Rulebook - Power / Functional Requirements | Mandatory | Flight firmware startup - TBD | Power-cycle test with no manual trigger. | Not Started | |
+| PWR-004 | Telemetry transmission must begin automatically when powered on. | Rulebook - Power / Functional Requirements | Mandatory | The controller transmits from `READY` onward with no arming step, trigger or operator action; transmission continues in every state including `FAULT` | Power on and observe the first packet without operator action. | Complete | `test_controller_sequence_and_degradation` initialises and polls with no trigger and gets packets; `flight_smoke_test` covers boot and the first three |
 | PWR-005 | The 1S LiPo supply must be designed for approximately 4.2 V full charge and lower discharge voltage. | Rulebook - Confirmed Project Hardware and Power Architecture | Mandatory | Orange 3.7 V 1500 mAh 25C 1S LiPo; power architecture - TBD | Measure operating voltage range and review power design. | Not Started | |
 | PWR-006 | A suitable regulated 3.3 V rail must be provided for applicable peripherals. | Project power architecture; rulebook sensor/radio requirements | Mandatory | 3.3 V regulated power supply - TBD | Electrical review, load test, and voltage measurement. | Blocked | |
 | PWR-007 | The regulator model, current rating, efficiency, and circuit must be documented before use. | Project constraint | Mandatory | Regulator selection - TBD | Review schematic, datasheet, and measured behavior. | TBD | |
@@ -150,7 +157,7 @@ carry the implementation that exists and the tests that cover it.
 | SUB-007 | Both project video links must be submitted through the Google Form. | Rulebook - Submission | Mandatory | Submission process - TBD | Review form confirmation. | Not Started | |
 | GEN-006 | The team must avoid disqualification for exceeding the applicable size or mass limit by more than 10%. | Rulebook - Disqualification | Mandatory | Compliance measurement - TBD | Measure against clarified limits and retain records. | TBD | |
 | GEN-007 | The team must avoid unsafe deployment, projectile motion, uncontrolled crash, and other unsafe operation. | Rulebook - Disqualification | Mandatory | Safety and recovery procedures - TBD | Safety review and controlled tests. | Not Started | |
-| GEN-008 | The CanSat must include an attempted communication system. | Rulebook - Disqualification | Mandatory | Paired RA-02 telemetry system - TBD | Demonstrate communication before competition. | Not Started | |
+| GEN-008 | The CanSat must include an attempted communication system. | Rulebook - Scoring / Functional | Mandatory | Paired RA-02 SX1278 modules on one shared link profile, vehicle to ground bridge to PC, with CRC framing over USB | Demonstrate a working or attempted telemetry link. | Complete | `test_link_profile_is_shared_by_both_ends`, the SX1278 driver suite, and the radio answering `0x12` and transmitting on hardware with airtime within 1.8 % of the model (bring-up rows 5.1 to 5.3) |
 | GEN-009 | The team must meet arrival and conduct requirements. | Rulebook - Disqualification | Mandatory | Team procedure - TBD | Confirm schedule, attendance, and conduct requirements. | TBD | |
 
 ## Hardware Gap Analysis

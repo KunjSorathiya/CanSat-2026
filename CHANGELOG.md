@@ -64,6 +64,28 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — four more requirements that had been done for weeks
+
+The same sweep, applied to the blocks outside the sensor rows.
+
+| | Said | Says |
+|---|---|---|
+| `PWR-004` — telemetry begins automatically at power-on | `Not Started`, *"Flight firmware startup - TBD"* | **Complete** — the controller transmits from `READY` with no arming step, trigger or operator action, and a test initialises and polls with none of them |
+| `GEN-008` — the vehicle includes a communication system | `Not Started`, *"Paired RA-02 telemetry system - TBD"* | **Complete** — one shared link profile across both ends, a driver suite, and a radio that has answered `0x12` and transmitted on a bench |
+| `MIS-003` — ground-floor telemetry reads about zero | `Not Started` | **Implemented; awaiting a lift test** |
+| `MIS-004` — telemetry reflects the altitude change while lifting | `Not Started` | **Implemented; awaiting a lift test** |
+
+The last two get the middle answer rather than `Complete`, because both are about what
+telemetry *shows during a lift*. The software produces the behaviour — altitude is relative
+to a pad reference the calibrator takes on the ground, and the end-to-end test watches it
+change through a scripted ascent — but nobody has yet watched it happen on a rope. A
+requirement about an observation is not met by the code that would make the observation
+true.
+
+Every remaining `Not Started`, `Blocked` and `TBD` row was checked in the same pass and is
+correct: they need the power design, the mechanical build, a launch, an organiser's answer,
+or a decision only the team can make. **34 of the 112** requirement rows now stand `Complete`.
+
 ### Fixed — the requirements checklist held two statuses for the same fact
 
 `TEL-015` says roll must be transmitted, and was marked `Complete` with a named test.

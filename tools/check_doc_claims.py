@@ -550,8 +550,10 @@ def main() -> int:
     requirements = read("documentation/requirements/requirements.md")
     complete_rows = len(re.findall(r"^\| [A-Z]{3}-[0-9a-z]+ \|.*\| Complete \|",
                                    requirements, re.MULTILINE))
-    checker.check(f"requirements.md counts its own {complete_rows} Complete rows",
-                  f"{complete_rows} of the requirements" in requirements, str(complete_rows))
+    total_rows = len(re.findall(r"^\| [A-Z]{3}-[0-9a-z]+ \|", requirements, re.MULTILINE))
+    checker.check(f"requirements.md counts its own {complete_rows} of {total_rows} rows",
+                  f"{complete_rows} of the {total_rows} requirement rows" in requirements,
+                  f"{complete_rows}/{total_rows}")
     # And no row may claim Complete without naming its evidence, which is the rule the
     # document states about itself two paragraphs earlier.
     unevidenced = [row.split("|")[1].strip()
