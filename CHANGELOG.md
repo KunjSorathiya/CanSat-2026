@@ -64,6 +64,29 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — two faults the vehicle can raise and no document explained
+
+Every packet carries `FAULTS-n`. The architecture document has a table of what each code
+means, and comparing that table against the `FaultCode` enum found two codes in the
+firmware and in no document at all:
+
+- **`mag_unavailable`** — no magnetometer answered at initialisation, or one that was
+  answering stopped. Not an edge case here: it is **standing on this vehicle**, whose IMU
+  has no magnetometer, so an operator counting faults on the pad is looking at it right now
+  and had nowhere to look it up.
+- **`yaw_reference_disagreement`** — the magnetic heading and the GPS course over ground
+  disagree while the vehicle is moving fast enough for the comparison to mean anything.
+  Unreachable on a six-axis part, which never claims a magnetic heading to disagree with.
+
+Both are in the table now, with the conditions that raise them and what they do to the
+mission, and the enum is held to the table: all **19** codes must appear.
+
+Checked in the same pass and deliberately left alone: 60 of the 78 fields in `config.hpp`
+are named in neither the runbook nor the architecture document. That is not a gap. The
+runbook's table says *"other tunables worth reviewing before a flight"* and lists six —
+the ones an operator should think about. Documenting the DLPF register values and the
+Mahony gains beside them would bury the six that matter under seventy that do not.
+
 ### Added — the pin table somebody actually wires from is checked too
 
 The GPIO assignment is gated against `config.hpp` in `wiring.md`. The quick start carries a

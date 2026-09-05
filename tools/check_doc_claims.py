@@ -619,6 +619,17 @@ def main() -> int:
     checker.check(f"test-plan.md states the {len(ctest_names)} CTest tests",
                   f"{len(ctest_names)} CTest tests" in test_plan, str(len(ctest_names)))
 
+    # Every fault the firmware can raise appears in the architecture document's table. An
+    # operator sees a fault count in every packet; a code that reaches them and is written
+    # down nowhere is a number they cannot act on. Two were missing.
+    fault_header = read("firmware/flight-computer/include/flight/fault_manager.hpp")
+    enum_body = fault_header[fault_header.index("enum class FaultCode"):]
+    enum_body = enum_body[:enum_body.index("};")]
+    fault_codes = re.findall(r"^\s{4}([a-z_]+)\s*(?:=\s*\d+\s*)?,", enum_body, re.MULTILINE)
+    undocumented_faults = [c for c in fault_codes if f"`{c}`" not in architecture]
+    checker.check(f"all {len(fault_codes)} fault codes appear in the architecture table",
+                  not undocumented_faults, ", ".join(undocumented_faults))
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.

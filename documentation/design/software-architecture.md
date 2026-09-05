@@ -404,6 +404,8 @@ number after wrapping is worse than one that stops at the maximum.
 | `radio_init` / `radio_tx` | error | Init fails, or 5 consecutive transmit failures | Bounded re-init plus back-off |
 | `battery_low` | warning | Below `battery_low_voltage`, only when a divider ratio is configured | Reported; no mission change |
 | `telemetry_suppressed` | error | Mandatory data invalid at build time | The packet number is not consumed |
+| `mag_unavailable` | warning | No magnetometer answered at initialisation, or a magnetometer that was answering stopped for longer than `sensor_stale_after_ms` | Yaw falls back to gyroscope integration and telemetry declares `YR-G`. **Standing on this vehicle**, whose IMU has no magnetometer ([F-1](../hardware/receiving-inspection.md#findings)) |
+| `yaw_reference_disagreement` | warning | Magnetic heading and GPS course over ground disagree beyond `yaw_cog_max_error_deg` while moving faster than `yaw_cog_min_speed_mps` | Reported only. Unreachable on a six-axis part, which never claims a magnetic heading to disagree with |
 | `calibration` | warning | Pad calibration did not settle cleanly | Best-effort reference used |
 | `watchdog_reboot` | warning | The power session began with a watchdog reset | Recorded so the ground station can see the recovery |
 | `packet_oversize` | warning / error | A packet would exceed the airtime budget or the 255-byte LoRa FIFO | Optional fields are shed in rulebook priority order — diagnostics, then GPS. If the mandatory block alone still overflows the packet is suppressed (error) rather than truncated by the radio |
