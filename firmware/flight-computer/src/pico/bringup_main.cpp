@@ -51,9 +51,13 @@ void wait_for_host(std::uint32_t timeout_ms) {
 
 const char* i2c_address_name(std::uint8_t addr) {
     switch (addr) {
-        case 0x0C: return "AK8963 magnetometer, inside the MPU-9250 package";
-        case 0x68: return "MPU-9250, AD0 low";
-        case 0x69: return "MPU-9250, AD0 high";
+        // The address labels say what answered, not what the board was sold as. This
+        // scan runs before WHO_AM_I is read, so it cannot know which part it is looking
+        // at -- and naming a specific one here would contradict the identity report a
+        // few lines later on the part this project actually received.
+        case 0x0C: return "AK8963 magnetometer, present only on a nine-axis package";
+        case 0x68: return "IMU (MPU-9250 family), AD0 low";
+        case 0x69: return "IMU (MPU-9250 family), AD0 high";
         case 0x76: return "BMP280, SDO low";
         case 0x77: return "BMP280, SDO high";
         default:   return "unexpected - not a device this vehicle knows about";
@@ -644,7 +648,14 @@ int main() {
 
     if (imu_ok) {
         report_imu_identity(imu);
-        scan_i2c("after IMU init - AK8963 at 0x0C SHOULD now appear");
+        // What the second scan should show depends on which part answered. Telling an
+        // operator that 0x0C "SHOULD now appear" on a six-axis package sends them looking
+        // for a wiring fault that is not there -- two lines after this program has just
+        // told them the package has no magnetometer in it.
+        scan_i2c(imu.has_magnetometer()
+                     ? "after IMU init - AK8963 at 0x0C SHOULD now appear"
+                     : "after IMU init - six-axis part, so 0x0C will NOT appear, which is "
+                       "correct");
     }
 
     if (imu_ok) stationary_statistics(imu, config);

@@ -64,6 +64,34 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — the bring-up diagnostic asked an operator to find a chip that is not there
+
+`cansat_bringup_firmware` scans the I2C bus twice, before and after the IMU is
+initialised, because the magnetometer sits behind a pass-through bridge and only answers
+once `BYPASS_EN` is set. The second scan was headed:
+
+```text
+-- I2C0 bus scan (after IMU init - AK8963 at 0x0C SHOULD now appear) --
+```
+
+It will not appear. The delivered IMU is a six-axis MPU-6500, and this program **says so
+itself, two lines earlier**: *"SIX axes - there is no magnetometer in this package at
+all."* Then it asks the operator to look for one. Somebody with a board in front of them
+and a bus scan showing two devices where the screen wanted three goes hunting a wiring
+fault that does not exist.
+
+The heading is now chosen by what the part actually reported: `SHOULD now appear` on a
+nine-axis package, and *"six-axis part, so 0x0C will NOT appear, which is correct"*
+otherwise.
+
+The bus scan's address labels had the same problem in miniature. `0x68` was labelled
+`MPU-9250` — but the scan runs **before** `WHO_AM_I` is read, so it cannot know which part
+it is looking at, and on this vehicle it was naming one the identity report contradicts a
+moment later. The labels now say what answered rather than what the board was sold as.
+
+Bring-up row 3.1 predicted *"3 after (0x0C appears)"*. It now states both cases and which
+one this vehicle is.
+
 ### Fixed — the vehicle refused to fly and would not say which setting was wrong
 
 `validate_config()` has **thirty** ways to refuse a configuration, and each one writes an
