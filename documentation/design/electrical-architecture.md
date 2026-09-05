@@ -169,19 +169,47 @@ No isolated ground, star ground, plane, or other specific layout is claimed at t
 
 ## Decoupling
 
-Each module's exact board documentation must be checked for required input, output, and local bypass capacitors. No capacitor values are selected in this document.
+Every load on this vehicle sits at the end of a wire from one 3.3 V pin, and
+[F-10](../testing/bring-up-record.md#findings) is what that costs when the wire is not good
+enough: a long jumper made **every** microSD write fail while every read passed, and the same
+fault on the RA-02's supply jumper made a healthy radio fail eight transmits in a row. Both
+were fixed by shortening the wire. Neither would have happened with a capacitor at the
+module.
 
-The prototype review must identify:
+That is the argument for this section. A capacitor at a module's own supply pins supplies the
+current the wire cannot deliver fast enough, and it only works if it is **at the pins** - one
+five centimetres away, through the same jumper, does very little.
 
-- Regulator input and output capacitor requirements
-- Local bypass requirements for the Pico
-- Local bypass requirements for the RA-02
-- Local bypass requirements for MPU-9250, BMP280, GPS, and SD reader
-- Placement relative to module supply pins
-- Capacitor voltage ratings
-- Effects of wiring length and connector resistance
+### What to fit, and where
 
-Decoupling is a design and verification item, not evidence that a stable rail already exists.
+| Where | Value | Type | What it is for |
+|---|---|---|---|
+| **microSD reader, across its own `3V3` and `GND` pins** | **470 µF** | Electrolytic, ≥ 6.3 V (10 or 16 V is what shops stock), low-ESR if offered | The write spike. ~100 mA for a few ms, once per telemetry second, and it must not reach the regulator or it stacks on the radio's peak |
+| Same module, same pins | **100 nF** | Ceramic, marked `104` | The fast edges the electrolytic is too slow for. Electrolytics are poor above a few hundred kHz; the ceramic covers what they miss |
+| **RA-02, across its `3.3V` and `GND`** | **10 µF** | Ceramic X5R/X7R ≥ 10 V, or electrolytic | PA key-up. 1.5 mA standby to 87 mA in microseconds, 45 times a minute |
+| Same module, same pins | **100 nF** | Ceramic `104` | As above |
+| **MPU-6500, BMP280, NEO-6M** | **100 nF each** | Ceramic `104` | Ordinary practice. These draw single-digit milliamps and need nothing bulk |
+| **Pico `VSYS`, near the battery input** | **100 µF** | Electrolytic ≥ 10 V | The battery leads have inductance and the LiPo is at the end of them. Optional; fit it if the rail looks noisy under load |
+
+The Pico's own 3.3 V rail is already decoupled on the Pico. Nothing needs adding there.
+
+### Practical notes
+
+- **Electrolytics are polarised.** The stripe down one side marks the **negative** leg, which
+  goes to GND. Backwards, they heat and can vent. Ceramics have no polarity.
+- **Voltage rating is a minimum, not a target.** A 16 V part on a 3.3 V rail is fine and
+  usually cheaper than a 6.3 V one.
+- **Short legs.** The capacitor's own leads are part of the path it is trying to shorten.
+- 470 µF is small enough not to trouble the Pico's regulator at switch-on. Do not scale it up
+  "for margin" without checking inrush.
+
+### What is still unverified
+
+No module's own board documentation has been read for its existing bypass capacitors. The
+microSD reader is known to carry two ([F-3](../hardware/receiving-inspection.md#findings));
+what they are is not known. These values are chosen from the measured load profile in the
+[power budget](#power-budget), not from a module datasheet, and the rail has not been
+measured with both the radio and the card active at once.
 
 ## Power Distribution
 
