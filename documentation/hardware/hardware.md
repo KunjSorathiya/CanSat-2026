@@ -204,14 +204,14 @@ was right, and this is what happened when the register was finally read.
 | Supply | Verify MPU-9250 VDD range in the product specification | Board input and onboard regulator - TBD | MPU-9250 product specification |
 | Logic | Verify VDDIO range in the product specification | Board signal levels - TBD | MPU-9250 product specification |
 | Interface | I2C and SPI at IC level; the AK8963 is I2C only | Exposed bus and board wiring - TBD | Register map and board schematic |
-| I2C address | `0x68` or `0x69` based on AD0; AK8963 at `0x0C` behind the pass-through bridge | AD0 wiring and available address - TBD | MPU-9250 register map |
-| `WHO_AM_I` | `0x71` MPU-9250, `0x73` MPU-9255, `0x70` MPU-6500 (no magnetometer) | Value on the delivered board - TBD | MPU-9250 register map |
+| I2C address | `0x68` or `0x69` based on AD0; AK8963 at `0x0C` behind the pass-through bridge | **`0x68` on 2026-09-05**, so AD0 is strapped low. `0x0C` never answers, before or after `BYPASS_EN` ([3.1](../testing/bring-up-record.md)) | MPU-9250 register map |
+| `WHO_AM_I` | `0x71` MPU-9250, `0x73` MPU-9255, `0x70` MPU-6500 (no magnetometer) | **`0x70` on 2026-09-05 — an MPU-6500** ([F-1](receiving-inspection.md#findings)) | MPU-9250 register map |
 | Accelerometer ranges | +/-2, +/-4, +/-8, and +/-16 g | Configured: +/-16 g | Product specification |
 | Gyroscope ranges | +/-250, +/-500, +/-1000, and +/-2000 degrees/s | Configured: +/-2000 deg/s | Product specification |
-| Magnetometer range | +/-4912 uT, 14-bit (0.6 uT/LSB) or 16-bit (0.15 uT/LSB) | Configured: 16-bit, continuous mode 2 at 100 Hz | AK8963 datasheet |
-| Magnetometer sensitivity adjustment | Per-axis ASA values in the AK8963 fuse ROM | Read at initialisation and applied per axis | AK8963 datasheet |
+| Magnetometer range | +/-4912 uT, 14-bit (0.6 uT/LSB) or 16-bit (0.15 uT/LSB) | **Not applicable to the delivered board**, which has no AK8963. The firmware would configure 16-bit continuous mode 2 at 100 Hz on a part that had one | AK8963 datasheet |
+| Magnetometer sensitivity adjustment | Per-axis ASA values in the AK8963 fuse ROM | **Not applicable to the delivered board.** Read at initialisation and applied per axis on a part that has an AK8963 | AK8963 datasheet |
 | Filters | Gyroscope `DLPF_CFG` (register 26) and accelerometer `A_DLPF_CFG` (register 29) are separate | Configured: 4 and 4, giving 20 Hz and 21.2 Hz | Register map |
-| Output data rates | 1 kHz internal with DLPF 1..6, divided by (1 + `SMPLRT_DIV`); magnetometer free-runs | Configured: 200 Hz inertial, 100 Hz magnetic | Register map |
+| Output data rates | 1 kHz internal with DLPF 1..6, divided by (1 + `SMPLRT_DIV`); magnetometer free-runs | Configured: 200 Hz inertial. The 100 Hz magnetic rate applies only to a part with an AK8963, and the delivered board has none | Register map |
 | Temperature | `TEMP_OUT`/333.87 + 21 degrees C; **not** the MPU-6050 transfer function | Diagnostic use only | Product specification |
 | Interrupt | INT output exists | Header exposure and electrical behavior - TBD | Register map and board schematic |
 | Current | IC and board current under selected mode - TBD | Board current - TBD | Product specification and measurement |
@@ -239,7 +239,7 @@ Verified from the delivered board, receiving inspection 2026-09-04:
 | Pin count and labels | **Six pins**: `VCC  GND  SCL  SDA  CSB  SDO` - the I2C/SPI variant, not the 4-pin I2C-only board | VERIFIED FROM HARDWARE |
 | Onboard regulator | **None.** The board carries the sensor, four resistors and two capacitors, and nothing else | VERIFIED FROM HARDWARE |
 | Fitted pull-ups | Four resistors marked `103` (10 kΩ) | VERIFIED FROM HARDWARE |
-| SDO strap direction | TBD - continuity check | TBD |
+| SDO strap direction | **Low** — the board answers at `0x76`, not `0x77` | Bus scan, 2026-09-05 ([3.1](../testing/bring-up-record.md)) |
 
 **No regulator means no 5 V tolerance.** This board must be fed 3.3 V, which is what the
 design intends; a 5 V source would destroy it. That is now a verified constraint rather than
@@ -255,7 +255,7 @@ bring-up - **not from the product name**.
 | Supply | BMP280 VDD and VDDIO ranges - use the downloaded datasheet | Board input and regulator - TBD | Bosch BMP280 datasheet |
 | Logic | VDDIO-dependent at IC level | Board signal levels - TBD | Bosch BMP280 datasheet |
 | Interface | I2C and SPI at IC level | Exposed interface - TBD | Bosch BMP280 datasheet and board schematic |
-| I2C address | `0x76` or `0x77` based on SDO | SDO wiring - TBD | Bosch BMP280 datasheet |
+| I2C address | `0x76` or `0x77` based on SDO | **`0x76` on 2026-09-05**, so SDO is strapped low ([3.1](../testing/bring-up-record.md)) | Bosch BMP280 datasheet |
 | Pressure range | 300 to 1100 hPa at IC level | Board operating conditions - TBD | Bosch BMP280 datasheet |
 | Temperature range | -40 to +85 degrees C at IC level | Board operating conditions - TBD | Bosch BMP280 datasheet |
 | Accuracy | Depends on operating mode and conditions; exact required value must be taken from the datasheet | Board-level accuracy - TBD | Bosch BMP280 datasheet |

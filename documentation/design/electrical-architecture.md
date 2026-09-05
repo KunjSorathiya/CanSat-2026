@@ -12,9 +12,9 @@ The architecture is based on the confirmed hardware list and the current require
 |---|---:|---|---|
 | Raspberry Pi Pico | 1 | CanSat flight computer | Confirmed hardware; electrical integration TBD |
 | SX1278 RA-02 433 MHz LoRa module | 1 | Onboard telemetry radio | Confirmed hardware; electrical integration TBD |
-| MPU-9250 | 1 | Gyroscope and accelerometer | Confirmed hardware; exact board documentation TBD |
+| MPU-9250 (delivered: **MPU-6500**) | 1 | Gyroscope and accelerometer | Sold as a nine-axis MPU-9250; `WHO_AM_I` read `0x70` on 2026-09-05, an MPU-6500 with six axes and no magnetometer ([F-1](../hardware/receiving-inspection.md#findings)). Answers at `0x68`; `0x0C` never does |
 | NEO-6M GPS with EEPROM | 1 | GPS sensor and possible additional telemetry source | Confirmed hardware; exact board documentation TBD |
-| GY-BMP280-3.3 | 1 | Pressure, altitude-related, and temperature measurement | Confirmed hardware; exact board documentation TBD |
+| GY-BMP280-3.3 | 1 | Pressure, altitude-related, and temperature measurement | Confirmed hardware; answers at `0x76`, so SDO is strapped low. BMP280-against-BME280 still unresolved |
 | Micro SD card reader | 1 | Onboard data storage | Confirmed hardware; breakout variant and documentation TBD |
 | Orange 3.7 V 1500 mAh 25C 1S LiPo | 1 | Primary power source | Confirmed hardware |
 | AMS1117-3.3 regulator module | TBD | Previously planned 3.3 V peripheral rail | Not recommended for direct 1S-to-3.3 V regulation |
@@ -63,7 +63,7 @@ The recommended architecture for evaluation is:
          -> Raspberry Pi Pico VSYS (Pico onboard 3.3 V regulator)
          -> peripheral power conversion - TBD
               -> verified 3.3 V peripheral rail - TBD
-                   -> MPU-9250, BMP280, NEO-6M, RA-02, microSD reader
+                   -> MPU-6500 (sold as MPU-9250), BMP280, NEO-6M, RA-02, microSD reader
                       (the microSD reader is a 3.3 V board: same rail, no second stage)
          -> power LED branch - TBD
 ```
@@ -340,4 +340,4 @@ The egg, parachute, and mechanical hardware are required by the competition but 
 
 ### Requires Datasheet Verification
 
-Before Gate 2 can be considered complete, the team must identify the exact board/module variants and obtain documentation for the Pico, RA-02, MPU-9250 board, NEO-6M board, BMP280 board, and Micro SD reader. The documentation review must record supply voltage, logic levels, maximum current, interface, pull-ups, capacitor requirements, and pin functions for each device. Until then, this document is a preliminary architecture and not an approved build schematic.
+Before Gate 2 can be considered complete, the team must identify the exact board/module variants and obtain documentation for the Pico, RA-02, MPU-9250 board, NEO-6M board, BMP280 board, and Micro SD reader. Two of those are now settled by measurement rather than by the label on the bag: the IMU is an **MPU-6500** (`WHO_AM_I` `0x70`, no magnetometer), and the microSD reader is a 3.3 V board with no level shifter. Both are recorded in [receiving-inspection.md](../hardware/receiving-inspection.md#findings). The documentation review must record supply voltage, logic levels, maximum current, interface, pull-ups, capacitor requirements, and pin functions for each device. Until then, this document is a preliminary architecture and not an approved build schematic.

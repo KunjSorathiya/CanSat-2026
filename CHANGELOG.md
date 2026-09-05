@@ -10,6 +10,40 @@ development cycle.
 
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
+### Fixed — three measurements that never reached the table they were taken for
+
+The bench settled the IMU's `WHO_AM_I`, its I2C address and the barometer's on 2026-09-05,
+and the bring-up record says so plainly. The hardware reference tables — the rows an
+electrical design is drawn from — still read `Value on the delivered board - TBD`,
+`AD0 wiring and available address - TBD` and `SDO wiring - TBD`, nine lines below the
+paragraph recording `0x70`.
+
+- **`WHO_AM_I` on the delivered board is `0x70`**, an MPU-6500, recorded against `F-1`.
+- **The IMU answers at `0x68`**, so `AD0` is strapped low; `0x0C` never answers, before or
+  after `BYPASS_EN`.
+- **The barometer answers at `0x76`**, so `SDO` is strapped low. The `SDO strap direction`
+  row no longer waits on a continuity check the bus scan already answered.
+
+`check_doc_claims.py` now holds each of these rows to the bring-up record: if the record
+carries a measured value, the matching reference row must carry it too and must not say
+`TBD`. Scoped to the row rather than the file, for the reason written at the top of that
+script — the document that records the value three rows away is not the document that
+records it here.
+
+The same tables asserted a magnetometer configuration in the *Breakout-board status*
+column, the one column that is specifically about the delivered board: 16-bit continuous
+mode 2 at 100 Hz, per-axis ASA read and applied. There is no AK8963 on this board. Those
+rows now say which part they describe.
+
+### Fixed — the electrical architecture had never heard the register read
+
+`electrical-architecture.md` still listed `MPU-9250` in the bill of materials with
+`exact board documentation TBD`, and its Gate 2 blocker asked the team to identify board
+variants that a register read had already identified. Someone planning the wiring from that
+document would have provisioned for an AK8963 at `0x0C` that does not exist. The bill of
+materials, the block diagram and the gate text now name the delivered part, both measured
+addresses, and the finding that recorded them.
+
 ### Added — the predicate that gates every transmission is now held to its own struct
 
 `TelemetryValidity::mandatory_valid()` is what stands between a record and the antenna:

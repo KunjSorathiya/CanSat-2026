@@ -357,6 +357,30 @@ def main() -> int:
     checker.check(f"README records the delivered {word} rather than a nine-axis part",
                   f"`{word}`" in readme and "MPU-6500" in readme, word)
 
+    # A measured answer must reach the table somebody designs from. The bring-up record
+    # settled the IMU's WHO_AM_I and both I2C addresses on 2026-09-05; the hardware
+    # reference tables still carried "Value on the delivered board - TBD" and "SDO wiring -
+    # TBD" for exactly those rows, a day later. The per-paragraph magnetometer gate did not
+    # see it, because those rows do not talk about nine axes -- they talk about a
+    # measurement, and say it has not been taken.
+    #
+    # Scoped to the row, for the reason written at the top of this file: a table is not a
+    # paragraph, and a document that records the value three rows away is not a document
+    # that records it here.
+    hardware = read("documentation/hardware/hardware.md")
+    bringup = read("documentation/testing/bring-up-record.md")
+    for label, value, subject in (("`WHO_AM_I`", "0x70", "the IMU's WHO_AM_I"),
+                                  ("I2C address", "0x68", "the IMU's I2C address"),
+                                  ("I2C address", "0x76", "the barometer's I2C address")):
+        if value not in bringup:
+            continue  # not measured yet: the table is entitled to say so
+        rows = [ln for ln in hardware.splitlines()
+                if ln.startswith("| " + label) and value in ln]
+        checker.check(
+            f"hardware.md records the measured value for {subject}",
+            any("TBD" not in row.split("|")[3] for row in rows),
+            f"{len(rows)} row(s)")
+
     # A document that talks about the magnetometer has to say that this vehicle does not
     # have one. The nine-axis design is still worth documenting -- the code implements it
     # and a real MPU-9250 would run it -- but a reader must never be left believing the
