@@ -96,7 +96,7 @@ had never executed. All are recorded in [CHANGELOG.md](../../CHANGELOG.md) and i
 | Sensor drivers | IMU (MPU-9250 family), BMP280, NEO-6M | Register encodings and timing model host-tested; the IMU, barometer and GPS have since read on hardware. The delivered IMU is a six-axis MPU-6500, so the magnetometer path is dormant ([F-1](../hardware/receiving-inspection.md#findings)) |
 | Ground bridge | Continuous RX, CRC framing, status lines, watchdog | Framing unit-tested |
 | Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI, end-to-end trace | 76 Python tests |
-| Web console | Framing, parser, validator and link health extracted from `index.html` and run under Node | 49 Node tests |
+| Web console | Framing, parser, validator and link health extracted from `index.html` and run under Node | 51 Node tests |
 | SPI drivers | LoRa radio and microSD command sequences against simulated devices | 675 assertions |
 | Tooling | LoRa time-on-air calculator used for the packet-rate decision | 33 Python tests |
 | Web console UI | Single-file console with demo, file replay and Web Serial | Rendering verified by hand in a browser |

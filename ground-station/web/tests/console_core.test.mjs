@@ -649,3 +649,38 @@ test("a framing stream split at every byte decodes identically", () => {
     assert.equal(decoder.overflows, c.totals.overflows, `${c.name} overflows`);
   }
 });
+
+/* Every element the console reaches for exists in the console.
+
+   $("#typo") returns null, and the next property access on it throws. In this page that
+   would stop the render loop mid-flight, on a display somebody is watching a vehicle
+   through. The portable core is DOM-free by construction and cannot make this mistake; the
+   half below the marker can, and nothing else checks it. */
+test("every id the console selects is declared in the console", () => {
+  const html = readFileSync(CONSOLE_HTML, "utf8");
+  const declared = new Set([...html.matchAll(/id="([A-Za-z0-9_-]+)"/g)].map(m => m[1]));
+  const selected = new Set([
+    ...[...html.matchAll(/\$\("#([A-Za-z0-9_-]+)"\)/g)].map(m => m[1]),
+    ...[...html.matchAll(/getElementById\("([A-Za-z0-9_-]+)"\)/g)].map(m => m[1]),
+    ...[...html.matchAll(/querySelector\("#([A-Za-z0-9_-]+)"\)/g)].map(m => m[1]),
+  ]);
+  assert.ok(selected.size > 40, "the console should select many elements");
+  const missing = [...selected].filter(id => !declared.has(id)).sort();
+  assert.deepEqual(missing, [], `selected but never declared: ${missing.join(", ")}`);
+});
+
+test("every SVG icon the console uses is defined in the console", () => {
+  // Icons are swapped by name at runtime -- setStat() takes an id string and builds a
+  // <use href="#..."> from it -- so a renamed symbol fails silently as a blank space
+  // rather than as an error.
+  const html = readFileSync(CONSOLE_HTML, "utf8");
+  const defined = new Set([...html.matchAll(/<symbol id="(i-[A-Za-z0-9_-]+)"/g)].map(m => m[1]));
+  const referenced = new Set([
+    ...[...html.matchAll(/href="#(i-[A-Za-z0-9_-]+)"/g)].map(m => m[1]),
+    ...[...html.matchAll(/"(i-[A-Za-z0-9_-]+)"/g)].map(m => m[1]),
+  ]);
+  assert.ok(defined.size > 10, "the console should define many icons");
+  const undefinedIcons = [...referenced].filter(id => !defined.has(id)).sort();
+  assert.deepEqual(undefinedIcons, [],
+    `icon referenced but never defined: ${undefinedIcons.join(", ")}`);
+});

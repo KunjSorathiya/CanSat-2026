@@ -90,7 +90,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Python ground station | 8 modules | ✅ **125 / 125 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **191 / 191 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **49 / 49 tests** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **51 / 51 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
@@ -242,6 +242,11 @@ Five further tests cover the yaw reference: a magnetic yaw is reported as a comp
 bearing, a relative one yields no bearing, a packet without the tag says nothing either
 way, the bearing wraps into `[0, 360)`, and the CSV row records which kind of yaw it
 holds — the same distinction the C++ formatter and the web console make.
+
+Two hold the console's markup to its own code: every id the page selects must be declared
+in the page, and every SVG icon it names must be defined there. A `$("#typo")` returns null
+and the next property access throws, which in this file would stop the render loop on a
+display somebody is watching a vehicle through.
 
 Two more hold the two parsers to the same **field names**, by running the console's parser
 under Node and comparing the record it returns with Python's. The shared fixtures already
