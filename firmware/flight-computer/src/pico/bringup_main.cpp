@@ -315,6 +315,11 @@ void acquisition_rate(flight::PicoImu& imu, flight::PicoBarometer& baro,
     double sum = 0.0, sum_sq = 0.0;
     std::uint64_t worst_read_us = 0, read_us_sum = 0;
     int n = 0;
+    // Count what the reads did, not just how long they took. A bus that drops one read in
+    // fifty produces interval and jitter figures indistinguishable from a clean one --
+    // the sleep dominates the timing either way -- so a silent failure here would pass
+    // both rows above unnoticed.
+    int imu_reads = 0, imu_fails = 0, baro_reads = 0, baro_fails = 0;
 
     for (int i = 0; i < kTicks; ++i) {
         sleep_ms(period);
@@ -323,8 +328,14 @@ void acquisition_rate(flight::PicoImu& imu, flight::PicoBarometer& baro,
         const std::uint64_t r0 = to_us_since_boot(get_absolute_time());
         flight::ImuSample s;
         flight::BaroSample b;
-        if (imu_ok) imu.read(s, t);
-        if (baro_ok) baro.read(b, t);
+        if (imu_ok) {
+            ++imu_reads;
+            if (!(imu.read(s, t) && s.valid)) ++imu_fails;
+        }
+        if (baro_ok) {
+            ++baro_reads;
+            if (!(baro.read(b, t) && b.valid)) ++baro_fails;
+        }
         const std::uint64_t read_us = to_us_since_boot(get_absolute_time()) - r0;
         read_us_sum += read_us;
         if (read_us > worst_read_us) worst_read_us = read_us;
@@ -348,11 +359,145 @@ void acquisition_rate(flight::PicoImu& imu, flight::PicoBarometer& baro,
     std::printf("        sensor read     = %7.3f ms mean, %.3f ms worst\n",
                 (read_us_sum / static_cast<double>(kTicks)) / 1000.0,
                 worst_read_us / 1000.0);
+    if (imu_reads > 0) {
+        std::printf("        IMU reads       = %5d, %d failed  %s\n", imu_reads, imu_fails,
+                    imu_fails == 0 ? "clean" : "FAILURES - see the shared-bus test below");
+    }
+    if (baro_reads > 0) {
+        std::printf("        baro reads      = %5d, %d failed  %s\n", baro_reads, baro_fails,
+                    baro_fails == 0 ? "clean" : "FAILURES - see the shared-bus test below");
+    }
     std::printf("   The read time is the number that matters: it is the part of the\n"
                 "   period the flight loop cannot spend on anything else. Worst case\n"
                 "   must stay well inside %lu ms.\n", static_cast<unsigned long>(period));
     std::printf("   Measured on this diagnostic's loop, NOT on controller.cpp's\n"
                 "   scheduler. It bounds the flight loop rather than describing it.\n");
+}
+
+// ---- Both sensors on one bus -------------------------------------------------
+//
+// The paced loop above reads both parts, but it leaves ~32 ms of idle between
+// transactions -- which is exactly the gap in which a marginal bus recovers. A fault that
+// costs one read in fifty would leave 3.7 and 3.8 looking clean, because the sleep
+// dominates the timing either way.
+//
+// So hammer it, and hammer it in two conditions. Each part is addressed alone at full
+// speed first, then the two are interleaved with no gap between them. Alone-versus-
+// together is what makes a failure attributable: a part that is clean by itself and dirty
+// in company is a *bus* problem -- capacitance, pull-ups, lead length -- not a broken
+// sensor, and the two call for completely different things to be done next.
+//
+// This is the I2C counterpart to what report_shared_bus() does for SPI0.
+//
+// Hammering is a fair test here because neither driver rate-limits: Mpu9250::read and
+// Bmp280::read each perform one burst read per call and return false only on a transfer
+// failure or a bus-fault data pattern. Polling faster than the parts convert returns the
+// same bytes again, which is uninteresting but not an error -- so every failure this
+// counts is a real one.
+
+struct BusTally {
+    int attempts = 0;
+    int failures = 0;
+};
+
+void print_tally(const char* label, const BusTally& t, double secs) {
+    const double pct = t.attempts > 0 ? (100.0 * t.failures) / t.attempts : 0.0;
+    std::printf("   %-24s %6d reads, %4d failed (%6.2f %%), %8.0f reads/s  %s\n", label,
+                t.attempts, t.failures, pct, secs > 0.0 ? t.attempts / secs : 0.0,
+                t.failures == 0 ? "clean" : "FAILURES");
+}
+
+void shared_i2c_stress(flight::PicoImu& imu, flight::PicoBarometer& baro,
+                       const flight::Configuration& config, bool imu_ok, bool baro_ok) {
+    std::printf("\n-- Both sensors on one bus: interleaved I2C stress --\n");
+
+    if (!imu_ok || !baro_ok) {
+        const char* missing = (!imu_ok && !baro_ok) ? "neither came up"
+                              : imu_ok              ? "only the IMU came up"
+                                                    : "only the barometer came up";
+        std::printf("   SKIPPED: this test needs BOTH parts on the bus, and %s.\n", missing);
+        std::printf("   Nothing about sharing can be concluded from one device. Wire the\n"
+                    "   other one to GP%d/GP%d and run this image again.\n",
+                    flight::BoardPins::i2c_sda, flight::BoardPins::i2c_scl);
+        return;
+    }
+
+    constexpr std::uint32_t kSoloMs = 1000;
+    constexpr std::uint32_t kBothMs = 2000;
+    const double solo_secs = static_cast<double>(kSoloMs) / 1000.0;
+    const double both_secs = static_cast<double>(kBothMs) / 1000.0;
+
+    BusTally imu_solo, baro_solo, imu_both, baro_both;
+
+    // Both parts stay wired throughout. What changes between the phases is not what is
+    // connected but what is being addressed -- so any difference is about sharing the
+    // conversation, not about sharing the wires.
+    {
+        const std::uint64_t end = now_ms() + kSoloMs;
+        while (now_ms() < end) {
+            flight::ImuSample s;
+            ++imu_solo.attempts;
+            if (!(imu.read(s, now_ms()) && s.valid)) ++imu_solo.failures;
+        }
+    }
+    {
+        const std::uint64_t end = now_ms() + kSoloMs;
+        while (now_ms() < end) {
+            flight::BaroSample b;
+            ++baro_solo.attempts;
+            if (!(baro.read(b, now_ms()) && b.valid)) ++baro_solo.failures;
+        }
+    }
+    {
+        const std::uint64_t end = now_ms() + kBothMs;
+        while (now_ms() < end) {
+            flight::ImuSample s;
+            ++imu_both.attempts;
+            if (!(imu.read(s, now_ms()) && s.valid)) ++imu_both.failures;
+
+            flight::BaroSample b;
+            ++baro_both.attempts;
+            if (!(baro.read(b, now_ms()) && b.valid)) ++baro_both.failures;
+        }
+    }
+
+    print_tally("IMU addressed alone", imu_solo, solo_secs);
+    print_tally("baro addressed alone", baro_solo, solo_secs);
+    print_tally("IMU, interleaved", imu_both, both_secs);
+    print_tally("baro, interleaved", baro_both, both_secs);
+
+    const int solo_fail = imu_solo.failures + baro_solo.failures;
+    const int both_fail = imu_both.failures + baro_both.failures;
+    const int total = imu_solo.attempts + baro_solo.attempts + imu_both.attempts +
+                      baro_both.attempts;
+
+    std::printf("\n");
+    if (solo_fail == 0 && both_fail == 0) {
+        std::printf("   RESULT: PASS. Both parts share I2C0 cleanly - %d reads, no failures.\n",
+                    total);
+    } else if (solo_fail == 0) {
+        std::printf("   RESULT: FAIL, and the shape of it points at the BUS.\n"
+                    "   Each part is clean addressed alone and they fail in company: %d\n"
+                    "   failures interleaved. Suspect the wiring before either sensor -\n"
+                    "   breadboard lead length, the two 10 kOhm pull-up pairs in parallel\n"
+                    "   (5 kOhm, see wiring.md 'Bus sharing rules'), or a loose ground.\n",
+                    both_fail);
+    } else {
+        std::printf("   RESULT: FAIL, but NOT because of sharing. %d failures occurred with\n"
+                    "   a single part addressed, before sharing enters into it. Fix the\n"
+                    "   one-sensor case first - this test cannot tell you anything until\n"
+                    "   each part is clean on its own.\n",
+                    solo_fail);
+    }
+
+    const double needed = config.sensor_period_ms > 0
+                              ? 1000.0 / static_cast<double>(config.sensor_period_ms)
+                              : 0.0;
+    std::printf("   Flight asks for %.0f reads/s of each part. The interleaved rates above\n"
+                "   are what the bus will carry flat out; everything over %.0f is margin.\n",
+                needed, needed);
+    std::printf("   A read rate far above the sensors' own output rates is expected and\n"
+                "   fine - it re-reads unchanged registers. This counts failures, not news.\n");
 }
 
 // ---- Gate 4 ------------------------------------------------------------------
@@ -1210,6 +1355,10 @@ int main() {
     if (imu_ok) stationary_statistics(imu, config);
     if (baro_ok && baro_addr != 0) barometer_output_rate(baro, baro_addr);
     if (imu_ok || baro_ok) acquisition_rate(imu, baro, config, imu_ok, baro_ok);
+
+    // Called unconditionally: with only one part wired it prints why it cannot run, which
+    // is more use to somebody at a breadboard than silence would be.
+    shared_i2c_stress(imu, baro, config, imu_ok, baro_ok);
 
     // GPS last: it is the only subsystem here whose supply is still unverified (C.5.5),
     // so everything that can be measured without it is already on the record by now.

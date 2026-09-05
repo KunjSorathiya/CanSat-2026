@@ -43,7 +43,7 @@ what stop that happening on the soldered board. Values and reasoning:
 
 | Item | Qty | Where it goes | ~₹ |
 |---|---:|---|---:|
-| **470 µF electrolytic**, ≥ 6.3 V (16 V is what shops stock) | 2 | Across the microSD reader's own `3V3` and `GND` pins. Takes the write spike locally so it never reaches the regulator | 20 |
+| **470 µF electrolytic**, ≥ 6.3 V (16 V is what shops stock) — **or 2 × 100 µF ceramic X5R/X7R ≥ 10 V** | 2 | Across the microSD reader's own `3V3` and `GND` pins. Takes the write spike locally so it never reaches the regulator. The requirement is [~50 µF effective](../design/electrical-architecture.md#how-much-bulk-is-actually-needed); the electrolytic is cheap margin, and ceramics work if derated for DC bias | 20 |
 | **100 µF electrolytic**, ≥ 10 V | 2 | Pico `VSYS`, near the battery input. Optional — fit if the rail looks noisy under load | 15 |
 | **10 µF**, ceramic X5R/X7R ≥ 10 V or electrolytic | 4 | Across the RA-02's `3.3V` and `GND`. PA key-up is 1.5 mA to 87 mA in microseconds | 20 |
 | **100 nF ceramic**, marked `104` | 20 | One at **every** module's supply pins. They cost pennies; buy the strip | 30 |

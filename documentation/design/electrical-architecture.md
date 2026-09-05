@@ -203,6 +203,48 @@ The Pico's own 3.3 V rail is already decoupled on the Pico. Nothing needs adding
 - 470 µF is small enough not to trouble the Pico's regulator at switch-on. Do not scale it up
   "for margin" without checking inrush.
 
+### How much bulk is actually needed
+
+The 470 µF above is generous rather than calculated, and it is worth knowing what the number
+rests on, because it decides whether an electrolytic is required at all.
+
+A bulk capacitor is **not** asked to supply the whole write. The regulator does that, and it
+has been measured doing it: the rail held **3.28–3.30 V through ten seconds of continuous
+writing** at 100 % duty (row 6.3b). What the capacitor covers is the **step** — the first tens
+of microseconds, before the regulator's control loop responds, and the inductance of the wire
+between them.
+
+For a 100 mA step held for 50 µs with 100 mV of droop allowed:
+
+```
+C  =  I × Δt / ΔV  =  0.1 A × 50 µs / 0.1 V  =  50 µF
+```
+
+So **50 µF is the engineering requirement and anything from 100 µF up is comfortable.** 470 µF
+is four times the margin, chosen because a 470 µF aluminium electrolytic costs ₹10 and there
+was no reason to be clever.
+
+### If you would rather not use an electrolytic
+
+There are good reasons not to want one. They are polarised, they are tall, and a tall part on
+long leads is a mechanical liability in a vehicle that is going to hit the ground.
+
+| Instead of the 470 µF | Verdict |
+|---|---|
+| **2 × 100 µF ceramic** (MLCC, X5R or X7R, ≥ 10 V) | **Works, and is the answer if you want no electrolytic.** But **derate for DC bias**: an MLCC loses much of its rated value under an applied voltage — a 6.3 V-rated part at 3.3 V can deliver under half its marking. Two 100 µF nominal lands somewhere near 60–100 µF effective, which clears the 50 µF requirement. Buy ≥ 10 V rated, not 6.3 V, precisely because the derating is gentler further from the rating |
+| **1 × 100 µF ceramic** | Marginal after derating — perhaps 40 µF effective. It would probably work; it has no margin |
+| **Tantalum** | Available at these values, but they **fail short and can burn** if reverse-fitted or stressed. Not worth it here |
+| **Polymer aluminium / OS-CON** | Genuinely better than all of the above — low ESR, no drying out. Harder to find locally and several times the price |
+| **Nothing at all** | The failure it prevents is [F-10](../testing/bring-up-record.md#findings), which was intermittent across five bench runs. A clean bench test would not tell you it was absent |
+
+Two notes that apply whichever is chosen:
+
+- **The 100 nF ceramics are unaffected by this question** and are not optional. Bulk capacitors
+  of every type are too slow for fast edges; the `104` is what covers them.
+- **If an electrolytic is used, mount it lying flat**, leads as short as they will go, and
+  secure the body with a zip tie or a bead of hot glue. Upright on 10 mm legs it is a lever
+  arm on two solder joints, and this vehicle lands hard.
+
 ### What is still unverified
 
 No module's own board documentation has been read for its existing bypass capacitors. The
