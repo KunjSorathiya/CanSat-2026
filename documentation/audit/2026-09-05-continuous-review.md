@@ -8,7 +8,7 @@ wrong, fix it, prove the fix, prevent the class of defect from returning, commit
 command the documentation tells a reader to run
 **Baseline:** `e87d480`, the last commit of cycle 33 before this pass
 
-**Verdict:** ✅ **Pass. Thirty-two findings, all fixed and all covered. Four would have cost
+**Verdict:** ✅ **Pass. Thirty-three findings, all fixed and all covered. Four would have cost
 a mission or a diagnosis: three produce wrong data, and one leaves a vehicle refusing to fly
 without saying why. The rest are documents that had stopped describing the software, or
 guarantees nothing was holding.**
@@ -32,7 +32,7 @@ the code still did what it said.
 ## Findings
 
 Numbering continues the software audit: the previous pass ended at F-42. F-43 to F-59 were
-found by reading; [F-60 to F-74](#second-wave--f-60-to-f-74) by comparing one
+found by reading; [F-60 to F-75](#second-wave--f-60-to-f-75) by comparing one
 machine-readable thing against another.
 
 | # | Finding | Severity | Status |
@@ -57,7 +57,7 @@ machine-readable thing against another.
 
 ---
 
-## Second wave — F-60 to F-74
+## Second wave — F-60 to F-75
 
 The findings above were reached by reading. Once the obvious classes were closed, the way to
 find more was to stop reading and start **comparing one machine-readable thing against
@@ -82,6 +82,7 @@ comparison a script can repeat.
 | **F-72** | The bring-up diagnostic's second I2C scan is headed *"AK8963 at `0x0C` **SHOULD** now appear"* — two lines after the same program prints *"SIX axes: there is no magnetometer in this package at all"*. An operator with the board in front of them goes hunting a wiring fault that does not exist | Medium | ✅ Fixed |
 | **F-73** | Both hardware documents named the delivered six-axis part in one section and asserted a *"genuine nine-axis part"* in another. **Both passed the rule written earlier in this pass to prevent exactly that**, because it asked whether the file mentions the delivered part rather than whether a paragraph contradicts itself | Medium | ✅ Fixed |
 | **F-74** | The test plan's **first instruction** described `build_host.sh` as running four suites. It runs eight — the LoRa driver, the microSD driver, the web console and the documented-claims check were all absent from the list a reader consults to find out what is covered | Low | ✅ Fixed |
+| **F-75** | `.gitattributes` requires shell scripts to be LF **in the working tree**, because CI runs them on Linux where a stray CR after the shebang is a `bad interpreter` error. `build_host.sh` had 130 CRLF endings, introduced by this pass's own edits. Git normalised them into the index, so the committed content was always correct and the only symptom was a warning on every commit | Low | ✅ Fixed |
 
 ### What the second wave says about the first
 
@@ -162,7 +163,7 @@ said, which was the subject of F-43.
 
 | | At `e87d480` | Now |
 |---|---:|---:|
-| Documented claims checked | 66 | **196** |
+| Documented claims checked | 66 | **198** |
 | C++ assertions | 4222 | **4268** |
 | Python tests | 131 | **160** |
 | Node tests | 37 | **51** |
@@ -267,6 +268,13 @@ about two things belonging together, scope the check to where they belong togeth
 **Reverting the fix to watch the test fail is worth the minute it costs.** Every fix here
 was confirmed that way, and one of them — the raw-log replay — proved the test was checking
 something the old code already satisfied, which meant writing a sharper one.
+
+**A warning that appears on every run is being ignored, not tolerated.** F-75 printed
+`CRLF will be replaced by LF` on every commit of this pass before anyone read it. The habit
+worth keeping is not *investigate every warning* — most of the ones here are correct and
+expected — but *know which ones are expected, and be able to say why*. Once the remaining
+warnings were checked, they turned out to be the `text=auto` Markdown ones, which are
+correct by design.
 
 
 ## Audit trail
