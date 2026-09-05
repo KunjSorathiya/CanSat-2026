@@ -1016,6 +1016,22 @@ function unescapeRaw(text) {
   }
   return out;
 }
+
+/* What the mission-state chip should read, for a MODE tag that may not be there.
+
+   MODE is a diagnostic tag, not part of the mandatory block, so a well-formed packet can
+   arrive without one -- and parsePacket already keeps that absence as null, the way it
+   does for every other optional tag. The chip used to turn that null into "READY", which
+   is the one reading that costs something: a vehicle in FLIGHT or FAULT whose MODE tag
+   was dropped would show a calm nominal word, and the phase ladder would light READY to
+   agree with it. An unreported state is reported as unreported. */
+function missionStateView(mode) {
+  if (mode === null || mode === undefined || mode === "") {
+    return { name: "—", live: "Mission state not reported", phase: null };
+  }
+  const spaced = mode.replace("_", " ");
+  return { name: spaced, live: "Mission state " + spaced.toLowerCase(), phase: mode };
+}
 // PORTABLE-CORE:END
 
 /* ================================================================
@@ -1192,7 +1208,7 @@ function pushSample(r) {
   const s = { tms: r.timestamp_ms, t: r.timestamp_ms / 1000, altitude: r.altitude, pressure: r.pressure,
     temperature: r.temperature, amag, roll: r.roll, pitch: r.pitch, yaw: r.yaw,
     yawRef: r.yaw_reference, heading: r.heading, vspd, spin,
-    x, y, fx, fy, hasFix, mode: r.mode || "",
+    x, y, fx, fy, hasFix, mode: r.mode,
     lat: r.gps_lat, lon: r.gps_lon, galt: r.gps_alt };
   samples.push(s);
   if (samples.length > MAX_SAMPLES) samples.shift();
@@ -2273,6 +2289,10 @@ const STATE_COLOR = {
   LANDED:    ["color-mix(in srgb, var(--good) 18%, var(--panel-2))", "var(--ink)", "color-mix(in srgb, var(--good) 45%, transparent)"],
   RECOVERY:  ["color-mix(in srgb, var(--good) 28%, var(--panel-2))", "var(--ink)", "color-mix(in srgb, var(--good) 55%, transparent)"],
   FAULT:     ["var(--crit)", "#ffffff", "transparent"],
+  // health.cpp returns this for a MissionState outside the enum. It should never
+  // travel, but if it does the operator must see a word that is not nominal rather
+  // than the muted INIT styling a missing entry would fall back to.
+  UNKNOWN:   ["var(--warn)", "#1b1206", "transparent"],
 };
 const PHASES = ["SELF_TEST", "READY", "FLIGHT", "LANDED", "RECOVERY"];
 const PHASE_SHORT = ["Test", "Ready", "Flight", "Landed", "Recov"];
@@ -2365,18 +2385,19 @@ function render(force) {
   drawSpark($("#rate-spark"), health.rateHistory, C.accent, true);
 
   /* ---- mission ---- */
-  const st = latest ? latest.mode || "READY" : (source === "demo" && missionT < 1 ? "SELF_TEST" : "INIT");
-  $("#state-name").textContent = st.replace("_", " ");
-  const sc = STATE_COLOR[st] || STATE_COLOR.INIT;
+  const st = latest ? latest.mode : (source === "demo" && missionT < 1 ? "SELF_TEST" : "INIT");
+  const sv = missionStateView(st);
+  $("#state-name").textContent = sv.name;
+  const sc = STATE_COLOR[sv.phase] || STATE_COLOR.INIT;
   const chip = $("#state-chip");
   chip.style.setProperty("--state-bg", sc[0]);
   chip.style.setProperty("--state-ink", sc[1]);
   chip.style.setProperty("--state-bd", sc[2]);
-  if (st !== lastState) {
-    lastState = st;
-    $("#state-live").textContent = "Mission state " + st.replace("_", " ").toLowerCase();
+  if (sv.phase !== lastState) {
+    lastState = sv.phase;
+    $("#state-live").textContent = sv.live;
   }
-  const pi = PHASES.indexOf(st);
+  const pi = PHASES.indexOf(sv.phase);
   [...$("#ladder").children].forEach((el, i) => {
     el.className = "step" + (pi >= 0 && i < pi ? " done" : "") + (i === pi ? " now" : "");
   });

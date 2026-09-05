@@ -46,7 +46,7 @@ function loadConsoleCore() {
   }
 
   const factory = new Function(
-    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S, parseBridgeStatus, syncWordLabel, SYNC_TEST, SYNC_LAUNCH, unescapeRaw };`
+    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S, parseBridgeStatus, syncWordLabel, SYNC_TEST, SYNC_LAUNCH, unescapeRaw, missionStateView };`
   );
   return factory();
 }
@@ -683,4 +683,52 @@ test("every SVG icon the console uses is defined in the console", () => {
   const undefinedIcons = [...referenced].filter(id => !defined.has(id)).sort();
   assert.deepEqual(undefinedIcons, [],
     `icon referenced but never defined: ${undefinedIcons.join(", ")}`);
+});
+
+test("an absent MODE tag is shown as unreported, not as READY", () => {
+  // The one that matters: a vehicle can be in FLIGHT or FAULT and have its diagnostic
+  // MODE tag dropped. Naming a nominal state the vehicle never claimed is worse than
+  // naming none, and the phase ladder must not light a step either.
+  for (const absent of [null, undefined, ""]) {
+    const view = M.missionStateView(absent);
+    assert.equal(view.name, "—");
+    assert.equal(view.phase, null);
+    assert.match(view.live, /not reported/);
+    assert.notEqual(view.name, "READY");
+  }
+});
+
+test("a MODE tag the vehicle did send is shown as sent", () => {
+  const view = M.missionStateView("SELF_TEST");
+  assert.equal(view.name, "SELF TEST");
+  assert.equal(view.phase, "SELF_TEST");
+  assert.equal(view.live, "Mission state self test");
+});
+
+test("every mission state the firmware names has a console colour", () => {
+  // health.cpp is the single place the firmware turns a MissionState into the string that
+  // travels in the MODE tag. A state added there and not here would fall back to the INIT
+  // colour silently -- a new state rendered as the oldest one.
+  const cpp = readFileSync(
+    join(REPO_ROOT, "firmware", "flight-computer", "src", "health.cpp"), "utf8");
+  const names = [...cpp.matchAll(/return "([A-Z_]+)";/g)].map(m => m[1]);
+  assert.ok(names.length >= 7, `expected the firmware to name at least 7 states, saw ${names.length}`);
+  const html = readFileSync(CONSOLE_HTML, "utf8");
+  const block = html.slice(html.indexOf("const STATE_COLOR"));
+  for (const name of names) {
+    assert.ok(new RegExp("^\\s*" + name + ":", "m").test(block),
+              `firmware state ${name} has no entry in STATE_COLOR`);
+  }
+});
+
+test("the presentation layer does not substitute a state for an absent one", () => {
+  // missionStateView is only worth having if the renderer goes through it. This is the
+  // structural half of the test above: the chip must not reintroduce a default by writing
+  // `latest.mode || "READY"` a second time.
+  const html = readFileSync(CONSOLE_HTML, "utf8");
+  const below = html.slice(html.indexOf("// PORTABLE-CORE:END"));
+  assert.ok(below.includes("missionStateView(st)"),
+            "the mission-state chip must render through missionStateView");
+  assert.ok(!/\.mode\s*\|\|/.test(below),
+            "an absent MODE tag must not fall back to a state the vehicle never claimed");
 });

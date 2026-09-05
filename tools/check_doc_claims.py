@@ -110,6 +110,7 @@ def main() -> int:
     readme = read("README.md")
     quick_start = read("documentation/quick-start.md")
     test_plan = read("documentation/testing/test-plan.md")
+    continuous_review = read("documentation/audit/2026-09-05-continuous-review.md")
     timeline = read("documentation/project/timeline.md")
     runbook = read("documentation/operations/runbook.md")
     architecture = read("documentation/design/software-architecture.md")
@@ -795,11 +796,16 @@ def main() -> int:
     # Only on a full run, though -- without the suite log a dozen checks are skipped, and
     # the quoted total is the full-run one, not the short-run one.
     if counts is not None:
-        claim_total = len(checker.results) + 2
+        claim_total = len(checker.results) + 3
         checker.check(f"test-plan.md states the {claim_total} claims this script checks",
                       f"**{claim_total} / {claim_total} claims**" in test_plan, str(claim_total))
         checker.check(f"README states the {claim_total} claims this script checks",
                       f"**{claim_total} / {claim_total}**" in readme, str(claim_total))
+        # The review's own audit trail records what this script answered. It said 159 long
+        # after the answer was 199 -- a document about keeping documents honest, gone stale
+        # about itself, because nothing checked the row that quotes this script's output.
+        checker.check(f"the continuous-review audit trail states {claim_total} / {claim_total}",
+                      f"| {claim_total} / {claim_total} |" in continuous_review, str(claim_total))
 
     return checker.report()
 

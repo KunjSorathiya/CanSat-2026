@@ -102,8 +102,8 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 8 modules | ✅ **127 / 127 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **199 / 199 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **51 / 51 tests** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **200 / 200 claims** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **55 / 55 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,

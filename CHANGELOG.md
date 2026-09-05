@@ -10,6 +10,37 @@ development cycle.
 
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
+### Fixed — the console named a mission state the vehicle never claimed
+
+`MODE` is a diagnostic tag, not part of the mandatory telemetry block, so a well-formed
+packet can arrive without one. The parser already kept that absence as `null`, the way it
+does for every other optional tag. The state chip then wrote `latest.mode || "READY"`, so a
+packet with no `MODE` tag put **READY** on the screen and lit the READY step of the phase
+ladder to agree with it — for a vehicle that might have been in `FLIGHT` or `FAULT`.
+
+- **An unreported state is now reported as unreported.** The decision moved into the
+  portable core as `missionStateView()`, which returns the chip text, the screen-reader
+  announcement and the phase to light, all `null` when the vehicle did not say.
+- **The default cannot be written a second time.** A structural test requires the renderer
+  to go through `missionStateView` and forbids `.mode ||` anywhere below the portable-core
+  marker.
+- **Every state the firmware names now has a colour.** A new test reads the state strings
+  out of `health.cpp` and requires an entry in the console's `STATE_COLOR` for each. It
+  found one missing on its first run: `UNKNOWN`, the value returned for a `MissionState`
+  outside the enum, which would have been painted in the muted `INIT` styling. It has its
+  own warning colour now.
+
+The same audit dropped `r.mode || ""` from the mission sample builder. An empty string is
+harmless there — it matches no state name — but every consumer compares with `===`, so
+`null` carries through unchanged and the habit does not survive anywhere.
+
+### Fixed — the review document had gone stale about its own result
+
+The continuous-review audit trail recorded `159 / 159` documented claims long after the
+answer was 199. `check_doc_claims.py` already counts its own checks and holds the test plan
+and the README to that number; it now holds the review's audit trail to it too, so the
+document that exists to keep other documents honest cannot drift about itself.
+
 ### Verified — headers fitted, and six Part C rows closed on the bench
 
 Headers were bought separately and soldered to both Picos, both sensor breakouts, the

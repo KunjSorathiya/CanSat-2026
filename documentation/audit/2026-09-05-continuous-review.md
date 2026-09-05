@@ -107,6 +107,42 @@ top of `check_doc_claims.py` where the next person will meet it.
 
 ---
 
+## Third wave — F-76 and F-77
+
+The pass resumed after being stopped, with the working copy green and every earlier gate
+passing. Both findings below came from the same comparison as the second wave: hold two
+representations of one fact side by side and see which one is lying.
+
+| # | Finding | Severity | Status |
+|---|---|---|---|
+| **F-76** | `MODE` is an optional diagnostic tag, and `parsePacket` correctly keeps its absence as `null` — then the console's state chip wrote `latest.mode \|\| "READY"`. A packet arriving without a `MODE` tag displayed **READY**, and the phase ladder lit the READY step to agree with it. A vehicle in `FLIGHT` or `FAULT` whose tag was dropped would show a calm nominal word | **High** | ✅ Fixed |
+| **F-77** | The audit trail in this document recorded `159 / 159` documented claims. The answer had been 199 for hours. A document about keeping documents honest had gone stale about itself, because nothing checked the row that quotes this script's own output | Low | ✅ Fixed |
+
+### F-76 in detail
+
+The console already had a test named *a field the bridge did not send is absent rather than
+guessed*, written for the bridge status line. The state chip broke the same rule on the
+field with the most operational weight on the page, and no test covered it, because the
+substitution lived in the renderer rather than in the portable core.
+
+The fix moves the decision into the core as `missionStateView()`, which returns the name to
+show, the text to announce, and the phase to light — `null` for all three when the vehicle
+did not say. Three gates now hold it:
+
+- an absent `MODE` renders as an em dash and never as a state name;
+- the renderer is required to go through `missionStateView`, and the string `.mode ||` is
+  forbidden below the portable-core marker, so the default cannot be written a second time;
+- every state name `health.cpp` returns must have an entry in the console's `STATE_COLOR`.
+
+The third gate found a live gap on its first run: `health.cpp` returns `UNKNOWN` for a
+`MissionState` outside the enum, and the console had no entry for it, so it would have been
+painted in the muted `INIT` styling. It now has its own warning colour.
+
+The same audit removed one more coalesce: the mission sample builder wrote `r.mode || ""`.
+An empty string is harmless there — it matches no state name — but it is the same habit,
+and every consumer of that field compares with `===`, so `null` carries through unchanged.
+
+
 ## The three that would have produced wrong data
 
 **F-57 — a heading nothing measured.** The magnetometer is admitted on field strength.
@@ -163,7 +199,7 @@ said, which was the subject of F-43.
 
 | | At `e87d480` | Now |
 |---|---:|---:|
-| Documented claims checked | 66 | **199** |
+| Documented claims checked | 66 | **200** |
 | C++ assertions | 4222 | **4268** |
 | Python tests | 131 | **160** |
 | Node tests | 37 | **51** |
@@ -286,7 +322,7 @@ Final state, re-run from a fresh `git clone` with no build directory:
 | Host build and tests | `bash tools/build_host.sh` | All pass, zero warnings |
 | Strict warning set | `CXXFLAGS="… -Werror" bash tools/build_host.sh` | Clean |
 | Firmware syntax | `bash tools/check_pico_syntax.sh` | 11 / 11 `OK` |
-| Documented claims | `python tools/check_doc_claims.py` | 159 / 159 |
+| Documented claims | `python tools/check_doc_claims.py` | 200 / 200 |
 | Documented commands | run as written, from the directory each document names | All pass |
 | Internal links | every relative Markdown link resolved | 0 broken |
 | Web console | driven in a browser, demo and injected packets | No console errors |
