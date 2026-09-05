@@ -64,6 +64,32 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — the live dashboard was missing nine of the values the ground station knows
+
+Having found the shape three times by hand, the fourth was found by comparing the whole
+snapshot against the display: run a packet through the pipeline, list every value the
+snapshot carries, and check the dashboard names each one.
+
+Nine did not appear, and two of them matter on a pad:
+
+| Missing | Why it matters |
+|---|---|
+| **`calibrated`**, **`armed`** | The two flags an operator stands there waiting for. The vehicle sends them in every packet as `CAL` and `ARM`, and the web console has always shown them. The display the runbook opens for a live flight did not |
+| `received`, `accepted`, `rejected` | The totals every other validation row is a fraction of. The replay command prints them; the live view showed the faults without the denominator |
+| `timestamp_regressions` | A clock going backwards, with no reboot to explain it |
+| `gps_rejected` | An implausible fix is kept and flagged rather than dropped, so the count is the only place it is visible at all |
+| `status_frames` | A bridge that is alive but hearing nothing still sends these. Without the count, that case looks exactly like a dead serial link |
+| `team_id` | Redundant when `--team` is set and the only identity on screen when it is not |
+
+All nine are shown now, and **the comparison is a test**. Every value in the snapshot must
+be named by the dashboard, with a short explicit list of the few rendered another way —
+`logging.last_error` is folded into the logging line beside its error count. A second test
+fails if anything on that list stops being rendered at all, so an exception cannot outlive
+its reason.
+
+That is the difference between fixing four instances of a defect and closing the way it
+gets in.
+
 ### Fixed — the frame decoder's counters reached nobody, including the one added earlier today
 
 `FrameDecoder` counts frames decoded, CRC errors, resyncs and overflows. The decoder lives

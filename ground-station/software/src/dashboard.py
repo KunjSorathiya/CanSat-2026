@@ -25,6 +25,9 @@ except Exception:  # pragma: no cover - env dependent
 
 _NUMERIC_FIELDS = [
     ("mission_time", "Mission time"),
+    # Shown even though the operator supplies --team: without that flag any team is
+    # accepted, and then this is the only place the identity on the air is visible.
+    ("team_id", "Team"),
     ("packet_number", "Packet #"),
     ("altitude", "Altitude (m)"),
     ("pressure", "Pressure (Pa)"),
@@ -45,6 +48,11 @@ _NUMERIC_FIELDS = [
     ("gps_fix", "GPS fix"),
     ("mode", "Flight state"),
     ("fault_count", "Active faults"),
+    # The two flags an operator is standing on a pad waiting for. The vehicle transmits
+    # them in every packet as CAL and ARM, the web console has always shown them, and this
+    # display -- the one the runbook opens for a live flight -- did not.
+    ("calibrated", "Calibrated"),
+    ("armed", "Armed"),
     # No battery row. The vehicle measures its pack voltage and raises a fault when it is
     # low, but the voltage itself is never transmitted -- the packet's optional fields are
     # MODE, FAULTS, CAL, ARM and YR, and nothing else. This row used to read the bridge's
@@ -55,11 +63,21 @@ _NUMERIC_FIELDS = [
 ]
 
 _VALIDATION_FIELDS = [
+    # The headline three first: how many packets arrived, how many were accepted, and how
+    # many were not. The replay command has always printed them; the live display showed
+    # every category of fault without ever showing the totals they are faults out of.
+    ("received", "Received"),
+    ("accepted", "Accepted"),
+    ("rejected", "Rejected"),
     ("missing", "Missing"),
     ("duplicates", "Duplicates"),
     ("out_of_order", "Out of order"),
     ("wrong_team", "Wrong team"),
     ("restarts", "Vehicle restarts"),
+    ("timestamp_regressions", "Clock regressions"),
+    # An implausible fix is kept and flagged rather than dropped, so the count is the only
+    # place it is visible at all.
+    ("gps_rejected", "GPS rejected"),
 ]
 
 _LINK_FIELDS = [
@@ -72,6 +90,9 @@ _LINK_FIELDS = [
     ("crc_errors", "CRC errors"),
     ("loss_pct", "Loss %"),
     ("seconds_since_rx", "Since last RX (s)"),
+    # A bridge that is alive but hearing nothing still sends status frames. Without this,
+    # that case looks identical to a dead serial link.
+    ("status_frames", "Status frames"),
 ]
 
 # The bridge reports the radio's own view of the link once a second. RSSI is what warns an

@@ -233,3 +233,61 @@ class FramingStatsTests(unittest.TestCase):
         transport = LoopbackTransport(framed=False)
         transport.push_packet(packet(1))
         self.assertEqual(self._snapshot(transport)["framing"], {})
+
+
+class DashboardCoverageTests(unittest.TestCase):
+    """Every value in the snapshot is named by the dashboard that displays it.
+
+    The snapshot is what the ground station knows; the dashboard is where an operator sees
+    it. Nine values had drifted out of that display, including `calibrated` and `armed` --
+    the two flags someone stands on a pad waiting for -- and the accepted and rejected
+    totals that every other validation row is a fraction of. A field added to the snapshot
+    and forgotten here is invisible, and nothing said so.
+    """
+
+    DASHBOARD = Path(__file__).parents[1] / "src" / "dashboard.py"
+
+    def _snapshot_keys(self):
+        transport = LoopbackTransport(framed=True)
+        transport.push_packet(packet(1, " MODE-READY; FAULTS-0; CAL-1; ARM-1;"))
+        transport.stop()
+        with tempfile.TemporaryDirectory() as tmp:
+            station = GroundStation(transport, expected_team=TEAM, log_dir=tmp)
+            station.run_forever()
+            snapshot = station.snapshot()
+
+        def walk(obj, prefix=""):
+            found = []
+            for key, value in obj.items():
+                if isinstance(value, dict):
+                    found.extend(walk(value, f"{prefix}{key}."))
+                else:
+                    found.append(f"{prefix}{key}")
+            return found
+
+        return walk(snapshot)
+
+    # Values the dashboard renders some other way than as a labelled row. Listing them
+    # here rather than loosening the check keeps "displayed differently" an explicit
+    # decision instead of something a substring match happens to let through.
+    RENDERED_ELSEWHERE = {
+        # Folded into the single Logging line, beside the error count it belongs to.
+        "logging.last_error",
+    }
+
+    def test_every_snapshot_value_is_named_by_the_dashboard(self):
+        source = self.DASHBOARD.read_text(encoding="utf-8")
+        keys = self._snapshot_keys()
+        self.assertGreater(len(keys), 30, "the snapshot should be substantial")
+        unshown = [k for k in keys
+                   if k not in self.RENDERED_ELSEWHERE
+                   and f'("{k.split(".")[-1]}"' not in source]
+        self.assertEqual(unshown, [], f"snapshot values the dashboard never displays: {unshown}")
+
+    def test_the_exception_list_does_not_outlive_its_reason(self):
+        # An allowlist that stops matching anything is a rule nobody is following.
+        source = self.DASHBOARD.read_text(encoding="utf-8")
+        for key in self.RENDERED_ELSEWHERE:
+            self.assertIn(key.split(".")[-1], source,
+                          f"{key} is allowed as rendered elsewhere, but the dashboard "
+                          f"no longer mentions it at all")
