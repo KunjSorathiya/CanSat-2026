@@ -687,6 +687,44 @@ void test_state_machine_fault_paths() {
 }
 
 // ----------------------------------------------------------------------------
+void test_a_refused_configuration_says_which_setting_was_wrong() {
+    // validate_config() has thirty ways to refuse and names the one that applied. The
+    // controller used to replace that with "configuration invalid", leaving an operator
+    // with a vehicle that will not fly and thirty candidates for why.
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+
+    flight::Configuration bad;
+    bad.team_id = "CAN-Team-07";
+    bad.post_impact_transmission_ms = 1000;  // rulebook minimum is 5000
+    flight::Controller refused(bad, imu, baro, gps, radio, logger, board);
+    CHECK(!refused.initialize());
+    const std::string reason = refused.config_error();
+    CHECK(!reason.empty());
+    CHECK(reason.find("post_impact_transmission_ms") != std::string::npos);
+
+    // A different rule gives a different reason, not the same generic string.
+    flight::Configuration other;
+    other.team_id = "CAN-Team-07";
+    other.radio.spreading_factor = 3;  // outside 6..12
+    flight::Controller refused_two(other, imu, baro, gps, radio, logger, board);
+    CHECK(!refused_two.initialize());
+    const std::string second = refused_two.config_error();
+    CHECK(second.find("spreading_factor") != std::string::npos);
+    CHECK(second != reason);
+
+    // A configuration that is accepted leaves it empty rather than stale.
+    flight::Configuration good;
+    good.team_id = "CAN-Team-07";
+    flight::Controller accepted(good, imu, baro, gps, radio, logger, board);
+    CHECK(accepted.initialize());
+    CHECK(std::string(accepted.config_error()).empty());
+}
+
 void test_config_validation() {
     std::string why;
     flight::Configuration c;
@@ -2494,6 +2532,7 @@ int main(int argc, char** argv) {
     test_state_machine_full_mission();
     test_state_machine_fault_paths();
     test_config_validation();
+    test_a_refused_configuration_says_which_setting_was_wrong();
     test_config_radio_airtime_guard();
     test_formatter_and_parser_agree_at_the_edges();
     test_a_value_too_wide_to_format_invalidates_the_packet();

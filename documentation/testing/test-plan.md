@@ -83,7 +83,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 61 suites across the whole flight core | ✅ **3578 / 3578 assertions** |
+| `flight_tests` | 62 suites across the whole flight core | ✅ **3586 / 3586 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **101 / 101 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
@@ -142,7 +142,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 61 suites, 3578 assertions
+### `flight_tests` — 62 suites, 3586 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -168,6 +168,7 @@ flowchart LR
 | `test_fault_manager` | Report, clear, occurrence counting, severity escalation, critical latching |
 | `test_state_machine_full_mission` | The full `INIT` to `RECOVERY` path with realistic inputs, including the 5 s post-impact window |
 | `test_state_machine_fault_paths` | `FAULT` is reachable from every operational state and does not stop telemetry |
+| `test_a_refused_configuration_says_which_setting_was_wrong` | A rejected configuration keeps the reason `validate_config()` gave, so two different rules produce two different messages rather than one generic phrase, and an accepted configuration leaves it empty |
 | `test_config_validation` | The `CAN-Team-XX` placeholder, a telemetry period over 1000 ms, and a post-impact window under 5000 ms are all rejected |
 | `test_telemetry_builder` | Snapshot to record to packet, optional GPS ordering, suppression on invalid mandatory data |
 | `test_the_widest_sd_row_still_fits_one_block` | The widest SD row the builder can produce — every column at its legitimate maximum, plus a packet at the airtime budget's cap — fits one 512-byte block, so raising that cap fails the build instead of silently cutting the flight log |

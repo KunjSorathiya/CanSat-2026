@@ -11,6 +11,7 @@
 #include "flight/telemetry_builder.hpp"
 
 #include <cstdint>
+#include <string>
 
 namespace flight {
 
@@ -40,6 +41,10 @@ public:
     const HealthSnapshot& health() const { return health_; }
     const FaultManager& faults() const { return faults_; }
     const char* last_error() const { return last_error_; }
+    // Why validate_config() refused, verbatim, when it did. Empty otherwise. The generic
+    // last_error() says the configuration is invalid; this says which setting, out of the
+    // thirty rules that could have rejected it.
+    const char* config_error() const { return config_error_.c_str(); }
     std::uint32_t packet_count() const { return packet_number_; }
     std::uint64_t mission_ms() const { return mission_ms_; }
 
@@ -120,6 +125,7 @@ private:
 
     bool operational_ = false;  // past self-test with mandatory sensors available
     const char* last_error_ = "";
+    std::string config_error_;  // set once at initialise, never reassigned
 };
 
 }  // namespace flight

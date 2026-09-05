@@ -64,6 +64,39 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — the vehicle refused to fly and would not say which setting was wrong
+
+`validate_config()` has **thirty** ways to refuse a configuration, and each one writes an
+exact reason into a `why` string: which setting, what the rule is, and often the rulebook
+clause behind it. The controller received that string and replaced it with four words:
+
+```cpp
+if (!validate_config(config_, why)) {
+    last_error_ = "configuration invalid";
+```
+
+The vehicle then latches a critical fault and enters `FAULT`, where it will never produce a
+compliant packet. An operator gets a dead vehicle and thirty candidates.
+
+This is the sharpest instance of the shape this pass keeps finding, because the diagnosis
+was not merely uncollected — it was **computed, handed over, and discarded**, on the one
+failure that stops a mission before it starts.
+
+The reason is kept now, exposed as `Controller::config_error()`, and **printed over USB at
+startup**:
+
+```text
+CONFIG REFUSED: post_impact_transmission_ms must be >= 5000 (rulebook post-impact minimum)
+```
+
+That is the console an operator already has open during bring-up, and it beats an accessor
+nobody calls. The runbook says to connect a serial monitor before changing anything when the
+vehicle sits in `FAULT`, because the first line it prints is the answer.
+
+`test_a_refused_configuration_says_which_setting_was_wrong` holds all three halves: two
+different rules produce two different messages rather than one generic phrase, and an
+accepted configuration leaves the reason empty rather than stale.
+
 ### Fixed — two faults the vehicle can raise and no document explained
 
 Every packet carries `FAULTS-n`. The architecture document has a table of what each code

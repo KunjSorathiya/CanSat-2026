@@ -60,6 +60,10 @@ bool Controller::initialize() {
 
     std::string why;
     if (!validate_config(config_, why)) {
+        // Keep the reason. validate_config() has thirty ways to refuse and says exactly
+        // which one applied; replacing that with "configuration invalid" leaves an
+        // operator with a vehicle that will not fly and no way to find out why.
+        config_error_ = why;
         last_error_ = "configuration invalid";
         faults_.report(FaultCode::config_invalid, FaultSeverity::critical, 0);
         state_machine_.begin_self_test(0);

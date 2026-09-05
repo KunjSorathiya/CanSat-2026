@@ -11,6 +11,7 @@
 #endif
 
 #include <cstdint>
+#include <cstdio>
 
 namespace {
 
@@ -71,7 +72,17 @@ int main() {
 #endif
 
     board.set_status_led(true);
-    controller.initialize();  // degraded operation still continues below
+    if (!controller.initialize()) {
+        // Degraded operation continues below either way. But if the configuration itself
+        // was refused, the vehicle will never produce a compliant packet, and the reason
+        // is the single most useful thing it can say -- so it says it on the serial console
+        // an operator already has open at this point in bring-up, rather than keeping it
+        // for an accessor nobody calls.
+        const char* why = controller.config_error();
+        if (why != nullptr && why[0] != '\0') {
+            std::printf("CONFIG REFUSED: %s\n", why);
+        }
+    }
 
 #ifdef PICO_BUILD
     // 2 s hardware watchdog: a hung loop reboots and telemetry restarts automatically.

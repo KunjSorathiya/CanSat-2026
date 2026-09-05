@@ -394,7 +394,7 @@ number after wrapping is worse than one that stops at the maximum.
 
 | Code | Severity | Raised when | Effect |
 |---|---|---|---|
-| `config_invalid` | critical | `validate_config()` fails | FAULT; no compliant telemetry is possible |
+| `config_invalid` | critical | `validate_config()` fails | FAULT; no compliant telemetry is possible. The rule that refused is kept and printed at startup over USB as `CONFIG REFUSED: <reason>`, and is available from `Controller::config_error()` |
 | `imu_init` / `baro_init` | error, critical if both | Sensor initialisation fails | Degraded; both dead means FAULT |
 | `imu_stale` / `baro_stale` | error | No good read for 2 s | Affected fields invalid; both stale is critical |
 | `orientation_invalid` | error | The estimator has no valid attitude | Roll, pitch and yaw invalid, so the packet is suppressed |
@@ -552,7 +552,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 61 C++ suites with 3578 assertions, plus the LoRa driver (101) and the microSD driver (581) against simulated devices, 158 Python tests including an end-to-end trace, and 49 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 62 C++ suites with 3586 assertions, plus the LoRa driver (101) and the microSD driver (581) against simulated devices, 158 Python tests including an end-to-end trace, and 49 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |

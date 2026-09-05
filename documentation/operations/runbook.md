@@ -63,6 +63,16 @@ The firmware refuses to run with the placeholder identity: `validate_config()` r
 `CAN-Team-XX`, raises a critical `config_invalid` fault, and the vehicle enters `FAULT`.
 This is deliberate — it makes flying with an unset identity impossible.
 
+**When it refuses, it says which rule refused.** Thirty rules can reject a configuration,
+and the vehicle prints the one that did over USB serial at startup:
+
+```text
+CONFIG REFUSED: post_impact_transmission_ms must be >= 5000 (rulebook post-impact minimum)
+```
+
+If the vehicle sits in `FAULT` with no telemetry, connect a serial monitor before changing
+anything: the first line it prints is the answer.
+
 Other tunables worth reviewing before a flight, all in
 [`config.hpp`](../../firmware/flight-computer/include/flight/config.hpp):
 
