@@ -689,6 +689,17 @@ def main() -> int:
         checker.check(f"test-plan.md lists the {suite} suite",
                       f"`{suite}`" in test_plan, suite)
 
+    # .gitattributes says shell scripts are LF in the working tree, not merely in the
+    # index, because CI executes them on Linux and a stray CR after the shebang is a "bad
+    # interpreter" error that reads like a missing file. An editor -- or a script rewriting
+    # the file on Windows -- undoes that silently, and the index normalises it on the way
+    # in, so nothing downstream complains. Check the bytes.
+    crlf_scripts = [q.relative_to(REPO_ROOT).as_posix()
+                    for q in sorted(REPO_ROOT.glob("tools/*.sh"))
+                    if b"\r\n" in q.read_bytes()]
+    checker.check("every shell script is LF in the working tree, as .gitattributes requires",
+                  not crlf_scripts, ", ".join(crlf_scripts))
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.
