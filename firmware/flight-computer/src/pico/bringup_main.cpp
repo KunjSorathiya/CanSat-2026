@@ -448,6 +448,69 @@ void radio_airtime(flight::PicoRadio& radio, std::size_t bytes, const char* labe
     if (sent < kBursts) describe_tx_failure(radio);
 }
 
+// A long enough burst to watch a meter, and enough samples to see a pattern.
+//
+// The five-packet airtime test is over in under three seconds, which is no use with a
+// handheld meter and gives five samples to judge an intermittent fault from. This transmits
+// back to back for long enough to do both, and prints one character per attempt so the
+// SHAPE of the failure is visible rather than just its rate:
+//
+//   ..............................  healthy
+//   .....xxxxxxxxxxxxxxxxxxxxxxxxx  works then stops - heat, or a supply sagging as a
+//                                   bulk capacitor somewhere gives up
+//   .x.x..x.x.x..x.x.x.x.x.x.x.x.x  random - a marginal connection or a marginal rail
+//
+// Those three want different investigations, and a success count alone cannot tell them
+// apart. Back-to-back transmission is also the worst case the supply will ever see: far
+// harsher than the 1 Hz the mission actually sends, which is the point.
+void radio_sustained(flight::PicoRadio& radio, std::size_t bytes, std::uint32_t window_ms) {
+    std::printf("\n-- 5.4 Sustained transmit, %lu s, for a rail measurement --\n",
+                static_cast<unsigned long>(window_ms / 1000));
+    std::printf("   Put the meter on DC volts across pin 36 (3V3) and pin 38 (GND) and\n"
+                "   watch it through the burst. The PA pulls about 120 mA at +17 dBm, so\n"
+                "   a rail that sags below ~3.1 V here is the answer to Gate 2.\n");
+    std::printf("   Back-to-back transmission - far harsher than the 1 Hz the mission\n"
+                "   sends. Starting in 3 s.\n");
+    sleep_ms(3000);
+
+    const std::string payload(bytes, 'A');
+    const std::uint64_t start = now_ms();
+    int attempts = 0, ok = 0;
+    int first_failure_at = -1;
+    std::printf("   ");
+    while (now_ms() - start < window_ms) {
+        const bool sent = radio.transmit(payload);
+        ++attempts;
+        if (sent) {
+            ++ok;
+            std::putchar('.');
+        } else {
+            if (first_failure_at < 0) first_failure_at = attempts;
+            std::putchar('x');
+        }
+        // Keep the line readable rather than letting it wrap wherever it lands.
+        if (attempts % 50 == 0) std::printf("\n   ");
+    }
+    std::printf("\n");
+
+    const double secs = static_cast<double>(now_ms() - start) / 1000.0;
+    std::printf("   %d attempts in %.1f s: %d sent, %d failed (%.0f %% success)\n",
+                attempts, secs, ok, attempts - ok,
+                attempts ? (100.0 * ok / attempts) : 0.0);
+    if (ok > 0) {
+        std::printf("   %.1f packets/s sustained at %u bytes\n", ok / secs,
+                    static_cast<unsigned>(bytes));
+    }
+    if (attempts != ok) {
+        if (first_failure_at > 1) {
+            std::printf("   First failure at attempt %d, so it worked before it did not.\n"
+                        "   That shape is heat or a supply falling away, not a bad wire -\n"
+                        "   a bad wire fails from the first attempt.\n", first_failure_at);
+        }
+        describe_tx_failure(radio);
+    }
+}
+
 void report_radio(const flight::Configuration& config) {
     std::printf("\n-- 5.1 Radio identity --\n");
     flight::PicoRadio radio(config);
@@ -494,6 +557,7 @@ void report_radio(const flight::Configuration& config) {
     std::printf("   transmitting...\n");
     radio_airtime(radio, 206, "5.2  206-byte packet");
     radio_airtime(radio, 255, "5.3  255-byte packet");
+    radio_sustained(radio, 206, 15000);
     std::printf("   Measured time includes FIFO fill, mode changes and the DIO0 round\n"
                 "   trip, so it should sit slightly above the predicted airtime. Well\n"
                 "   above means the driver is waiting on something it should not be.\n");

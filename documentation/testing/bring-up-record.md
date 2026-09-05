@@ -291,6 +291,21 @@ computed airtime that has never been observed.
 > regulator is still unchosen — but it says the RA-02's transmit transient does not brown out
 > a 300 mA-class source, which is useful when sizing one.
 
+> **Row 5.4a exists because five packets cannot tell you what is wrong.** The airtime test
+> is over in under three seconds — no use with a handheld meter, and five samples is not
+> enough to judge an intermittent fault. The sustained burst runs for 15 seconds and prints
+> one character per attempt, so the *shape* of a failure is visible:
+>
+> | Pattern | Means |
+> |---|---|
+> | `..............` | healthy |
+> | `.....xxxxxxxxx` | worked, then stopped — heat, or a supply falling away |
+> | `.x.x..x.x.x.x.` | random — a marginal connection or a marginal rail |
+>
+> Those three want different investigations and a success *count* cannot separate them.
+> Back-to-back transmission is also the harshest load the supply will ever see, far beyond
+> the 1 Hz the mission sends — which is the point of measuring there.
+
 > ⚠️ **Never transmit without the antenna connected.** An open RF port reflects the whole
 > output back into the power amplifier, and this is the one action in bring-up that can
 > destroy a module rather than merely fail. The chain is antenna → SMA joint → 10 cm pigtail
@@ -328,6 +343,7 @@ computed airtime that has never been observed.
 | 5.3 | Airtime, full 255-byte packet | **400 ms** | Same | Same, with a padded packet | **406.9 ms**, mean of 5, all 5 sent. +7.3 ms (1.8 %) over the 399.6 ms model | ✅ 2026-09-05 / KS |
 | 5.4 | Achieved telemetry rate | **1.00 Hz** | `telemetry_period_ms` | Packet numbers per second at the ground station | | |
 | 5.5 | Channel occupancy at 1 Hz | ~33 % typical, 40 % worst case | [link-budget.md](../design/link-budget.md) | 5.2 ÷ 1000 ms | **33.4 % typical, 40.7 % worst case**, from the measured airtimes | ✅ 2026-09-05 / KS |
+| 5.4a | **Sustained transmit, back to back** | Every packet sent; the rail holds | 15 s of continuous transmits, one character printed per attempt; meter on DC volts across the 3V3 rail | | |
 | 5.6 | RSSI at 10 m | −28 dBm free-space | [link-budget.md](../design/link-budget.md) | Bridge status line | | |
 | 5.7 | RSSI at 100 m | −48 dBm free-space | Same | Same | | |
 | 5.8 | RSSI at 500 m | −62 dBm free-space | Same | Same | | |
