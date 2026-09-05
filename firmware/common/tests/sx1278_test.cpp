@@ -38,6 +38,12 @@ struct FakeRadio {
     bool selected = false;
     bool reset_level = true;
     bool dio0 = false;
+    // A real radio asserts TxDone after the packet's airtime, not instantly. When this is
+    // set, DIO0 comes up only once that much simulated time has passed since MODE_TX --
+    // which is what makes an honest transmission distinguishable from a floating line
+    // reading high. Zero keeps the old immediate behaviour for tests that want it.
+    std::uint32_t dio0_delay_ms = 0;
+    std::uint32_t tx_started_ms = 0;
     std::uint32_t millis = 0;
 
     // Observability for the assertions.
@@ -83,6 +89,7 @@ struct FakeRadio {
     void write_register(std::uint8_t addr, std::uint8_t value) {
         if (addr == 0x01) {  // REG_OP_MODE
             mode_history.push_back(value);
+            if ((value & 0x07) == 0x03) tx_started_ms = millis;  // entered TX
         }
         if (addr == 0x0D) {  // REG_FIFO_ADDR_PTR
             fifo_ptr = value;
@@ -116,7 +123,11 @@ void hal_delay(void* ctx, std::uint32_t ms) {
     radio->total_delay_ms += ms;
     radio->millis += ms;
 }
-bool hal_dio0(void* ctx) { return static_cast<FakeRadio*>(ctx)->dio0; }
+bool hal_dio0(void* ctx) {
+    auto* r = static_cast<FakeRadio*>(ctx);
+    if (r->dio0_delay_ms == 0) return r->dio0;
+    return r->millis - r->tx_started_ms >= r->dio0_delay_ms;
+}
 std::uint32_t hal_millis(void* ctx) { return static_cast<FakeRadio*>(ctx)->millis; }
 
 cansat::Sx1278Hal make_hal(FakeRadio& radio, bool with_dio0 = true,
@@ -271,7 +282,10 @@ void test_transmit_loads_the_fifo_and_completes_on_dio0() {
     cansat::Sx1278 driver;
     CHECK(driver.begin(make_hal(radio), cansat::Sx1278Settings{}));
 
-    radio.dio0 = true;  // TxDone asserted immediately
+    // TxDone after a realistic airtime. A 19-byte packet takes about 51 ms at SF7/125 kHz,
+    // and the driver now refuses anything that claims to finish in under half of that -
+    // see test_a_transmit_that_finishes_faster_than_its_airtime_is_refused for why.
+    radio.dio0_delay_ms = 60;
     const char* packet = "CAN-Team-01; P-001;";
     const std::size_t len = std::strlen(packet);
     CHECK(driver.transmit(reinterpret_cast<const std::uint8_t*>(packet), len, 2000));
@@ -501,6 +515,42 @@ void test_probe_version_reads_the_bus_rather_than_a_cached_value() {
     CHECK(sx.probe_version() == 0x12);
 }
 
+// A transmit that reports done faster than its own airtime is refused.
+//
+// This is not a hypothetical. On the bench a DIO0 line that had come loose floated high,
+// and the driver read "done" the instant it polled: a 255-byte packet whose airtime is
+// 399.6 ms returned success in 6.5 ms, and a 15-second burst claimed 2804 packets at 187
+// per second. Every one reported sent. None were transmitted.
+//
+// A timeout is loud - the caller sees false. This was silent, and a vehicle would fly the
+// whole mission reporting a healthy radio and an empty sky. The airtime model is the only
+// thing that can catch it, and it is trustworthy enough to: pinned against published
+// reference vectors, and measured against this radio to within 1.8 %.
+void test_a_transmit_that_finishes_faster_than_its_airtime_is_refused() {
+    FakeRadio radio;
+    radio.dio0 = true;   // the loose wire, floating high: "done" the instant it is polled
+    cansat::Sx1278 sx;
+    CHECK(sx.begin(make_hal(radio), cansat::Sx1278Settings{}));
+
+    const std::uint8_t payload[206] = {};
+    CHECK(!sx.transmit(payload, sizeof(payload)));
+    CHECK(sx.tx_impossibly_fast() == 1);
+    CHECK(sx.tx_timeouts() == 0);   // it did not time out; it returned far too early
+}
+
+// And the guard must not reject an honest transmission. A radio whose DIO0 asserts after a
+// realistic delay still succeeds, or the fix would ground the vehicle it was meant to save.
+void test_a_normal_transmit_is_still_accepted() {
+    FakeRadio radio;
+    radio.dio0_delay_ms = 330;   // a 206-byte packet's real airtime at SF7/125 kHz
+    cansat::Sx1278 sx;
+    CHECK(sx.begin(make_hal(radio), cansat::Sx1278Settings{}));
+    const std::uint8_t payload[206] = {};
+    CHECK(sx.transmit(payload, sizeof(payload)));
+    CHECK(sx.tx_impossibly_fast() == 0);
+    CHECK(sx.tx_timeouts() == 0);
+}
+
 int main() {
     test_begin_requires_the_right_silicon();
     test_begin_requires_a_complete_hal();
@@ -522,6 +572,8 @@ int main() {
     test_reconfigure_reapplies_every_setting();
 
     test_probe_version_reads_the_bus_rather_than_a_cached_value();
+    test_a_transmit_that_finishes_faster_than_its_airtime_is_refused();
+    test_a_normal_transmit_is_still_accepted();
 
     std::cout << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
     if (g_failures != 0) {

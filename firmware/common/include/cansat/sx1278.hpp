@@ -87,6 +87,10 @@ public:
     // completed at all, which is the modem or the supply feeding it.
     std::uint8_t last_tx_irq_flags() const { return last_tx_irq_flags_; }
     std::uint32_t tx_timeouts() const { return tx_timeouts_; }
+    // Transmits that reported done faster than their own airtime allows, and were refused
+    // for it. Non-zero means the completion signal is lying - in practice a DIO0 line that
+    // is not connected and floats high. Worse than a timeout, because it is silent.
+    std::uint32_t tx_impossibly_fast() const { return tx_impossibly_fast_; }
     bool healthy() const { return healthy_; }
 
 private:
@@ -97,6 +101,7 @@ private:
     void set_mode(std::uint8_t mode);
     bool apply_settings(const Sx1278Settings& settings);
     std::uint32_t now_ms();
+    LoraModemParams modem_params() const;
     void sleep(std::uint32_t ms);
 
     Sx1278Hal hal_{};
@@ -106,6 +111,7 @@ private:
     std::uint8_t version_ = 0;
     std::uint8_t last_tx_irq_flags_ = 0;
     std::uint32_t tx_timeouts_ = 0;
+    std::uint32_t tx_impossibly_fast_ = 0;
     std::uint32_t truncated_receives_ = 0;
     int last_rssi_dbm_ = 0;
     float last_snr_db_ = 0.0f;

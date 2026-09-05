@@ -84,6 +84,7 @@ public:
     // so; clear means it never finished. Different faults, identical symptom.
     std::uint8_t last_tx_irq_flags() const { return radio_.last_tx_irq_flags(); }
     std::uint32_t tx_timeouts() const { return radio_.tx_timeouts(); }
+    std::uint32_t tx_impossibly_fast() const { return radio_.tx_impossibly_fast(); }
 
 private:
     Configuration config_;

@@ -405,8 +405,17 @@ void gps_raw_echo(const flight::Configuration& config, std::uint32_t seconds) {
 // opposite investigations, so guessing between them wastes an evening.
 void describe_tx_failure(const flight::PicoRadio& radio) {
     const std::uint8_t irq = radio.last_tx_irq_flags();
-    std::printf("       IRQ_FLAGS at timeout = 0x%02X, %lu timeout(s) so far\n", irq,
-                static_cast<unsigned long>(radio.tx_timeouts()));
+    std::printf("       IRQ_FLAGS = 0x%02X, %lu timeout(s), %lu impossibly fast\n", irq,
+                static_cast<unsigned long>(radio.tx_timeouts()),
+                static_cast<unsigned long>(radio.tx_impossibly_fast()));
+    if (radio.tx_impossibly_fast() != 0) {
+        std::printf("       Transmits reported done faster than their own airtime.\n"
+                    "       DIO0 is floating HIGH - reading done the instant it is\n"
+                    "       polled. Same loose wire on GP%d as a timeout, opposite\n"
+                    "       symptom. Refused rather than counted as sent.\n",
+                    flight::BoardPins::lora_dio0);
+        return;
+    }
     if (irq & 0x08) {
         std::printf("       TxDone IS set: the radio finished and DIO0 never said so.\n"
                     "       That is the wire on GP%d, not the radio.\n",
