@@ -1,6 +1,7 @@
 #include "flight/pico/pico_hal.hpp"
 
 #include "flight/sensor_math.hpp"
+#include "flight/sound_level.hpp"
 
 #ifdef PICO_BUILD
 #include "hardware/adc.h"
@@ -43,6 +44,7 @@ void ensure_adc() {
     if (g_adc_ready) return;
     adc_init();
     adc_gpio_init(BoardPins::battery_adc);
+    adc_gpio_init(BoardPins::sound_adc);
     g_adc_ready = true;
 }
 }  // namespace
@@ -141,6 +143,54 @@ void PicoBoardIo::set_status_led(bool on) {
     gpio_put(BoardPins::status_led, on ? 1 : 0);
 }
 
+bool PicoSoundSensor::initialize() {
+    ensure_adc();
+    health_.initialized = true;
+    // There is nothing to interrogate. An analogue module has no identity register and no
+    // handshake, so unlike the IMU or the radio this cannot report "the part is wrong" -- it
+    // can only report what the pin reads. A disconnected input floats and produces a level
+    // like any other, which is why the log keeps the raw extremes beside the span: a window
+    // whose min and max are both pinned near a rail is a wire, not a sound.
+    SoundSample probe{};
+    const bool ok = read(probe, 0);
+    health_.healthy = ok;
+    return ok;
+}
+
+bool PicoSoundSensor::read(SoundSample& out, std::uint64_t now_ms) {
+    ensure_adc();
+    const std::uint32_t wanted = config_.sound_samples_per_window;
+    if (wanted == 0) return false;
+
+    adc_select_input(static_cast<std::uint32_t>(BoardPins::sound_adc - 26));
+
+    std::uint16_t lo = 0xFFFF;
+    std::uint16_t hi = 0;
+    for (std::uint32_t i = 0; i < wanted; ++i) {
+        const std::uint16_t raw = adc_read();
+        if (raw < lo) lo = raw;
+        if (raw > hi) hi = raw;
+    }
+
+    SoundWindow window;
+    window.min_counts = lo;
+    window.max_counts = hi;
+    window.sample_count = wanted;
+
+    out.min_counts = lo;
+    out.max_counts = hi;
+    out.samples = wanted;
+    out.level_mv_pp = sound_peak_to_peak_mv(window, config_.sound_reference_mv,
+                                            config_.sound_full_scale_counts);
+    out.clipped = sound_window_clipped(window, config_.sound_full_scale_counts);
+    out.valid = true;
+    out.timestamp_ms = now_ms;
+
+    health_.healthy = true;
+    health_.last_update_ms = now_ms;
+    return true;
+}
+
 float PicoBoardIo::battery_voltage() const {
     ensure_adc();
     // Derive the ADC channel from the pin rather than hard-coding 0: GP26/27/28 are ADC
@@ -168,6 +218,8 @@ bool PicoGps::latest(cansat::GpsData&) const { return false; }
 
 void PicoBoardIo::set_status_led(bool) {}
 float PicoBoardIo::battery_voltage() const { return 0.0f; }
+bool PicoSoundSensor::initialize() { return false; }
+bool PicoSoundSensor::read(SoundSample&, std::uint64_t) { return false; }
 
 #endif
 

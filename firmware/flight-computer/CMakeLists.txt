@@ -7,6 +7,7 @@ add_subdirectory(../common common_build)
 set(FLIGHT_CORE_SOURCES
     src/config.cpp
     src/fat_volume.cpp
+    src/sound_level.cpp
     src/controller.cpp
     src/state_machine.cpp
     src/gps_parser.cpp

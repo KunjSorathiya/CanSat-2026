@@ -51,6 +51,24 @@ struct BaroSample {
     std::uint64_t timestamp_ms = 0;
 };
 
+// One reduced window from the analogue microphone. See flight/sound_level.hpp for why a
+// window rather than a sample, and for why the level is in millivolts and not decibels.
+struct SoundSample {
+    // Peak-to-peak envelope over the window, millivolts. A RELATIVE level: it is comparable
+    // with other readings from this module at this gain setting and with nothing else. It
+    // is not a sound pressure level and must never be reported as one.
+    double level_mv_pp = 0.0;
+    std::uint16_t min_counts = 0;
+    std::uint16_t max_counts = 0;
+    std::uint32_t samples = 0;
+    // The window touched an end of the converter's range, so the level is a lower bound
+    // rather than a measurement. Canopy inflation and touchdown are the two moments most
+    // likely to do this, which is exactly why it is carried rather than hidden.
+    bool clipped = false;
+    bool valid = false;
+    std::uint64_t timestamp_ms = 0;
+};
+
 // Inertial measurement unit (MPU-9250 on this vehicle): accelerometer, gyroscope and,
 // on a genuine part, the integrated AK8963 magnetometer.
 //
@@ -92,6 +110,22 @@ public:
     // position from a frozen one.
     virtual std::uint64_t last_fix_ms() const = 0;
     virtual std::uint32_t checksum_errors() const = 0;
+    virtual SensorHealth health() const = 0;
+};
+
+// Analogue microphone on an ADC pin -- an additional sensor, never a mandatory one.
+//
+// Nothing in the mandatory telemetry depends on this and nothing may be allowed to: a dead
+// microphone must cost a column in the log and nothing else. The controller therefore holds
+// it as a pointer that may be null, and a vehicle built without one behaves exactly as it
+// did before this interface existed.
+class SoundSensor {
+public:
+    virtual ~SoundSensor() = default;
+    virtual bool initialize() = 0;
+    // Sample a window and reduce it. Must be bounded: this runs inside the flight loop,
+    // whose whole period is 33 ms.
+    virtual bool read(SoundSample& out, std::uint64_t now_ms) = 0;
     virtual SensorHealth health() const = 0;
 };
 

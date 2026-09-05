@@ -30,6 +30,7 @@ COMMON_SRC=(
 FLIGHT_CORE_SRC=(
   "$ROOT/firmware/flight-computer/src/config.cpp"
   "$ROOT/firmware/flight-computer/src/fat_volume.cpp"
+  "$ROOT/firmware/flight-computer/src/sound_level.cpp"
   "$ROOT/firmware/flight-computer/src/controller.cpp"
   "$ROOT/firmware/flight-computer/src/state_machine.cpp"
   "$ROOT/firmware/flight-computer/src/gps_parser.cpp"

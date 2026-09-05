@@ -34,6 +34,11 @@ struct SensorSnapshot {
     bool orientation_valid = false;
     bool yaw_is_magnetic = false;
     bool baro_valid = false;
+    // Analogue microphone, peak-to-peak millivolts over the last window. A relative level,
+    // not a sound pressure level -- see flight/sound_level.hpp. Logged, never transmitted.
+    double sound_mv_pp = 0.0;
+    bool sound_clipped = false;
+    bool sound_valid = false;
     cansat::GpsData gps{};  // gps.valid == has fix
 };
 
@@ -46,6 +51,15 @@ public:
     struct Built {
         cansat::TelemetryRecord record;
         std::string packet;
+        // Additional-sensor data that is logged but never transmitted. It is carried here
+        // rather than in `record` on purpose: TelemetryRecord is the shared contract with
+        // the ground station and describes what goes over the air, and putting a field in
+        // it that is never sent would misrepresent the packet to every reader of that
+        // header. The SD log is a wider record than the link, and this is where the two
+        // differ.
+        double sound_mv_pp = 0.0;
+        bool sound_clipped = false;
+        bool sound_valid = false;
     };
 
     // Returns nullopt when mandatory data is invalid -> no telemetry point is produced.

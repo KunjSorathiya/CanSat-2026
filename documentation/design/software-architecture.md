@@ -408,6 +408,7 @@ number after wrapping is worse than one that stops at the maximum.
 | `yaw_reference_disagreement` | warning | Magnetic heading and GPS course over ground disagree beyond `yaw_cog_max_error_deg` while moving faster than `yaw_cog_min_speed_mps` | Reported only. Unreachable on a six-axis part, which never claims a magnetic heading to disagree with |
 | `calibration` | warning | Pad calibration did not settle cleanly | Best-effort reference used |
 | `watchdog_reboot` | warning | The power session began with a watchdog reset | Recorded so the ground station can see the recovery |
+| `sound_unavailable` | warning | The analogue microphone is absent, failed to start, or has stopped producing windows | Nothing. It is an additional sensor: the log loses two columns and every mandatory field is unaffected. It can never move the mission state, and `initialize()` returning false for it does not fail the self-test |
 | `packet_oversize` | warning / error | A packet would exceed the airtime budget or the 255-byte LoRa FIFO | Optional fields are shed in rulebook priority order — diagnostics, then GPS. If the mandatory block alone still overflows the packet is suppressed (error) rather than truncated by the radio |
 
 ### Onboard logging
@@ -552,7 +553,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 63 C++ suites with 3606 assertions, plus the LoRa driver (101) and the microSD driver (581) against simulated devices, 166 Python tests including an end-to-end trace, and 57 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 71 C++ suites with 3645 assertions, plus the LoRa driver (101) and the microSD driver (581) against simulated devices, 166 Python tests including an end-to-end trace, and 57 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Not verified** — no hardware bring-up has been performed |

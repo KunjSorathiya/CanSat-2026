@@ -77,13 +77,20 @@ std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
     if (!packet) {
         return std::nullopt;
     }
-    return Built{record, *packet};
+    Built built{record, *packet, 0.0, false, false};
+    built.sound_mv_pp = s.sound_mv_pp;
+    built.sound_clipped = s.sound_clipped;
+    built.sound_valid = s.sound_valid;
+    return built;
 }
 
 std::string TelemetryBuilder::sd_header() {
+    // sound_mv_pp and sound_clipped sit before `packet` so the packet string stays the last
+    // column: it contains no commas but it is by far the widest field, and a reader opening
+    // the CSV wants the numbers before it.
     return "mission_ms,packet_number,state,fault_total,altitude_m,pressure_pa,temperature_c,"
            "roll_deg,pitch_deg,yaw_deg,ax_mps2,ay_mps2,az_mps2,gps_valid,gps_lat,gps_lon,"
-           "gps_alt,packet";
+           "gps_alt,sound_mv_pp,sound_clipped,packet";
 }
 
 std::string TelemetryBuilder::sd_line(const Built& b, MissionState state,
@@ -123,6 +130,13 @@ std::string TelemetryBuilder::sd_line(const Built& b, MissionState state,
     } else {
         out += ",,";  // gps_lat, gps_lon, gps_alt all empty
     }
+    // An absent or unfitted microphone leaves both columns empty rather than writing a
+    // zero. Zero is a level a working sensor can report -- silence -- and a column that
+    // cannot distinguish "silent" from "not measured" is worse than a blank one.
+    out += ',';
+    if (b.sound_valid) out += fixed(b.sound_mv_pp, 1);
+    out += ',';
+    if (b.sound_valid) out += (b.sound_clipped ? '1' : '0');
     out += ',';
     out += b.packet;
     return out;

@@ -28,6 +28,9 @@ struct HealthSnapshot {
     bool gps_fix = false;
     bool radio_ok = false;
     bool sd_ok = false;
+    // Additional sensor. False also means "not fitted", which is a legitimate build of this
+    // vehicle rather than a fault, so nothing mandatory keys off it.
+    bool sound_ok = false;
     bool calibrated = false;         // startup calibration completed cleanly
     bool calibration_settled = false;// completed or timed out (best-effort applied)
     bool armed = false;              // launch detection is enabled

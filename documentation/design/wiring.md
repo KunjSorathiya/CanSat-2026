@@ -54,6 +54,7 @@ flowchart LR
         P13["GP13 · UART0 RX"]
         P14["GP14 · status LED"]
         P26["GP26 · ADC0 battery sense"]
+        P27["GP27 · ADC1 microphone"]
     end
 
     IMU["MPU-9250<br/>accel + gyro"]
@@ -113,6 +114,7 @@ UART0                     RA-02 control
 Board I/O
   GP14 -> status LED (through a current-limiting resistor, value TBD)
   GP26 <- ADC0, battery-sense reservation only — nothing connected
+  GP27 <- ADC1, analogue microphone AO (additional sensor)
 ```
 
 ---
@@ -175,6 +177,7 @@ and mirror `BoardPins`.
 | GP21 | LoRa DIO0 | GPIO | Input | RA-02 DIO0 (TxDone / RxDone) | Yes | `lora_dio0` |
 | GP22 | LoRa DIO1 | GPIO | Input | RA-02 DIO1 | Optional | `lora_dio1` |
 | GP26 | Battery sense | ADC0 | Analog in | Reservation only | Useful | `battery_adc` |
+| GP27 | Microphone | ADC1 | Analog in | Sound module `AO` | Optional | `sound_adc` |
 
 Bus speeds configured by the HAL
 ([`pico_hal.cpp`](../../firmware/flight-computer/src/pico/pico_hal.cpp)):
@@ -389,6 +392,28 @@ encodes the mission state
 ## Battery monitoring
 
 GP26 / ADC0 is a **reservation only**. No divider is designed and nothing is connected.
+
+### GP27 / ADC1 — the analogue microphone
+
+An additional sensor, and wired directly: the module's `AO` output already swings inside
+0–3.3 V, so no divider is needed and none should be fitted — one would halve the signal for
+nothing. Take `AO`, not `DO`. The digital output is a comparator against the trimpot and
+carries one bit; the analogue output is the level this vehicle logs.
+
+**The module must be a 3.3 V part.** There is no level shifter anywhere on this vehicle, and
+a 5 V module's output swing would exceed the RP2040's absolute maximum on an ADC pin.
+
+Three notes that matter more than the wiring:
+
+- **The trimpot sets the gain, and nothing records where it was left.** Two flights at
+  different trimpot positions produce numbers that cannot be compared. Set it once, mark it,
+  and write the position in the flight log.
+- **Route `AO` away from SPI0 and the antenna lead.** It is a high-impedance analogue line
+  next to a 4 MHz clock and a transmitting PA, and it will pick up both. Keep it short, keep
+  it off the SPI bundle, and give it a ground return of its own if the layout allows.
+- **A disconnected input floats and still produces a level.** That is why the driver keeps
+  the window's raw minimum and maximum, not only the span: a window pinned near a rail is a
+  wire, not a sound.
 
 The firmware is written to make an unsafe assumption impossible:
 `BoardIo::battery_voltage()` returns the **raw pin voltage**, implementations must not

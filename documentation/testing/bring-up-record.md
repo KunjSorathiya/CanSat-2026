@@ -168,6 +168,9 @@ confident wrong number.
 | 3.8 | Acquisition jitter | < 6 % of the period (2 ms) | 2 ms loop tick | Standard deviation of the same intervals | **0.453 ms sd** against a 1.98 ms limit — 4.4× inside. Sensor read cost **0.282 ms mean, 0.33–0.35 ms worst across two runs**, i.e. under 1 % of the period (barometer only; the IMU was not wired for this run) | ✅ 2026-09-05 / KS |
 | 3.9 | Calibration settle time | Within `calib_samples` at 30 Hz ≈ 2.7 s | `startup_calibration.cpp` | Time from power-on to `CAL-1` in telemetry | | |
 | 3.10 | I2C bus utilisation | ~1.6 % at 30 Hz | [sensor-rates.md](../design/sensor-rates.md) | Scope SCL, measure active time per second | | |
+| 3.11 | **Microphone quiet-room floor** | A small non-zero span. **Not** zero and **not** clipped | `sound_mv_pp` in the SD log, vehicle still, room quiet | | |
+| 3.12 | **Microphone responds to sound** | The level rises clearly above 3.11 and returns | Clap or speak near the capsule and watch the column | | |
+| 3.13 | **Trimpot position recorded** | A written record exists | The gain is set by an unmarked trimpot and nothing reads it back, so **two flights at different positions produce incomparable numbers.** Set it, mark it, write it down | | |
 
 > **3.5 was re-taken, and the first attempt's shortfall was the method, not the sensor.** The
 > first measurement counted *changed* pressure values and got 44 Hz against a predicted 83.

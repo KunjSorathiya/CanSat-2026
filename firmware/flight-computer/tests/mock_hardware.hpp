@@ -160,6 +160,35 @@ private:
     bool healthy_ = false;
 };
 
+class MockSound final : public SoundSensor {
+public:
+    bool initialize() override {
+        health_.initialized = !fail_init;
+        health_.healthy = !fail_init;
+        return !fail_init;
+    }
+    bool read(SoundSample& out, std::uint64_t now_ms) override {
+        ++reads;
+        if (fail_read) return false;
+        out.level_mv_pp = level_mv_pp;
+        out.clipped = clipped;
+        out.valid = true;
+        out.timestamp_ms = now_ms;
+        health_.last_update_ms = now_ms;
+        return true;
+    }
+    SensorHealth health() const override { return health_; }
+
+    double level_mv_pp = 120.0;
+    bool clipped = false;
+    bool fail_init = false;
+    bool fail_read = false;
+    int reads = 0;
+
+private:
+    SensorHealth health_{};
+};
+
 class MockBoard final : public BoardIo {
 public:
     void set_status_led(bool on) override {

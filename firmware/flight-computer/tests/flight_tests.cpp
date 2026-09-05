@@ -15,6 +15,7 @@
 #include "flight/sensor_timing.hpp"
 #include "flight/startup_calibration.hpp"
 #include "flight/state_machine.hpp"
+#include "flight/sound_level.hpp"
 #include "flight/telemetry_builder.hpp"
 #include "mock_hardware.hpp"
 
@@ -2543,6 +2544,226 @@ void test_measured_packet_sizes_match_the_link_budget() {
 
 }  // namespace
 
+// ---- Analogue microphone (additional sensor) -------------------------------------
+//
+// The rule this whole feature is built around: an additional sensor may add a column to the
+// log and may never touch mandatory telemetry. Every test below is a way of failing that.
+
+void test_sound_level_reduces_a_window_to_its_envelope() {
+    // 3300 mV over 4095 codes is 0.80586 mV per code, so a 1000-code span is 805.9 mV.
+    flight::SoundWindow w;
+    w.min_counts = 1500;
+    w.max_counts = 2500;
+    w.sample_count = 256;
+    const double mv = flight::sound_peak_to_peak_mv(w, 3300.0, 4095);
+    CHECK(mv > 805.0 && mv < 806.9);
+
+    // The level is the SPAN, not the position. A window sitting at a different bias with
+    // the same span is the same loudness, and a reading that moved with the bias would be
+    // tracking the module's trimpot rather than the sound.
+    flight::SoundWindow shifted = w;
+    shifted.min_counts = 500;
+    shifted.max_counts = 1500;
+    CHECK(flight::sound_peak_to_peak_mv(shifted, 3300.0, 4095) == mv);
+
+    // Silence is zero, and zero is a real reading rather than an absent one.
+    flight::SoundWindow quiet;
+    quiet.min_counts = 2048;
+    quiet.max_counts = 2048;
+    quiet.sample_count = 256;
+    CHECK(flight::sound_peak_to_peak_mv(quiet, 3300.0, 4095) == 0.0);
+}
+
+void test_sound_level_refuses_a_window_it_cannot_scale() {
+    flight::SoundWindow empty;
+    empty.min_counts = 0;
+    empty.max_counts = 4095;
+    empty.sample_count = 0;          // nothing was sampled
+    CHECK(flight::sound_peak_to_peak_mv(empty, 3300.0, 4095) == 0.0);
+
+    flight::SoundWindow w;
+    w.min_counts = 100;
+    w.max_counts = 900;
+    w.sample_count = 64;
+    CHECK(flight::sound_peak_to_peak_mv(w, 3300.0, 0) == 0.0);     // no full scale
+    CHECK(flight::sound_peak_to_peak_mv(w, 0.0, 4095) == 0.0);     // no reference
+    CHECK(flight::sound_peak_to_peak_mv(w, -3300.0, 4095) == 0.0);
+
+    // A window that was never filled leaves max below min. Report nothing rather than a
+    // negative loudness.
+    flight::SoundWindow unfilled;
+    unfilled.min_counts = 4095;
+    unfilled.max_counts = 0;
+    unfilled.sample_count = 32;
+    CHECK(flight::sound_peak_to_peak_mv(unfilled, 3300.0, 4095) == 0.0);
+}
+
+// Canopy inflation and touchdown are the loudest things in the flight and the two most
+// likely to saturate a gain set for ambient noise. A clipped window is a LOWER BOUND, and
+// folding that into the number silently would misreport exactly the two events the sensor
+// is carried for.
+void test_a_clipped_window_is_reported_as_clipped() {
+    flight::SoundWindow at_top;
+    at_top.min_counts = 1000;
+    at_top.max_counts = 4095;
+    at_top.sample_count = 256;
+    CHECK(flight::sound_window_clipped(at_top, 4095));
+
+    flight::SoundWindow at_bottom;
+    at_bottom.min_counts = 0;
+    at_bottom.max_counts = 3000;
+    at_bottom.sample_count = 256;
+    CHECK(flight::sound_window_clipped(at_bottom, 4095));
+
+    flight::SoundWindow inside;
+    inside.min_counts = 1000;
+    inside.max_counts = 3000;
+    inside.sample_count = 256;
+    CHECK(!flight::sound_window_clipped(inside, 4095));
+
+    flight::SoundWindow nothing;
+    nothing.sample_count = 0;
+    CHECK(!flight::sound_window_clipped(nothing, 4095));
+}
+
+// The point of the whole design: the level reaches the SD log and never reaches the packet.
+// The rulebook makes optional sensor data optional, and every byte of the packet is airtime
+// the mandatory fields need more.
+void test_the_sound_level_is_logged_and_never_transmitted() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::TelemetryBuilder builder(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = true;
+    s.baro_valid = true;
+    s.orientation_valid = true;
+    s.sound_mv_pp = 412.5;
+    s.sound_valid = true;
+    s.sound_clipped = true;
+
+    const auto built = builder.build(1, 1000, s);
+    CHECK(built.has_value());
+
+    // Not in the packet, under any spelling.
+    CHECK(built->packet.find("412.5") == std::string::npos);
+    CHECK(built->packet.find("SND") == std::string::npos);
+    CHECK(built->packet.find("SOUND") == std::string::npos);
+
+    // In the log, in the columns the header names.
+    const std::string header = flight::TelemetryBuilder::sd_header();
+    CHECK(header.find("sound_mv_pp,sound_clipped,packet") != std::string::npos);
+    const std::string line = builder.sd_line(*built, flight::MissionState::flight, 0);
+    CHECK(line.find(",412.5,1,") != std::string::npos);
+
+    // The header and the row must carry the same number of columns, or every reader of the
+    // CSV is silently misaligned from the moment a column was added.
+    std::size_t header_commas = 0;
+    for (char ch : header) {
+        if (ch == 0x2C) ++header_commas;
+    }
+    std::size_t line_commas = 0;
+    for (char ch : line) {
+        if (ch == 0x2C) ++line_commas;
+    }
+    CHECK(header_commas == line_commas);
+}
+
+// An unfitted microphone must be distinguishable from a silent one. Zero is a level a
+// working sensor reports; a blank is the absence of a measurement, and a column that cannot
+// tell those apart is worse than no column.
+void test_an_absent_microphone_leaves_the_columns_blank_rather_than_zero() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::TelemetryBuilder builder(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = true;
+    s.baro_valid = true;
+    s.orientation_valid = true;
+    s.sound_valid = false;          // no microphone on this vehicle
+
+    const auto built = builder.build(1, 1000, s);
+    CHECK(built.has_value());
+    const std::string line = builder.sd_line(*built, flight::MissionState::flight, 0);
+    CHECK(line.find(",,,") != std::string::npos);   // both sound columns empty
+    CHECK(line.find(",0.0,0,") == std::string::npos);
+}
+
+// A vehicle built without a microphone is a legitimate build. The controller takes it as a
+// pointer for that reason, and a null one must change nothing at all.
+void test_a_vehicle_without_a_microphone_behaves_as_before() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);   // no sound sensor
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 2000; t += 10) {
+        ctrl.poll(t);
+    }
+    CHECK(ctrl.health().packets_sent > 0);
+    CHECK(!ctrl.health().sound_ok);
+    CHECK(!ctrl.faults().active(flight::FaultCode::sound_unavailable));
+}
+
+// And a microphone that fails must cost a warning and a column, never a packet. This is the
+// test that fails if the sensor is ever promoted into the mandatory path.
+void test_a_failed_microphone_costs_a_warning_and_nothing_else() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::test::MockSound sound;
+    sound.fail_init = true;
+    sound.fail_read = true;
+
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board, &sound);
+    CHECK(ctrl.initialize());          // a dead additional sensor never fails the self-test
+    for (std::uint64_t t = 0; t <= 5000; t += 10) {
+        ctrl.poll(t);
+    }
+    CHECK(ctrl.faults().active(flight::FaultCode::sound_unavailable));
+    CHECK(ctrl.state() != flight::MissionState::fault);
+    CHECK(ctrl.health().packets_sent > 0);   // telemetry unaffected
+    CHECK(!ctrl.health().sound_ok);
+}
+
+// A working one reaches the log, and the log alone.
+void test_a_working_microphone_reaches_the_log() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::test::MockSound sound;
+    sound.level_mv_pp = 250.0;
+
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board, &sound);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 2000; t += 10) {
+        ctrl.poll(t);
+    }
+    CHECK(sound.reads > 0);
+    CHECK(ctrl.health().sound_ok);
+    CHECK(!ctrl.faults().active(flight::FaultCode::sound_unavailable));
+    for (const std::string& packet : logger.packets) {
+        CHECK(packet.find("250.0") == std::string::npos);
+    }
+}
+
 int main(int argc, char** argv) {
     const std::string repo_root = argc > 1 ? argv[1] : ".";
     test_mandatory_validity_covers_every_flag();
@@ -2570,6 +2791,14 @@ int main(int argc, char** argv) {
     test_state_machine_full_mission();
     test_state_machine_fault_paths();
     test_config_validation();
+    test_sound_level_reduces_a_window_to_its_envelope();
+    test_sound_level_refuses_a_window_it_cannot_scale();
+    test_a_clipped_window_is_reported_as_clipped();
+    test_the_sound_level_is_logged_and_never_transmitted();
+    test_an_absent_microphone_leaves_the_columns_blank_rather_than_zero();
+    test_a_vehicle_without_a_microphone_behaves_as_before();
+    test_a_failed_microphone_costs_a_warning_and_nothing_else();
+    test_a_working_microphone_reaches_the_log();
     test_a_refused_configuration_says_which_setting_was_wrong();
     test_config_radio_airtime_guard();
     test_formatter_and_parser_agree_at_the_edges();

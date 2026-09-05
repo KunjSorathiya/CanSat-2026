@@ -29,6 +29,9 @@ struct BoardPins {
     static constexpr int status_led = 14;
     static constexpr int battery_adc = 26;  // ADC0
     static constexpr int sd_cs = 6;
+    // Analogue microphone output. ADC1, and chosen over GP28 so the two ADC channels the
+    // vehicle uses are adjacent to the battery sense on GP26 and the third stays free.
+    static constexpr int sound_adc = 27;  // ADC1
 };
 
 enum class RadioMode { test, official };
@@ -277,6 +280,26 @@ struct Configuration {
     // ---- GPS optional-field precision (rulebook unspecified) --------------
     int gps_latlon_decimals = 6;
     int gps_alt_decimals = 1;
+
+    // ---- Analogue microphone (additional sensor) -------------------------
+    //
+    // Sampled into the SD log and the health snapshot, and deliberately NOT transmitted:
+    // see documentation/design/telemetry-protocol.md. The rulebook makes optional sensor
+    // data optional, and every byte of the packet is airtime the mandatory fields need
+    // more.
+    //
+    // The window is a burst of ADC conversions, not a filter. 256 conversions on the
+    // RP2040's ADC at its 500 kS/s ceiling is about half a millisecond, against a 33 ms
+    // loop period -- so the cost is under 2 % of one tick, and the window is long enough
+    // to span several cycles of anything above ~2 kHz.
+    std::uint32_t sound_samples_per_window = 256;
+    // Full-scale voltage and top code of the converter the microphone is read through.
+    double sound_reference_mv = 3300.0;
+    std::uint16_t sound_full_scale_counts = 4095;  // RP2040 ADC is 12-bit
+    // How long a sample may go unrefreshed before the sensor is called unhealthy. Generous,
+    // because nothing mandatory depends on it and a warning that fires in flight for a
+    // sensor nobody is scoring is noise.
+    std::uint32_t sound_stale_after_ms = 2000;
 
     // Append non-mandatory diagnostic fields ("MODE-<state>", "FAULTS-<n>") AFTER every
     // mandatory (and GPS) field. The official parser ignores unknown optional fields; set

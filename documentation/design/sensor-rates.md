@@ -148,6 +148,42 @@ The driver also reads the AK8963's `ST2` register at the end of every burst. Tha
 optional: an AK8963 whose `ST2` is never read stops updating, so a driver that reads only
 the data registers gets a magnetometer that works exactly once.
 
+## The microphone: a burst, not a rate
+
+The analogue microphone is the one sensor here that is not sampled at the loop rate, and the
+reason is worth stating because it looks like an exception to everything above.
+
+Sound is an AC signal at hundreds of hertz and up. Sampling it at 30 Hz would not measure it
+slowly, it would **alias it into nonsense** — the reading would depend on where in the
+waveform each tick happened to land, and would move whether or not the loudness did. Every
+guard elsewhere in this document exists to prevent exactly that.
+
+So the microphone is not sampled at 30 Hz. Once per flight-loop tick it is sampled in a
+**burst**: `sound_samples_per_window` conversions back to back, as fast as the converter
+runs, reduced to the peak-to-peak span of that window. What is produced at 30 Hz is one
+*envelope value*, not one sample of a waveform.
+
+| Quantity | Value | Where from |
+|---|---|---|
+| Conversions per window | 256 | `sound_samples_per_window` |
+| RP2040 ADC conversion time | ~2 µs at its 500 kS/s ceiling | RP2040 datasheet |
+| Window duration | **~0.5 ms** | 256 × 2 µs |
+| Fraction of one 33 ms tick | **~1.6 %** | 0.5 / 33 |
+| Window spans one cycle of | **~2 kHz and above** | 1 / 0.5 ms |
+
+Two consequences fall out of that table and both matter:
+
+- **The cost is affordable and bounded.** 1.6 % of a tick, in a loop already measured at
+  30.04 Hz with 0.453 ms of jitter. It is not, however, free — see
+  [F-11](../testing/bring-up-record.md#findings), which is about a different 30 ms and is the
+  reason loop jitter needs re-measuring with everything running.
+- **The window sets the low-frequency limit.** Half a millisecond spans a full cycle only
+  above about 2 kHz. Slower content — a canopy breathing at a few hertz — is not captured
+  *within* one window; it appears as the envelope value **changing from tick to tick**, which
+  is sampled at 30 Hz and is well within Nyquist for anything under 15 Hz. Both bands are
+  therefore covered, by different mechanisms, and confusing the two is the easiest mistake to
+  make when reading this column.
+
 ## Why over-sampling a sensor corrupts vertical speed
 
 Vertical speed is differentiated from barometric altitude:

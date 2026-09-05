@@ -22,8 +22,12 @@ namespace flight {
 // sensor) stops the loop or suppresses mandatory telemetry that can still be produced.
 class Controller {
 public:
+    // `sound` is optional and may be null. It is a pointer rather than a reference for
+    // exactly that reason: the microphone is an additional sensor, a vehicle built without
+    // one is a legitimate build, and nothing mandatory may depend on its presence.
     Controller(Configuration config, Imu& imu, Barometer& barometer, Gps& gps,
-               Radio& radio, SdLogger& logger, BoardIo& board);
+               Radio& radio, SdLogger& logger, BoardIo& board,
+               SoundSensor* sound = nullptr);
 
     // Record why this power session started, before the loop begins. `from_watchdog`
     // true means the previous run hung or browned out and was reset.
@@ -73,6 +77,7 @@ private:
     Radio& radio_;
     SdLogger& logger_;
     BoardIo& board_;
+    SoundSensor* sound_ = nullptr;   // optional; null on a vehicle without a microphone
 
     StateMachine state_machine_;
     OrientationEstimator orientation_;
@@ -96,6 +101,7 @@ private:
     std::uint64_t last_sensor_ms_ = 0;
     std::uint64_t last_good_imu_ms_ = 0;   // last plausible + valid IMU read
     std::uint64_t last_good_baro_ms_ = 0;  // last plausible + valid barometer read
+    std::uint64_t last_good_sound_ms_ = 0;
 
     std::uint32_t packet_number_ = 0;
 

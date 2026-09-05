@@ -62,8 +62,12 @@ int main() {
     flight::PicoRadio radio(config);
     flight::PicoSdLogger logger;
     flight::PicoBoardIo board(config);
+    // Additional sensor. Passed by address because the controller treats it as optional:
+    // remove this line and the vehicle flies exactly as it did before the microphone
+    // existed, minus two columns in the log.
+    flight::PicoSoundSensor sound(config);
 
-    flight::Controller controller(config, imu, barometer, gps, radio, logger, board);
+    flight::Controller controller(config, imu, barometer, gps, radio, logger, board, &sound);
 
 #ifdef PICO_BUILD
     // If the previous run hung or browned out, the watchdog reset us. Record it before

@@ -29,6 +29,7 @@ enum class FaultCode : std::uint8_t {
     sensor_implausible,   // a reading fell outside datasheet-derived bounds
     watchdog_reboot,      // this boot was caused by the hardware watchdog
     packet_oversize,      // packet exceeded the airtime budget; optional fields dropped
+    sound_unavailable,    // the analogue microphone is absent or has stopped sampling
     count
 };
 

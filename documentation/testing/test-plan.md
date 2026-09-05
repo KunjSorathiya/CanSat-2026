@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 63 suites across the whole flight core | ✅ **3606 / 3606 assertions** |
+| `flight_tests` | 71 suites across the whole flight core | ✅ **3645 / 3645 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -157,7 +157,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 63 suites, 3606 assertions
+### `flight_tests` — 71 suites, 3645 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -186,6 +186,14 @@ flowchart LR
 | `test_state_machine_fault_paths` | `FAULT` is reachable from every operational state and does not stop telemetry |
 | `test_a_refused_configuration_says_which_setting_was_wrong` | A rejected configuration keeps the reason `validate_config()` gave, so two different rules produce two different messages rather than one generic phrase, and an accepted configuration leaves it empty |
 | `test_config_validation` | The `CAN-Team-XX` placeholder, a telemetry period over 1000 ms, and a post-impact window under 5000 ms are all rejected |
+| `test_sound_level_reduces_a_window_to_its_envelope` | An ADC window becomes its peak-to-peak span in millivolts; the same span at a different bias reads the same, and silence reads zero |
+| `test_sound_level_refuses_a_window_it_cannot_scale` | An empty window, a zero full scale, a zero or negative reference, and a window never filled all return 0 rather than dividing by zero or reporting a negative loudness |
+| `test_a_clipped_window_is_reported_as_clipped` | A window touching either end of the converter is flagged, because the level is then a lower bound — and canopy inflation and touchdown are the two events most likely to saturate |
+| `test_the_sound_level_is_logged_and_never_transmitted` | The level appears in the SD row and in no spelling anywhere in the packet, and the CSV header and row carry the same column count |
+| `test_an_absent_microphone_leaves_the_columns_blank_rather_than_zero` | No sensor writes empty columns, never `0.0` — a working sensor reports zero for silence and the two must stay distinguishable |
+| `test_a_vehicle_without_a_microphone_behaves_as_before` | A null sound pointer flies the full mission, sends packets, and raises no sound fault |
+| `test_a_failed_microphone_costs_a_warning_and_nothing_else` | A microphone that fails to start and fails every read raises a warning, does not fail the self-test, does not reach `fault`, and does not cost a packet |
+| `test_a_working_microphone_reaches_the_log` | A working one is read, marks health, clears its fault, and its level appears in no transmitted packet |
 | `test_telemetry_builder` | Snapshot to record to packet, optional GPS ordering, suppression on invalid mandatory data |
 | `test_the_widest_sd_row_still_fits_one_block` | The widest SD row the builder can produce — every column at its legitimate maximum, plus a packet at the airtime budget's cap — fits one 512-byte block, so raising that cap fails the build instead of silently cutting the flight log |
 | `test_raw_block_log` | Header round-trip, append, resume after a simulated reset, boot counting, full-region behaviour |

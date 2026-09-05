@@ -10,6 +10,51 @@ development cycle.
 
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
+### Added — an acoustic sensor, logged and deliberately not transmitted
+
+An analogue microphone on `GP27` / ADC1, as the project's second additional sensor. It
+closes sensor integration at its 25-point cap — which is a cap, so a third sensor scores
+nothing more there, and planning for ten points from two sensors would have been planning
+for five.
+
+**The rulebook was checked before the packet was touched, and the packet was not touched.**
+`TEL-022` says optional sensor data *may* be appended after mandatory data. May, not must.
+Every question this sensor exists to answer is a post-flight one — when the canopy
+inflated, when it landed, how the level tracked descent rate — and all of them are asked
+of the log, against the altitude and acceleration columns beside them. So the level goes to
+the SD card as `sound_mv_pp` and `sound_clipped`, and never into a packet. The nine bytes it
+would have cost are airtime the mandatory fields need more. `telemetry-protocol.md` records
+the decision, its bandwidth assessment and what it gives up: if the vehicle is never
+recovered, the acoustic record is gone.
+
+**A window, not a sample.** The module's output is AC-coupled and rests near half its
+supply, so a single reading per tick would say where in the waveform the tick landed, not
+how loud anything was. Each tick takes a burst of 256 conversions — about 0.5 ms, 1.6 % of
+one 33 ms period — and reduces it to a peak-to-peak envelope.
+
+**It reports millivolts and not decibels, and that is not laziness.** dB SPL needs a
+calibrated reference source and a record of where the module's gain trimpot was left. This
+project has neither, so the value is a relative level comparable across one flight at one
+gain setting and with nothing else. That limit is in the header comment, the requirements
+row, the log column name and a new bring-up row that asks for the trimpot position to be
+written down.
+
+**Nothing mandatory can depend on it.** The controller holds it as a pointer that may be
+null: a vehicle built without a microphone behaves exactly as before, a failed
+`initialize()` does not fail the self-test, and a failed read raises a warning that cannot
+move the mission state. Three of the eight new tests exist only to keep that true.
+
+An unfitted microphone writes empty columns rather than `0.0`, because a working one reports
+zero for silence and a column that cannot tell those apart is worse than no column.
+
+### Changed — the load budget, because 5 mA of 23 is not a rounding error
+
+The microphone is a continuous load: it draws whether or not anything is listening. Roughly
+5 mA, almost all of it the LM393 and its indicator LEDs rather than the capsule. The
+all-at-once case moves from 302 to 307 mA against a 300 mA pin, and the realistic case from
+18 mA of margin to 13.
+
+
 ### Closed — both bench intermittents were the same fault, on two wires
 
 The radio that failed eight transmits and then sent seventy-five (F-5), and the microSD

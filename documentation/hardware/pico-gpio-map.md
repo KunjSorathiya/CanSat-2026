@@ -29,6 +29,7 @@ No regulator is selected and no PCB or firmware is created here.
 | MPU-9250 INT | GPIO7 | Reserved interrupt-capable ordinary GPIO input |
 | Status LED | GPIO14 | Dedicated ordinary GPIO; external LED polarity and resistor remain TBD |
 | Battery ADC | GPIO26 / ADC0 | Reserved ADC-capable GPIO; divider is not designed |
+| Microphone | GPIO27 / ADC1 | Analogue sound module `AO`, direct, no divider; additional sensor |
 
 The alternate functions listed above must still be checked against the exact Pico datasheet revision and final board configuration. A valid Pico mux assignment does not prove that the connected breakout boards are electrically safe.
 
@@ -42,6 +43,7 @@ The selected pins use these documented RP2040 function roles:
 - GPIO16/GPIO17/GPIO18/GPIO19: SPI0 RX/CSn/SCK/TX functions
 - GPIO12/GPIO13: UART0 TX/RX pair
 - GPIO26: ADC0
+- GPIO27: ADC1
 - GPIO6, GPIO7, GPIO14, GPIO20, GPIO21, and GPIO22: ordinary GPIO resources for control or input functions
 
 The GPIOs used for control and interrupts do not need a special alternate function for this preliminary map. GPIO interrupt capability remains a firmware and final electrical validation item.
@@ -67,6 +69,7 @@ The Pico's onboard LED is not used as the competition-visible external LED. GPIO
 | GPIO7 | MPU-9250 INT | GPIO interrupt/input | Input | MPU-9250 INT | USEFUL | Provisional | Only if the breakout exposes INT and the design uses it |
 | GPIO14 | Status LED | GPIO | Output | External visible LED | REQUIRED | Provisional | Proposed GPIO -> resistor -> LED -> GND; polarity and resistor value TBD |
 | GPIO26 | Battery monitoring | ADC0 | Analog input | Battery-voltage monitor reservation | USEFUL | Reserved | Divider and protection not designed; never connect LiPo directly |
+| GPIO27 | Microphone | ADC1 | Analog input | Analogue sound module `AO` | OPTIONAL | Assigned | 3.3 V module only, no level shifting anywhere on this vehicle. Take `AO`, not `DO`. Keep the run short and away from SPI0 and the antenna lead |
 
 ## Connection Summary
 
@@ -99,6 +102,7 @@ GPIO14 -> status LED
 
 Battery:
 GPIO26 <- ADC reservation
+GPIO27 <- sound module AO (additional sensor)
 ```
 
 ### LED Connection
@@ -191,6 +195,7 @@ UART1 remains unassigned for debugging, a future sensor, or expansion if the fin
 | UART0 | NEO-6M GPS | GPIO12 TX / GPIO13 RX | Provisional | Pico TX -> GPS RX; Pico RX <- GPS TX |
 | UART1 | Debug or future expansion | Unassigned | Reserved | Preserve if final pin multiplexing permits |
 | ADC0 | Battery-voltage monitoring | GPIO26 | Reserved | Divider and protection not designed |
+| ADC1 | Analogue microphone | GPIO27 | Assigned | Read as a burst of conversions per flight-loop tick and reduced to a peak-to-peak envelope; logged, never transmitted |
 | GPIO | RA-02 controls, SD CS, MPU-9250 INT, status LED | GPIO17, GPIO6, GPIO20-GPIO22, GPIO7, GPIO14 | Provisional | Exact breakout pins and logic levels TBD |
 | USB | Programming and development debug | USB interface | Preserved | Not consumed by mission peripherals |
 | SWD/debug | Low-level development/debug | Pico debug interface | Preserved where practical | Access and header arrangement remain TBD |
@@ -200,7 +205,7 @@ UART1 remains unassigned for debugging, a future sensor, or expansion if the fin
 - USB remains available for programming and development/debugging.
 - UART1 is kept unassigned for a debug console, future sensor, or expansion if final pin multiplexing permits.
 - SWD/debug access is preserved where practical through the Pico debug interface.
-- GPIO0, GPIO1, GPIO2, GPIO3, GPIO8, GPIO9, GPIO10, GPIO11, GPIO15, GPIO27, and GPIO28 remain available for testing or expansion.
+- GPIO0, GPIO1, GPIO2, GPIO3, GPIO8, GPIO9, GPIO10, GPIO11, GPIO15 and GPIO28 remain available for testing or expansion. **GPIO27 was one of them and is now the microphone.** A hall effect sensor, if its supply voltage is confirmed as 3.3 V, would take one of the digital pins above and needs no ADC channel.
 - No debug resource is considered a mission connection until the final wiring review.
 
 ## Reserved and Spare Pins

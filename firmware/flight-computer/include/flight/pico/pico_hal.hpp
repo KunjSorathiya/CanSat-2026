@@ -134,6 +134,24 @@ private:
     bool healthy_ = false;
 };
 
+// Analogue microphone on GP27 (ADC1).
+//
+// The module is AC-coupled and rests near half its supply, so this samples a burst of
+// conversions as fast as the converter will run and keeps the extremes. See
+// flight/sound_level.hpp for why an envelope rather than a sample, and why the result is
+// millivolts rather than decibels.
+class PicoSoundSensor final : public SoundSensor {
+public:
+    explicit PicoSoundSensor(const Configuration& config) : config_(config) {}
+    bool initialize() override;
+    bool read(SoundSample& out, std::uint64_t now_ms) override;
+    SensorHealth health() const override { return health_; }
+
+private:
+    Configuration config_;
+    SensorHealth health_{};
+};
+
 class PicoBoardIo final : public BoardIo {
 public:
     explicit PicoBoardIo(const Configuration& config) : config_(config) {}

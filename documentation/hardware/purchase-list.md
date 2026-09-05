@@ -19,7 +19,8 @@ finding, or a scoring recommendation that has been costed.
 | JST-RCY female pigtail | To mate the battery's discharge lead |
 | Header strips | Soldered to both Picos and every module on 2026-09-04 |
 | Power switch, LEDs, and their resistors | Held as of 2026-09-05. The 100 kΩ divider pair and the ¼ W spares below are still needed if not among them |
-| Hall effect sensor | Held. See section 4 — it replaces the magnetometer by decision, not by equivalence |
+| Hall effect sensor | Held. See section 4 — it replaces the magnetometer by decision, not by equivalence. **Not yet integrated: its supply voltage is unconfirmed**, and there is no level shifting anywhere on this vehicle |
+| Analogue sound sensor module | Held, and confirmed 3.3 V. **Integrated on 2026-09-05** — `GP27` / ADC1, logged to the SD card, not transmitted |
 
 ---
 
@@ -76,7 +77,7 @@ the need the night before a launch is the case worth avoiding.
 
 | Item | Qty | Why | ~₹ |
 |---|---:|---|---:|
-| ~~QMC5883L / HMC5883L magnetometer~~ | — | **Declined 2026-09-05.** A hall effect sensor already held will be integrated instead, for the same additional-sensor credit | — |
+| ~~QMC5883L / HMC5883L magnetometer~~ | — | **Declined 2026-09-05.** The additional-sensor credit is taken by the analogue microphone instead, which is integrated and held by tests | — |
 
 The delivered IMU is a six-axis **MPU-6500 with no magnetometer**
 ([F-1](receiving-inspection.md#findings)), so declining this part leaves the vehicle with no

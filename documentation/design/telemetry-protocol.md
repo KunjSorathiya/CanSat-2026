@@ -216,6 +216,39 @@ Rules:
 - Optional fields are omitted when they would threaten the 1 Hz minimum, packet stability, or mandatory data priority.
 - GPS remains an additional sensor; no scoring result is claimed until it works.
 - Do not add optional fields without a documented consumer and bandwidth assessment.
+- **Not every sensor belongs in the packet.** The onboard log is a wider record than the link, and an additional sensor whose questions are all post-flight belongs in the first and not the second. See the acoustic level below.
+
+### Decided: the acoustic level is logged and not transmitted
+
+The vehicle carries an analogue microphone on `GP27` as an additional sensor. **Its level
+is written to the SD log and is never put in a packet.** That is a decision, taken against
+this document's own rule that an optional field needs a documented consumer and a bandwidth
+assessment, and both are recorded here.
+
+**The rulebook does not require it.** `TEL-022` says optional sensor data *may* be appended
+after mandatory data and must not displace it. May, not must. Nothing in the mandatory
+packet format has a place for an acoustic level, and the scoring for additional sensors
+rewards integrating the sensor, not transmitting it.
+
+**The bandwidth assessment.** A `SND-xxx.x` field is about nine bytes against a 255-byte
+budget whose measured worst case is 206. It is affordable. But affordable is not free: those
+nine bytes are airtime, the packet already sheds optional fields when it grows, and buying
+them for a field no rule asks for and no ground display reads is a poor trade.
+
+**The consumer is the analysis, not the link.** Every question this sensor exists to answer
+is a post-flight one — when did the canopy inflate, when did it land, how did the acoustic
+level track descent rate. All of them are asked of the log, at leisure, against the altitude
+and acceleration columns beside them. None of them needs an answer during the flight, and an
+operator watching a live link can do nothing with a millivolt figure.
+
+**What that costs.** The link is the only telemetry that survives a lost vehicle. If the
+CanSat is never recovered the acoustic record is gone, where a transmitted field would have
+been on the ground already. That is accepted: this is an additional sensor, and the mandatory
+data — which does go over the link — is what a lost vehicle must still have delivered.
+
+Reversing the decision is a one-line change in the controller, and it must come with a
+bandwidth re-check and a ground-station consumer, exactly as this document requires of any
+new field.
 
 ### Open: the pack voltage is measured and not transmitted
 

@@ -49,10 +49,12 @@ without changing its approach.
 **The whole remaining gap is mechanical and procedural, not electronic or software.** Every
 point in C and D is waiting on a structure, a parachute, a switch and an LED.
 
-**The four cheapest recommendations below total about 23 points — slightly more than the egg
+**The cheapest recommendations below total about 23 points — slightly more than the egg
 forgoes.** That is the useful way to read this table: the 20 points are recoverable
 elsewhere, at a cost of roughly one evening, one small sensor, a configuration change and a
-PCB order.
+PCB order. **One of them is now taken**: the additional sensor +5 has been claimed by the
+microphone, which closes sensor integration at its 25-point cap. Note that it is a **cap** —
+a second additional sensor scores nothing more in that section.
 
 ---
 
@@ -160,25 +162,104 @@ The rulebook explicitly permits any outer material (PVC, plastic, 3D print) and 
 |---|---:|---:|---|
 | PCB design | 15 | ~0 | Perfboard, not a custom PCB |
 | Code originality | 10 | **~9** | The strongest single area in the project |
-| Sensor integration | 25 | **20** | 15 mandatory + 5 for GPS |
+| Sensor integration | 25 | **25** | 15 mandatory + 5 GPS + 5 microphone — **at the cap**, and a further sensor adds nothing here |
 | Data analysis | 20 | ~0 | Tooling ready; needs flight data |
 
 **Code originality — 9 or 10 of 10.** Self-written, no third-party libraries anywhere in the
-flight path, heavily commented, and held by 4378 assertions across 166 Python and 57 Node
+flight path, heavily commented, and held by 4417 assertions across 166 Python and 57 Node
 tests. The drivers for the MPU-9250, BMP280, NEO-6M, SX1278 and the SD card are all written
 here against their datasheets and register maps. This section rewards exactly what this
 repository is.
 
-**Sensor integration — 20 of 25 today.** The mandatory set is complete and worth 15 in the
+**Sensor integration — 25 of 25.** The mandatory set is complete and worth 15 in the
 2026 revision (it was worth nothing in the previous one — **this is a scoring change in our
 favour**): gyroscope and accelerometer, pressure and altitude, and LoRa telemetry. GPS adds
 the first +5.
 
-**The second +5 is missing, and the reason is [F-1](../hardware/receiving-inspection.md#findings).**
-The rulebook lists *magnetometer* first among its additional-sensor examples and defines
-`MGX`/`MGY`/`MGZ` prefixes for it. The module sold as an MPU-9250 turned out to be an
-MPU-6500 with no magnetometer — so the vehicle has no magnetometer to score, **and** no
-absolute yaw.
+**The second +5 is being taken by the analogue microphone**, integrated on `GP27` and
+logging an acoustic level for the whole flight. That closes the section at its 25-point cap.
+
+**A word on what that cap means, because it is easy to plan against the wrong number.**
+Sensor integration is worth **25 and no more**. The mandatory set is 15, GPS is the first
++5, and the microphone is the second — which reaches 25. **A third additional sensor scores
+nothing in this section.** A hall effect sensor added afterwards is worth zero points here,
+and anyone expecting two sensors to be worth ten is going to be disappointed by five of
+them. It can still earn its place: an extra channel of flight data feeds section E's data
+analysis, where correlations and descent profiles carry marks, and a sensor with a real
+purpose is something to write about in the report. But not in this section, and not for the
+reason people usually add it.
+
+**The magnetometer's absence is still a live problem, and it is not a scoring one.**
+[F-1](../hardware/receiving-inspection.md#findings): the module sold as an MPU-9250 turned
+out to be an MPU-6500, so the vehicle has no absolute yaw. Yaw is a **mandatory** telemetry
+field (`TEL-017`, `SEN-010`) and this vehicle can only send a relative, gyro-propagated one
+declared `YR-G`. Whether that is acceptable is an **unanswered organizer question**. The
+microphone takes the points the magnetometer would have taken; it does not answer that
+question, and nothing but a magnetometer or an organizer's "yes" will.
+
+### The science case for an acoustic sensor
+
+This is the part to put in front of a judge, and it is worth making properly: a microphone
+on a descending probe is a flight-proven atmospheric instrument, not a novelty.
+
+**Flight heritage.** Mars 2020 *Perseverance* carried a microphone dedicated to entry,
+descent and landing, and a second on SuperCam that measures wind and the acoustics of its
+laser sparks. The *Huygens* probe that descended through Titan's atmosphere in 2005 carried
+an acoustic sensor inside its HASI instrument package. The Soviet *Venera 13* and *14*
+landers recorded wind noise on the surface of Venus. Acoustics is one of the cheapest ways
+to instrument a descent, which is exactly why it keeps being flown.
+
+**What it measures on this vehicle, in order of confidence:**
+
+1. **Parachute deployment, timed independently.** Canopy inflation is a sharp broadband
+   transient. The accelerometer sees the deceleration; the microphone sees the event itself.
+   Two independent witnesses to the single most critical moment of the mission — and if they
+   disagree, that disagreement is a finding rather than a mystery.
+2. **Touchdown.** Impact is an impulsive transient far above the descent noise floor. It
+   confirms landing without relying on the altitude trace flattening, which is exactly what
+   a barometer does badly near the ground.
+3. **Descent rate, by an independent route.** Aerodynamic noise rises steeply with airspeed —
+   turbulent surface pressure fluctuations scale roughly with the sixth power of velocity,
+   and free turbulence faster still. The acoustic level should therefore track descent rate,
+   giving a cross-check on the barometric rate that shares none of its failure modes. A
+   barometer in a pressure-disturbed wake and a microphone are wrong in different ways.
+4. **Canopy stability.** A parachute that is oscillating or breathing modulates the noise
+   periodically. The frequency of that modulation is the oscillation frequency, measurable
+   from a single channel with no extra hardware — and section C of the rulebook cares about
+   descent stability.
+5. **The atmosphere itself, in principle.** The speed of sound is `sqrt(γRT/M)`: it depends
+   on temperature and on what the gas is made of, which is how Huygens used acoustics at
+   Titan. A single microphone cannot do time-of-flight, so this vehicle does not claim it —
+   but it is the reason the instrument class exists, and it is the honest answer to "what
+   would you do with more of these".
+
+**What it does not measure, and say so before a judge asks.** The level is a **relative
+peak-to-peak envelope in millivolts, not a sound pressure level**. Reporting decibels would
+need a calibrated reference source and a record of the module's gain trimpot position, and
+this project has neither. Values are comparable across one flight at one gain setting and
+with nothing else. That limitation is in the firmware comments, the requirements row and the
+log column name — which is itself worth pointing at, because knowing what an instrument
+cannot tell you is the part that separates a measurement from a number.
+
+### The science case for a hall effect sensor
+
+Not yet built — its supply voltage is unconfirmed — but the argument, when it is:
+
+**Separation detection.** A magnet on the launch carrier and the sensor on the CanSat makes
+the moment of release a hardware event, at zero power and with no software in the path. It
+is mechanically independent of the accelerometer, so it witnesses deployment even if the
+inertial data is saturated by the release transient — which is precisely when accelerometers
+are least trustworthy. Separation and deployment switches of this kind are standard
+spacecraft practice.
+
+**Line-twist diagnosis.** With a magnet on the parachute swivel, hall pulses count relative
+rotation between the payload and the canopy — the thing a swivel exists to prevent. A
+post-flight count of how much it twisted is a direct measurement of a recovery-system
+property that is otherwise inferred from video.
+
+**What it cannot do.** It is not a magnetometer and cannot replace one. A common hall switch
+operates around 10 mT; the Earth's field is about 50 µT, some two hundred times weaker. It
+gives no heading, no yaw reference, and no help at all with `TEL-017`.
 
 **PCB design — near zero on a perfboard.** The section asks for original PCB design with
 layout diagrams, minimal external wiring and well-routed traces, with a bonus for custom
@@ -226,7 +307,14 @@ missing either loses points, and the LED must light **immediately on power-on** 
 across the 3.3 V rail through a resistor, not from a GPIO the firmware drives. A
 firmware-driven LED does not light until the firmware boots.
 
-### 2. Add a magnetometer — **5 points, ~₹100–150**
+### 2. ~~Add a magnetometer~~ — **taken instead by the microphone, 2026-09-05**
+
+The +5 this recommendation was worth has been claimed by the analogue microphone, which reaches the section cap. What the magnetometer would ALSO have done is still undone, and is no longer a scoring item at all: it is the only thing that turns the mandatory yaw field from a relative angle into an absolute one. Track it as the open organizer question, not as points.
+
+<details>
+<summary>The original recommendation, kept because the yaw problem it describes is still live</summary>
+
+#### Add a magnetometer — **5 points, ~₹100–150**
 
 The single best-value part left, because it buys three things at once:
 
@@ -240,6 +328,8 @@ The single best-value part left, because it buys three things at once:
 A **QMC5883L** or **HMC5883L** breakout is 3.3 V, I²C, and sits on the bus already proven at
 GP4/GP5. It needs a new driver — perhaps 150 lines against the existing `Imu` interface
 pattern — plus `MGX`/`MGY`/`MGZ` fields, which the rulebook already defines prefixes for.
+
+</details>
 
 ### 3. Raise the packet rate to 2 Hz — **~2–3 points, no new hardware**
 

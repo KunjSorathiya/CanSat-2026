@@ -353,6 +353,7 @@ project has measured something, the measurement is named.
 | | ~45 mA | tracking | continuous once fixed | Same |
 | **MPU-6500** | **~4 mA** | gyro + accel active | continuous | MPU-6500 datasheet: 3.2 mA gyro, 450 µA accel |
 | **BMP280** | **~1 mA** | 83 Hz, high oversampling (row 3.5) | continuous | BMP280 datasheet, 720 µA at maximum rate |
+| **Analogue microphone** | **~5 mA** | continuous | continuous | Electret capsule plus an LM393 comparator and its two indicator LEDs. The capsule itself is under 0.5 mA; almost all of this is the board around it. **Measure it — this is the least certain figure in the table** |
 | **Status LED, 330 Ω** | **~4 mA** | lit | ≤ 50 % duty, it blinks | (3.3 − 2.0) / 330 |
 | **Battery divider, GP26** | ~21 µA | continuous | continuous | 100 kΩ / 100 kΩ from 4.2 V. Draws from the **battery**, not this rail |
 
@@ -360,14 +361,16 @@ project has measured something, the measurement is named.
 
 | Case | Peripherals | + RP2040 | Against the 300 mA pin guidance |
 |---|---:|---:|---|
-| **Everything at once** — TX, SD write, GPS acquiring, all sensors, LED | **267 mA** | **302 mA** | **over** |
-| **GPS tracking rather than acquiring** — otherwise the same | **242 mA** | **277 mA** | under, with 23 mA to spare |
-| **Steady state** — TX at 33 % duty, RX otherwise, GPS tracking | **92 mA** | **127 mA** | comfortable |
+| **Everything at once** — TX, SD write, GPS acquiring, all sensors, LED | **272 mA** | **307 mA** | **over** |
+| **GPS tracking rather than acquiring** — otherwise the same | **247 mA** | **282 mA** | under, with 18 mA to spare |
+| **Steady state** — TX at 33 % duty, RX otherwise, GPS tracking | **97 mA** | **132 mA** | comfortable |
 
 Both columns are given because both get quoted. The peripheral column is what leaves the
 `3V3(OUT)` pin; the second adds the RP2040's own draw, which shares the regulator, and is the
 one to compare against Raspberry Pi's 300 mA figure.
 
+> **The microphone added 5 mA to every row above**, and it is a continuous load rather than a duty-cycled one: it draws whether or not anything is listening. That took the tight case from 18 mA of margin to 13, which is the whole reason this table is re-run rather than amended. **Nothing further may join this rail without doing the same**, and the hall effect sensor — when its supply voltage is confirmed — will add a few milliamps more.
+>
 > **An earlier revision of this tally read 316 mA.** The difference is almost entirely the
 > radio: **120 mA is the SX1278's +20 dBm figure and this vehicle transmits at +17 dBm, which
 > is 87 mA** — 33 mA less. Against that, the RP2040 estimate rose from 25 to 35 mA, and the
@@ -391,7 +394,10 @@ milliseconds.
    killed the radio, on the same kind of wire.
 3. **Short, direct supply tracks to both.** Not a design nicety: it cost five bench runs.
 4. **Do not add a load to this rail without re-doing this table.** There is no headroom left
-   for one.
+   for one. The microphone was added this way and cost 5 mA of the 23 that were spare.
+5. **The microphone's `AO` line is analogue and high-impedance.** Keep it short, off the
+   SPI0 bundle and away from the antenna lead. That is a signal-integrity rule rather than a
+   power one, but it is decided at the same moment as the layout.
 
 ### What has been measured
 

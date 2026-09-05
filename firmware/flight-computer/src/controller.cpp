@@ -17,7 +17,8 @@ bool finite3(double a, double b, double c) {
 }  // namespace
 
 Controller::Controller(Configuration config, Imu& imu, Barometer& barometer, Gps& gps,
-                       Radio& radio, SdLogger& logger, BoardIo& board)
+                       Radio& radio, SdLogger& logger, BoardIo& board,
+                       SoundSensor* sound)
     : config_(std::move(config)),
       imu_(imu),
       barometer_(barometer),
@@ -25,6 +26,7 @@ Controller::Controller(Configuration config, Imu& imu, Barometer& barometer, Gps
       radio_(radio),
       logger_(logger),
       board_(board),
+      sound_(sound),
       state_machine_(config_),
       builder_(config_),
       calibrator_(config_),
@@ -79,6 +81,11 @@ bool Controller::initialize() {
     const bool gps_ok = gps_.initialize();
     logger_enabled_ = logger_.initialize();
     const bool radio_ok = radio_.initialize(sync_word(config_));
+    // An additional sensor that fails to start is a warning and nothing more. It is not
+    // counted towards the self-test result and it can never hold up a launch.
+    if (sound_ != nullptr && !sound_->initialize()) {
+        faults_.report(FaultCode::sound_unavailable, FaultSeverity::warning, 0);
+    }
 
     if (!imu_ok) faults_.report(FaultCode::imu_init, FaultSeverity::error, 0);
     // A module sold as an MPU-9250 that answers WHO_AM_I with an MPU-6500 has no
@@ -369,6 +376,29 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
         faults_.report(FaultCode::gps_unavailable, FaultSeverity::warning, mission_ms);
     }
 
+    // ---- Analogue microphone (additional sensor) ----
+    //
+    // Last, and deliberately so. Everything above feeds mandatory telemetry; this feeds a
+    // column in the log. It is read inside the same task rather than on a timer of its own
+    // because a level that is not synchronous with the altitude and acceleration beside it
+    // is far less useful for the correlations it exists to support.
+    if (sound_ != nullptr) {
+        SoundSample sound{};
+        if (sound_->read(sound, mission_ms) && sound.valid &&
+            std::isfinite(sound.level_mv_pp)) {
+            snapshot_.sound_mv_pp = sound.level_mv_pp;
+            snapshot_.sound_clipped = sound.clipped;
+            snapshot_.sound_valid = true;
+            last_good_sound_ms_ = mission_ms;
+            faults_.clear(FaultCode::sound_unavailable);
+        } else if (mission_ms - last_good_sound_ms_ > config_.sound_stale_after_ms) {
+            // Warning, never error. A dead microphone costs a column and nothing else, and
+            // an additional sensor must not be able to move the mission state.
+            snapshot_.sound_valid = false;
+            faults_.report(FaultCode::sound_unavailable, FaultSeverity::warning, mission_ms);
+        }
+    }
+
     if (!imu_implausible && !baro_implausible) {
         faults_.clear(FaultCode::sensor_implausible);
     }
@@ -629,6 +659,9 @@ void Controller::refresh_health(std::uint64_t mission_ms) {
     health_.gps_fix = snapshot_.gps.valid;
     health_.radio_ok = radio_.healthy();
     health_.sd_ok = logger_enabled_;
+    // "Not fitted" and "fitted but silent" are both false here, which is correct: neither
+    // is a reason to do anything, and the fault log distinguishes them if anyone asks.
+    health_.sound_ok = sound_ != nullptr && snapshot_.sound_valid;
     health_.calibrated = calibrator_.complete();
     health_.calibration_settled = calibrator_.settled();
     health_.armed = is_armed(mission_ms);
