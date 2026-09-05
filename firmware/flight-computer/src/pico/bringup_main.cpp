@@ -581,6 +581,35 @@ void report_radio(const flight::Configuration& config) {
 // Initialisation and the card-type read are non-destructive. The write test is not, and it
 // is behind its own prompt for a different reason from the radio's: it cannot damage
 // hardware, but it destroys the filesystem.
+// A failed write says one thing from outside and means five. This says which, and decodes
+// the CMD13 status byte, because that is the only place a card admits to being write
+// protected -- and a card that has gone read-only looks exactly like bad wiring until you
+// ask it.
+void describe_write_failure(const flight::pico::SdCard& card) {
+    std::printf("       stopped at: %s\n",
+                flight::pico::SdCard::describe(card.write_stage()));
+    std::printf("       CMD R1 = 0x%02X, CMD13 R2 = 0x%02X, data token = 0x%02X\n",
+                card.last_write_r1(), card.last_write_r2(), card.last_data_response());
+    const std::uint8_t r2 = card.last_write_r2();
+    if (r2 & 0x20) {
+        std::printf("       R2 bit 5: WRITE PROTECT VIOLATION. The card is refusing to be\n"
+                    "       written, and that is the card's decision, not the wiring.\n");
+    }
+    if (r2 & 0x01) std::printf("       R2 bit 0: the card reports itself LOCKED.\n");
+    if (r2 & 0x08) std::printf("       R2 bit 3: CC error - internal controller fault.\n");
+    if (r2 & 0x10) std::printf("       R2 bit 4: ECC failed - the card could not correct it.\n");
+    if (r2 & 0x80) std::printf("       R2 bit 7: out of range, or CSD overwrite.\n");
+    const std::uint8_t tok = card.last_data_response();
+    if ((tok & 0x1F) == 0x0B) {
+        std::printf("       Data token 0x0B: CRC error on the data block - a bus problem.\n");
+    } else if ((tok & 0x1F) == 0x0D) {
+        std::printf("       Data token 0x0D: write error - the card, not the bus.\n");
+    }
+    if (card.write_stage() == flight::pico::SdCard::WriteStage::status_error && r2 == 0x00) {
+        std::printf("       R2 clear but R1 was not: re-read the R1 value above.\n");
+    }
+}
+
 bool sd_probe_read(void* ctx, std::uint32_t lba, std::uint8_t* out512) {
     return static_cast<flight::pico::SdCard*>(ctx)->read_block(lba, out512);
 }
@@ -765,7 +794,10 @@ void report_sd() {
     std::printf("\n-- 6.6 Log boot count --\n");
     flight::PicoSdLogger logger;
     if (!logger.initialize()) {
-        std::printf("   logger init FAILED\n");
+        std::printf("   logger init FAILED: %s\n",
+                    flight::FatVolume::describe(logger.locate_status()));
+        std::printf("   If the file was located, the failure is a write: the\n"
+                    "   log first act is to put a header down.\n");
         return;
     }
     std::printf("   boot_count = %lu, records = %lu, %s\n",
@@ -820,6 +852,21 @@ void report_shared_bus(const flight::Configuration& config) {
                 static_cast<unsigned long>(flight::pico::SdCard::kRunBaud), after,
                 after == 0x12 ? "- unchanged" : "- CHANGED, the faster clock is not safe");
 
+    // Address the log file rather than a remembered LBA. An earlier version had 33152
+    // written into it, taken from one card on one day; the number moves with the card, the
+    // format and the file, and a stale one would have this gate reading and writing
+    // wherever that happened to land.
+    flight::FatVolume::Io fio;
+    fio.ctx = &card;
+    fio.read_block = sd_probe_read;
+    flight::FatVolume::Layout layout;
+    if (flight::FatVolume::locate(fio, "FLIGHT  CSV", 64, layout) !=
+        flight::FatVolume::Status::ok) {
+        std::printf("   cannot run Gate 7: the log file could not be located.\n");
+        return;
+    }
+    const std::uint32_t base = layout.extents[0].first_lba;
+
     // 7.4. Read a block, then immediately ask the radio who it is. If the card is still
     // driving MISO when the radio is selected, this is where it shows.
     constexpr int kRounds = 200;
@@ -827,7 +874,7 @@ void report_shared_bus(const flight::Configuration& config) {
     int card_fail = 0, radio_wrong = 0;
     std::uint8_t worst = 0x12;
     for (int i = 0; i < kRounds; ++i) {
-        if (!card.read_block(33152u + static_cast<std::uint32_t>(i % 32), block)) ++card_fail;
+        if (!card.read_block(base + static_cast<std::uint32_t>(i % 32), block)) ++card_fail;
         const std::uint8_t v = radio.probe_version();
         if (v != 0x12) {
             ++radio_wrong;
@@ -869,13 +916,14 @@ void report_shared_bus(const flight::Configuration& config) {
     for (int i = 0; i < kBursts; ++i) {
         if (!radio.transmit(packet)) ++tx_fail;
         block[0] = static_cast<std::uint8_t>(i);
-        if (!card.write_block(33152u + static_cast<std::uint32_t>(i), block)) ++wr_fail;
+        if (!card.write_block(base + static_cast<std::uint32_t>(i), block)) ++wr_fail;
         if (radio.probe_version() != 0x12) ++radio_wrong;
     }
     std::printf("   7.3 %d transmit-then-write rounds: %d TX failures, %d write failures,\n"
                 "       %d radio misreads afterwards\n",
                 kBursts, tx_fail, wr_fail, radio_wrong);
     if (tx_fail != 0) describe_tx_failure(radio);
+    if (wr_fail != 0) describe_write_failure(card);
     if (tx_fail == 0 && wr_fail == 0 && radio_wrong == 0) {
         std::printf("       PASS - both devices work while the other is active.\n");
     } else {

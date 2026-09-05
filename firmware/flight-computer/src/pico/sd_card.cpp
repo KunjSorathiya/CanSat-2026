@@ -242,13 +242,17 @@ bool SdCard::write_block(std::uint32_t lba, const std::uint8_t* in512) {
 
     if (hal_.set_baudrate) hal_.set_baudrate(hal_.ctx, kRunBaud);
 
+    write_stage_ = WriteStage::none;
     select(true);
     // A card still busy from the previous write ignores commands, so wait for it first.
     if (wait_ready() != 0xFF) {
+        write_stage_ = WriteStage::busy_before;
         release();
         return false;
     }
-    if (command(24, addr, 0xFF) != 0x00) {  // CMD24: WRITE_BLOCK
+    last_write_r1_ = command(24, addr, 0xFF);  // CMD24: WRITE_BLOCK
+    if (last_write_r1_ != 0x00) {
+        write_stage_ = WriteStage::cmd24_rejected;
         release();
         return false;
     }
@@ -258,20 +262,46 @@ bool SdCard::write_block(std::uint32_t lba, const std::uint8_t* in512) {
     transfer(0xFF);  // CRC, ignored in SPI mode
     transfer(0xFF);
 
-    const std::uint8_t response = transfer(0xFF);
-    if ((response & 0x1F) != 0x05) {  // 0b00101 = data accepted
+    last_data_response_ = transfer(0xFF);
+    if ((last_data_response_ & 0x1F) != 0x05) {  // 0b00101 = data accepted
+        write_stage_ = WriteStage::data_rejected;
         release();
         return false;
     }
     if (wait_ready() != 0xFF) {  // wait out the programming busy period
+        write_stage_ = WriteStage::programming_timeout;
         release();
         return false;
     }
-    // CMD13 (SEND_STATUS) confirms the card recorded no write error.
-    const std::uint8_t status_r1 = command(13, 0, 0xFF);
-    const std::uint8_t status_r2 = transfer(0xFF);
+    // CMD13 (SEND_STATUS) confirms the card recorded no write error. This is the only
+    // place a card admits to write protection, so the R2 byte is kept whatever happens.
+    last_write_r1_ = command(13, 0, 0xFF);
+    last_write_r2_ = transfer(0xFF);
     release();
-    return status_r1 == 0x00 && status_r2 == 0x00;
+    if (last_write_r1_ != 0x00 || last_write_r2_ != 0x00) {
+        write_stage_ = WriteStage::status_error;
+        return false;
+    }
+    write_stage_ = WriteStage::complete;
+    return true;
+}
+
+const char* SdCard::describe(WriteStage stage) {
+    switch (stage) {
+        case WriteStage::none: return "no write attempted";
+        case WriteStage::busy_before:
+            return "the card was still busy from the previous write and never came ready";
+        case WriteStage::cmd24_rejected:
+            return "WRITE_BLOCK was refused outright - the card would not even start";
+        case WriteStage::data_rejected:
+            return "the card refused the data block itself";
+        case WriteStage::programming_timeout:
+            return "the data was accepted but programming never finished";
+        case WriteStage::status_error:
+            return "the write appeared to work and CMD13 then reported an error";
+        case WriteStage::complete: return "complete";
+    }
+    return "unknown";
 }
 
 // ---------------------------------------------------------- Pico SDK bindings --

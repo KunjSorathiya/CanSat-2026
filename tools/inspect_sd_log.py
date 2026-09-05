@@ -191,7 +191,13 @@ def main():
 
     if len(runs) == 1:
         print("\nCONTIGUOUS. The firmware will accept this file.")
-        print(f"  It should report first LBA {lba} and {walked * bpb['spc']} blocks.")
+        print(f"  It should report {walked * bpb['spc']} blocks over 1 extent.")
+        print("")
+        print("  NOTE: the LBAs above are VOLUME-relative, because this opens the")
+        print("  volume directly. The firmware opens the whole card, walks the MBR,")
+        print("  and reports CARD-absolute LBAs - larger by the partition start.")
+        print("  A difference of exactly the partition offset is the two agreeing,")
+        print("  not a discrepancy.")
         vol.close()
         return 0
 

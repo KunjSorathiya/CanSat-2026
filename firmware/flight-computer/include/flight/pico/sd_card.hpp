@@ -70,6 +70,27 @@ public:
         complete,
     };
 
+    // Where a write stopped, and what the card said. Five distinct failure points that
+    // look like one "write failed" from outside, and they mean different things: a card
+    // that will not leave busy, a command it rejects outright, data it refuses, a
+    // programming cycle that never ends, or an error it only admits to when asked
+    // afterwards. The last of those is where write protection shows up.
+    enum class WriteStage : std::uint8_t {
+        none,
+        busy_before,          // still busy from the previous write before CMD24
+        cmd24_rejected,       // WRITE_BLOCK itself refused
+        data_rejected,        // the data-response token was not "accepted"
+        programming_timeout,  // accepted, then never finished programming
+        status_error,         // CMD13 reported an error after the fact
+        complete,
+    };
+
+    WriteStage write_stage() const { return write_stage_; }
+    std::uint8_t last_write_r1() const { return last_write_r1_; }
+    std::uint8_t last_write_r2() const { return last_write_r2_; }
+    std::uint8_t last_data_response() const { return last_data_response_; }
+    static const char* describe(WriteStage stage);
+
     Stage stage() const { return stage_; }
     std::uint8_t last_r1() const { return last_r1_; }
     // Milliseconds spent in the ACMD41 loop. A healthy card leaves idle in tens of ms.
@@ -94,6 +115,10 @@ private:
     std::uint8_t last_r1_ = 0xFF;
     std::uint32_t init_wait_ms_ = 0;
     int cmd0_attempts_ = 0;
+    WriteStage write_stage_ = WriteStage::none;
+    std::uint8_t last_write_r1_ = 0;
+    std::uint8_t last_write_r2_ = 0;
+    std::uint8_t last_data_response_ = 0;
     bool ok_ = false;
     bool sdhc_ = false;
 };
