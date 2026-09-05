@@ -64,6 +64,26 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — three mandatory requirements cited a test that does not exist
+
+`requirements.md` names a test for each requirement. That citation is the only thing
+connecting a compliance claim to something that runs, and a requirement pointing at nothing
+reads exactly like a requirement that is covered.
+
+`TEL-018`, `TEL-019` and `TEL-020` — the three mandatory acceleration fields — cited
+`test_mpu_scaling`. That test became `test_imu_scaling` when the MPU-6050 was replaced by a
+nine-axis part, and the citations stayed behind. Three of the rulebook's mandatory
+telemetry fields have had dangling evidence ever since.
+
+Nothing else was dangling: 249 test names are defined across the suites, and every other one
+named in a document exists. Both facts are now checked, along with a second class found in
+the same sweep — **every repository path named in prose**, not only the ones written as
+links. Paths appear in prose far more often, and a moved file leaves them behind silently.
+
+The changelog and the audits are excluded from the path check on purpose: `ui.py` and
+`radio.py` were deleted in cycle 2, and the entries recording that deletion have to be able
+to name them. A record of a removal is not a stale reference.
+
 ### Added — every link and heading anchor in the documentation is checked
 
 Thirty-four documents, a table of contents in most of them, and cross-references between

@@ -486,6 +486,60 @@ def main() -> int:
     checker.check("every same-document anchor resolves to a heading",
                   not missing_anchors, "; ".join(missing_anchors[:3]))
 
+    # ---- a document that names a test must name one that exists ----------------------
+    # requirements.md cites tests as the evidence for each requirement, which is the only
+    # thing connecting a compliance claim to something that runs. A test renamed without
+    # updating the citation leaves the requirement pointing at nothing, and it reads exactly
+    # like a requirement that is covered. Three mandatory telemetry rows cited
+    # `test_mpu_scaling` for a day after it became `test_imu_scaling`.
+    #
+    # The 2026-09-04 audit is excluded for the same reason it is excluded elsewhere: it is a
+    # dated record of a past run, not a document making a current claim.
+    defined_tests: set[str] = set()
+    for source in list(REPO_ROOT.rglob("*.cpp")) + list(REPO_ROOT.rglob("*.py")):
+        if {".git", "build", ".claude"} & set(source.parts):
+            continue
+        body = source.read_text(encoding="utf-8", errors="replace")
+        defined_tests |= set(re.findall(r"\b(?:void|def)\s+(test_[A-Za-z0-9_]+)", body))
+
+    dangling: list[str] = []
+    for doc in markdown:
+        if "audit" in doc.parts:
+            continue
+        body = doc.read_text(encoding="utf-8", errors="replace")
+        rel = doc.relative_to(REPO_ROOT).as_posix()
+        for match in re.finditer(r"`(test_[A-Za-z0-9_]+)`", body):
+            name = match.group(1)
+            if name.endswith("_py") or name in defined_tests:
+                continue
+            if f"{name}.py" in body or (REPO_ROOT / "ground-station/software/tests" / f"{name}.py").exists():
+                continue
+            line = body[:match.start()].count("\n") + 1
+            dangling.append(f"{rel}:{line} {name}")
+    checker.check(f"every test named in the documentation exists ({len(defined_tests)} defined)",
+                  not dangling, "; ".join(dangling[:3]))
+
+    # ---- a document that names a path must name one that exists ----------------------
+    # Paths appear in prose far more often than they appear as links, and a moved file
+    # leaves them behind silently. The changelog and the audits are excluded: both refer to
+    # files on purpose after they were deleted -- `ui.py` and `radio.py` were removed in
+    # cycle 2, and the entries recording that removal have to be able to name them.
+    stale_paths: list[str] = []
+    path_pattern = re.compile(
+        r"`((?:firmware|ground-station|tools|documentation|test-data)/[A-Za-z0-9_./-]+)`")
+    for doc in markdown:
+        if "audit" in doc.parts or doc.name == "CHANGELOG.md":
+            continue
+        body = doc.read_text(encoding="utf-8", errors="replace")
+        rel = doc.relative_to(REPO_ROOT).as_posix()
+        for match in path_pattern.finditer(body):
+            named = match.group(1).rstrip("/")
+            if not (REPO_ROOT / named).exists():
+                line = body[:match.start()].count("\n") + 1
+                stale_paths.append(f"{rel}:{line} {named}")
+    checker.check("every repository path named in the documentation exists",
+                  not stale_paths, "; ".join(stale_paths[:3]))
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.
