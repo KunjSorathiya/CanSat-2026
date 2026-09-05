@@ -36,9 +36,7 @@ the whole volume is one free run.
 
 import argparse
 import os
-import re
 import shutil
-import subprocess
 import sys
 
 FILENAME = "FLIGHT.CSV"
@@ -57,32 +55,18 @@ def human(n: int) -> str:
 
 
 def count_extents(path: str):
-    """How many separate runs of clusters the file occupies, or None if unknown.
+    """Not checkable from here on a FAT32 card, and it is worth saying why.
 
-    The firmware requires one. Checking here means finding out at a desk, with the card in
-    a reader, rather than at the bench with everything wired up - which is where this was
-    actually discovered, and it cost a rebuild and a re-run to learn.
+    `fsutil file layout` is the obvious Windows tool and it refuses: "A local NTFS volume is
+    required for this operation." There is no built-in way to ask a FAT32 volume how a file
+    is laid out. Reading the FAT itself needs raw volume access, which needs elevation, and
+    silently demanding that of anyone preparing a card is worse than admitting the gap.
 
-    Uses Windows `fsutil file layout`, which **requires an elevated prompt** - it returns
-    "Access is denied" otherwise, and this returns None. That is the common case, so treat
-    a definite answer as a bonus rather than the plan.
-
-    Returns None on any other platform too. The firmware checks contiguity regardless and
-    refuses a fragmented file by name, so an unknown answer here costs a bench round trip
-    and never a wrong result.
+    So this returns None, always, and `tools/inspect_sd_log.py` does the real job from an
+    Administrator prompt when an answer is actually needed. The firmware checks regardless
+    and names the reason when it refuses.
     """
-    if os.name != "nt":
-        return None
-    try:
-        out = subprocess.run(["fsutil", "file", "layout", path],
-                             capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if out.returncode != 0:
-        return None
-    # One "Extent[ n ]:" line per run of clusters.
-    count = len(re.findall(r"^\s*Extent\[\s*\d+\s*\]", out.stdout, re.MULTILINE))
-    return count or None
+    return None
 
 
 def format_instructions(target: str) -> str:
@@ -178,8 +162,9 @@ def main() -> int:
     if extents == 1:
         piece = "in one piece - verified"
     elif extents is None:
-        piece = ("size verified. Contiguity was not checkable here - run this from an "
-                 "elevated prompt to have it verified, or let the firmware report it")
+        piece = ("size verified. Contiguity is not checkable from here on FAT32 - "
+                 "run tools/inspect_sd_log.py from an Administrator prompt to "
+                 "confirm it, or let the firmware report it")
     else:
         piece = f"in {extents} pieces - FRAGMENTED"
 
