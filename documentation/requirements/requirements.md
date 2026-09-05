@@ -15,7 +15,7 @@ Confirmed hardware is recorded in the implementation column, but possession does
 
 ## Requirements Checklist
 
-**Status as of 2026-09-05:** 34 of the 112 requirement rows are marked
+**Status as of 2026-09-05:** 34 of the 114 requirement rows are marked
 `Complete`, each with a named test in the Evidence column. None is
 marked `Verified`: that word is reserved for evidence from hardware, and while the IMU, the
 barometer, the GPS and the radio have now each read on the bench, no requirement has been
@@ -47,6 +47,8 @@ software produces the behaviour and no one has yet watched it happen.
 | MIS-003 | Initial ground-floor telemetry should report approximately zero altitude. | Rulebook - Mission | Mandatory | Altitude is relative to a pad reference: the startup calibrator averages barometer samples on the ground and every later altitude is computed against that pressure | Compare startup telemetry with the ground-floor baseline. | Implemented; **awaiting a lift test** | `test_startup_calibrator_stationary_and_moving`, `test_pressure_altitude` |
 | MIS-004 | Telemetry must reflect the altitude change during lifting. | Rulebook - Mission | Mandatory | Continuous altitude in every packet, from the same compensated barometer reading the flight core uses for its state machine | Review logged packets during a lift test. | Implemented; **awaiting a lift test** | `test_altitude_varies_over_the_mission` runs the real controller through a scripted ascent and descent and checks the altitude the ground station reads back |
 | MIS-005 | Parachute deployment must be demonstrated after release. | Rulebook - Mission and Descent | Mandatory | Parachute and deployment hardware - TBD | Demonstrate release and deployment in a controlled test. | Blocked | |
+| PAY-001 | An egg payload must be carried and recovered intact. | Rulebook 2026 - General Rules; Evaluation A | Mandatory system; 20 points | **Not carried. Team decision, 2026-09-05, on personal grounds.** The 20 points for egg integrity are forgone deliberately. **This is not a disqualification condition** - the rulebook's list is closed and an absent egg is not on it | N/A - not attempted | **Declined** | [scoring-assessment.md](../project/scoring-assessment.md) |
+| PAY-002 | A cushioned, secure egg chamber must be included. | Rulebook 2026 - Section 8 | Mandatory | **Still to be built despite PAY-001.** The chamber is a separately stated requirement, carries its own +7 cm dimensional allowance, and section D scores effective use of the volume the rules permit | Inspect the chamber and demonstrate cushioning. | Not Started | |
 | MIS-006 | The CanSat must descend safely after release. | Rulebook - Mission | Mandatory | Descent system - TBD | Conduct a controlled descent test and inspect results. | Blocked | |
 | MIS-007 | The egg must survive descent and landing. | Rulebook - Mission and Egg Payload | Mandatory | Egg chamber and cushioning - TBD | Perform documented impact and recovery tests. | Blocked | |
 | MIS-008 | Telemetry must remain stable after release during flight. | Rulebook - Mission | Mandatory | Flight telemetry link - TBD | Analyze flight packets for continuity and validity. | Not Started | |

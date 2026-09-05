@@ -1114,6 +1114,31 @@ can explain when it fails.
 Run standalone, without the log, the script skips the count checks and reports 69/69 rather
 than inventing a number.
 
+### Decided — no egg payload will be flown
+
+The team has elected not to carry an egg, on personal grounds. **The 20 points for egg
+integrity are forgone deliberately**, and every figure in the scoring assessment now reflects
+that: achievable total moves from ~177 to **~157**. The 5 points for parachute deployment are
+unaffected.
+
+**This is not a disqualification.** The rulebook's disqualification list is closed and
+specific - size or mass over by more than 10 %, unsafe deployment, no communication attempt,
+late arrival, code of conduct - and an absent egg is on none of them. Recorded as `PAY-001`
+so nobody later reads the zero as a failure rather than a choice.
+
+**The chamber should still be built**, and that is `PAY-002`. Section 8 states it as its own
+requirement, it carries a **+7 cm** dimensional allowance the body does not have to share,
+and section D scores effective use of the volume the rules permit. A chamber that exists and
+demonstrably works is compliance; an absent one invites a judge to read "mandatory system
+missing" more broadly than the 20 points.
+
+**It also shifts the tie-break.** Ties resolve on payload safety first, telemetry accuracy
+second, descent stability third. At 5 of 25 in the first, the second and third are worth more
+than their face value - and both are areas this project is strong in.
+
+The four cheapest recommendations already in the assessment total about 23 points, slightly
+more than the egg forgoes. The 20 are recoverable elsewhere.
+
 ### Changed — the 2026 rulebook revision, and three contradictions it closes
 
 `documentation/requirements/updated CanSat Final Guidelines 2026.pdf` supersedes the earlier

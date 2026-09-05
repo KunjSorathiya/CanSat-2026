@@ -27,13 +27,17 @@ it would score today, and what the cheapest remaining points are.
 
 | Section | Max | **Secured today** | **Achievable** | Gap |
 |---|---:|---:|---:|---|
-| A · Payload safety | 25 | **0** | 25 | No egg chamber, no parachute |
+| A · Payload safety | 25 | **0** | **5** | Egg test declined — 20 points forgone by choice |
 | B · Telemetry & communication | 25 | **0** | 23 | Link never flown; rate is at the floor |
 | C · Parachute, descent, stability | 25 | **0** | 23 | No descent system, no switch, no LED |
 | D · Structural & material innovation | 30 | **0** | 24 | Nothing mechanical exists |
 | E · Technical design & analysis | 70 | **~29** | 58 | Perfboard not PCB; one sensor short |
 | F · Final report | 25 | **~18** | 24 | Needs photos and flight graphs |
-| **Total** | **200** | **~47** | **~177** | |
+| **Total** | **200** | **~47** | **~157** | |
+
+> **The team has elected not to fly an egg payload**, on personal grounds. The 20 points for
+> egg integrity are treated as forgone from here on, and every figure in this document
+> reflects that. The 5 points for parachute deployment are unaffected and remain in scope.
 
 **"Secured today"** counts only what is built and verified — the firmware, the ground
 station, the documentation, and the five bring-up gates that have passed on hardware.
@@ -42,8 +46,13 @@ station, the documentation, and the five bring-up gates that have passed on hard
 the recommendations below are acted on. It is not a ceiling; it is what this design earns
 without changing its approach.
 
-**The whole gap is mechanical and procedural, not electronic or software.** Every point in
-A, C and D is waiting on a structure, a chamber, a parachute, a switch and an LED.
+**The whole remaining gap is mechanical and procedural, not electronic or software.** Every
+point in C and D is waiting on a structure, a parachute, a switch and an LED.
+
+**The four cheapest recommendations below total about 23 points — slightly more than the egg
+forgoes.** That is the useful way to read this table: the 20 points are recoverable
+elsewhere, at a cost of roughly one evening, one small sensor, a configuration change and a
+PCB order.
 
 ---
 
@@ -53,16 +62,38 @@ A, C and D is waiting on a structure, a chamber, a parachute, a switch and an LE
 
 | Item | Points | Status |
 |---|---:|---|
-| Egg recovered unbroken | 20 | **Not addressed.** No egg chamber designed or built |
-| Parachute deployment | 5 | **Not addressed.** No parachute |
+| Egg recovered unbroken | 20 | **Forgone by team decision.** Scored as 0 |
+| Parachute deployment | 5 | **In scope, not yet built.** No parachute exists |
+
+**Omitting the egg is not a disqualification.** The rulebook's disqualification list is
+closed and specific: exceeding size or mass by more than 10 %, unsafe deployment, no attempt
+at a communication system, arriving late, or violating the code of conduct. An absent egg
+appears on none of them, so this costs 20 points and nothing else.
+
+**Two consequences worth planning around, neither of them the points.**
+
+**First, build the egg chamber anyway.** Section 8 requires "a cushioned and secure chamber
+specifically designed to hold the egg payload", and the general rules list an egg payload
+among the mandatory systems. A chamber that exists and demonstrably works is compliance with
+a stated requirement; an absent chamber invites a judge to read "mandatory system missing"
+more broadly than the 20 points. The chamber also carries its own **+7 cm** dimensional
+allowance, and section D scores effective use of the volume the rules permit — so building it
+costs nothing and protects marks elsewhere. Whether anything rides inside it on the day is a
+separate question from whether it was engineered.
+
+**Second, it changes the tie-break.** Ties are broken on payload safety first, telemetry
+accuracy second, descent stability third. At 5 of 25 in the first category, a tie is likely
+to go the other way — which makes the second and third categories worth more than their raw
+point value. Both are areas this project is strong in.
+
+**Worth one email to the organizers:** whether declining the egg carries any consequence
+beyond the 20 points, given the general rules call it mandatory. The disqualification list
+says no. Getting that in writing costs nothing and removes the only real uncertainty here.
 
 The 2026 revision adds a specific constraint worth designing to now: the parachute **must
 not be tightly packed** — it has to be external or semi-exposed so it deploys instantly on
 release. A chute stuffed inside the body risks both the 5 points and a disqualification for
 unsafe deployment.
-
-The egg chamber gets its own **+7 cm** allowance on top of the 21 cm body, so it does not
-have to compete with the electronics for length.
 
 ### B · Telemetry & Communication — 25 points
 
