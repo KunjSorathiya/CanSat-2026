@@ -2652,7 +2652,7 @@ void test_the_sound_level_is_logged_and_never_transmitted() {
 
     // In the log, in the columns the header names.
     const std::string header = flight::TelemetryBuilder::sd_header();
-    CHECK(header.find("sound_mv_pp,sound_clipped,packet") != std::string::npos);
+    CHECK(header.find("sound_mv_pp,sound_clipped,sound_gate_pct,packet") != std::string::npos);
     const std::string line = builder.sd_line(*built, flight::MissionState::flight, 0);
     CHECK(line.find(",412.5,1,") != std::string::npos);
 
@@ -2686,7 +2686,7 @@ void test_an_absent_microphone_leaves_the_columns_blank_rather_than_zero() {
     const auto built = builder.build(1, 1000, s);
     CHECK(built.has_value());
     const std::string line = builder.sd_line(*built, flight::MissionState::flight, 0);
-    CHECK(line.find(",,,") != std::string::npos);   // both sound columns empty
+    CHECK(line.find(",,,,") != std::string::npos);  // all three sound columns empty
     CHECK(line.find(",0.0,0,") == std::string::npos);
 }
 
@@ -2764,6 +2764,80 @@ void test_a_working_microphone_reaches_the_log() {
     }
 }
 
+
+// A three-pin LM393 board has no analogue output at all. Refusing its threshold duty because
+// the level is missing would throw away the only measurement that board can make -- and the
+// two variants are sold under the same name, so this is a real build, not a hypothetical.
+void test_a_gate_only_module_is_still_a_working_sensor() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::test::MockSound sound;
+    sound.analog_connected = false;      // no AO pin on this board
+    sound.gate_connected = true;
+    sound.gate_duty_pct = 42.0;
+
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board, &sound);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 3000; t += 10) {
+        ctrl.poll(t);
+    }
+    CHECK(ctrl.health().sound_ok);
+    CHECK(!ctrl.faults().active(flight::FaultCode::sound_unavailable));
+}
+
+void test_gate_duty_is_a_percentage_and_stays_one() {
+    CHECK(flight::sound_gate_duty_pct(0, 256) == 0.0);
+    CHECK(flight::sound_gate_duty_pct(256, 256) == 100.0);
+    const double half = flight::sound_gate_duty_pct(128, 256);
+    CHECK(half > 49.9 && half < 50.1);
+
+    // An empty window is 0, not a division by zero.
+    CHECK(flight::sound_gate_duty_pct(0, 0) == 0.0);
+    CHECK(flight::sound_gate_duty_pct(5, 0) == 0.0);
+    // A counter that has overrun its window is clamped rather than reported above 100.
+    CHECK(flight::sound_gate_duty_pct(500, 256) == 100.0);
+}
+
+// The gate is a separate column and a separate validity. A board with only AO wired must
+// leave it blank rather than write a zero that reads as "never above threshold".
+void test_an_unwired_gate_leaves_its_column_blank() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::TelemetryBuilder builder(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = true;
+    s.baro_valid = true;
+    s.orientation_valid = true;
+    s.sound_mv_pp = 300.0;
+    s.sound_valid = true;
+    s.sound_gate_valid = false;          // DO not connected
+
+    const auto built = builder.build(1, 1000, s);
+    CHECK(built.has_value());
+    const std::string line = builder.sd_line(*built, flight::MissionState::flight, 0);
+    CHECK(line.find(",300.0,0,,") != std::string::npos);
+
+    const std::string header = flight::TelemetryBuilder::sd_header();
+    CHECK(header.find("sound_mv_pp,sound_clipped,sound_gate_pct,packet") !=
+          std::string::npos);
+    std::size_t header_commas = 0;
+    for (char ch : header) {
+        if (ch == 0x2C) ++header_commas;
+    }
+    std::size_t line_commas = 0;
+    for (char ch : line) {
+        if (ch == 0x2C) ++line_commas;
+    }
+    CHECK(header_commas == line_commas);
+}
+
 int main(int argc, char** argv) {
     const std::string repo_root = argc > 1 ? argv[1] : ".";
     test_mandatory_validity_covers_every_flag();
@@ -2799,6 +2873,9 @@ int main(int argc, char** argv) {
     test_a_vehicle_without_a_microphone_behaves_as_before();
     test_a_failed_microphone_costs_a_warning_and_nothing_else();
     test_a_working_microphone_reaches_the_log();
+    test_a_gate_only_module_is_still_a_working_sensor();
+    test_gate_duty_is_a_percentage_and_stays_one();
+    test_an_unwired_gate_leaves_its_column_blank();
     test_a_refused_configuration_says_which_setting_was_wrong();
     test_config_radio_airtime_guard();
     test_formatter_and_parser_agree_at_the_edges();

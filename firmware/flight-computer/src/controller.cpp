@@ -384,17 +384,30 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
     // is far less useful for the correlations it exists to support.
     if (sound_ != nullptr) {
         SoundSample sound{};
-        if (sound_->read(sound, mission_ms) && sound.valid &&
-            std::isfinite(sound.level_mv_pp)) {
-            snapshot_.sound_mv_pp = sound.level_mv_pp;
-            snapshot_.sound_clipped = sound.clipped;
-            snapshot_.sound_valid = true;
+        // Either channel on its own is a working sensor. A three-pin LM393 board has
+        // no analogue output at all, and refusing its threshold duty because the level is
+        // missing would discard the only measurement it can make.
+        const bool got = sound_->read(sound, mission_ms) &&
+                         ((sound.valid && std::isfinite(sound.level_mv_pp)) ||
+                          (sound.gate_valid && std::isfinite(sound.gate_duty_pct)));
+        if (got) {
+            snapshot_.sound_valid = sound.valid && std::isfinite(sound.level_mv_pp);
+            if (snapshot_.sound_valid) {
+                snapshot_.sound_mv_pp = sound.level_mv_pp;
+                snapshot_.sound_clipped = sound.clipped;
+            }
+            snapshot_.sound_gate_valid = sound.gate_valid &&
+                                         std::isfinite(sound.gate_duty_pct);
+            if (snapshot_.sound_gate_valid) {
+                snapshot_.sound_gate_pct = sound.gate_duty_pct;
+            }
             last_good_sound_ms_ = mission_ms;
             faults_.clear(FaultCode::sound_unavailable);
         } else if (mission_ms - last_good_sound_ms_ > config_.sound_stale_after_ms) {
             // Warning, never error. A dead microphone costs a column and nothing else, and
             // an additional sensor must not be able to move the mission state.
             snapshot_.sound_valid = false;
+            snapshot_.sound_gate_valid = false;
             faults_.report(FaultCode::sound_unavailable, FaultSeverity::warning, mission_ms);
         }
     }
@@ -661,7 +674,8 @@ void Controller::refresh_health(std::uint64_t mission_ms) {
     health_.sd_ok = logger_enabled_;
     // "Not fitted" and "fitted but silent" are both false here, which is correct: neither
     // is a reason to do anything, and the fault log distinguishes them if anyone asks.
-    health_.sound_ok = sound_ != nullptr && snapshot_.sound_valid;
+    health_.sound_ok = sound_ != nullptr &&
+                       (snapshot_.sound_valid || snapshot_.sound_gate_valid);
     health_.calibrated = calibrator_.complete();
     health_.calibration_settled = calibrator_.settled();
     health_.armed = is_armed(mission_ms);

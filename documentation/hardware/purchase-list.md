@@ -19,7 +19,7 @@ finding, or a scoring recommendation that has been costed.
 | JST-RCY female pigtail | To mate the battery's discharge lead |
 | Header strips | Soldered to both Picos and every module on 2026-09-04 |
 | Power switch, LEDs, and their resistors | Held as of 2026-09-05. The 100 kΩ divider pair and the ¼ W spares below are still needed if not among them |
-| Hall effect sensor | Held. See section 4 — it replaces the magnetometer by decision, not by equivalence. **Not yet integrated: its supply voltage is unconfirmed**, and there is no level shifting anywhere on this vehicle |
+| Hall effect sensor | Held, and **not being used** (decided 2026-09-06). Its supply voltage was never confirmed, and with sensor integration already at its 25-point cap it would have scored nothing. Kept as a spare part, not a planned one |
 | Analogue sound sensor module | Held, and confirmed 3.3 V. **Integrated on 2026-09-05** — `GP27` / ADC1, logged to the SD card, not transmitted |
 
 ---

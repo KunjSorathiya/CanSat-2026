@@ -54,7 +54,8 @@ flowchart LR
         P13["GP13 · UART0 RX"]
         P14["GP14 · status LED"]
         P26["GP26 · ADC0 battery sense"]
-        P27["GP27 · ADC1 microphone"]
+        P27["GP27 · ADC1 microphone AO"]
+        P15["GP15 · microphone DO"]
     end
 
     IMU["MPU-9250<br/>accel + gyro"]
@@ -114,7 +115,8 @@ UART0                     RA-02 control
 Board I/O
   GP14 -> status LED (through a current-limiting resistor, value TBD)
   GP26 <- ADC0, battery-sense reservation only — nothing connected
-  GP27 <- ADC1, analogue microphone AO (additional sensor)
+  GP27 <- ADC1, sound module AO (additional sensor; absent on a 3-pin board)
+  GP15 <- sound module DO, comparator output (pulled down in firmware)
 ```
 
 ---
@@ -177,7 +179,8 @@ and mirror `BoardPins`.
 | GP21 | LoRa DIO0 | GPIO | Input | RA-02 DIO0 (TxDone / RxDone) | Yes | `lora_dio0` |
 | GP22 | LoRa DIO1 | GPIO | Input | RA-02 DIO1 | Optional | `lora_dio1` |
 | GP26 | Battery sense | ADC0 | Analog in | Reservation only | Useful | `battery_adc` |
-| GP27 | Microphone | ADC1 | Analog in | Sound module `AO` | Optional | `sound_adc` |
+| GP27 | Microphone level | ADC1 | Analog in | Sound module `AO` | Optional | `sound_adc` |
+| GP15 | Microphone gate | GPIO | Input, pull-down | Sound module `DO` | Optional | `sound_gate` |
 
 Bus speeds configured by the HAL
 ([`pico_hal.cpp`](../../firmware/flight-computer/src/pico/pico_hal.cpp)):
@@ -393,7 +396,24 @@ encodes the mission state
 
 GP26 / ADC0 is a **reservation only**. No divider is designed and nothing is connected.
 
-### GP27 / ADC1 — the analogue microphone
+### GP27 and GP15 — the LM393 sound module
+
+**Count the pins on the module before wiring it.** The LM393 sound detection sensor is sold
+in two forms under one name, and they are not interchangeable:
+
+| Pins | Outputs | What this vehicle gets |
+|---|---|---|
+| **4** — `VCC GND DO AO` | comparator **and** analogue | Both channels. Wire `AO` to GP27 and `DO` to GP15 |
+| **3** — `VCC GND OUT` | comparator only | `OUT` is `DO`. Wire it to GP15 and leave GP27 unconnected |
+
+If the board has only three pins, set `sound_analog_connected = false` in the configuration.
+That matters: **an unconnected ADC pin does not read zero, it floats**, and a floating input
+produces a plausible-looking level that no microphone measured. The flag is how the log
+avoids recording it.
+
+`DO` is pulled down in firmware, so leaving it unwired reads as a constant "not asserted"
+rather than drifting. Set `sound_gate_connected = false` as well if you only wire `AO`, so
+the column stays blank instead of reading a truthful-looking 0.0 %.
 
 An additional sensor, and wired directly: the module's `AO` output already swings inside
 0–3.3 V, so no divider is needed and none should be fitted — one would halve the signal for

@@ -77,10 +77,12 @@ std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
     if (!packet) {
         return std::nullopt;
     }
-    Built built{record, *packet, 0.0, false, false};
+    Built built{record, *packet, 0.0, false, false, 0.0, false};
     built.sound_mv_pp = s.sound_mv_pp;
     built.sound_clipped = s.sound_clipped;
     built.sound_valid = s.sound_valid;
+    built.sound_gate_pct = s.sound_gate_pct;
+    built.sound_gate_valid = s.sound_gate_valid;
     return built;
 }
 
@@ -90,7 +92,7 @@ std::string TelemetryBuilder::sd_header() {
     // the CSV wants the numbers before it.
     return "mission_ms,packet_number,state,fault_total,altitude_m,pressure_pa,temperature_c,"
            "roll_deg,pitch_deg,yaw_deg,ax_mps2,ay_mps2,az_mps2,gps_valid,gps_lat,gps_lon,"
-           "gps_alt,sound_mv_pp,sound_clipped,packet";
+           "gps_alt,sound_mv_pp,sound_clipped,sound_gate_pct,packet";
 }
 
 std::string TelemetryBuilder::sd_line(const Built& b, MissionState state,
@@ -137,6 +139,8 @@ std::string TelemetryBuilder::sd_line(const Built& b, MissionState state,
     if (b.sound_valid) out += fixed(b.sound_mv_pp, 1);
     out += ',';
     if (b.sound_valid) out += (b.sound_clipped ? '1' : '0');
+    out += ',';
+    if (b.sound_gate_valid) out += fixed(b.sound_gate_pct, 1);
     out += ',';
     out += b.packet;
     return out;

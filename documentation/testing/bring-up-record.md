@@ -168,8 +168,9 @@ confident wrong number.
 | 3.8 | Acquisition jitter | < 6 % of the period (2 ms) | 2 ms loop tick | Standard deviation of the same intervals | **0.453 ms sd** against a 1.98 ms limit — 4.4× inside. Sensor read cost **0.282 ms mean, 0.33–0.35 ms worst across two runs**, i.e. under 1 % of the period (barometer only; the IMU was not wired for this run) | ✅ 2026-09-05 / KS |
 | 3.9 | Calibration settle time | Within `calib_samples` at 30 Hz ≈ 2.7 s | `startup_calibration.cpp` | Time from power-on to `CAL-1` in telemetry | | |
 | 3.10 | I2C bus utilisation | ~1.6 % at 30 Hz | [sensor-rates.md](../design/sensor-rates.md) | Scope SCL, measure active time per second | | |
-| 3.11 | **Microphone quiet-room floor** | A small non-zero span. **Not** zero and **not** clipped | `sound_mv_pp` in the SD log, vehicle still, room quiet | | |
-| 3.12 | **Microphone responds to sound** | The level rises clearly above 3.11 and returns | Clap or speak near the capsule and watch the column | | |
+| 3.11 | **Microphone quiet-room floor** | A small non-zero span, **not** zero and **not** clipped; `sound_gate_pct` near 0 | `sound_mv_pp` and `sound_gate_pct` in the SD log, vehicle still, room quiet. **A span of exactly zero means `AO` is not connected**, and a span that never moves means it is not connected to a microphone | | |
+| 3.12 | **Microphone responds to sound** | Both channels move: the level rises clearly above 3.11 and returns, and `sound_gate_pct` rises from near 0 | Clap, then speak steadily. **A clap should give a high level at low duty and speech a lower level at higher duty** — that difference is the whole reason both channels are carried | | |
+| 3.13a | **Board variant recorded** | 3-pin or 4-pin, written down | Count the pins. A 3-pin board has no `AO` at all and needs `sound_analog_connected = false`, or the log fills with a floating ADC pin that looks exactly like a quiet room | | |
 | 3.13 | **Trimpot position recorded** | A written record exists | The gain is set by an unmarked trimpot and nothing reads it back, so **two flights at different positions produce incomparable numbers.** Set it, mark it, write it down | | |
 
 > **3.5 was re-taken, and the first attempt's shortfall was the method, not the sensor.** The

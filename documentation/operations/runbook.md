@@ -335,7 +335,7 @@ and pressure, each against time or packet number.
    | Acceleration | `ax_mps2`, `ay_mps2`, `az_mps2` | `ax`, `ay`, `az` |
    | GPS | `gps_valid`, `gps_lat`, `gps_lon`, `gps_alt` | `gps_lat`, `gps_lon`, `gps_alt` (blank when there was no fix) |
    | Mission state and faults | `state`, `fault_total` | not carried as columns — they are inside `raw_packet` as `MODE` and `FAULTS` |
-   | Acoustic level | `sound_mv_pp`, `sound_clipped` | **not carried at all — this is on the card only.** The microphone is an additional sensor and its level is deliberately not transmitted, so the SD log is the only copy. Blank in both columns means no microphone was fitted or it was not reporting; `0.0` means it measured silence, and the two are not the same thing |
+   | Acoustic level | `sound_mv_pp`, `sound_clipped`, `sound_gate_pct` | **not carried at all — this is on the card only.** The microphone is an additional sensor and its level is deliberately not transmitted, so the SD log is the only copy. Blank in both columns means no microphone was fitted or it was not reporting; `0.0` means it measured silence, and the two are not the same thing |
    | The packet itself | `packet` | `raw_packet` |
 
    The onboard names carry their units because they are written by the flight computer,

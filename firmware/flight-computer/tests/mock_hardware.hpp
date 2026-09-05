@@ -172,7 +172,9 @@ public:
         if (fail_read) return false;
         out.level_mv_pp = level_mv_pp;
         out.clipped = clipped;
-        out.valid = true;
+        out.valid = analog_connected;
+        out.gate_duty_pct = gate_duty_pct;
+        out.gate_valid = gate_connected;
         out.timestamp_ms = now_ms;
         health_.last_update_ms = now_ms;
         return true;
@@ -180,7 +182,10 @@ public:
     SensorHealth health() const override { return health_; }
 
     double level_mv_pp = 120.0;
+    double gate_duty_pct = 0.0;
     bool clipped = false;
+    bool analog_connected = true;
+    bool gate_connected = true;
     bool fail_init = false;
     bool fail_read = false;
     int reads = 0;

@@ -44,7 +44,7 @@ void ensure_adc() {
     if (g_adc_ready) return;
     adc_init();
     adc_gpio_init(BoardPins::battery_adc);
-    adc_gpio_init(BoardPins::sound_adc);
+    adc_gpio_init(BoardPins::sound_adc);  // harmless if only DO is wired
     g_adc_ready = true;
 }
 }  // namespace
@@ -145,6 +145,14 @@ void PicoBoardIo::set_status_led(bool on) {
 
 bool PicoSoundSensor::initialize() {
     ensure_adc();
+    if (config_.sound_gate_connected) {
+        gpio_init(BoardPins::sound_gate);
+        gpio_set_dir(BoardPins::sound_gate, GPIO_IN);
+        // Pulled down rather than left floating. An unconnected input would otherwise drift
+        // and count as sound, which is the one failure that produces plausible-looking data
+        // from a wire that is not there.
+        gpio_pull_down(BoardPins::sound_gate);
+    }
     health_.initialized = true;
     // There is nothing to interrogate. An analogue module has no identity register and no
     // handshake, so unlike the IMU or the radio this cannot report "the part is wrong" -- it
@@ -161,30 +169,49 @@ bool PicoSoundSensor::read(SoundSample& out, std::uint64_t now_ms) {
     ensure_adc();
     const std::uint32_t wanted = config_.sound_samples_per_window;
     if (wanted == 0) return false;
+    if (!config_.sound_analog_connected && !config_.sound_gate_connected) return false;
 
-    adc_select_input(static_cast<std::uint32_t>(BoardPins::sound_adc - 26));
+    if (config_.sound_analog_connected) {
+        adc_select_input(static_cast<std::uint32_t>(BoardPins::sound_adc - 26));
+    }
 
     std::uint16_t lo = 0xFFFF;
     std::uint16_t hi = 0;
+    std::uint32_t asserted = 0;
+    // Both channels come out of ONE pass, interleaved, so the envelope and the threshold
+    // duty describe the same half-millisecond of air rather than two neighbouring ones.
+    // Comparing a peak from one window against a duty from another is the sort of thing
+    // that produces a correlation nobody can reproduce.
     for (std::uint32_t i = 0; i < wanted; ++i) {
-        const std::uint16_t raw = adc_read();
-        if (raw < lo) lo = raw;
-        if (raw > hi) hi = raw;
+        if (config_.sound_analog_connected) {
+            const std::uint16_t raw = adc_read();
+            if (raw < lo) lo = raw;
+            if (raw > hi) hi = raw;
+        }
+        if (config_.sound_gate_connected && gpio_get(BoardPins::sound_gate)) {
+            ++asserted;
+        }
     }
 
-    SoundWindow window;
-    window.min_counts = lo;
-    window.max_counts = hi;
-    window.sample_count = wanted;
-
-    out.min_counts = lo;
-    out.max_counts = hi;
     out.samples = wanted;
-    out.level_mv_pp = sound_peak_to_peak_mv(window, config_.sound_reference_mv,
-                                            config_.sound_full_scale_counts);
-    out.clipped = sound_window_clipped(window, config_.sound_full_scale_counts);
-    out.valid = true;
     out.timestamp_ms = now_ms;
+
+    if (config_.sound_analog_connected) {
+        SoundWindow window;
+        window.min_counts = lo;
+        window.max_counts = hi;
+        window.sample_count = wanted;
+        out.min_counts = lo;
+        out.max_counts = hi;
+        out.level_mv_pp = sound_peak_to_peak_mv(window, config_.sound_reference_mv,
+                                                config_.sound_full_scale_counts);
+        out.clipped = sound_window_clipped(window, config_.sound_full_scale_counts);
+        out.valid = true;
+    }
+    if (config_.sound_gate_connected) {
+        out.gate_duty_pct = sound_gate_duty_pct(asserted, wanted);
+        out.gate_valid = true;
+    }
 
     health_.healthy = true;
     health_.last_update_ms = now_ms;

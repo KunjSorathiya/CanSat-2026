@@ -166,7 +166,7 @@ The rulebook explicitly permits any outer material (PVC, plastic, 3D print) and 
 | Data analysis | 20 | ~0 | Tooling ready; needs flight data |
 
 **Code originality — 9 or 10 of 10.** Self-written, no third-party libraries anywhere in the
-flight path, heavily commented, and held by 4417 assertions across 166 Python and 57 Node
+flight path, heavily commented, and held by 4430 assertions across 166 Python and 57 Node
 tests. The drivers for the MPU-9250, BMP280, NEO-6M, SX1278 and the SD card are all written
 here against their datasheets and register maps. This section rewards exactly what this
 repository is.
@@ -232,6 +232,34 @@ to instrument a descent, which is exactly why it keeps being flown.
    Titan. A single microphone cannot do time-of-flight, so this vehicle does not claim it —
    but it is the reason the instrument class exists, and it is the honest answer to "what
    would you do with more of these".
+
+#### What the LM393 board specifically can and cannot do
+
+The module on this vehicle is an **LM393 sound detection sensor**: an electret capsule, a
+comparator, a gain trimpot, and — on the four-pin variant — a lightly amplified analogue
+output. It is a ten-rupee part and pretending otherwise in front of a judge is worse than
+naming its limits first.
+
+**Honest confidence, item by item:**
+
+| Use | Confidence | Why |
+|---|---|---|
+| **Landing detection** | **High** | Impact is an impulsive transient tens of decibels above anything else in the flight. Even a poor microphone and a comparator catch it |
+| **Flow noise against descent rate** | **Good** | Unshielded electrets are extremely sensitive to airflow. On a descending body that is normally called a defect; here it is the measurement |
+| **Canopy oscillation** | **Good** | Carried by the envelope *between* windows at 30 Hz, not within one. Canopy modes are 0.5–3 Hz, comfortably inside Nyquist |
+| **Deployment transient** | **Moderate** | The crack is sharp and loud, but it happens exactly when flow noise is highest. The `sound_gate_pct` channel helps: a transient is a brief high peak at low duty, sustained flow noise is high duty |
+| **Absolute sound pressure level** | **None** | No calibration, no reference, and an unrecorded trimpot |
+| **Frequency spectra** | **None** | A 0.5 ms window resolves ~2 kHz upward, which is not where the useful content is. This vehicle does not claim spectra |
+
+**Two channels, deliberately, and they answer different questions.** `sound_mv_pp` is *how
+loud*; `sound_gate_pct` is *what fraction of the window was loud*. A sharp crack and a
+steady roar can reach the same peak and mean opposite things, and the duty is what separates
+them. It is also the only channel a three-pin board can produce at all.
+
+**Fit a windscreen.** A scrap of open-cell foam over the capsule. Without one the flow noise
+will saturate everything else on a descent — which makes the descent-rate proxy easy and the
+deployment transient impossible. The foam trades some of the first for the second, and
+mentioning that you made that trade on purpose is worth more to a judge than either result.
 
 **What it does not measure, and say so before a judge asks.** The level is a **relative
 peak-to-peak envelope in millivolts, not a sound pressure level**. Reporting decibels would

@@ -50,4 +50,14 @@ double sound_peak_to_peak_mv(const SoundWindow& window, double reference_mv,
 // silently folded into the number.
 bool sound_window_clipped(const SoundWindow& window, std::uint16_t full_scale_counts);
 
+// Percentage of a window that sat above the module's comparator threshold.
+//
+// A sharp transient and a sustained noise can reach the same peak level and mean completely
+// different things -- canopy inflation against the flow noise of a fast descent. The
+// analogue envelope cannot tell them apart within one window; this can, and it is the only
+// measurement a three-pin LM393 board can make at all.
+//
+// Returns 0 for an empty window, and never exceeds 100 even if the counter is nonsense.
+double sound_gate_duty_pct(std::uint32_t asserted_samples, std::uint32_t total_samples);
+
 }  // namespace flight

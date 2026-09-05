@@ -65,7 +65,17 @@ struct SoundSample {
     // rather than a measurement. Canopy inflation and touchdown are the two moments most
     // likely to do this, which is exactly why it is carried rather than hidden.
     bool clipped = false;
-    bool valid = false;
+    bool valid = false;              // the analogue level above is a measurement
+
+    // The comparator output, sampled across the same window: the percentage of the window
+    // that sat above the module's trimpot threshold.
+    //
+    // This is a second, independent channel and not a worse copy of the first. The analogue
+    // level says how loud; this says how much of the window was loud, which is what
+    // separates a single sharp transient from sustained noise at the same peak. It is also
+    // the only channel a three-pin LM393 board can provide at all.
+    double gate_duty_pct = 0.0;
+    bool gate_valid = false;
     std::uint64_t timestamp_ms = 0;
 };
 

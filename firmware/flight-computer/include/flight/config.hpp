@@ -32,6 +32,11 @@ struct BoardPins {
     // Analogue microphone output. ADC1, and chosen over GP28 so the two ADC channels the
     // vehicle uses are adjacent to the battery sense on GP26 and the third stays free.
     static constexpr int sound_adc = 27;  // ADC1
+    // The sound module's comparator output. Digital, and separate from the analogue
+    // line above because the two LM393 board variants expose different subsets: the
+    // four-pin board has AO and DO, the three-pin board has DO alone. Wiring both
+    // costs one GPIO and makes the firmware indifferent to which arrived.
+    static constexpr int sound_gate = 15;
 };
 
 enum class RadioMode { test, official };
@@ -293,6 +298,12 @@ struct Configuration {
     // loop period -- so the cost is under 2 % of one tick, and the window is long enough
     // to span several cycles of anything above ~2 kHz.
     std::uint32_t sound_samples_per_window = 256;
+    // Which of the module's two outputs are actually wired. A three-pin LM393 board
+    // has no AO at all, and reading an unconnected ADC pin returns a floating level
+    // that looks exactly like a quiet room. Say what is connected rather than let the
+    // log carry a number nothing measured.
+    bool sound_analog_connected = true;   // module AO -> GP27
+    bool sound_gate_connected = true;     // module DO -> GP15
     // Full-scale voltage and top code of the converter the microphone is read through.
     double sound_reference_mv = 3300.0;
     std::uint16_t sound_full_scale_counts = 4095;  // RP2040 ADC is 12-bit

@@ -39,6 +39,11 @@ struct SensorSnapshot {
     double sound_mv_pp = 0.0;
     bool sound_clipped = false;
     bool sound_valid = false;
+    // Percentage of the same window above the module's comparator threshold. The only
+    // channel a three-pin LM393 board can provide, and an independent one on a
+    // four-pin board.
+    double sound_gate_pct = 0.0;
+    bool sound_gate_valid = false;
     cansat::GpsData gps{};  // gps.valid == has fix
 };
 
@@ -60,6 +65,8 @@ public:
         double sound_mv_pp = 0.0;
         bool sound_clipped = false;
         bool sound_valid = false;
+        double sound_gate_pct = 0.0;
+        bool sound_gate_valid = false;
     };
 
     // Returns nullopt when mandatory data is invalid -> no telemetry point is produced.
