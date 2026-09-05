@@ -164,6 +164,26 @@ class Transport:
     def close(self) -> None:  # pragma: no cover - default no-op
         pass
 
+    def framing_stats(self) -> dict[str, int]:
+        """What the frame decoder has seen, for transports that decode frames.
+
+        The decoder counts resyncs and overflows and used to tell nobody: it lives inside
+        the transport, and the application above it only ever sees whole `Frame` objects.
+        Those two counters separate "the header was corrupted" from "a length field no
+        frame on this link can have", which is the difference between noise on the wire and
+        a receiver talking to something it does not understand. An unframed transport has
+        no decoder and returns nothing.
+        """
+        decoder = getattr(self, "_decoder", None)
+        if decoder is None:
+            return {}
+        return {
+            "frames_ok": decoder.frames_ok,
+            "crc_errors": decoder.crc_errors,
+            "resyncs": decoder.resyncs,
+            "overflows": decoder.overflows,
+        }
+
 
 # A raw-log line is "<ISO 8601 receipt time> TAB <escaped payload>". No telemetry packet
 # begins with a date, so a line in this shape is unambiguously one of ours.

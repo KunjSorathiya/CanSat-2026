@@ -260,12 +260,20 @@ Link health on the ground station:
 | RSSI | Falls as range grows; roughly −60 dBm close in | Below about −105 dBm the link is running out of headroom, **before** loss appears; below −115 dBm expect packets to start dropping |
 | SNR | Positive on a healthy link | Negative SNR means the signal is near the demodulator's floor. It is the earliest warning available |
 | Bridge drops | Zero | Non-zero means the PC application was not reading; the bridge kept running and discarded output rather than blocking |
+| Resyncs | Zero | The frame decoder threw away a partial header and started again. A few mean noise on the serial line; a rising count means the link is corrupting bytes, not packets |
+| Oversized length | Zero | A length field larger than any frame this link can carry. Not noise: either a badly corrupted header, or a sender configured for frames this receiver will never accept |
 
 > [!TIP]
 > **RSSI and SNR come from the bridge radio, not from the packets.** They are the only
 > indicators that degrade *before* packets start disappearing, which makes them the numbers
 > to watch during a range test and during descent. They appear in the web console's Link
 > health panel, the Tk dashboard's Bridge radio panel, and the headless CLI's `bridge:` line.
+>
+> **Resyncs and oversized lengths come from the frame decoder on the PC**, not from the
+> radio, and they answer a different question: whether the bytes arriving over USB are
+> intact, independently of whether the packets inside them are. They appear in the Tk
+> dashboard's Serial framing panel. An unframed run shows `--` for all of them, because no
+> decoder ran — which is a different statement from zero.
 
 ---
 

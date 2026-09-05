@@ -197,3 +197,39 @@ class BridgeStatusTests(unittest.TestCase):
             link = station.health.snapshot()
             self.assertEqual(link["status_frames"], 1)
             self.assertEqual(link["packets_ok"], 1)
+
+
+class FramingStatsTests(unittest.TestCase):
+    """The frame decoder's counters, all the way to the snapshot an operator reads.
+
+    They were counted inside the transport and read by nobody: the application above only
+    ever sees whole frames. A resync is noise on the wire; an overflow is a length field no
+    frame on this link can have, which is a corrupted header or a sender configured for
+    frames this receiver will never accept. Different faults, different actions.
+    """
+
+    def _snapshot(self, transport):
+        with tempfile.TemporaryDirectory() as tmp:
+            station = GroundStation(transport, expected_team=TEAM, log_dir=tmp)
+            transport.stop()
+            station.run_forever()
+            return station.snapshot()
+
+    def test_a_framed_transport_reports_what_its_decoder_saw(self):
+        transport = LoopbackTransport(framed=True)
+        transport.push_packet(packet(1))
+        # A length no frame on this link can have, mid-stream.
+        transport.push_bytes(b"$99999,ffff,")
+        transport.push_packet(packet(2))
+        framing = self._snapshot(transport)["framing"]
+        self.assertEqual(framing["frames_ok"], 2)
+        self.assertEqual(framing["overflows"], 1)
+        self.assertEqual(framing["resyncs"], 0)
+        self.assertEqual(framing["crc_errors"], 0)
+
+    def test_an_unframed_transport_reports_nothing_rather_than_zeroes(self):
+        # No decoder ran, so there is nothing to report. Zeroes would read as "nothing went
+        # wrong", which is a different statement from "this was never measured".
+        transport = LoopbackTransport(framed=False)
+        transport.push_packet(packet(1))
+        self.assertEqual(self._snapshot(transport)["framing"], {})

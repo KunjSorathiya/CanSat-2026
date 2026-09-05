@@ -140,6 +140,11 @@ class GroundStation:
             "link": self.health.snapshot(),
             "validation": vars(self.validator.stats).copy(),
             "bridge": dict(self._bridge_status),
+            # What the frame decoder saw on the way in. A resync is noise on the wire; an
+            # overflow is a length field no frame on this link can have, which means a
+            # corrupted header or a sender configured for frames this receiver will never
+            # accept. Empty for an unframed transport, which has no decoder.
+            "framing": self.transport.framing_stats(),
             "latest_raw": raw,
             # Logging failures never stop reception, so they must be visible somewhere:
             # a flight that is not being recorded should be discovered on the pad, not

@@ -87,7 +87,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **101 / 101 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **119 / 119 tests** |
+| Python ground station | 8 modules | ✅ **121 / 121 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **165 / 165 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **49 / 49 tests** |
@@ -284,7 +284,7 @@ stability. Plus three rate-estimator tests added after a live defect was found: 
 2 Hz stream reads 2.00 Hz, a same-instant burst cannot inflate the rate, and the rate
 falls to zero once the link drops instead of freezing at its last value.
 
-### `test_app.py` — 11 tests
+### `test_app.py` — 13 tests
 
 End-to-end counting and logging through the full pipeline; a CRC-error frame is recorded
 but never parsed; CSV export; a healthy log reports no errors, and a failing write is
@@ -295,6 +295,11 @@ itself: the radio report reaches the snapshot, a negative SNR keeps its sign, a 
 line is recorded, status lines are never counted as telemetry, and the **sync word the
 bridge reports** reaches the dashboard — with an older bridge image that reports no sync
 word leaving the field absent rather than filling it with a guess.
+
+Two more carry the frame decoder's own counters to the snapshot an operator reads: a framed
+transport reports what its decoder saw, including an oversized length mid-stream, and an
+unframed one reports nothing at all rather than zeroes — no decoder ran, and zero would read
+as "nothing went wrong".
 
 ### `test_logger.py` — 22 tests
 

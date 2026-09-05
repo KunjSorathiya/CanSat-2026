@@ -76,6 +76,15 @@ _LINK_FIELDS = [
 
 # The bridge reports the radio's own view of the link once a second. RSSI is what warns an
 # operator that a link is running out of headroom while packet loss is still zero.
+# The frame decoder's own view of the link, which is a different question from whether the
+# packets inside those frames were any good. Absent on an unframed transport.
+_FRAMING_FIELDS = [
+    ("frames_ok", "Frames decoded"),
+    ("crc_errors", "Frame CRC errors"),
+    ("resyncs", "Resyncs"),
+    ("overflows", "Oversized length"),
+]
+
 _BRIDGE_FIELDS = [
     ("radio", "Radio"),
     ("rssi", "RSSI (dBm)"),
@@ -138,6 +147,11 @@ class Dashboard:
         bridge.pack(fill="x", pady=(6, 0))
         for i, (key, label) in enumerate(_BRIDGE_FIELDS):
             self._add_row(bridge, f"bridge.{key}", label, i)
+
+        framing = ttk.LabelFrame(left, text="Serial framing", padding=6)
+        framing.pack(fill="x", pady=(6, 0))
+        for i, (key, label) in enumerate(_FRAMING_FIELDS):
+            self._add_row(framing, f"framing.{key}", label, i)
 
         # Logging health. A ground station that is receiving but not recording looks
         # perfectly healthy everywhere else, so it gets its own line.
@@ -220,6 +234,12 @@ class Dashboard:
         bridge_status = snap.get("bridge", {})
         for key, _ in _BRIDGE_FIELDS:
             self._vars[f"bridge.{key}"].set(str(bridge_status.get(key, "--")))
+
+        framing_stats = snap.get("framing", {})
+        for key, _ in _FRAMING_FIELDS:
+            # "--" for an unframed transport: no decoder ran, so there is nothing to report
+            # rather than a zero that would read as "nothing went wrong".
+            self._vars[f"framing.{key}"].set(str(framing_stats.get(key, "--")))
         self._vars["latest_raw"].set(str(snap.get("latest_raw", "--")) or "--")
 
         self._plot.update(self._t, self._series)

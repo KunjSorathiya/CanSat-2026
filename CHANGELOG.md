@@ -64,6 +64,33 @@ strap measurement.
 > software, or guarantees nothing was holding. Read the audit for the shape of it; these
 > entries are the detail.
 
+### Fixed — the frame decoder's counters reached nobody, including the one added earlier today
+
+`FrameDecoder` counts frames decoded, CRC errors, resyncs and overflows. The decoder lives
+inside the transport, and the application above it only ever sees whole `Frame` objects —
+so nothing read any of them. CRC errors reach an operator by another route entirely, as a
+frame kind the link-health module counts. Resyncs and overflows reached nobody at all.
+
+That includes the `overflows` counter **added earlier in this same pass**, when the three
+decoders were unified. The argument then was that an oversized length deserves its own
+diagnosis rather than being folded into a generic resync. That argument is only worth
+anything if someone can see it, and this is the third time this pass has found the shape it
+is an instance of. Finding one's own instance of it is the least comfortable and most
+useful kind.
+
+`Transport.framing_stats()` exposes them, the snapshot carries them, and the Tk dashboard
+has a **Serial framing** panel. The runbook gains two monitoring rows, because the two
+counters answer different questions:
+
+| Indicator | What it means |
+|---|---|
+| **Resyncs** | A partial header thrown away and the decoder started again. A few are noise on the serial line; a rising count means the link is corrupting bytes, not packets |
+| **Oversized length** | A length field larger than any frame this link can carry. Not noise: a badly corrupted header, or a sender configured for frames this receiver will never accept |
+
+An unframed transport reports **nothing** rather than zeroes. No decoder ran, and a zero
+would read as "nothing went wrong" — a different statement from "this was never
+measured". The dashboard shows `--`.
+
 ### Fixed — four more requirements that had been done for weeks
 
 The same sweep, applied to the blocks outside the sensor rows.
