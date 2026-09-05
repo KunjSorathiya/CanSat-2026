@@ -8,7 +8,7 @@ wrong, fix it, prove the fix, prevent the class of defect from returning, commit
 command the documentation tells a reader to run
 **Baseline:** `e87d480`, the last commit of cycle 33 before this pass
 
-**Verdict:** ✅ **Pass. Thirty-one findings, all fixed and all covered. Four would have cost
+**Verdict:** ✅ **Pass. Thirty-two findings, all fixed and all covered. Four would have cost
 a mission or a diagnosis: three produce wrong data, and one leaves a vehicle refusing to fly
 without saying why. The rest are documents that had stopped describing the software, or
 guarantees nothing was holding.**
@@ -32,7 +32,7 @@ the code still did what it said.
 ## Findings
 
 Numbering continues the software audit: the previous pass ended at F-42. F-43 to F-59 were
-found by reading; [F-60 to F-73](#second-wave--f-60-to-f-73) by comparing one
+found by reading; [F-60 to F-74](#second-wave--f-60-to-f-74) by comparing one
 machine-readable thing against another.
 
 | # | Finding | Severity | Status |
@@ -57,7 +57,7 @@ machine-readable thing against another.
 
 ---
 
-## Second wave — F-60 to F-73
+## Second wave — F-60 to F-74
 
 The findings above were reached by reading. Once the obvious classes were closed, the way to
 find more was to stop reading and start **comparing one machine-readable thing against
@@ -81,6 +81,7 @@ comparison a script can repeat.
 | **F-71** | `validate_config()` names which of its thirty rules refused a configuration. The controller replaced that with `"configuration invalid"`, then latched a critical fault — leaving an operator a vehicle that will not fly and thirty candidates for why | **High** | ✅ Fixed |
 | **F-72** | The bring-up diagnostic's second I2C scan is headed *"AK8963 at `0x0C` **SHOULD** now appear"* — two lines after the same program prints *"SIX axes: there is no magnetometer in this package at all"*. An operator with the board in front of them goes hunting a wiring fault that does not exist | Medium | ✅ Fixed |
 | **F-73** | Both hardware documents named the delivered six-axis part in one section and asserted a *"genuine nine-axis part"* in another. **Both passed the rule written earlier in this pass to prevent exactly that**, because it asked whether the file mentions the delivered part rather than whether a paragraph contradicts itself | Medium | ✅ Fixed |
+| **F-74** | The test plan's **first instruction** described `build_host.sh` as running four suites. It runs eight — the LoRa driver, the microSD driver, the web console and the documented-claims check were all absent from the list a reader consults to find out what is covered | Low | ✅ Fixed |
 
 ### What the second wave says about the first
 
@@ -161,10 +162,10 @@ said, which was the subject of F-43.
 
 | | At `e87d480` | Now |
 |---|---:|---:|
-| Documented claims checked | 66 | **191** |
+| Documented claims checked | 66 | **196** |
 | C++ assertions | 4222 | **4268** |
-| Python tests | 131 | **158** |
-| Node tests | 37 | **49** |
+| Python tests | 131 | **160** |
+| Node tests | 37 | **51** |
 | Shared cross-implementation fixtures | 1 | **4** |
 
 The four fixtures now cover every pair of implementations the cross-implementation table
@@ -217,6 +218,29 @@ know where this pass has already been.
 | Everything the [bring-up record](../testing/bring-up-record.md) still has blank | 61 of 79 rows. Needs hardware, and Gate 2 — power — has not been started at all |
 
 ---
+
+## Where the pass stopped finding things
+
+Recorded because knowing where a review ran out is part of knowing what it covered.
+
+The last several comparisons came back clean, and that is a result rather than a gap:
+
+- **The console's DOM.** Every `$("#id")` resolves, and every icon named at runtime is
+  defined. Both are now tests, because the failure mode — a null dereference stopping the
+  render loop mid-flight — is silent until it happens.
+- **The dashboard's variables.** Every variable written is one it created. Also now a test:
+  the failure is a `KeyError` on the first snapshot.
+- **The documentation index.** All 21 documents are listed.
+- **The configuration surface.** 60 of 78 fields are undocumented on purpose; the runbook
+  lists the six an operator should think about, and burying those under seventy internal
+  tuning constants would make it worse.
+- **The C++ record's field names.** Deliberately not aligned with the receivers': it names
+  its units, which is worth more on an embedded target than matching a struct in another
+  language that is not a port of it.
+
+What remains unexamined is what cannot be examined here: the Pico HAL has been read but
+never executed, and every hardware gate below still needs the bench. That boundary has not
+moved in this pass, and no finding above changes it.
 
 ## What this pass would do differently
 
