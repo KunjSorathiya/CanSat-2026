@@ -32,9 +32,22 @@ because it needs hardware.
 bash tools/build_host.sh
 ```
 
-Compiles and runs every host suite — the flight smoke test, the full flight suite, the
-ground framing tests — and then the Python ground-station suite. One command, one
-pass/fail.
+Compiles and runs everything that does not need hardware, in one pass:
+
+| | |
+|---|---|
+| `flight_smoke_test` | boot, the first three packets, a GPS parse |
+| `flight_tests` | the whole flight core |
+| `sx1278_tests` | the LoRa driver against a fake register bank |
+| `sd_card_tests` | the microSD driver against a simulated card |
+| `ground_station_tests` | framing, and the shared framing fixtures |
+| Python | the ground-station suite and the tooling suite |
+| Node | the web console's portable core, when Node is present |
+| `check_doc_claims.py` | every documented number, last, because it reads what the suites above reported |
+
+One command, one pass/fail, **about 17 seconds** on a developer machine — of which the
+documentation checks are a third of a second. There is no reason not to run it before every
+commit.
 
 ```bash
 bash tools/check_pico_syntax.sh
@@ -89,7 +102,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 8 modules | ✅ **127 / 127 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **191 / 191 claims** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **196 / 196 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **51 / 51 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 

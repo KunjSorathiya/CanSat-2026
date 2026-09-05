@@ -678,6 +678,17 @@ def main() -> int:
     checker.check(f"all {len(fault_codes)} fault codes appear in the architecture table",
                   not undocumented_faults, ", ".join(undocumented_faults))
 
+    # The test plan lists what build_host.sh runs. It described four suites while the
+    # script ran eight, which is the kind of drift that makes a reader think a suite they
+    # cannot see is a suite that does not exist.
+    build_script = read("tools/build_host.sh")
+    compiled = re.findall(r'echo "== compiling (\w+) =="', build_script)
+    for suite in compiled:
+        if suite == "emit_mission":
+            continue  # a fixture generator for the end-to-end test, not a suite
+        checker.check(f"test-plan.md lists the {suite} suite",
+                      f"`{suite}`" in test_plan, suite)
+
     counts = suite_counts()
     if counts is None:
         # The log is written by tools/build_host.sh immediately before this script runs.
