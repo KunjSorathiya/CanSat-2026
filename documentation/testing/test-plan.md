@@ -87,7 +87,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **101 / 101 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **125 / 125 tests** |
+| Python ground station | 8 modules | ✅ **127 / 127 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **191 / 191 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **51 / 51 tests** |
@@ -297,7 +297,7 @@ stability. Plus three rate-estimator tests added after a live defect was found: 
 2 Hz stream reads 2.00 Hz, a same-instant burst cannot inflate the rate, and the rate
 falls to zero once the link drops instead of freezing at its last value.
 
-### `test_app.py` — 15 tests
+### `test_app.py` — 17 tests
 
 End-to-end counting and logging through the full pipeline; a CRC-error frame is recorded
 but never parsed; CSV export; a healthy log reports no errors, and a failing write is
@@ -313,6 +313,11 @@ Two more carry the frame decoder's own counters to the snapshot an operator read
 transport reports what its decoder saw, including an oversized length mid-stream, and an
 unframed one reports nothing at all rather than zeroes — no decoder ran, and zero would read
 as "nothing went wrong".
+
+Two hold the dashboard to itself: every field list is populated, and every variable the
+dashboard writes to is one it created — `self._vars["typo"].set(...)` is a `KeyError` the
+moment a snapshot arrives, which on this display means the window stops updating during a
+flight. The check is static, so it runs without Tk.
 
 Two more hold the Tk dashboard to the snapshot: every value the ground station knows must be
 named by the display an operator watches, with an explicit list of the few rendered another

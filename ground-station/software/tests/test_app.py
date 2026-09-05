@@ -1,4 +1,5 @@
 import csv
+import re
 import sys
 import tempfile
 import unittest
@@ -291,3 +292,49 @@ class DashboardCoverageTests(unittest.TestCase):
             self.assertIn(key.split(".")[-1], source,
                           f"{key} is allowed as rendered elsewhere, but the dashboard "
                           f"no longer mentions it at all")
+
+
+class DashboardVariableTests(unittest.TestCase):
+    """Every variable the dashboard writes to is one it created.
+
+    `self._vars["typo"].set(...)` is a `KeyError` the moment a snapshot arrives, which on
+    this display means the window stops updating during a flight. Tk is not needed to check
+    it: the keys are literals and field lists in the source, so the comparison is static and
+    runs anywhere the rest of the suite does.
+    """
+
+    DASHBOARD = Path(__file__).parents[1] / "src" / "dashboard.py"
+
+    def _source(self):
+        return self.DASHBOARD.read_text(encoding="utf-8")
+
+    def _field_lists(self, source):
+        """The ("key", "Label") pairs in each _FIELDS list, by list name."""
+        lists = {}
+        for name, body in re.findall(r"^(_[A-Z_]+_FIELDS) = \[(.*?)^\]", source,
+                                     re.MULTILINE | re.DOTALL):
+            lists[name] = re.findall(r'\(\s*"([a-z_0-9]+)"\s*,', body)
+        return lists
+
+    def test_every_field_list_is_populated(self):
+        lists = self._field_lists(self._source())
+        self.assertGreaterEqual(len(lists), 4, f"found only {sorted(lists)}")
+        for name, keys in lists.items():
+            with self.subTest(field_list=name):
+                self.assertTrue(keys, f"{name} is empty")
+
+    def test_every_variable_written_is_a_variable_created(self):
+        source = self._source()
+        created = set(re.findall(r'self\._vars\[\s*"([^"]+)"\s*\]\s*=', source))
+        prefixes = set(re.findall(r'_add_row\([^,]+,\s*f"([a-z]+)\.\{key\}"', source))
+        for keys in self._field_lists(source).values():
+            for prefix in prefixes:
+                created |= {f"{prefix}.{key}" for key in keys}
+        # A literal key created inside _add_row without an f-string prefix.
+        created |= set(re.findall(r'_add_row\([^,]+,\s*"([^"]+)"', source))
+
+        written = set(re.findall(r'self\._vars\[\s*"([^"]+)"\s*\]\s*\.set\(', source))
+        self.assertGreater(len(written), 2, "the dashboard should write several variables")
+        missing = sorted(written - created)
+        self.assertEqual(missing, [],
+                         f"written but never created, a KeyError on the first snapshot: {missing}")
