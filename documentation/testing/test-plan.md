@@ -96,13 +96,13 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 62 suites across the whole flight core | ✅ **3586 / 3586 assertions** |
+| `flight_tests` | 63 suites across the whole flight core | ✅ **3606 / 3606 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **101 / 101 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **581 / 581 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 8 modules | ✅ **127 / 127 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **200 / 200 claims** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **202 / 202 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **55 / 55 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
@@ -155,10 +155,11 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 62 suites, 3586 assertions
+### `flight_tests` — 63 suites, 3606 assertions
 
 | Suite | What it proves |
 |---|---|
+| `test_mandatory_validity_covers_every_flag` | Dropping any one of the nine mandatory validity flags makes the record invalid and stops it becoming a packet, so a reading the vehicle never took cannot travel as though it had |
 | `test_telemetry_format_exact` | The emitted packet matches the rulebook format byte for byte, including field order, separators and decimal places |
 | `test_packet_numbering_and_padding` | Numbering starts at `P-001`, increments sequentially, and zero-pads to three digits |
 | `test_parser_rejects_precision_and_order` | Wrong decimal precision, wrong field order and malformed fields are all rejected |

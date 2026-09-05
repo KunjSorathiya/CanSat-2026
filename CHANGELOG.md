@@ -10,6 +10,23 @@ development cycle.
 
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
+### Added — the predicate that gates every transmission is now held to its own struct
+
+`TelemetryValidity::mandatory_valid()` is what stands between a record and the antenna:
+`format_packet()` refuses any record it rejects. It is a nine-term AND over a struct of
+nine flags, and nothing exercised it or held the two lists together. A tenth flag added to
+the header and forgotten in the function would have let a reading the vehicle never took
+travel as though it had — silently, and only for the field that was added.
+
+- **Behavioural half**, in `flight_tests`: a default-constructed validity is invalid,
+  all nine set is valid, and dropping any one of the nine both fails the predicate and
+  stops the record becoming a packet.
+- **Structural half**, in `check_doc_claims.py`: the struct's flag count, the number of
+  terms in the AND, and the flags the test names must all agree.
+
+Adding a flag to the header without adding it to the function now fails the checker;
+removing a term from the function fails the test.
+
 ### Fixed — the console named a mission state the vehicle never claimed
 
 `MODE` is a diagnostic tag, not part of the mandatory telemetry block, so a well-formed

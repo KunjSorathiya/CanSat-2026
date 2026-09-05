@@ -65,6 +65,43 @@ cansat::TelemetryRecord make_valid_record() {
 }
 
 // ----------------------------------------------------------------------------
+// mandatory_valid() is the predicate that decides whether a record may be transmitted at
+// all: format_packet() refuses a record it rejects. It is a nine-term AND over a struct of
+// nine flags, and until now nothing exercised it. Drop any one flag and the record must be
+// rejected -- a reading the vehicle never took must not travel as though it had.
+//
+// The matching structural check, that the struct and the AND name the same number of
+// flags, lives in tools/check_doc_claims.py: it is the half that catches a tenth flag
+// added to the header and forgotten in the function.
+void test_mandatory_validity_covers_every_flag() {
+    using cansat::TelemetryValidity;
+    bool TelemetryValidity::*const flags[] = {
+        &TelemetryValidity::altitude,       &TelemetryValidity::pressure,
+        &TelemetryValidity::temperature,    &TelemetryValidity::roll,
+        &TelemetryValidity::pitch,          &TelemetryValidity::yaw,
+        &TelemetryValidity::acceleration_x, &TelemetryValidity::acceleration_y,
+        &TelemetryValidity::acceleration_z,
+    };
+    const std::size_t flag_count = sizeof(flags) / sizeof(flags[0]);
+
+    TelemetryValidity all;
+    CHECK(!all.mandatory_valid());  // default-constructed: nothing measured yet
+    for (std::size_t i = 0; i < flag_count; ++i) all.*flags[i] = true;
+    CHECK(all.mandatory_valid());
+
+    for (std::size_t i = 0; i < flag_count; ++i) {
+        TelemetryValidity one_missing = all;
+        one_missing.*flags[i] = false;
+        CHECK(!one_missing.mandatory_valid());
+
+        // ...and a record carrying that gap must not become a packet.
+        auto record = make_valid_record();
+        record.validity = one_missing;
+        CHECK(!cansat::format_packet(record).has_value());
+    }
+}
+
+// ----------------------------------------------------------------------------
 void test_telemetry_format_exact() {
     const auto packet = cansat::format_packet(make_valid_record());
     CHECK(packet.has_value());
@@ -2508,6 +2545,7 @@ void test_measured_packet_sizes_match_the_link_budget() {
 
 int main(int argc, char** argv) {
     const std::string repo_root = argc > 1 ? argv[1] : ".";
+    test_mandatory_validity_covers_every_flag();
     test_telemetry_format_exact();
     test_packet_numbering_and_padding();
     test_parser_rejects_precision_and_order();

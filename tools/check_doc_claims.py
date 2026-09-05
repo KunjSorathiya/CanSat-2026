@@ -121,6 +121,24 @@ def main() -> int:
     markdown = [q for q in REPO_ROOT.rglob("*.md")
                 if not {".git", "build", ".claude"} & set(q.parts)]
 
+    # TelemetryValidity's flags and the AND that consumes them. format_packet() refuses a
+    # record whose mandatory_valid() is false, so a tenth flag added to the struct and
+    # forgotten in the function would let a reading the vehicle never took travel as though
+    # it had -- silently, and only for the field that was added.
+    validity_hpp = read("firmware/common/include/cansat/telemetry.hpp")
+    validity_cpp = read("firmware/common/src/telemetry.cpp")
+    struct_body = validity_hpp.split("struct TelemetryValidity", 1)[-1].split("};", 1)[0]
+    flag_names = re.findall(r"^\s+bool (\w+) = false;", struct_body, re.MULTILINE)
+    fn_body = validity_cpp.split("bool TelemetryValidity::mandatory_valid()", 1)[-1].split("}", 1)[0]
+    checker.check(
+        f"mandatory_valid() ands all {len(flag_names)} TelemetryValidity flags",
+        len(flag_names) >= 9 and all(re.search(r"\b" + n + r"\b", fn_body) for n in flag_names)
+        and fn_body.count("&&") == len(flag_names) - 1,
+        f"{len(flag_names)} flags, {fn_body.count('&&') + 1} terms")
+    checker.check(
+        "every mandatory validity flag is exercised by a test",
+        all(f"TelemetryValidity::{n}" in read("firmware/flight-computer/tests/flight_tests.cpp") for n in flag_names))
+
     # ---- the radio link profile, quoted throughout the design documents -------------
     profile = read("firmware/common/include/cansat/link_profile.hpp")
     spreading_factor = constant(profile, "kSpreadingFactor")

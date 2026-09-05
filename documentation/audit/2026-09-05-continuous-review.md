@@ -107,16 +107,17 @@ top of `check_doc_claims.py` where the next person will meet it.
 
 ---
 
-## Third wave — F-76 and F-77
+## Third wave — F-76 to F-78
 
 The pass resumed after being stopped, with the working copy green and every earlier gate
-passing. Both findings below came from the same comparison as the second wave: hold two
+passing. The findings below came from the same comparison as the second wave: hold two
 representations of one fact side by side and see which one is lying.
 
 | # | Finding | Severity | Status |
 |---|---|---|---|
 | **F-76** | `MODE` is an optional diagnostic tag, and `parsePacket` correctly keeps its absence as `null` — then the console's state chip wrote `latest.mode \|\| "READY"`. A packet arriving without a `MODE` tag displayed **READY**, and the phase ladder lit the READY step to agree with it. A vehicle in `FLIGHT` or `FAULT` whose tag was dropped would show a calm nominal word | **High** | ✅ Fixed |
 | **F-77** | The audit trail in this document recorded `159 / 159` documented claims. The answer had been 199 for hours. A document about keeping documents honest had gone stale about itself, because nothing checked the row that quotes this script's own output | Low | ✅ Fixed |
+| **F-78** | `TelemetryValidity::mandatory_valid()` decides whether a record may be transmitted at all — `format_packet()` refuses one it rejects — and no test named it. It is a nine-term AND over a struct of nine flags, with nothing holding the two together: a tenth flag added to the header and forgotten in the function would let a reading the vehicle never took travel as though it had | Medium | ✅ Fixed |
 
 ### F-76 in detail
 
@@ -199,7 +200,7 @@ said, which was the subject of F-43.
 
 | | At `e87d480` | Now |
 |---|---:|---:|
-| Documented claims checked | 66 | **200** |
+| Documented claims checked | 66 | **202** |
 | C++ assertions | 4222 | **4268** |
 | Python tests | 131 | **160** |
 | Node tests | 37 | **51** |
@@ -322,7 +323,7 @@ Final state, re-run from a fresh `git clone` with no build directory:
 | Host build and tests | `bash tools/build_host.sh` | All pass, zero warnings |
 | Strict warning set | `CXXFLAGS="… -Werror" bash tools/build_host.sh` | Clean |
 | Firmware syntax | `bash tools/check_pico_syntax.sh` | 11 / 11 `OK` |
-| Documented claims | `python tools/check_doc_claims.py` | 200 / 200 |
+| Documented claims | `python tools/check_doc_claims.py` | 202 / 202 |
 | Documented commands | run as written, from the directory each document names | All pass |
 | Internal links | every relative Markdown link resolved | 0 broken |
 | Web console | driven in a browser, demo and injected packets | No console errors |
