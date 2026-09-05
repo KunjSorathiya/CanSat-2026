@@ -126,10 +126,17 @@ battery-powered test.
 > question held up the power design for so long.
 >
 > **The consequence simplifies this gate.** There is one 3.3 V rail, not two, and the boost
-> stage the earlier design reserved is not to be built. What is still needed is a load budget
-> the regulator can be chosen against — and the number nobody has is the **microSD
-> write-transient current**, which no photograph and no datasheet can supply. Measure it at
-> Gate 6 and bring it back here.
+> stage the earlier design reserved is not to be built.
+>
+> **The microSD half is now answered, on 2026-09-05.** Under a 10-second sustained write at
+> 100 % duty — 324 writes per second, far beyond anything the mission asks — the 3V3 rail held
+> **3.28–3.30 V**. That is a 0.6 % droop. **The Pico's own regulator carries the card without
+> strain, and the peripherals do not need a rail of their own on the card's account.**
+>
+> **What is still open is the combined case.** The radio draws ~120 mA transmitting and the
+> GPS ~67 mA, both from this same rail, and nothing has yet run them together. Gate 7 is where
+> that is settled. Until then this gate stays amber rather than green: the SD question is
+> closed, the total is not.
 
 | # | Quantity | Predicted | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|
@@ -348,6 +355,27 @@ computed airtime that has never been observed.
 
 ## Gate 6 · Storage
 
+> **Gate 2's SD question is answered, and the answer is decisive.** The rail was watched on
+> DC volts through the 10-second sustained burst — **100 % duty, 324 writes per second** — and
+> held **3.28–3.30 V**. A 20 mV droop on a 3.3 V rail is 0.6 %, against a card specified to
+> 2.7 V and an RP2040 that browns out far below that. **The Pico's own regulator carries the
+> microSD with no strain, and no separate buck-boost rail is needed for it.**
+>
+> No current figure was taken — the series connection would not hold with hand-held probes —
+> so the load budget still cannot be totalled arithmetically. It does not need to be for this
+> decision. **What is still open is the combined case**: the radio's ~120 mA transmit burst
+> and the GPS's ~67 mA share this rail, and only Gate 7 exercises them together.
+>
+> **The card is 500× faster than the mission needs.** 324 writes/s sustained, against two
+> writes per telemetry record — the record and the header rewrite — so 2 writes/s at 1 Hz, or
+> 4 at 2 Hz. Storage throughput will never be the constraint on this vehicle.
+>
+> **One number to carry into Gate 7: the worst single write took 4.814 ms.** The flight loop
+> is single-threaded and its sensor tick is 33 ms, so a write landing inside a tick consumes
+> 15 % of it. Row 3.8 measured 0.453 ms of jitter with no card attached; expect occasional
+> excursions once the log is live, on roughly one tick in thirty. That is a prediction to
+> check, not a fault.
+
 > **The log file was located successfully on 2026-09-05**, which is the first exercise of the
 > FAT32 lookup on real hardware: `FLIGHT.CSV` at **LBA 33152, 131072 blocks available**. That
 > is exactly the 64 MiB the prep script allocated, so the contiguity check passed across every
@@ -408,11 +436,11 @@ computed airtime that has never been observed.
 |---|---|---|---|---|---|
 | 6.1 | Card initialises | CMD0/CMD8/ACMD41 succeed | `sd_ok` in the health snapshot, or `cansat_bringup_firmware` | **Complete.** 32 ms in ACMD41, 1 CMD0 attempt, on an HP mx310 64 GB. Reached only after [the CMD0 fix](#gate-6--storage) - the first attempt on this card returned `0x1F` | ✅ 2026-09-05 / KS |
 | 6.2 | Card type detected | SDHC (block-addressed) for any modern card | `high_capacity()` | **Block-addressed.** The delivered card is an HP mx310 64 GB, so SDXC rather than SDHC - the same addressing mode, which is what this row actually tests | ✅ 2026-09-05 / KS |
-| 6.3 | Single block write time | — | Time 100 `write_block` calls | | |
-| 6.3b | **Sustained write current** | — (this is the Gate 2 input) | Meter in series with the module `3V3`, current range; note idle, run the 10 s burst, subtract | | |
+| 6.3 | Single block write time | — | Time 100 `write_block` calls | **2.677 ms mean, 4.814 ms worst**, 100/100 written. **Read-back of the last block matched**, so the writes landed rather than merely being acknowledged | ✅ 2026-09-05 / KS |
+| 6.3b | **Sustained write load** | — (this is the Gate 2 input) | Meter in series for a current; **or DC volts across the rail for the go/no-go** | **3246 writes in 10.0 s — 324 writes/s, 162 KiB/s, at 100.0 % duty.** Current not taken; the series connection would not hold. **Instead the 3V3 rail was watched under that load and held 3.28–3.30 V** | ✅ 2026-09-05 / KS — decisive for the design question, though not a current figure |
 | 6.4 | Records written per telemetry packet | 2 (record + header) | Count blocks after N packets | | |
 | 6.5 | Log survives a power cut | Resumes at the right block, no data lost | Pull power mid-flight-test, reboot, read back | | |
-| 6.6 | Boot count increments | +1 per power session | `boot_count()` | | |
+| 6.6 | Boot count increments | +1 per power session | `boot_count()` | **boot_count = 1, records = 1, truncated = 0.** The one record is the CSV column header a fresh log writes, so that path works. **Still to do: power-cycle and confirm it reads 2** | ⚠️ 2026-09-05 / KS — first half only |
 | 6.6a | Records cut to fit a block | **0** — the widest possible row is 402 bytes against a 511-byte limit, 109 to spare | `truncated_records()`, reported by `cansat_bringup_firmware` at 6.6 | | |
 | 6.7 | Records recovered after impact | All up to the last write | Read the card after a drop test | | |
 
