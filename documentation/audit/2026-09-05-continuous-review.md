@@ -8,9 +8,10 @@ wrong, fix it, prove the fix, prevent the class of defect from returning, commit
 command the documentation tells a reader to run
 **Baseline:** `e87d480`, the last commit of cycle 33 before this pass
 
-**Verdict:** ✅ **Pass. Twenty-seven findings, all fixed and all covered. Three are defects
-in flight or ground software that would have produced wrong data; the rest are documents
-that had stopped describing the software, or guarantees nothing was holding.**
+**Verdict:** ✅ **Pass. Twenty-nine findings, all fixed and all covered. Four would have cost
+a mission or a diagnosis: three produce wrong data, and one leaves a vehicle refusing to fly
+without saying why. The rest are documents that had stopped describing the software, or
+guarantees nothing was holding.**
 
 ---
 
@@ -31,7 +32,7 @@ the code still did what it said.
 ## Findings
 
 Numbering continues the software audit: the previous pass ended at F-42. F-43 to F-59 were
-found by reading; [F-60 to F-69](#second-wave--f-60-to-f-69) by comparing one
+found by reading; [F-60 to F-71](#second-wave--f-60-to-f-71) by comparing one
 machine-readable thing against another.
 
 | # | Finding | Severity | Status |
@@ -56,7 +57,7 @@ machine-readable thing against another.
 
 ---
 
-## Second wave — F-60 to F-69
+## Second wave — F-60 to F-71
 
 The findings above were reached by reading. Once the obvious classes were closed, the way to
 find more was to stop reading and start **comparing one machine-readable thing against
@@ -76,6 +77,8 @@ comparison a script can repeat.
 | **F-67** | Post-flight step 5 says to compare the onboard SD log against the ground station's CSV. Of their 18 and 23 columns, `packet_number` is the only name they share, and nothing said how to line them up | Medium | ✅ Fixed |
 | **F-68** | The quick start's `pip install -r requirements.txt` installs nothing — the file is entirely comments — and the document never named `pyserial`, which its own step 19 requires | Medium | ✅ Fixed |
 | **F-69** | The quick start carries a second copy of the GPIO table, the one somebody wires from with the board in front of them, and nothing held it to the firmware | Low | ✅ Fixed |
+| **F-70** | Two of the nineteen fault codes the firmware can raise appeared in no document. One of them, `mag_unavailable`, is **standing on this vehicle right now** | Low | ✅ Fixed |
+| **F-71** | `validate_config()` names which of its thirty rules refused a configuration. The controller replaced that with `"configuration invalid"`, then latched a critical fault — leaving an operator a vehicle that will not fly and thirty candidates for why | **High** | ✅ Fixed |
 
 ### What the second wave says about the first
 
@@ -125,6 +128,12 @@ nothing said**.
 | `Sx1278::poll_receive()` | a payload longer than the caller's buffer | counted (F-59) |
 | the bridge status line | 121 characters into a 128-byte buffer | 160-byte buffer, arithmetic written down |
 
+A fifth is the same idea one step further on, and the worst of them: a diagnosis that was
+not merely uncollected but **computed, handed over, and discarded**. `validate_config()`
+told the controller exactly which rule had refused the configuration, and the controller
+wrote `"configuration invalid"` instead (F-71). The vehicle then sat in `FAULT`, unable to
+produce a compliant packet, with nothing to say about it.
+
 And two more are its mirror image — **a display with nowhere to get its value from**: the
 console's sync word (F-44) and the dashboard's battery row (F-54).
 
@@ -141,8 +150,8 @@ said, which was the subject of F-43.
 
 | | At `e87d480` | Now |
 |---|---:|---:|
-| Documented claims checked | 66 | **188** |
-| C++ assertions | 4222 | **4260** |
+| Documented claims checked | 66 | **189** |
+| C++ assertions | 4222 | **4268** |
 | Python tests | 131 | **158** |
 | Node tests | 37 | **49** |
 | Shared cross-implementation fixtures | 1 | **4** |
