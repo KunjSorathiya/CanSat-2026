@@ -10,6 +10,21 @@ development cycle.
 
 ## [Unreleased] — 2026-09-06 (cycle 34)
 
+### Fixed — `GND` is on one side of the RA-02's supply pin, not both
+
+Five documents said the RA-02's `3.3V` pin sits **"with `GND` either side of it"**. The transcribed silkscreen, printed directly above that sentence in two of them, says:
+
+```text
+J2   GND   GND   3.3V   RST   DIO0   DIO1   DIO2   DIO3
+```
+
+`GND` immediately before it, **`RST` immediately after**. And the warning attached to the claim gives the game away: it says a one-pin offset "puts 3.3 V onto `RST`" — which is only possible because `RST` is the neighbour.
+
+It matters because of what the sentence is for. It is the pin-counting warning on the one module where a single-position slip drives the supply into a reset line, and a warning that miscounts its own pins is worse than none. Corrected in `wiring.md`, `hardware.md`, `receiving-inspection.md`, `bring-up-record.md` and the assembly procedure, and each now names both neighbours and both failure directions rather than one.
+
+**The decoupling pair is unaffected and is now easier to place than the wrong version implied:** the 10 µF and the `104` go between `3.3V` (J2 position 3) and the `GND` at J2 position 2, which is the adjacent hole. A capacitor fitted one position the other way lands between `3.3V` and `RST`, which is not decoupling at all.
+
+
 ### Removed — the `GP26` capacitor is deferred, because the reasoning did not survive being asked twice
 
 Asked whether the 100 nF at the divider tap was really needed. On inspection: **no**, and it is now out of the build.

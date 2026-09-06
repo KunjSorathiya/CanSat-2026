@@ -329,8 +329,8 @@ computed airtime that has never been observed.
 >
 > Everything from 5.4 down needs both radios and the ground station.
 >
-> **Wiring for Gate 5**, from `BoardPins` — the RA-02's supply pin is third from the end with
-> `GND` either side, so mark pin 1 before connecting anything:
+> **Wiring for Gate 5**, from `BoardPins` — the RA-02's supply pin is third from the u.FL end,
+> with `GND` before it and `RST` after it, so mark pin 1 before connecting anything:
 >
 > ```text
 > Pico 3V3  pin 36  ──  3.3V        Pico GP17 pin 22  ──  NSS

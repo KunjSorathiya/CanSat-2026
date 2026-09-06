@@ -204,9 +204,11 @@ J2   GND   GND   3.3V   RST   DIO0   DIO1   DIO2   DIO3
 J1   GND   NSS   MOSI   MISO   SCK   DIO5   DIO4   GND
 ```
 
-> The supply pin is **third from the end, with `GND` either side of it**. A one-pin offset
-> when the module is pressed into the prototype board puts 3.3 V onto `RST`, or ground onto
-> the rail. Mark pin 1 on the board before wiring.
+> The supply pin is **third from the u.FL end, with `GND` immediately before it and `RST`
+> immediately after.** Earlier revisions of this repository said `GND` sat on *both* sides of
+> it; the transcription above says otherwise, and so does the warning that followed it. A
+> one-pin offset is a fault in either direction — one way puts 3.3 V onto `RST`, the other puts
+> the supply onto `GND`. Mark pin 1 on the board before wiring.
 
 **MPU-9250 breakout** (`GY-6500 / GY-9250`, `V356`) — 10 pins:
 

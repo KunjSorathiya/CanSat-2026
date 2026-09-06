@@ -592,8 +592,9 @@ Pico pin 27 (GP21) ──────── RA-02   DIO0
 Pico pin 29 (GP22) ──────── RA-02   DIO1      optional
 ```
 
-RA-02 header, read from the u.FL end — **the supply pin is third, with `GND` either side of
-it.** A one-pin offset puts 3.3 V onto `RST`:
+RA-02 header, read from the u.FL end — **the supply pin is third, with `GND` immediately
+before it and `RST` immediately after.** A one-pin offset puts 3.3 V onto `RST` one way, or
+the supply onto `GND` the other:
 
 ```text
 J2   GND   GND   3.3V   RST   DIO0   DIO1   DIO2   DIO3

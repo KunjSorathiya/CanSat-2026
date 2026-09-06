@@ -88,9 +88,10 @@ Photographs: [`1150780-ra02-front.jpg`](photos/1150780-ra02-front.jpg),
 | Onboard passives | `C1` and `C2` outside the shield; no regulator, no translator | Board inspection, 2026-09-04 |
 | RF requirements | Correct antenna, grounding, supply stability, and launch configuration - TBD | Module/RF documentation and competition requirements |
 
-The supply pin sits **third from one end, with `GND` on either side of it**. A one-pin offset
-when the module is pressed into the prototype board puts 3.3 V onto `RST`, or a ground pin
-onto the rail. Mark pin 1 before wiring.
+The supply pin sits **third from the u.FL end, with `GND` immediately before it and `RST`
+immediately after** — not `GND` on both sides. A one-pin offset when the module is pressed
+into the prototype board puts 3.3 V onto `RST` one way, or the supply onto a ground pin the
+other. Mark pin 1 before wiring.
 
 The launch sync words are competition requirements and are recorded in `requirements/requirements.md`; they are not electrical specifications.
 

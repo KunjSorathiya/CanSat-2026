@@ -237,9 +237,10 @@ J1 (opposite row, reading from the same end)
 ```
 
 > This is the canonical Ra-02 arrangement, and it is now confirmed against the delivered
-> board rather than assumed. Note that **the supply pin sits third from one end with `GND`
-> either side of it** — a one-pin offset when the module is pressed into the prototype board
-> puts 3.3 V onto `RST` or a `GND` pin onto the rail. Mark pin 1 on the board before wiring.
+> board rather than assumed. Note that **the supply pin sits third from the u.FL end, with
+> `GND` immediately before it and `RST` immediately after** — a one-pin offset when the module
+> is pressed into the prototype board puts 3.3 V onto `RST` one way, or a `GND` pin onto the
+> rail the other. Mark pin 1 on the board before wiring.
 >
 > **`PA:+18dBm` on the shield is not the 17 dBm the link budget assumes.** The shield states
 > the module's PA capability, not the configured output;
