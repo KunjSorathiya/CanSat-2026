@@ -38,6 +38,17 @@ finding, or a scoring recommendation that has been costed.
 | ~~**Silicone stranded wire**, 22 AWG, red and black~~ | — | Battery leads only. Stranded survives flexing where solid core work-hardens and snaps | **Held, confirmed 2026-09-06** |
 | ~~**Male header strip**~~ | — | The board end of the four jumpered modules — 30 pins across five footprints | **Held, confirmed 2026-09-06.** Count it against the footprints before cutting any of it |
 
+## 1a · One diode, and it is the only outstanding purchase
+
+| Item | Qty | Why | ~₹ |
+|---|---:|---|---:|
+| **Schottky diode, 1 A** — `1N5817`, `SS14` or `SS34` | 2 | Between the switch and Pico `VSYS`, so USB cannot back-power the LiPo. Buy the spare; it is a rupee. **Not a 1N4001** — silicon drops 0.7 V for nothing | 10 |
+
+Required by the Pico datasheet's own second-supply guidance (§4.5) and by
+[D-6](assembly-procedure.md#d-6-a-schottky-goes-between-the-switch-and-vsys). Until it is
+fitted the battery switch must be OFF whenever a USB cable is connected, which is most of the
+bring-up.
+
 ## 2 · Capacitors — from [F-10](../testing/bring-up-record.md#findings)
 
 A long supply jumper made **every** microSD write fail while every read passed, and the same

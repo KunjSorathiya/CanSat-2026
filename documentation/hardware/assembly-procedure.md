@@ -87,14 +87,15 @@ Run against the repository on 2026-09-06. ✅ settled, ⚠️ needs your eyes at
 | 32 | `team_id` is still the `CAN-Team-XX` placeholder | Blocks flight, not soldering |
 | 33 | Antenna centre contacts unphotographed — SMA or RP-SMA | Blocks *reordering* an antenna, not this build |
 | 34 | No reverse-polarity protection anywhere on the vehicle | The JST-RCY is keyed, so the risk is one badly wired pigtail. Step 15 meters it before the first mate |
+| 35a | **No Schottky between the switch and `VSYS`.** Until one is fitted, USB back-powers the battery whenever both are connected — [D-6](#d-6-a-schottky-goes-between-the-switch-and-vsys) | **Blocks nothing, but changes how you work.** Battery switch OFF whenever USB is in, for every gate from 1 to 14 |
 | 35 | **The RP2040 datasheet is not in this repository.** `datasheets/` holds the Pico datasheet and the BMP280 one; the ADC sample time and sample capacitance that would settle whether a 16.5 kΩ divider needs help are in the RP2040 document | Does not block. The `104` at `GP26` is fitted on judgement in the meantime, and [says so](#one-part-to-add-100-nf-from-the-divider-tap-to-agnd) |
 
 ---
 
 ## Decisions taken here
 
-Five places where the repository contradicted itself or stopped short. Each is settled
-below, with the reason, and the losing document should be corrected.
+Six places where the repository contradicted itself, stopped short, or — in the last case —
+where this page itself was wrong. Each is settled below, with the reason.
 
 ### [D-1] The microSD bulk capacitor is **2 × 100 µF in parallel**, not 470 µF
 
@@ -164,6 +165,32 @@ distribution node — **not** a share of the ring behind five other modules.
 
 The IMU, barometer, GPS, sound board and both LEDs draw single-digit milliamps between them and
 tap the nearest point on the ring.
+
+### [D-6] A Schottky goes between the switch and `VSYS`
+
+**Added 2026-09-06, correcting this page.** The Pico datasheet §4.5 gives exactly one simple
+way to put a second source on `VSYS` alongside USB: feed it through **another Schottky diode**,
+so the two supplies OR together and neither back-powers the other. This build had the battery
+wired straight to pin 39, which is the arrangement the diode exists to prevent.
+
+```text
+switch ── [ divider tap ] ── ▶|─ Schottky ──► Pico pin 39 (VSYS)
+                              1N5817 / SS14, ~0.3 V drop
+```
+
+| | |
+|---|---|
+| Part | Any 1 A Schottky — `1N5817`, `SS14`, `SS34`. **Not** a 1N4001: a silicon diode drops ~0.7 V and is slower to no benefit |
+| Cost | About 0.3 V of headroom. `VSYS` accepts 1.8–5.5 V, so a 3.0 V cell still arrives at 2.7 V — comfortably inside range |
+| Orientation | **Band (cathode) toward the Pico.** Backwards, nothing powers up at all, which is the good failure |
+| Where it does *not* go | **After** the divider tap. The divider must see the pack, not the pack minus a diode drop, or every battery reading is 0.3 V low |
+
+The datasheet also describes a P-channel MOSFET arrangement (§4.5, Figure 17, DMG2305UX) that
+avoids the voltage drop and actively disconnects the battery when `VBUS` is present. It is the
+better circuit. It is also a part nobody here has, and the diode is sufficient.
+
+**Until the diode is fitted, the rule is procedural and fragile:** the battery switch is OFF
+whenever a USB cable is in.
 
 ---
 
@@ -442,10 +469,20 @@ Three things this settles that were previously `TBD`:
 3. **The divider taps the switched node, not the battery directly**, so its 64 µA stops when the
    switch opens.
 
-> [!NOTE]
-> **USB and battery may both be connected.** The Pico's `D1` Schottky from `VBUS` to `VSYS`
-> means the 5 V USB rail simply wins and the pack idles. This is the documented arrangement and
-> it is how you will run gates 1–14.
+> [!CAUTION]
+> **USB and battery must not both be connected until a second Schottky is fitted.** An earlier
+> revision of this page said the opposite, and it was wrong. The Pico's `D1` stops `VSYS`
+> back-feeding `VBUS`; it does nothing to stop `VBUS` pushing current *into* a battery wired to
+> `VSYS`. With USB plugged in, `VSYS` sits at about 4.7 V and a 3.9 V cell hangs directly off it
+> — uncontrolled charging, no CC/CV, no termination, and this pack has
+> [no visible protection board](receiving-inspection.md#d4--battery).
+>
+> The Pico datasheet §4.5 is explicit: a second source is added *"via another Schottky diode
+> … with the diodes preventing either supply from back-powering the other"*. That diode is
+> [**D-6**](#d-6-a-schottky-goes-between-the-switch-and-vsys) and it is not yet fitted.
+>
+> **Until it is: switch the battery OFF before plugging USB in, every time.** Gates 1–14 all
+> run on USB, so this is not a rare case — it is most of the build.
 
 ---
 
@@ -485,6 +522,14 @@ will actually count on the board**, from pin 1 at the USB end of the left row.
 
 Everything not listed stays unconnected. That includes `VBUS` (40), `3V3_EN` (37), `RUN` (30),
 `ADC_VREF` (35) and `GP28` (34).
+
+> [!CAUTION]
+> **`VBUS`, pin 40, is the most dangerous unused pin on this board.** It is the raw 5 V from the
+> USB socket, it is live whenever a cable is in, and **nothing on this vehicle tolerates 5 V** —
+> there is no level shifter anywhere, so it reaches the RA-02, the barometer and the card
+> directly. It also sits immediately beside pin 39, `VSYS`. The datasheet says 40 and 39 may be
+> shorted *when USB is the only supply*; on this vehicle that bridge wires 5 V straight to the
+> LiPo with no diode. Check pin 40 for solder bridges at step 3 and never wire it.
 
 > [!NOTE]
 > **`GP7` and `GP22` are configured as inputs by the firmware and never read.**
@@ -822,13 +867,16 @@ wrong divider cannot silently produce a plausible number.
 
 ### 15 · Switch and battery — last
 
-Solder the switch into the battery positive lead using **silicone stranded** wire. Then:
+Solder the switch into the battery positive lead using **silicone stranded** wire, and the
+**Schottky between the switch and pin 39**, band toward the Pico, *after* the divider tap
+([D-6](#d-6-a-schottky-goes-between-the-switch-and-vsys)). Then:
 
 1. With the pack **not** connected, meter the pigtail at the board end. **Red must be positive.**
    Mark the polarity on the board with a pen.
 2. Confirm the 3V3 ring to GND ring is still open.
-3. Switch OFF. Mate the JST-RCY.
-4. Switch ON.
+3. **Unplug USB.** If the Schottky is not fitted yet, this is the whole of your protection.
+4. Switch OFF. Mate the JST-RCY.
+5. Switch ON.
 
 **Gate: bring-up gate 2.** Rail voltage under load. Then take the measurement this project has
 never taken: **pull the test-link jumper, put the meter in series across it, and read total
@@ -864,6 +912,9 @@ Then, before anything closes:
 - **Do not let 5 V onto this board.** There is no level shifter anywhere; it reaches the RA-02,
   the barometer and the card directly.
 - **Do not power the radio without its antenna.**
+- **Do not leave the battery switched on with USB plugged in** until the Schottky is fitted.
+- **Do not bridge pin 40 to pin 39.** `VBUS` to `VSYS` is a documented shortcut *when USB is the
+  only supply* — on this vehicle it wires 5 V USB straight to the LiPo with no diode at all.
 - **Do not add a load to the 3.3 V rail** without re-running the
   [power budget](../design/electrical-architecture.md#power-budget). There is 19 mA of margin in
   the realistic case and none in the worst.

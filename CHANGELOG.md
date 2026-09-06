@@ -10,6 +10,21 @@ development cycle.
 
 ## [Unreleased] — 2026-09-06 (cycle 34)
 
+### Fixed — USB back-powers the battery, and this page said it did not
+
+Asked whether `VBUS` is used anywhere. It is not, and answering that caught a genuine error in this repository's own guidance.
+
+The assembly procedure said USB and battery could both be connected because the Pico's `D1` Schottky *"means the 5 V USB rail simply wins and the pack idles."* **That is wrong.** `D1` prevents `VSYS` from back-feeding `VBUS`. It does nothing to stop `VBUS` pushing current *into* a battery wired to `VSYS`. With USB plugged in, `VSYS` sits near 4.7 V and a 3.9 V cell hangs directly off it: uncontrolled charging, no CC/CV, no termination, no current limit beyond what the port allows.
+
+**The Pico datasheet is in `datasheets/` and says so plainly.** §4.5: a second source is added *"via another Schottky diode … with the diodes preventing either supply from back-powering the other"*, and the caution on the same page is about unprotected lithium cells catching fire. [D.4](documentation/hardware/receiving-inspection.md#d4--battery) already records that this pack shows no protection board. The document that would have prevented this was in the repository the whole time.
+
+**D-6 adds the diode**: a 1 A Schottky between the switch and pin 39, band toward the Pico, fitted *after* the divider tap so the battery reading still sees the pack rather than the pack minus 0.3 V. `VSYS` takes 1.8–5.5 V, so a 3.0 V cell still arrives at 2.7 V. The datasheet's P-FET alternative is the better circuit and is noted, but the diode is sufficient and is a part that can be bought for a rupee.
+
+**Until it is fitted the rule is procedural and fragile:** battery switch OFF whenever a USB cable is in. Gates 1 to 14 all run on USB, so that is most of the build.
+
+And the answer to the original question, recorded where it belongs: **`VBUS`, pin 40, is unused and stays unwired.** It is live 5 V whenever a cable is in, nothing on this vehicle tolerates 5 V, and it sits immediately beside `VSYS`. The datasheet permits shorting 40 to 39 *when USB is the only supply*; on this vehicle that bridge wires 5 V straight to the LiPo with no diode at all. It is now on the do-not list and in the step 3 bridge check.
+
+
 ### Added — signal routing, and a capacitor that is not a decoupling capacitor
 
 A build instinct worth answering properly: hold the signal wires three rows apart to avoid interference. It is right about the risk and wrong about the remedy.
