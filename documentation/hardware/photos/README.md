@@ -22,8 +22,12 @@ Taken 2026-09-04, on delivery. Transcribed in
 | `11566-sd-reader-front.jpg` · `-back.jpg` | microSD reader | **No regulator, no level shifter**, supply pin `3V3`, four 10 kΩ pull-ups, header `GND MISO CLK MOSI CS 3V3` |
 | `1125094-lipo-front.jpg` · `-back.jpg` | 1S LiPo | **Pro-Range, not Orange.** `1 Cell 3.7V 25C`, 1500 mAh, JST-RCY and JST-XH leads, no charge parameters printed |
 | `1031002-protoboard-front.jpg` · `-back.jpg` | Prototype PCB | `10*10CM 2.54MM`, single-sided, isolated pads, edge rails, `A`–`K`/`01`–`35` grid |
+| `lm393-sound-front.jpg` **(to be filed)** | LM393 sound module | **Four-pin header `AO DO GND VCC`** — the fact that decides whether the analogue channel exists at all. LM393 SOIC, gain trimpot, electret capsule, two indicator LEDs. Transcribed in [receiving-inspection.md](../receiving-inspection.md) D.5 |
+| `passives-2026-09-06.jpg` **(to be filed)** | Second-batch passives | Delivery evidence for the capacitors and the three resistor groups. **Establishes quantities, not values** — the colour bands are below its resolution and must be metered |
 
 Outstanding re-shoots, all macro:
+
+- The **resistor colour bands**, close enough to read, or the values written down from a meter. The delivery shot shows three taped groups and settles how many arrived, not what they are.
 
 - Both RF **mating faces**, straight on — the only way to settle SMA against RP-SMA.
 - ~~The **BMP280 die**, to settle BMP280 against BME280.~~ Settled by register instead on 2026-09-05: chip ID `0xD0` returned `0x58` ([F-4](../receiving-inspection.md#findings)). A photograph is no longer needed for this.

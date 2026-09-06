@@ -18,9 +18,11 @@ finding, or a scoring recommendation that has been costed.
 | microSD card | HP mx310 64 GB, confirmed block-addressed at bring-up row 6.2 |
 | JST-RCY female pigtail | To mate the battery's discharge lead |
 | Header strips | Soldered to both Picos and every module on 2026-09-04 |
-| Power switch, LEDs, and their resistors | Held as of 2026-09-05. The 100 kΩ divider pair and the ¼ W spares below are still needed if not among them |
+| Power switch, LEDs, and their resistors | Held. An I/O switch and LEDs in two colours, confirmed 2026-09-06 |
+| Capacitors — 10 µF, 100 µF, 0.1 µF `104` | **Received 2026-09-06.** Radial electrolytics at 25 V and 50 V, and ceramic discs |
+| Resistors, three values | **Received 2026-09-06**, about 24 in three taped groups. **Values unconfirmed** — meter them before fitting, especially the divider pair |
 | Hall effect sensor | Held, and **not being used** (decided 2026-09-06). Its supply voltage was never confirmed, and with sensor integration already at its 25-point cap it would have scored nothing. Kept as a spare part, not a planned one |
-| Analogue sound sensor module | Held, and confirmed 3.3 V. **Integrated on 2026-09-05** — `GP27` / ADC1, logged to the SD card, not transmitted |
+| LM393 sound detection sensor | Held, confirmed 3.3 V, and confirmed the **four-pin `AO DO GND VCC` variant** on 2026-09-06. Integrated on `GP27` (level) and `GP15` (threshold duty), logged to the SD card, not transmitted |
 
 ---
 

@@ -76,6 +76,10 @@ and do not connect the battery to anything.
 | A.8 | Micro SD card reader module | 11566 | 1 | **1** | No visible damage | **3.3 V board, not the 4.5–5.5 V one the listing described.** Header loose, 6-pin. See [D.1](#d1--the-microsd-reader-sku-11566) |
 | A.9 | 1S 3.7 V 1500 mAh 25C LiPo | 1125094 | 1 | **1** | Pack flat, no puffing visible | **Delivered as Pro-Range, not Orange.** Do not charge yet. See [D.4](#d4--battery) |
 | A.10 | Universal prototype PCB, 10 x 10 cm | 1031002 | 2 | **2** | No visible damage | Single-sided, isolated pads, edge rails |
+| A.11 | LM393 sound detection sensor | TBD | 1 | **1** | No visible damage | **Second batch, received 2026-09-06.** Four-pin board: `AO DO GND VCC`. See [D.5](#d5--the-lm393-sound-module) |
+| A.12 | Electrolytic capacitors, 10 µF and 100 µF | TBD | — | **3 + spares** | No visible damage | Second batch. Radial, 25 V and 50 V parts |
+| A.13 | Ceramic capacitors, 0.1 µF `104` | TBD | — | **present** | No visible damage | Second batch. Orange discs |
+| A.14 | Resistors, three values | TBD | — | **~24, taped in three groups** | No visible damage | Second batch. **Values not yet confirmed** — the colour bands are below the delivery photograph's resolution. Measure each group before fitting |
 
 > **Counted by hand on 2026-09-05 / KS. Every line matches the quantity ordered.** The
 > photographs show one unit of each item, and a photograph of one board is never evidence that
@@ -89,6 +93,7 @@ Not on the BOM, but Part C cannot be completed without them. Record what you act
 | Multimeter with continuity | **Yes, the second one** | The original meter's resistance range is faulty — see the note below; its Ω readings are discarded. **A replacement was obtained 2026-09-05.** Short its probes and confirm ≤0.5 Ω, steady, before it is used for anything |
 | Magnifier or phone macro lens | | Required to read regulator and level-shifter markings |
 | Soldering iron and solder | **Yes** | Headers arrive loose on most of these boards. All headers fitted 2026-09-04 |
+| Power switch and LEDs | **Yes, obtained 2026-09-06** | An I/O switch and LEDs in two colours. Both are rulebook items: the switch is mandatory, and the power LED must light **immediately on power-on**, so it is wired across the 3.3 V rail through a resistor and never from a GPIO |
 | microSD card | **Yes, 32 GB, obtained 2026-09-05** | Not on the BOM, and none was in the reader's bag in `11566-sd-reader-front.jpg`. **32 GB is the top of the SDHC range**, so it should enumerate block-addressed as Gate 6.2 predicts — confirm with `high_capacity()` rather than from the capacity printed on the card |
 | USB micro-B cable, data-capable | | For the Pico. A charge-only cable is a classic wasted afternoon |
 | 1S LiPo charger | **Yes — USB-powered 1S charger, obtained 2026-09-05** | Not on the BOM. **Never charge a LiPo without one.** Being 1S there is no cell balancing to do, so a single-cell CC/CV charger is the right part. **Record its charge current and its output connector** — the pack's leads are JST-RCY and JST-XH, and the charger must mate with one of them or via the new pigtail. Check it terminates at 4.20 V |
@@ -697,6 +702,48 @@ item verified, in this order:
 
 Do not batch this to the end of the week. The gap between observing and recording is where
 "I'm sure it was 3.3 V" comes from.
+
+---
+
+### D.5 · The LM393 sound module
+
+Received 2026-09-06 and photographed. **The photograph is still to be filed** in
+`documentation/hardware/photos/` under the name `lm393-sound-front.jpg`, cropped to
+the module. The facts below were read from it, and this section is the transcription
+Part C asks for. Link the file here once it is in place.
+
+**Established from the photograph:**
+
+| Fact | Evidence |
+|---|---|
+| **Four-pin board: `AO DO GND VCC`** | Header silkscreen, legible |
+| Analogue output present | The `AO` label above |
+| Comparator output present | The `DO` label above |
+| LM393 comparator fitted | 8-pin SOIC on the board |
+| Gain trimpot fitted | Blue multi-turn part beside the IC |
+| Electret capsule fitted | Cylindrical can on its own stalk |
+| Two indicator LEDs | Small SMD parts at the board edge, one power and one threshold |
+
+**Why this mattered.** The firmware supports both board variants because they are sold under
+one name and only the pin count separates them — see
+[wiring.md](../design/wiring.md#gp27-and-gp15--the-lm393-sound-module). A three-pin board has
+no `AO` at all, and reading an unconnected ADC pin does not return zero: it returns a
+floating level that looks exactly like a quiet room. **This board is the four-pin variant, so
+both channels are real and `sound_analog_connected` and `sound_gate_connected` are both
+correct at their defaults.** That closes bring-up row 3.13a.
+
+**Not established, and not to be guessed:**
+
+- The board's own part-number silkscreen is below the photograph's resolution.
+- Whether `AO` is buffered or is the raw capsule bias. It affects the level's scale, not
+  whether it works, and the trimpot makes it unrecordable anyway — see the millivolts-not-
+  decibels note in [sound_level.hpp](../../firmware/flight-computer/include/flight/sound_level.hpp).
+- **The resistor values.** Three taped groups arrived together and the colour bands are
+  below this photograph's resolution. One group has blue bodies, which usually means metal
+  film and 1 % tolerance and is consistent with the 100 kΩ divider pair — *usually* is not
+  a measurement. **Measure each group with the meter before fitting anything.** The divider
+  on `GP26` is the one place a wrong value produces a plausible number rather than an
+  obvious failure.
 
 ---
 
