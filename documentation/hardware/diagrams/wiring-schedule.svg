@@ -1,0 +1,498 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1268" width="1500" height="1268" font-family="ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<rect width="1500" height="1268" fill="#ffffff"/>
+<text x="40" y="46" font-size="26" font-weight="700" fill="#0f172a">CanSat 2026 — complete wiring schedule</text>
+<text x="40" y="72" font-size="13.5" fill="#64748b">Every Pico pin and every module pin. Pico physical numbering, USB to the left, component side up. Module pin order is silkscreen, as printed.</text>
+<rect x="40" y="88" width="22" height="11" rx="2.5" fill="#c02626"/>
+<text x="68" y="98" font-size="11.5" fill="#334155">battery</text>
+<rect x="149" y="88" width="22" height="11" rx="2.5" fill="#c2650a"/>
+<text x="177" y="98" font-size="11.5" fill="#334155">3.3 V</text>
+<rect x="244" y="88" width="22" height="11" rx="2.5" fill="#334155"/>
+<text x="272" y="98" font-size="11.5" fill="#334155">ground</text>
+<rect x="346" y="88" width="22" height="11" rx="2.5" fill="#1d4ed8"/>
+<text x="374" y="98" font-size="11.5" fill="#334155">SPI0</text>
+<rect x="434" y="88" width="22" height="11" rx="2.5" fill="#15803d"/>
+<text x="462" y="98" font-size="11.5" fill="#334155">I2C0</text>
+<rect x="522" y="88" width="22" height="11" rx="2.5" fill="#7c3aed"/>
+<text x="550" y="98" font-size="11.5" fill="#334155">UART0</text>
+<rect x="617" y="88" width="22" height="11" rx="2.5" fill="#0891b2"/>
+<text x="645" y="98" font-size="11.5" fill="#334155">radio ctrl</text>
+<rect x="747" y="88" width="22" height="11" rx="2.5" fill="#be185d"/>
+<text x="775" y="98" font-size="11.5" fill="#334155">analogue</text>
+<rect x="863" y="88" width="22" height="11" rx="2.5" fill="#94a3b8"/>
+<text x="891" y="98" font-size="11.5" fill="#334155">unused</text>
+<line x1="40" y1="112" x2="1460" y2="112" stroke="#e2e8f0" stroke-width="2"/>
+<text x="40.0" y="140.0" font-size="14.5" font-weight="700" fill="#0f172a">Pico — TOP row</text>
+<text x="174.4" y="140.0" font-size="10.8" fill="#64748b">left → right, USB end first</text>
+<line x1="40.0" y1="152.0" x2="740.0" y2="152.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="40.0" y="157.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="157.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="171.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">40</text>
+<text x="84.0" y="171.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">VBUS</text>
+<text x="192.0" y="171.5" font-size="11.5" fill="#94a3b8">NEVER WIRE — live 5 V</text>
+<rect x="40.0" y="178.0" width="3.5" height="21.0" fill="#c02626"/>
+<text x="74.0" y="192.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">39</text>
+<text x="84.0" y="192.5" font-size="11.5" font-weight="600" fill="#c02626" font-family="ui-monospace, Consolas, monospace">VSYS</text>
+<text x="192.0" y="192.5" font-size="11.5" fill="#1e293b">Schottky cathode  (anode ← switch ← batt +)</text>
+<rect x="40.0" y="199.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="199.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="74.0" y="213.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">38</text>
+<text x="84.0" y="213.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="192.0" y="213.5" font-size="11.5" fill="#1e293b">GND node → GND ring</text>
+<rect x="40.0" y="220.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="234.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">37</text>
+<text x="84.0" y="234.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">3V3_EN</text>
+<text x="192.0" y="234.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="40.0" y="241.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="241.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="74.0" y="255.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">36</text>
+<text x="84.0" y="255.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">3V3 OUT</text>
+<text x="192.0" y="255.5" font-size="11.5" fill="#1e293b">test link → 3.3 V distribution node</text>
+<rect x="40.0" y="262.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="276.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">35</text>
+<text x="84.0" y="276.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">ADC_VREF</text>
+<text x="192.0" y="276.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="40.0" y="283.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="283.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="297.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">34</text>
+<text x="84.0" y="297.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP28</text>
+<text x="192.0" y="297.5" font-size="11.5" fill="#94a3b8">not connected  (zero-ref deferred, D-7)</text>
+<rect x="40.0" y="304.0" width="3.5" height="21.0" fill="#be185d"/>
+<text x="74.0" y="318.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">33</text>
+<text x="84.0" y="318.5" font-size="11.5" font-weight="600" fill="#be185d" font-family="ui-monospace, Consolas, monospace">AGND</text>
+<text x="192.0" y="318.5" font-size="11.5" fill="#1e293b">GND node, ONE tie beside pin 38</text>
+<rect x="40.0" y="325.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="325.0" width="3.5" height="21.0" fill="#be185d"/>
+<text x="74.0" y="339.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">32</text>
+<text x="84.0" y="339.5" font-size="11.5" font-weight="600" fill="#be185d" font-family="ui-monospace, Consolas, monospace">GP27</text>
+<text x="192.0" y="339.5" font-size="11.5" fill="#1e293b">LM393  AO</text>
+<rect x="40.0" y="346.0" width="3.5" height="21.0" fill="#be185d"/>
+<text x="74.0" y="360.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">31</text>
+<text x="84.0" y="360.5" font-size="11.5" font-weight="600" fill="#be185d" font-family="ui-monospace, Consolas, monospace">GP26</text>
+<text x="192.0" y="360.5" font-size="11.5" fill="#1e293b">battery divider midpoint</text>
+<rect x="40.0" y="367.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="367.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="381.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">30</text>
+<text x="84.0" y="381.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">RUN</text>
+<text x="192.0" y="381.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="40.0" y="388.0" width="3.5" height="21.0" fill="#0891b2"/>
+<text x="74.0" y="402.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">29</text>
+<text x="84.0" y="402.5" font-size="11.5" font-weight="600" fill="#0891b2" font-family="ui-monospace, Consolas, monospace">GP22</text>
+<text x="192.0" y="402.5" font-size="11.5" fill="#1e293b">RA-02  DIO1   (optional, never read)</text>
+<rect x="40.0" y="409.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="409.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="74.0" y="423.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">28</text>
+<text x="84.0" y="423.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="192.0" y="423.5" font-size="11.5" fill="#1e293b">spare ground — may join GND ring</text>
+<rect x="40.0" y="430.0" width="3.5" height="21.0" fill="#0891b2"/>
+<text x="74.0" y="444.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">27</text>
+<text x="84.0" y="444.5" font-size="11.5" font-weight="600" fill="#0891b2" font-family="ui-monospace, Consolas, monospace">GP21</text>
+<text x="192.0" y="444.5" font-size="11.5" fill="#1e293b">RA-02  DIO0</text>
+<rect x="40.0" y="451.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="451.0" width="3.5" height="21.0" fill="#0891b2"/>
+<text x="74.0" y="465.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">26</text>
+<text x="84.0" y="465.5" font-size="11.5" font-weight="600" fill="#0891b2" font-family="ui-monospace, Consolas, monospace">GP20</text>
+<text x="192.0" y="465.5" font-size="11.5" fill="#1e293b">RA-02  RST</text>
+<rect x="40.0" y="472.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="74.0" y="486.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">25</text>
+<text x="84.0" y="486.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">GP19</text>
+<text x="192.0" y="486.5" font-size="11.5" fill="#1e293b">RA-02 MOSI  +  microSD MOSI</text>
+<rect x="40.0" y="493.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="493.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="74.0" y="507.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">24</text>
+<text x="84.0" y="507.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">GP18</text>
+<text x="192.0" y="507.5" font-size="11.5" fill="#1e293b">RA-02 SCK   +  microSD CLK</text>
+<rect x="40.0" y="514.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="74.0" y="528.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">23</text>
+<text x="84.0" y="528.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="192.0" y="528.5" font-size="11.5" fill="#1e293b">spare ground</text>
+<rect x="40.0" y="535.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="535.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="74.0" y="549.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">22</text>
+<text x="84.0" y="549.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">GP17</text>
+<text x="192.0" y="549.5" font-size="11.5" fill="#1e293b">RA-02  NSS</text>
+<rect x="40.0" y="556.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="74.0" y="570.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">21</text>
+<text x="84.0" y="570.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">GP16</text>
+<text x="192.0" y="570.5" font-size="11.5" fill="#1e293b">RA-02 MISO  +  microSD MISO</text>
+<text x="760.0" y="140.0" font-size="14.5" font-weight="700" fill="#0f172a">Pico — BOTTOM row</text>
+<text x="920.2" y="140.0" font-size="10.8" fill="#64748b">left → right, USB end first</text>
+<line x1="760.0" y1="152.0" x2="1460.0" y2="152.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="760.0" y="157.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="157.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="794.0" y="171.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">1</text>
+<text x="804.0" y="171.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP0</text>
+<text x="912.0" y="171.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="760.0" y="178.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="794.0" y="192.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">2</text>
+<text x="804.0" y="192.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP1</text>
+<text x="912.0" y="192.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="760.0" y="199.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="199.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="794.0" y="213.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">3</text>
+<text x="804.0" y="213.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="912.0" y="213.5" font-size="11.5" fill="#1e293b">spare ground</text>
+<rect x="760.0" y="220.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="794.0" y="234.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">4</text>
+<text x="804.0" y="234.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP2</text>
+<text x="912.0" y="234.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="760.0" y="241.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="241.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="794.0" y="255.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">5</text>
+<text x="804.0" y="255.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP3</text>
+<text x="912.0" y="255.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="760.0" y="262.0" width="3.5" height="21.0" fill="#15803d"/>
+<text x="794.0" y="276.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">6</text>
+<text x="804.0" y="276.5" font-size="11.5" font-weight="600" fill="#15803d" font-family="ui-monospace, Consolas, monospace">GP4</text>
+<text x="912.0" y="276.5" font-size="11.5" fill="#1e293b">MPU-6500 SDA  +  BMP280 SDA</text>
+<rect x="760.0" y="283.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="283.0" width="3.5" height="21.0" fill="#15803d"/>
+<text x="794.0" y="297.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">7</text>
+<text x="804.0" y="297.5" font-size="11.5" font-weight="600" fill="#15803d" font-family="ui-monospace, Consolas, monospace">GP5</text>
+<text x="912.0" y="297.5" font-size="11.5" fill="#1e293b">MPU-6500 SCL  +  BMP280 SCL</text>
+<rect x="760.0" y="304.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="794.0" y="318.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">8</text>
+<text x="804.0" y="318.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="912.0" y="318.5" font-size="11.5" fill="#1e293b">spare ground</text>
+<rect x="760.0" y="325.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="325.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="794.0" y="339.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">9</text>
+<text x="804.0" y="339.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">GP6</text>
+<text x="912.0" y="339.5" font-size="11.5" fill="#1e293b">microSD  CS</text>
+<rect x="760.0" y="346.0" width="3.5" height="21.0" fill="#15803d"/>
+<text x="794.0" y="360.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">10</text>
+<text x="804.0" y="360.5" font-size="11.5" font-weight="600" fill="#15803d" font-family="ui-monospace, Consolas, monospace">GP7</text>
+<text x="912.0" y="360.5" font-size="11.5" fill="#1e293b">MPU-6500 INT  (optional, never read)</text>
+<rect x="760.0" y="367.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="367.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="794.0" y="381.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">11</text>
+<text x="804.0" y="381.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP8</text>
+<text x="912.0" y="381.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="760.0" y="388.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="794.0" y="402.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">12</text>
+<text x="804.0" y="402.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP9</text>
+<text x="912.0" y="402.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="760.0" y="409.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="409.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="794.0" y="423.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">13</text>
+<text x="804.0" y="423.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="912.0" y="423.5" font-size="11.5" fill="#1e293b">spare ground</text>
+<rect x="760.0" y="430.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="794.0" y="444.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">14</text>
+<text x="804.0" y="444.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP10</text>
+<text x="912.0" y="444.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="760.0" y="451.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="451.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="794.0" y="465.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">15</text>
+<text x="804.0" y="465.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP11</text>
+<text x="912.0" y="465.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="760.0" y="472.0" width="3.5" height="21.0" fill="#7c3aed"/>
+<text x="794.0" y="486.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">16</text>
+<text x="804.0" y="486.5" font-size="11.5" font-weight="600" fill="#7c3aed" font-family="ui-monospace, Consolas, monospace">GP12</text>
+<text x="912.0" y="486.5" font-size="11.5" fill="#1e293b">NEO-6M  RX      (Pico transmits)</text>
+<rect x="760.0" y="493.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="493.0" width="3.5" height="21.0" fill="#7c3aed"/>
+<text x="794.0" y="507.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">17</text>
+<text x="804.0" y="507.5" font-size="11.5" font-weight="600" fill="#7c3aed" font-family="ui-monospace, Consolas, monospace">GP13</text>
+<text x="912.0" y="507.5" font-size="11.5" fill="#1e293b">NEO-6M  TX      (Pico receives)</text>
+<rect x="760.0" y="514.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="794.0" y="528.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">18</text>
+<text x="804.0" y="528.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="912.0" y="528.5" font-size="11.5" fill="#1e293b">spare ground</text>
+<rect x="760.0" y="535.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="535.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="794.0" y="549.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">19</text>
+<text x="804.0" y="549.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">GP14</text>
+<text x="912.0" y="549.5" font-size="11.5" fill="#1e293b">1 kΩ → status LED anode</text>
+<rect x="760.0" y="556.0" width="3.5" height="21.0" fill="#be185d"/>
+<text x="794.0" y="570.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">20</text>
+<text x="804.0" y="570.5" font-size="11.5" font-weight="600" fill="#be185d" font-family="ui-monospace, Consolas, monospace">GP15</text>
+<text x="912.0" y="570.5" font-size="11.5" fill="#1e293b">LM393  DO</text>
+<text x="40.0" y="640.0" font-size="14.5" font-weight="700" fill="#0f172a">SX1278 RA-02</text>
+<text x="157.2" y="640.0" font-size="10.8" fill="#64748b">J2 read from the u.FL end</text>
+<line x1="40.0" y1="652.0" x2="480.0" y2="652.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="40.0" y="657.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="657.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="74.0" y="671.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J2·1</text>
+<text x="84.0" y="671.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="192.0" y="671.5" font-size="11.5" fill="#1e293b">GND ring</text>
+<rect x="40.0" y="678.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="74.0" y="692.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J2·2</text>
+<text x="84.0" y="692.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="192.0" y="692.5" font-size="11.5" fill="#1e293b">star GND  ← capacitors here</text>
+<rect x="40.0" y="699.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="699.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="74.0" y="713.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J2·3</text>
+<text x="84.0" y="713.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">3.3V</text>
+<text x="192.0" y="713.5" font-size="11.5" fill="#1e293b">star 3.3 V  ← capacitors here</text>
+<rect x="40.0" y="720.0" width="3.5" height="21.0" fill="#0891b2"/>
+<text x="74.0" y="734.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J2·4</text>
+<text x="84.0" y="734.5" font-size="11.5" font-weight="600" fill="#0891b2" font-family="ui-monospace, Consolas, monospace">RST</text>
+<text x="192.0" y="734.5" font-size="11.5" fill="#1e293b">pin 26  GP20</text>
+<rect x="40.0" y="741.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="741.0" width="3.5" height="21.0" fill="#0891b2"/>
+<text x="74.0" y="755.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J2·5</text>
+<text x="84.0" y="755.5" font-size="11.5" font-weight="600" fill="#0891b2" font-family="ui-monospace, Consolas, monospace">DIO0</text>
+<text x="192.0" y="755.5" font-size="11.5" fill="#1e293b">pin 27  GP21</text>
+<rect x="40.0" y="762.0" width="3.5" height="21.0" fill="#0891b2"/>
+<text x="74.0" y="776.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J2·6</text>
+<text x="84.0" y="776.5" font-size="11.5" font-weight="600" fill="#0891b2" font-family="ui-monospace, Consolas, monospace">DIO1</text>
+<text x="192.0" y="776.5" font-size="11.5" fill="#1e293b">pin 29  GP22   (optional)</text>
+<rect x="40.0" y="783.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="783.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="797.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J2·7</text>
+<text x="84.0" y="797.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">DIO2</text>
+<text x="192.0" y="797.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="40.0" y="804.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="818.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J2·8</text>
+<text x="84.0" y="818.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">DIO3</text>
+<text x="192.0" y="818.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="40.0" y="825.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="825.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="839.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J1·1</text>
+<text x="84.0" y="839.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="192.0" y="839.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="40.0" y="846.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="74.0" y="860.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J1·2</text>
+<text x="84.0" y="860.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">NSS</text>
+<text x="192.0" y="860.5" font-size="11.5" fill="#1e293b">pin 22  GP17</text>
+<rect x="40.0" y="867.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="867.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="74.0" y="881.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J1·3</text>
+<text x="84.0" y="881.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">MOSI</text>
+<text x="192.0" y="881.5" font-size="11.5" fill="#1e293b">pin 25  GP19</text>
+<rect x="40.0" y="888.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="74.0" y="902.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J1·4</text>
+<text x="84.0" y="902.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">MISO</text>
+<text x="192.0" y="902.5" font-size="11.5" fill="#1e293b">pin 21  GP16</text>
+<rect x="40.0" y="909.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="909.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="74.0" y="923.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J1·5</text>
+<text x="84.0" y="923.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">SCK</text>
+<text x="192.0" y="923.5" font-size="11.5" fill="#1e293b">pin 24  GP18</text>
+<rect x="40.0" y="930.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="944.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J1·6</text>
+<text x="84.0" y="944.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">DIO5</text>
+<text x="192.0" y="944.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="40.0" y="951.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="951.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="965.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J1·7</text>
+<text x="84.0" y="965.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">DIO4</text>
+<text x="192.0" y="965.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="40.0" y="972.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="74.0" y="986.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">J1·8</text>
+<text x="84.0" y="986.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="192.0" y="986.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<text x="520.0" y="640.0" font-size="14.5" font-weight="700" fill="#0f172a">microSD reader</text>
+<text x="654.4" y="640.0" font-size="10.8" fill="#64748b">GND and 3V3 at opposite ends</text>
+<line x1="520.0" y1="652.0" x2="960.0" y2="652.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="520.0" y="657.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="520.0" y="657.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="554.0" y="671.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">1</text>
+<text x="564.0" y="671.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="672.0" y="671.5" font-size="11.5" fill="#1e293b">star GND  ← caps here</text>
+<rect x="520.0" y="678.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="554.0" y="692.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">2</text>
+<text x="564.0" y="692.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">MISO</text>
+<text x="672.0" y="692.5" font-size="11.5" fill="#1e293b">pin 21  GP16</text>
+<rect x="520.0" y="699.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="520.0" y="699.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="554.0" y="713.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">3</text>
+<text x="564.0" y="713.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">CLK</text>
+<text x="672.0" y="713.5" font-size="11.5" fill="#1e293b">pin 24  GP18   (CLK, not SCK)</text>
+<rect x="520.0" y="720.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="554.0" y="734.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">4</text>
+<text x="564.0" y="734.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">MOSI</text>
+<text x="672.0" y="734.5" font-size="11.5" fill="#1e293b">pin 25  GP19</text>
+<rect x="520.0" y="741.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="520.0" y="741.0" width="3.5" height="21.0" fill="#1d4ed8"/>
+<text x="554.0" y="755.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">5</text>
+<text x="564.0" y="755.5" font-size="11.5" font-weight="600" fill="#1d4ed8" font-family="ui-monospace, Consolas, monospace">CS</text>
+<text x="672.0" y="755.5" font-size="11.5" fill="#1e293b">pin 9   GP6</text>
+<rect x="520.0" y="762.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="554.0" y="776.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">6</text>
+<text x="564.0" y="776.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">3V3</text>
+<text x="672.0" y="776.5" font-size="11.5" fill="#1e293b">star 3.3 V  ← caps here</text>
+<text x="520.0" y="817.0" font-size="14.5" font-weight="700" fill="#0f172a">MPU-6500 IMU</text>
+<text x="637.2" y="817.0" font-size="10.8" fill="#64748b">sold as MPU-9250</text>
+<line x1="520.0" y1="829.0" x2="960.0" y2="829.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="520.0" y="834.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="520.0" y="834.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="554.0" y="848.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">1</text>
+<text x="564.0" y="848.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">VCC</text>
+<text x="672.0" y="848.5" font-size="11.5" fill="#1e293b">3V3 ring</text>
+<rect x="520.0" y="855.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="554.0" y="869.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">2</text>
+<text x="564.0" y="869.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="672.0" y="869.5" font-size="11.5" fill="#1e293b">GND ring</text>
+<rect x="520.0" y="876.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="520.0" y="876.0" width="3.5" height="21.0" fill="#15803d"/>
+<text x="554.0" y="890.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">3</text>
+<text x="564.0" y="890.5" font-size="11.5" font-weight="600" fill="#15803d" font-family="ui-monospace, Consolas, monospace">SCL</text>
+<text x="672.0" y="890.5" font-size="11.5" fill="#1e293b">pin 7   GP5</text>
+<rect x="520.0" y="897.0" width="3.5" height="21.0" fill="#15803d"/>
+<text x="554.0" y="911.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">4</text>
+<text x="564.0" y="911.5" font-size="11.5" font-weight="600" fill="#15803d" font-family="ui-monospace, Consolas, monospace">SDA</text>
+<text x="672.0" y="911.5" font-size="11.5" fill="#1e293b">pin 6   GP4</text>
+<rect x="520.0" y="918.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="520.0" y="918.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="554.0" y="932.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">5</text>
+<text x="564.0" y="932.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">EDA</text>
+<text x="672.0" y="932.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="520.0" y="939.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="554.0" y="953.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">6</text>
+<text x="564.0" y="953.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">ECL</text>
+<text x="672.0" y="953.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="520.0" y="960.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="520.0" y="960.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="554.0" y="974.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">7</text>
+<text x="564.0" y="974.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">AD0</text>
+<text x="672.0" y="974.5" font-size="11.5" fill="#94a3b8">not connected — strapped low, 0x68</text>
+<rect x="520.0" y="981.0" width="3.5" height="21.0" fill="#15803d"/>
+<text x="554.0" y="995.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">8</text>
+<text x="564.0" y="995.5" font-size="11.5" font-weight="600" fill="#15803d" font-family="ui-monospace, Consolas, monospace">INT</text>
+<text x="672.0" y="995.5" font-size="11.5" fill="#1e293b">pin 10  GP7   (optional)</text>
+<rect x="520.0" y="1002.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="520.0" y="1002.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="554.0" y="1016.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">9</text>
+<text x="564.0" y="1016.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">NCS</text>
+<text x="672.0" y="1016.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<rect x="520.0" y="1023.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="554.0" y="1037.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">10</text>
+<text x="564.0" y="1037.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">FSYNC</text>
+<text x="672.0" y="1037.5" font-size="11.5" fill="#94a3b8">not connected</text>
+<text x="1000.0" y="640.0" font-size="14.5" font-weight="700" fill="#0f172a">GY-BMP280</text>
+<text x="1091.4" y="640.0" font-size="10.8" fill="#64748b">6-pin variant</text>
+<line x1="1000.0" y1="652.0" x2="1440.0" y2="652.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="1000.0" y="657.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="1000.0" y="657.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="1034.0" y="671.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">1</text>
+<text x="1044.0" y="671.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">VCC</text>
+<text x="1152.0" y="671.5" font-size="11.5" fill="#1e293b">3V3 ring</text>
+<rect x="1000.0" y="678.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="1034.0" y="692.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">2</text>
+<text x="1044.0" y="692.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="1152.0" y="692.5" font-size="11.5" fill="#1e293b">GND ring</text>
+<rect x="1000.0" y="699.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="1000.0" y="699.0" width="3.5" height="21.0" fill="#15803d"/>
+<text x="1034.0" y="713.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">3</text>
+<text x="1044.0" y="713.5" font-size="11.5" font-weight="600" fill="#15803d" font-family="ui-monospace, Consolas, monospace">SCL</text>
+<text x="1152.0" y="713.5" font-size="11.5" fill="#1e293b">pin 7   GP5</text>
+<rect x="1000.0" y="720.0" width="3.5" height="21.0" fill="#15803d"/>
+<text x="1034.0" y="734.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">4</text>
+<text x="1044.0" y="734.5" font-size="11.5" font-weight="600" fill="#15803d" font-family="ui-monospace, Consolas, monospace">SDA</text>
+<text x="1152.0" y="734.5" font-size="11.5" fill="#1e293b">pin 6   GP4</text>
+<rect x="1000.0" y="741.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="1000.0" y="741.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="1034.0" y="755.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">5</text>
+<text x="1044.0" y="755.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">CSB</text>
+<text x="1152.0" y="755.5" font-size="11.5" fill="#94a3b8">not connected — strapped, I2C</text>
+<rect x="1000.0" y="762.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="1034.0" y="776.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">6</text>
+<text x="1044.0" y="776.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">SDO</text>
+<text x="1152.0" y="776.5" font-size="11.5" fill="#94a3b8">not connected — strapped low, 0x76</text>
+<text x="1000.0" y="817.0" font-size="14.5" font-weight="700" fill="#0f172a">NEO-6M GPS</text>
+<text x="1100.0" y="817.0" font-size="10.8" fill="#64748b">patch antenna faces up</text>
+<line x1="1000.0" y1="829.0" x2="1440.0" y2="829.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="1000.0" y="834.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="1000.0" y="834.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="1034.0" y="848.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">1</text>
+<text x="1044.0" y="848.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">VCC</text>
+<text x="1152.0" y="848.5" font-size="11.5" fill="#1e293b">3V3 ring</text>
+<rect x="1000.0" y="855.0" width="3.5" height="21.0" fill="#7c3aed"/>
+<text x="1034.0" y="869.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">2</text>
+<text x="1044.0" y="869.5" font-size="11.5" font-weight="600" fill="#7c3aed" font-family="ui-monospace, Consolas, monospace">RX</text>
+<text x="1152.0" y="869.5" font-size="11.5" fill="#1e293b">pin 16  GP12   (Pico TX)</text>
+<rect x="1000.0" y="876.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="1000.0" y="876.0" width="3.5" height="21.0" fill="#7c3aed"/>
+<text x="1034.0" y="890.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">3</text>
+<text x="1044.0" y="890.5" font-size="11.5" font-weight="600" fill="#7c3aed" font-family="ui-monospace, Consolas, monospace">TX</text>
+<text x="1152.0" y="890.5" font-size="11.5" fill="#1e293b">pin 17  GP13   (Pico RX)</text>
+<rect x="1000.0" y="897.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="1034.0" y="911.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">4</text>
+<text x="1044.0" y="911.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="1152.0" y="911.5" font-size="11.5" fill="#1e293b">GND ring</text>
+<text x="1000.0" y="952.0" font-size="14.5" font-weight="700" fill="#0f172a">LM393 sound</text>
+<text x="1108.6" y="952.0" font-size="10.8" fill="#64748b">4-pin variant</text>
+<line x1="1000.0" y1="964.0" x2="1440.0" y2="964.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="1000.0" y="969.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="1000.0" y="969.0" width="3.5" height="21.0" fill="#be185d"/>
+<text x="1034.0" y="983.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">1</text>
+<text x="1044.0" y="983.5" font-size="11.5" font-weight="600" fill="#be185d" font-family="ui-monospace, Consolas, monospace">AO</text>
+<text x="1152.0" y="983.5" font-size="11.5" fill="#1e293b">pin 32  GP27   short, own return</text>
+<rect x="1000.0" y="990.0" width="3.5" height="21.0" fill="#be185d"/>
+<text x="1034.0" y="1004.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">2</text>
+<text x="1044.0" y="1004.5" font-size="11.5" font-weight="600" fill="#be185d" font-family="ui-monospace, Consolas, monospace">DO</text>
+<text x="1152.0" y="1004.5" font-size="11.5" fill="#1e293b">pin 20  GP15</text>
+<rect x="1000.0" y="1011.0" width="440.0" height="21.0" fill="#f8fafc"/>
+<rect x="1000.0" y="1011.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="1034.0" y="1025.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">3</text>
+<text x="1044.0" y="1025.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">GND</text>
+<text x="1152.0" y="1025.5" font-size="11.5" fill="#1e293b">GND ring, near the AGND tie</text>
+<rect x="1000.0" y="1032.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="1034.0" y="1046.5" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="end" font-family="ui-monospace, Consolas, monospace">4</text>
+<text x="1044.0" y="1046.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">VCC</text>
+<text x="1152.0" y="1046.5" font-size="11.5" fill="#1e293b">3V3 ring</text>
+<text x="40.0" y="1055.0" font-size="14.5" font-weight="700" fill="#0f172a">Discretes</text>
+<text x="131.4" y="1055.0" font-size="10.8" fill="#64748b">power path, divider, LEDs</text>
+<line x1="40.0" y1="1067.0" x2="740.0" y2="1067.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="40.0" y="1072.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="1072.0" width="3.5" height="21.0" fill="#c02626"/>
+<text x="84.0" y="1086.5" font-size="11.5" font-weight="600" fill="#c02626" font-family="ui-monospace, Consolas, monospace">battery +</text>
+<text x="192.0" y="1086.5" font-size="11.5" fill="#1e293b">JST-RCY → switch → Schottky anode</text>
+<rect x="40.0" y="1093.0" width="3.5" height="21.0" fill="#c02626"/>
+<text x="84.0" y="1107.5" font-size="11.5" font-weight="600" fill="#c02626" font-family="ui-monospace, Consolas, monospace">Schottky</text>
+<text x="192.0" y="1107.5" font-size="11.5" fill="#1e293b">cathode → pin 39  VSYS   (band toward Pico)</text>
+<rect x="40.0" y="1114.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="1114.0" width="3.5" height="21.0" fill="#334155"/>
+<text x="84.0" y="1128.5" font-size="11.5" font-weight="600" fill="#334155" font-family="ui-monospace, Consolas, monospace">battery −</text>
+<text x="192.0" y="1128.5" font-size="11.5" fill="#1e293b">GND ring</text>
+<rect x="40.0" y="1135.0" width="3.5" height="21.0" fill="#be185d"/>
+<text x="84.0" y="1149.5" font-size="11.5" font-weight="600" fill="#be185d" font-family="ui-monospace, Consolas, monospace">divider</text>
+<text x="192.0" y="1149.5" font-size="11.5" fill="#1e293b">switched node → 33 kΩ → tap → 33 kΩ → GND ring</text>
+<rect x="40.0" y="1156.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="1156.0" width="3.5" height="21.0" fill="#be185d"/>
+<text x="84.0" y="1170.5" font-size="11.5" font-weight="600" fill="#be185d" font-family="ui-monospace, Consolas, monospace">divider tap</text>
+<text x="192.0" y="1170.5" font-size="11.5" fill="#1e293b">pin 31  GP26      (no capacitor — D-7)</text>
+<rect x="40.0" y="1177.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="84.0" y="1191.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">status LED</text>
+<text x="192.0" y="1191.5" font-size="11.5" fill="#1e293b">pin 19 → 1 kΩ → anode; cathode → GND ring</text>
+<rect x="40.0" y="1198.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="40.0" y="1198.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="84.0" y="1212.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">power LED</text>
+<text x="192.0" y="1212.5" font-size="11.5" fill="#1e293b">3V3 ring → 1 kΩ → anode; cathode → GND ring</text>
+<rect x="40.0" y="1219.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="84.0" y="1233.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">test link</text>
+<text x="192.0" y="1233.5" font-size="11.5" fill="#1e293b">pin 36 → 2-pin header → 3.3 V node</text>
+<text x="760.0" y="1055.0" font-size="14.5" font-weight="700" fill="#0f172a">Capacitors</text>
+<text x="860.0" y="1055.0" font-size="10.8" fill="#64748b">all at each module’s own pins</text>
+<line x1="760.0" y1="1067.0" x2="1460.0" y2="1067.0" stroke="#cbd5e1" stroke-width="1.6"/>
+<rect x="760.0" y="1072.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="1072.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="804.0" y="1086.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">microSD</text>
+<text x="912.0" y="1086.5" font-size="11.5" fill="#1e293b">100 µF 50 V ∥ 100 µF 25 V ∥ 104</text>
+<rect x="760.0" y="1093.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="804.0" y="1107.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">RA-02</text>
+<text x="912.0" y="1107.5" font-size="11.5" fill="#1e293b">10 µF 50 V ∥ 104</text>
+<rect x="760.0" y="1114.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="1114.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="804.0" y="1128.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">MPU-6500</text>
+<text x="912.0" y="1128.5" font-size="11.5" fill="#1e293b">104</text>
+<rect x="760.0" y="1135.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="804.0" y="1149.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">BMP280</text>
+<text x="912.0" y="1149.5" font-size="11.5" fill="#1e293b">104</text>
+<rect x="760.0" y="1156.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="1156.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="804.0" y="1170.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">NEO-6M</text>
+<text x="912.0" y="1170.5" font-size="11.5" fill="#1e293b">104</text>
+<rect x="760.0" y="1177.0" width="3.5" height="21.0" fill="#c2650a"/>
+<text x="804.0" y="1191.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">LM393</text>
+<text x="912.0" y="1191.5" font-size="11.5" fill="#1e293b">104</text>
+<rect x="760.0" y="1198.0" width="700.0" height="21.0" fill="#f8fafc"/>
+<rect x="760.0" y="1198.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="804.0" y="1212.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP26 divider</text>
+<text x="912.0" y="1212.5" font-size="11.5" fill="#94a3b8">none — deferred, see D-7</text>
+<rect x="760.0" y="1219.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="804.0" y="1233.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace"></text>
+<text x="912.0" y="1233.5" font-size="11.5" fill="#94a3b8">nine total · stripe → GND on every electrolytic</text>
+<text x="40" y="1246" font-size="11.5" font-weight="700" fill="#991b1b">Pin 40 VBUS is live 5 V and nothing here tolerates 5 V. AGND (33) is a separate plane — tie it once, beside pin 38. Battery switch OFF whenever USB is connected until the Schottky is fitted.</text>
+</svg>

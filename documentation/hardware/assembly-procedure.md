@@ -559,6 +559,15 @@ Everything not listed stays unconnected. That includes `VBUS` (40), `3V3_EN` (37
 
 ## Wiring diagrams
 
+![Complete wiring schedule](diagrams/wiring-schedule.svg)
+
+**The complete schedule — every Pico pin and every module pin on one sheet:**
+[wiring-schedule.svg](diagrams/wiring-schedule.svg). Regenerate with
+`python tools/gen_wiring_schedule.py` from the repository root. It is the sheet to have open
+while soldering; the per-bus diagrams below are the same information grouped by bus, for when
+you are working one subsystem at a time.
+
+
 ### I2C — left zone
 
 ```text
