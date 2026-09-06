@@ -259,23 +259,35 @@ Two consequences worth stating plainly:
 The GPS in the bottom-right against pins 16 and 17; the microSD reachable from `CS` on pin 9;
 the sound board on the ADC side of the top row for `AO`.
 
-### Record before committing
+### As laid out, 2026-09-06
 
-| Item | Pin-1 pad | Note |
+Placement was settled on the board rather than on paper, and the photograph is the record —
+no pad coordinates are transcribed here, because a coordinate copied by hand is one more
+thing that can disagree with the board.
+
+| Item | Where | Confirmed by |
 |---|---|---|
-| Pico pin 1 | | 20 rows x 8 cols. USB overhang or panel cutout: |
-| RA-02 J1 pin 1, `GND` beside `NSS` | | row spacing measured: ____ mm |
-| RA-02 J2 pin 1, `GND` at the u.FL end | | u.FL faces: |
-| microSD pin 1, `GND` | | card slot faces: |
-| BMP280 strip, 6 pins | | |
-| MPU strip, 10 pins | | |
-| NEO-6M strip, 4 pins | | |
-| LM393 strip, 4 pins | | |
-| GND ring, gaps at | | |
-| 3V3 ring, gaps at | | |
+| Pico | Centred, USB to the left edge, ~24 mm inboard | Needs a panel cutout; do not shift the Pico left, that margin is the power zone |
+| RA-02 | Top band, centre, u.FL to the top edge | Its `NSS`/`MOSI`/`MISO`/`SCK` column lands almost directly above Pico pins 21–25. SPI runs are 20–30 mm and near-vertical |
+| microSD | Top band, right of the RA-02, header facing the Pico | Reaches `MISO`/`MOSI`/`CLK` on pins 21/25/24. Card slot to the right or top edge |
+| LM393 strip | Top band, far left, on the ADC side | `AO` reaches pin 32 in ~40 mm. Route it with a paired return to `AGND` on pin 33 and cross the supply wires at right angles |
+| MPU strip | Bottom band, directly under pins 6 and 7 | Shortest I2C run on the board |
+| BMP280 strip | Bottom band, left of the MPU | 12–30 mm to the same two pins |
+| NEO-6M strip | Bottom band, right, near pins 16 and 17 | Unchanged from the first layout, which had it right |
+| Power zone | Left margin, beside pins 36, 38 and 39 | Distribution nodes, test link, both 33 kΩ, switch terminals, battery entry |
+| Both LEDs | Bottom right, near pin 19 | Must sit behind whatever window the airframe gets |
 
 **Dry-fit everything before any solder.** The RA-02's two 8-pin rows and the Pico's two 20-pin
 rows must land on real holes at real spacing; measure, do not assume.
+
+Four things must be clear before the first joint, and none of them is a component:
+
+- **Both bus rings**, marked and reserved — the outermost ring of pads for GND and the ring
+  inside it for 3V3.
+- **All four corner mounting holes**, plus about 4 mm around each. The top-left one is under
+  the sound module and the top-right one is where the microSD wants to go.
+- **The power zone**, before the BMP280 strip creeps up into it.
+- **The USB cutout**, decided with the airframe rather than after it.
 
 ---
 
