@@ -451,15 +451,36 @@ reason the breadboard faults were findable at all.
 
 ### 1 · Dry fit, no solder
 
-Place the Pico, RA-02, both sensor breakouts, the GPS, the microSD reader and the sound board
-onto the perfboard. Check every footprint lands on real holes. Rotate until the USB faces the
-top edge, the RA-02's u.FL faces the board edge, and the microSD sits as near the Pico's pin 36
-as it will go.
+**Only two parts land on the perfboard's own hole grid: the Pico and the RA-02.** Those are the
+two that get soldered down. The other five — IMU, barometer, GPS, microSD reader and sound
+board — sit on the structure and reach the board on Dupont jumpers, so their board-end footprint
+is a male header strip you cut yourself and fits by construction. Nothing about them can
+surprise the grid; the RA-02 can.
 
-Record each module's pin-1 pad coordinate.
+1. **Measure the RA-02's row-to-row spacing with a ruler or calipers before assuming it is a
+   whole number of 2.54 mm pitches.** If it is not, the module cannot be pressed flat into
+   perfboard and one row's pins have to be bent. That is a step-1 discovery, not a step-10 one.
+2. **Press the Pico in.** 2 × 20 pins at 2.54 mm, rows 17.78 mm apart — **exactly 7 hole
+   pitches**, so it occupies 20 rows × 8 columns. Both rows should seat without splaying.
+3. **Reserve the two bus rings before placing anything else.** Mark the outermost usable ring of
+   pads as GND and the ring inside it as 3V3. Nothing else may land there. Decide now where a
+   module overhang forces a gap.
+4. **Orient**, in this priority order: USB to the top edge; the RA-02's u.FL toward the edge
+   that carries the bulkhead hole, with the pigtail offered up to check it reaches without a
+   loop; the microSD's strip and its soldered supply pads hard against Pico pins 36 and 38; the
+   sound board's strip in the corner furthest from the RA-02.
+5. **Draw the two crossings** — `GP6` (pin 9) to the microSD's `CS`, and `GP15` (pin 20) to the
+   sound board's `DO` — along the bottom of the board, clear of the SPI bundle. If a route
+   cannot be drawn clear, move the strip rather than the wire.
+6. **Record every pin-1 pad coordinate** on the silkscreened grid, and photograph the laid-out
+   board from directly above into [`photos/`](photos/README.md).
 
-**Gate:** every module fits, nothing overlaps a mounting hole, and the antenna pigtail reaches
-its bulkhead position without a loop.
+**Cut no header strip yet.** That is step 6. Step 1 commits nothing.
+
+**Gate:** the RA-02 and the Pico both land on real holes at real pitch; no footprint or ring
+overlaps one of the four corner mounting holes; the antenna pigtail reaches its bulkhead
+position without a loop; both crossings route clear of SPI; every pin-1 coordinate is written
+down.
 
 ### 2 · The two buses
 
