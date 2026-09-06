@@ -43,7 +43,7 @@ Run against the repository on 2026-09-06. ✅ settled, ⚠️ needs your eyes at
 | 5 | Barometer is a BMP280 not a BME280 | ✅ Chip ID `0x58` ([F-4](receiving-inspection.md#findings)) |
 | 6 | Header pin order transcribed from silkscreen for every board | ✅ [wiring.md](../design/wiring.md#module-header-pinouts-as-printed) |
 | 7 | Firmware pin map matches the documentation | ✅ `BoardPins` in [`config.hpp`](../../firmware/flight-computer/include/flight/config.hpp) agrees with [pico-gpio-map.md](pico-gpio-map.md) and [wiring.md](../design/wiring.md) on all 17 pins |
-| 8 | Documentation claims still match the source | ✅ `python tools/check_doc_claims.py` — **216/216** |
+| 8 | Documentation claims still match the source | ✅ `python tools/check_doc_claims.py` — **218/218** |
 
 ### Function, proved on the breadboard
 
@@ -95,7 +95,7 @@ below, with the reason, and the losing document should be corrected.
 
 ### [D-1] The microSD bulk capacitor is **2 × 100 µF in parallel**, not 470 µF
 
-[wiring.md](../design/wiring.md#what-the-jumpered-microsd-requires) and
+[wiring.md](../design/wiring.md#what-the-soldered-microsd-requires) and
 [electrical-architecture.md](../design/electrical-architecture.md#what-to-fit-and-where) both
 say 470 µF. **No 470 µF part arrived.** What arrived is a 100 µF 50 V and a 100 µF 25 V
 ([D.7](receiving-inspection.md#d7--the-capacitors)), which is 200 µF in parallel.
@@ -115,16 +115,30 @@ which says the opposite and gives its reasons: **Pico and RA-02 soldered down** 
 duplicate), **IMU, barometer, GPS and microSD jumpered** (all held singly). The later decision
 wins. **Do not buy female headers.**
 
-### [D-3] The jumpers land on **male header strips** at the board end — except the microSD supply
+### [D-3] The microSD is soldered too. Only four modules stay on jumpers
 
-[The open item](../design/wiring.md#still-open) offered two options and stated an intent. Take
-the intent:
+**Revised 2026-09-06.** The [mounting decision](../design/wiring.md#module-mounting) jumpered
+the microSD reader for one reason - no spare - and a stronger reason runs the other way:
+**the microSD's supply jumper is the only wire on this project that has actually failed.**
+[F-10](../testing/bring-up-record.md#findings) was five bench runs of every write failing while
+every read passed, appearing and vanishing with the seating. Soldering the module deletes that
+wire instead of decoupling around it.
 
-- **Signal groups** (I2C, UART, the microSD's four SPI lines, the sound module) land on male
-  header strips soldered into the perfboard. Both ends stay serviceable.
-- **The microSD's `3V3` and `GND` land as soldered wire, module end to board end**, with the
-  capacitors at the module's own pins. That is [F-10](../testing/bring-up-record.md#findings)'s
-  instruction and it is not negotiable: a connector in that pair is the wire that failed.
+The spare argument is weaker here than it looks, too. The reader is four 10 kohm resistors and
+two capacitors with no active part on it, and the component swapped in service is the **card**,
+not the board.
+
+- **Soldered down:** Pico, RA-02, **microSD reader**
+- **On jumpers, into male header strips:** MPU-6500, BMP280, NEO-6M and the LM393 sound board -
+  **24 pins of strip** across four footprints
+
+**One requirement arrives with it.** The card slot must reach an opening in the airframe. The
+flight log is recovered off that card, and a reader soldered inside a sealed body with its slot
+facing inward loses it.
+
+The capacitors do not change: 100 uF in parallel with 100 uF and a `104`, at the module's own
+`3V3` and `GND` pins. A soldered track is shorter than a jumper, but the write spike still wants
+its charge locally.
 
 ### [D-4] The power LED hangs off the **3.3 V bus**, and the switch sits in the battery positive lead
 
@@ -167,42 +181,101 @@ it is ready at step 15 rather than being the thing that delays it.
 
 ## Floorplan
 
-100 × 100 mm, single-sided, isolated pads. The grid runs `A`–`Z` then `A`–`K` across
-(36 columns) and `01`–`35` down. **Record each module's pin-1 pad coordinate in the assembly
-notes as you place it** — that is what makes the layout survive being taken apart.
+100 x 100 mm, single-sided, isolated pads. The grid runs `A`-`Z` then `A`-`K` across
+(36 columns) and `01`-`35` down.
 
-```mermaid
-flowchart TB
-    TOP["GND ring — outer perimeter · 3V3 ring — just inside it"]
-    subgraph MID["Component side, USB at the top edge"]
-        direction LR
-        LEFT["LEFT ZONE<br/>Pico pins 1–20<br/><br/>MPU-6500 · I2C<br/>BMP280 · I2C<br/>NEO-6M · UART<br/>patch antenna faces up"]
-        PICO["PICO<br/>vertical<br/>USB to top edge<br/><br/>20 rows × 8 cols"]
-        RIGHT["RIGHT ZONE<br/>Pico pins 21–40<br/><br/>RA-02 · soldered down<br/>u.FL to the board edge<br/><br/>microSD · jumpered<br/>as close to pin 36 as it goes"]
-    end
-    BOT["BOTTOM STRIP<br/>switch terminals · battery divider · both LEDs · LM393 sound board<br/>far corner from the RA-02"]
+**Decided 2026-09-06, with every module laid out on the board.** The Pico sits with its **USB
+facing the left edge**, and that one choice fixes everything else - because it decides which of
+the Pico's two pin rows faces which half of the board.
 
-    TOP --- MID --- BOT
+### Where the Pico's pins actually are
+
+USB left, component side up, pin 1 at the bottom-left:
+
+| Row | left to right | Carries |
+|---|---|---|
+| **Top** | `40 39 38 37 36`, `35 34 33 32 31`, `30 29 28 27 26`, `25 24 23 22 21` | **power** - VBUS, VSYS, GND, 3V3_EN, **3V3(OUT)**; **ADC** - GP28, AGND, GP27, GP26; radio control - GP22, GP21, GP20; **SPI** - GP19, GP18, GP17, GP16 |
+| **Bottom** | `01`-`05`, `06 07 08 09 10`, `11`-`15`, `16 17 18 19 20` | spare; **I2C** GP4, GP5, plus SD CS GP6 and IMU INT GP7; spare; **GPS** GP12, GP13, plus status LED GP14 and sound DO GP15 |
+
+> [!IMPORTANT]
+> **There is no 3.3 V pin on the bottom row.** Pin 36 is the only supply output the part has,
+> and it is on the top row. The four bottom-row grounds - 3, 8, 13 and 18 - are returns, not a
+> rail. Placing the SPI devices low "to be near 3V3" moves them away from it.
+
+### The bands that follow
+
+```text
+  TOP EDGE - GND ring, 3V3 ring just inside it
+ +---------------------------------------------------------------+
+ | [sound 4-pin strip]     [ microSD, soldered ]   [   RA-02   ]  |
+ |        AO -> pin 32      card slot -> panel      u.FL -> edge  |
+ | +----+ +---------------------------------------------+        |
+ | |PWR | | 40 39 38 37 36  35 34 33 32 31 ....... 22 21|        |
+ | |zone| | USB<            P I C O                     |        |
+ | |    | | 01 ......... 06 07 .. 09 ....... 16 17 .. 20|        |
+ | +----+ +---------------------------------------------+        |
+ |  [ BMP280 6-pin ]  [ MPU 10-pin ]    [ GPS 4-pin ]  [ LEDs ]   |
+ +---------------------------------------------------------------+
 ```
 
-Why this and not something else:
+**Top band, against the top pin row:** RA-02 and microSD at the right end where the SPI pins
+are; the sound board's 4-pin strip under the ADC pins in the middle-left; the power zone -
+distribution nodes, test link, both 33 kohm legs, the electrolytics, switch and battery entry -
+in the left margin beside pins 36, 38 and 39.
 
-- **The Pico's own pinout splits the board for you.** Pins 1–20 carry I2C, the GPS UART, the
-  status LED and the sound gate; pins 21–40 carry all of SPI, the radio's control lines, both
-  ADC channels and every power pin. Sensors left, radio and storage right, and almost nothing
-  crosses.
-- **The microSD sits as close to the Pico's `3V3(OUT)` as it will go.** Its supply pair is the
-  wire that failed twice; the shortest one you can make is the right one.
-- **The RA-02's u.FL faces the board edge**, so the pigtail reaches the bulkhead nut without a
-  loop. That mount is the strain relief.
-- **The sound board goes in the far corner from the radio.** `AO` is a high-impedance analogue
-  line and the SPI bundle clocks at 4 MHz.
-- **Two wires cross the board and both are harmless:** `GP6` (pin 9, left) to the microSD's
-  `CS`, and `GP15` (pin 20, left) to the sound board's `DO`. Both are static or slow digital
-  lines. Route them along the bottom, not through the SPI bundle.
+**Bottom band, against the bottom pin row:** BMP280 and MPU strips under the I2C pins, the GPS
+strip under pins 16 and 17, both LEDs at the right end where pin 19 is.
 
-**Dry-fit every module into the perfboard before any solder.** The RA-02's two 8-pin rows and
-the Pico's two 20-pin rows must land on real holes at real spacing; measure, do not assume.
+### Why not the other way round
+
+A first layout put the RA-02 and microSD in the **bottom** band. The two arrangements differ by
+seventeen wires:
+
+| Wires that must cross or loop the Pico | SPI devices low | SPI devices high |
+|---|---:|---:|
+| RA-02 signals | 7 | 0 |
+| microSD signals | 3 | 0 |
+| Both supply stars | 4 | 0 |
+| I2C | 4 | 0 |
+| Sound `DO` | 1 | 1 |
+| microSD `CS`, from pin 9 on the bottom row | 0 | 1 |
+| **Total** | **19** | **2** |
+
+There is a six-column channel between the Pico's two pin rows on the copper side, so wires
+*can* pass underneath. Nineteen cannot, and filling it makes the Pico unremovable.
+
+Two consequences worth stating plainly:
+
+- **The star supply wires now run about 40 mm along the top edge to the RA-02, and that is
+  fine.** [F-10](../testing/bring-up-record.md#findings) was a Dupont jumper - two crimps and
+  two contact interfaces - not length. 40 mm of soldered 22 AWG is roughly 2 milliohms, which
+  is 0.2 mV at 100 mA. The bulk pair still goes at the module's own pins.
+- **`AO` sits in the middle-left of the top band and the RA-02 at its right end**, about 60 mm
+  apart. That is the better of two imperfect options: the alternative runs a high-impedance
+  analogue line the width of the board and straight through the SPI bundle.
+
+### What the first layout already had right, and did not move
+
+The GPS in the bottom-right against pins 16 and 17; the microSD reachable from `CS` on pin 9;
+the sound board on the ADC side of the top row for `AO`.
+
+### Record before committing
+
+| Item | Pin-1 pad | Note |
+|---|---|---|
+| Pico pin 1 | | 20 rows x 8 cols. USB overhang or panel cutout: |
+| RA-02 J1 pin 1, `GND` beside `NSS` | | row spacing measured: ____ mm |
+| RA-02 J2 pin 1, `GND` at the u.FL end | | u.FL faces: |
+| microSD pin 1, `GND` | | card slot faces: |
+| BMP280 strip, 6 pins | | |
+| MPU strip, 10 pins | | |
+| NEO-6M strip, 4 pins | | |
+| LM393 strip, 4 pins | | |
+| GND ring, gaps at | | |
+| 3V3 ring, gaps at | | |
+
+**Dry-fit everything before any solder.** The RA-02's two 8-pin rows and the Pico's two 20-pin
+rows must land on real holes at real spacing; measure, do not assume.
 
 ---
 
@@ -451,11 +524,11 @@ reason the breadboard faults were findable at all.
 
 ### 1 · Dry fit, no solder
 
-**Only two parts land on the perfboard's own hole grid: the Pico and the RA-02.** Those are the
-two that get soldered down. The other five — IMU, barometer, GPS, microSD reader and sound
-board — sit on the structure and reach the board on Dupont jumpers, so their board-end footprint
-is a male header strip you cut yourself and fits by construction. Nothing about them can
-surprise the grid; the RA-02 can.
+**Three parts land on the perfboard's own hole grid: the Pico, the RA-02 and the microSD
+reader** ([D-3](#d-3-the-microsd-is-soldered-too-only-four-modules-stay-on-jumpers)). The other
+four — IMU, barometer, GPS and the sound board — sit on the structure and reach the board on
+Dupont jumpers, so their board-end footprint is a male header strip you cut yourself and fits by
+construction. Nothing about them can surprise the grid; the RA-02 can.
 
 1. **Measure the RA-02's row-to-row spacing with a ruler or calipers before assuming it is a
    whole number of 2.54 mm pitches.** If it is not, the module cannot be pressed flat into
@@ -467,7 +540,7 @@ surprise the grid; the RA-02 can.
    module overhang forces a gap.
 4. **Orient**, in this priority order: USB to the top edge; the RA-02's u.FL toward the edge
    that carries the bulkhead hole, with the pigtail offered up to check it reaches without a
-   loop; the microSD's strip and its soldered supply pads hard against Pico pins 36 and 38; the
+   loop; the microSD beside it in the same top band, its card slot facing a panel opening; the
    sound board's strip in the corner furthest from the RA-02.
 5. **Draw the two crossings** — `GP6` (pin 9) to the microSD's `CS`, and `GP15` (pin 20) to the
    sound board's `DO` — along the bottom of the board, clear of the SPI bundle. If a route
@@ -528,9 +601,9 @@ are half-periods: `READY` unarmed is 900 ms on, 900 ms off — **1800 ms full cy
 
 ### 6 · The header field
 
-Solder male header strips for the four jumpered modules' signal groups — 10, 6, 4 and 6 pins,
-plus 4 for the sound board — at the coordinates recorded in step 1. **No supply pins in the
-microSD's strip**; its supply is step 7.
+Solder male header strips for the four jumpered modules — **10 pins (MPU), 6 (BMP280), 4
+(NEO-6M) and 4 (LM393), 24 in total** — at the coordinates recorded in step 1. The microSD needs
+no strip: it is soldered down like the RA-02.
 
 **Gate:** adjacent-pin isolation across every strip.
 
@@ -585,8 +658,9 @@ hole, fit the nut and star washer, and screw the antenna on hand-tight.
 
 ### 11 · microSD
 
-Wire the four SPI signals from the header strip. Its supply pair is already soldered from step 7.
-Insert the card.
+Solder the reader down and wire its four SPI signals. Its supply pair went in at step 7. Insert
+the card — and check now, not later, that the slot lines up with wherever the airframe panel
+opening will be, because the flight log is recovered through it.
 
 **Gate: bring-up gate 6.** The card initialises, reads its BPB — and, the row that matters,
 **writes.** [F-10](../testing/bring-up-record.md#findings) was every write failing while every

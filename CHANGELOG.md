@@ -10,6 +10,25 @@ development cycle.
 
 ## [Unreleased] — 2026-09-06 (cycle 34)
 
+### Changed — the board has a floorplan, and the microSD is soldered after all
+
+The modules were laid out on the perfboard and photographed. The Pico sits with its **USB facing the left edge**, and that single choice decides the rest of the board: with USB left, the Pico's top pin row carries power at its left end, both ADC channels in the middle and all of SPI at its right end, while the bottom row carries I2C, the GPS and the status LED. **There is no 3.3 V pin on the bottom row at all** — pin 36 is the only supply output the part has.
+
+The first arrangement put the RA-02 and the microSD in the bottom band, on the reasonable-sounding ground that it kept them near the Pico's 3.3 V pin. It does the reverse, and it also puts both devices as far as they can get from the SPI pins they need. Counted out, the two layouts differ by **nineteen wires crossing the Pico against two**. The bands are swapped: SPI devices and the power zone up top, sensors and the GPS below.
+
+**The microSD reader is now soldered down rather than jumpered**, which reverses part of the 2026-09-05 mounting decision. That decision jumpered anything held singly, and it was right about the IMU, the barometer and the GPS. It is wrong about the card reader for one reason: **the microSD's supply jumper is the only wire on this project that has actually failed.** [F-10](documentation/testing/bring-up-record.md#findings) was five bench runs of every write failing while every read passed. Soldering the module deletes that wire instead of asking a capacitor to stand in for it, and the reader is four resistors and two capacitors with no active part on it — the thing swapped in service is the card, not the board.
+
+**Which creates a requirement, and it is a mechanical one:** the card slot must reach an opening in the airframe. The flight log is recovered off that card, and a reader soldered inside a sealed body with its slot facing inward loses it.
+
+The jumper board-end question is closed with it: **male header strips, 24 pins across four footprints.**
+
+### Fixed — the claim checker did not check cross-document anchors, and let one through
+
+Renaming a heading in `wiring.md` broke a link to it from `assembly-procedure.md`, and `check_doc_claims.py` reported 217/217 anyway. Its own comment says a renamed heading breaks navigation silently and that this is what the check exists to prevent — but it only validated anchors *within* a document, and for a link to another file it checked that the file existed and stopped there.
+
+It now resolves the fragment against the target document's own headings whenever the target is Markdown. The broken link is fixed. Claim count 216 -> 218 across the two cycles: one for the new document, one for the new check.
+
+
 ### Added — the assembly procedure, and the five contradictions it had to settle
 
 [assembly-procedure.md](documentation/hardware/assembly-procedure.md) is the order this vehicle gets soldered in: thirty-four pre-solder checks, a floorplan, physical Pico pin numbers rather than GPIO numbers, and sixteen steps each ending in a gate from the bring-up record. It exists because the wiring diagram says what connects to what and never said what to do first — and on this vehicle the order is the design. Both faults this project has actually had were supply wires, and both were findable only because one subsystem was powered at a time.

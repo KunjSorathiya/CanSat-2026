@@ -543,31 +543,35 @@ removable, and the split follows the spares rather than the wiring.
 |---|---:|---|---|
 | Raspberry Pi Pico | 2 | **Header pins through the board, soldered** | Headers were fitted on 2026-09-04, so flat castellation mounting was already off the table. A spare Pico is in the drawer |
 | SX1278 RA-02 | 2 | **Soldered** | One of the two modules whose supply jumper caused [F-10](../testing/bring-up-record.md#findings). Soldering it removes that wire entirely. A spare RA-02 is in the drawer |
+| microSD reader | 1 | **Soldered**, revised 2026-09-06 | Its supply jumper is the only wire on this project that has actually failed. Soldering deletes [F-10](../testing/bring-up-record.md#findings) rather than decoupling around it, and the part swapped in service is the card, not the reader |
 | MPU-6500 IMU | 1 | Jumpered | No spare |
 | GY-BMP280 | 1 | Jumpered | No spare |
 | NEO-6M GPS | 1 | Jumpered | No spare |
-| microSD reader | 1 | Jumpered | No spare |
 
-The two modules held in duplicate are the two made permanent; the four held singly stay
-removable. A destroyed RA-02 costs a module from the drawer. A destroyed IMU costs the
-mission, and there is no second one to fit.
+The two modules held in duplicate are permanent because a spare exists. **The microSD reader
+is permanent for the opposite reason** — not because losing it is cheap, but because the wire
+it would otherwise hang on is the one this project has already watched fail. A destroyed RA-02
+costs a module from the drawer. A destroyed IMU costs the mission, and there is no second one
+to fit.
 
-### What the jumpered microSD requires
+### What the soldered microSD requires
 
 [F-10](../testing/bring-up-record.md#findings) was a long supply jumper: **every** microSD
 write failed while **every** read passed, across five bench runs, appearing and vanishing with
-the seating. Soldering the RA-02 removes that wire for the radio. It does not remove it for
-the card, which is still on a jumper — so the card is still in the configuration that failed,
-and the capacitor is what stands in for the wire.
+the seating. **Revised 2026-09-06: the reader is soldered down**, which removes that wire
+entirely rather than asking a capacitor to stand in for it.
 
-Two rules follow, and the first is the one that decides whether this works:
+Two rules survive the change, and one requirement arrives with it:
 
-- **The 470 µF and the 100 nF go on the microSD module's own `3V3` and `GND` pins** — the
-  module end of the jumper, not the perfboard end. A capacitor at the board end still has the
-  whole jumper between itself and the current it is meant to supply, which is the path
-  [F-10](../testing/bring-up-record.md#findings) proved is not good enough.
-- **Run the card's supply as short soldered wire even if its signals stay on jumpers.** The
-  signals tolerated the jumper throughout; only the supply failed.
+- **The bulk pair and the 100 nF still go on the microSD module's own `3V3` and `GND` pins.**
+  A soldered track is shorter than a jumper, but the write spike still wants its charge
+  locally, and a capacitor at the perfboard end has the whole track between itself and the
+  current it is meant to supply.
+- **The supply track is the shortest and most direct run on the board.** Length was never the
+  whole of [F-10](../testing/bring-up-record.md#findings) — two crimps and two contact
+  interfaces were — but the rule costs nothing to keep.
+- **The card slot must reach an opening in the airframe.** The flight log is recovered off that
+  card, and a reader soldered inside a sealed body with its slot facing inward loses it.
 
 The same rule applies at smaller stakes to the 100 nF at the IMU, barometer and GPS: module
 end, at the pins. Values and reasoning are in
@@ -621,9 +625,9 @@ microSD's supply pair.
 - [x] **1S charger obtained** — 2026-09-05; none was supplied and none is on the BOM
 - [x] Pico headers obtained and fitted, 2026-09-04 — flat mounting is therefore off the table
 - [x] **Vehicle Pico mounting decided, 2026-09-05** — pins passed through the board and soldered. No sockets anywhere on this build
-- [x] **Module mounting split decided, 2026-09-05** — RA-02 soldered; IMU, barometer, GPS and microSD jumpered. See [Module mounting](#module-mounting)
-- [ ] Jumper board-end landing decided: male header strips into the perfboard, or wire soldered into the pad
-- [ ] 470 µF and 100 nF fitted at the microSD module's **own** supply pins, not at the perfboard end
+- [x] **Module mounting split decided, 2026-09-05, revised 2026-09-06** — Pico, RA-02 **and the microSD reader** soldered; IMU, barometer, GPS and the sound board jumpered. See [Module mounting](#module-mounting)
+- [x] **Jumper board-end landing decided, 2026-09-06** — male header strips into the perfboard, 24 pins across four footprints ([D-3](../hardware/assembly-procedure.md#d-3-the-microsd-is-soldered-too-only-four-modules-stay-on-jumpers))
+- [ ] 100 µF ∥ 100 µF and 100 nF fitted at the microSD module's **own** supply pins, not at the perfboard end
 - [ ] Retention and strain relief specified for all four jumpered modules
 - [ ] IMU rigidly bonded to the structure, independently of its wiring
 - [ ] Antenna and cable centre contacts photographed, settling SMA against RP-SMA

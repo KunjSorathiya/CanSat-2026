@@ -610,12 +610,18 @@ def main() -> int:
         text = re.sub(r"[`*_]", "", heading.strip().lower())
         return re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE).replace(" ", "-")
 
+    def anchors_of(body: str) -> set[str]:
+        return {heading_slug(h)
+                for h in re.findall(r"^#{1,6}\s+(.+?)\s*$", body, re.MULTILINE)}
+
+    anchor_cache: dict[Path, set[str]] = {}
+
     missing_targets: list[str] = []
     missing_anchors: list[str] = []
+    missing_cross_anchors: list[str] = []
     for doc in markdown:
         body = doc.read_text(encoding="utf-8", errors="replace")
-        anchors = {heading_slug(h)
-                   for h in re.findall(r"^#{1,6}\s+(.+?)\s*$", body, re.MULTILINE)}
+        anchors = anchors_of(body)
         rel = doc.relative_to(REPO_ROOT).as_posix()
         for match in re.finditer(r"\]\(([^)]+)\)", body):
             target = match.group(1).strip()
@@ -627,13 +633,27 @@ def main() -> int:
                 if fragment not in anchors:
                     missing_anchors.append(f"{rel}:{line} #{fragment}")
                 continue
-            if not (doc.parent / unquote(path_part)).resolve().exists():
+            resolved = (doc.parent / unquote(path_part)).resolve()
+            if not resolved.exists():
                 missing_targets.append(f"{rel}:{line} {path_part}")
+                continue
+            # A link into *another* document's heading breaks exactly as silently as one
+            # into its own, and renaming a heading is the common way to do it. Only
+            # Markdown targets have headings; a fragment on anything else is not ours to
+            # judge.
+            if fragment and resolved.suffix == ".md":
+                if resolved not in anchor_cache:
+                    anchor_cache[resolved] = anchors_of(
+                        resolved.read_text(encoding="utf-8", errors="replace"))
+                if fragment not in anchor_cache[resolved]:
+                    missing_cross_anchors.append(f"{rel}:{line} {path_part}#{fragment}")
 
     checker.check(f"every relative link in {len(markdown)} documents resolves",
                   not missing_targets, "; ".join(missing_targets[:3]))
     checker.check("every same-document anchor resolves to a heading",
                   not missing_anchors, "; ".join(missing_anchors[:3]))
+    checker.check("every cross-document anchor resolves to a heading in that document",
+                  not missing_cross_anchors, "; ".join(missing_cross_anchors[:3]))
 
     # ---- a document that names a test must name one that exists ----------------------
     # requirements.md cites tests as the evidence for each requirement, which is the only

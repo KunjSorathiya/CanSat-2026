@@ -33,7 +33,7 @@ finding, or a scoring recommendation that has been costed.
 | Item | Qty | Why | Status |
 |---|---:|---|---|
 | ~~**Perfboard**~~ | — | The vehicle board, plus one spare | **Held.** 2 × 100 × 100 mm, single-sided, isolated pads, 1.6 mm FR-4 ([C.9](receiving-inspection.md#c9--prototype-pcb-quantity-2)) |
-| ~~**Female headers**~~ | — | Was: socket every module rather than soldering it down | **Cancelled.** Superseded by the [module mounting decision of 2026-09-05](../design/wiring.md#module-mounting) — Pico and RA-02 soldered down, the other four jumpered onto **male** strips. See [D-2](assembly-procedure.md#d-2-no-sockets-the-2026-09-05-mounting-decision-stands) |
+| ~~**Female headers**~~ | — | Was: socket every module rather than soldering it down | **Cancelled.** Superseded by the [module mounting decision of 2026-09-05](../design/wiring.md#module-mounting) — Pico, RA-02 and the microSD reader soldered down, the other four jumpered onto **male** strips. See [D-2](assembly-procedure.md#d-2-no-sockets-the-2026-09-05-mounting-decision-stands) |
 | ~~**Solid-core hookup wire**, 22 AWG, several colours~~ | — | Board wiring. Solid core, not stranded — it seats in perfboard holes | **Held, confirmed 2026-09-06** |
 | ~~**Silicone stranded wire**, 22 AWG, red and black~~ | — | Battery leads only. Stranded survives flexing where solid core work-hardens and snaps | **Held, confirmed 2026-09-06** |
 | ~~**Male header strip**~~ | — | The board end of the four jumpered modules — 30 pins across five footprints | **Held, confirmed 2026-09-06.** Count it against the footprints before cutting any of it |
