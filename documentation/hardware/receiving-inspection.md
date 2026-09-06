@@ -77,8 +77,8 @@ and do not connect the battery to anything.
 | A.9 | 1S 3.7 V 1500 mAh 25C LiPo | 1125094 | 1 | **1** | Pack flat, no puffing visible | **Delivered as Pro-Range, not Orange.** Do not charge yet. See [D.4](#d4--battery) |
 | A.10 | Universal prototype PCB, 10 x 10 cm | 1031002 | 2 | **2** | No visible damage | Single-sided, isolated pads, edge rails |
 | A.11 | LM393 sound detection sensor | TBD | 1 | **1** | No visible damage | **Second batch, received 2026-09-06.** Four-pin board: `AO DO GND VCC`. See [D.5](#d5--the-lm393-sound-module) |
-| A.12 | Electrolytic capacitors, 10 µF and 100 µF | TBD | — | **3 + spares** | No visible damage | Second batch. Radial, 25 V and 50 V parts |
-| A.13 | Ceramic capacitors, 0.1 µF `104` | TBD | — | **present** | No visible damage | Second batch. Orange discs |
+| A.12 | Electrolytic capacitors | TBD | — | **3: one 10 µF 50 V, one 100 µF 50 V, one 100 µF 25 V** | No visible damage | Second batch. Sleeve print legible. Exactly what the design uses and no spares — see [D.7](#d7--the-capacitors) |
+| A.13 | Ceramic capacitors, 0.1 µF `104` | TBD | — | **2 visible** | No visible damage | Second batch. Orange discs, **print worn illegible**. **Short: six are needed**, one per module supply pin. See [D.7](#d7--the-capacitors) |
 | A.14 | Resistors: 100 kΩ, 33 kΩ, 1 kΩ | TBD | — | **~10 of each, taped in three groups** | No visible damage | Second batch. **Values read from the colour bands** in the three close-ups — see [D.6](#d6--the-resistors). **No 330 Ω arrived**; 1 kΩ serves both LEDs instead |
 
 > **Counted by hand on 2026-09-05 / KS. Every line matches the quantity ordered.** The
@@ -746,9 +746,9 @@ correct at their defaults.** That closes bring-up row 3.13a.
 
 ### D.6 · The resistors
 
-Three groups arrived taped together and were photographed separately so the bands could be read. **What follows is read from colour bands, which is what a part claims to be, not what it measures.** Meter one from each group before fitting — it takes half a minute and the `GP26` divider is the one place a wrong value produces a plausible number rather than an obvious failure.
+Three groups arrived taped together and were photographed separately so the bands could be read. **The bands were then checked against the meter on 2026-09-06 and all three agree.** That order matters: the photograph says what the part claims, the meter says what it is, and only the second belongs in a design. The `GP26` divider is the one place a wrong value would have produced a plausible number rather than an obvious failure, so it is the one that most needed checking.
 
-| Photograph | Body | Bands | Value | Use |
+| Photograph | Body | Bands | Value — **band-read and metered, agreeing** | Use |
 |---|---|---|---|---|
 | [`resistors-100k-5pct.jpg`](photos/resistors-100k-5pct.jpg) | Beige, carbon film | brown‑black‑yellow‑gold | **100 kΩ ±5 %** | Spare. The divider uses the 1 % parts instead |
 | [`resistors-33k-1pct.jpg`](photos/resistors-33k-1pct.jpg) | Blue, metal film | orange‑orange‑black‑red‑brown | **33 kΩ ±1 %** | **The `GP26` battery divider**, two in series |
@@ -757,6 +757,40 @@ Three groups arrived taped together and were photographed separately so the band
 **Two of these are four-band and one is five-band, and the four-band pair were photographed with the gold tolerance band on the left** — so they read right to left. That is not pedantry: read the wrong way a `brown‑black‑yellow‑gold` part becomes an invalid code rather than a wrong number, which is the good case. The five-band 33 kΩ is the dangerous one, because it reads as a plausible 1.2 kΩ backwards. Its tolerance band is the brown one set slightly apart at the right.
 
 **No 330 Ω arrived**, which the purchase list had asked for. It does not matter: 1 kΩ drives both LEDs at about 1.3 mA, which is visible and *reduces* the load budget. If the power LED proves too dim outdoors, two 1 kΩ in parallel give 500 Ω and 2.6 mA.
+
+---
+
+### D.7 · The capacitors
+
+Photographed as
+[`capacitors-2026-09-06.jpg`](photos/capacitors-2026-09-06.jpg), cropped from the batch shot.
+
+| Part | Read from | Quantity in the photograph | Where it goes |
+|---|---|---|---|
+| **10 µF 50 V** electrolytic | Sleeve print, legible | **1** | RA-02 supply pins, with a `104` beside it |
+| **100 µF 50 V** electrolytic | Sleeve print, legible | **1** | microSD supply pins — **in parallel with the one below** |
+| **100 µF 25 V** electrolytic | Sleeve print, legible | **1** | microSD supply pins, the other half of the pair |
+| **0.1 µF ceramic disc** | **Print worn illegible.** The value comes from the purchase, not from the part | **2 visible** | One at every module's supply pins |
+
+Two 100 µF in parallel is 200 µF at the microSD, against the
+[~50 µF the write spike actually needs](../design/electrical-architecture.md#how-much-bulk-is-actually-needed).
+Mixing a 50 V and a 25 V part in that pair is fine: both are far above a 3.3 V rail, and an
+electrolytic has no DC-bias derating, so each contributes its full marking.
+
+**Two shortfalls, and only one of them matters:**
+
+- **The `104` ceramics are short.** Every module supply pin wants one — microSD, RA-02,
+  MPU-6500, BMP280, NEO-6M and the sound board is six, and two are visible here. They cost
+  about ₹2 each. **Buy more before the board is built**, because a bulk capacitor of any
+  type is too slow for the fast edges these cover, and this is not a part to be short of
+  halfway through soldering.
+- **One 10 µF rather than the four listed.** One is all the design uses. Spares are only
+  spares.
+
+**The disc print being unreadable is worth stating plainly.** The value on record is what
+was ordered, not what was verified — an orange disc looks the same at 100 pF as at 0.1 µF.
+Anything with a capacitance range on it will settle them in seconds; if the meter has none,
+fit them and treat a rail that misbehaves at high frequency as a suspect.
 
 ---
 

@@ -24,6 +24,7 @@ Taken 2026-09-04, on delivery. Transcribed in
 | `1031002-protoboard-front.jpg` · `-back.jpg` | Prototype PCB | `10*10CM 2.54MM`, single-sided, isolated pads, edge rails, `A`–`K`/`01`–`35` grid |
 | `lm393-sound-front.jpg` | LM393 sound module | **Four-pin header `AO DO GND VCC`** — the fact that decides whether the analogue channel exists at all. `LM393` `49M` `BWQ64` SOIC, cermet gain trimpot, electret capsule with `+`/`−` pad marks, `PWR-LED` and `DO-LED` indicators, SMD resistors marked `102` and `201`. Transcribed in [receiving-inspection.md](../receiving-inspection.md) D.5 |
 | `passives-2026-09-06.jpg` | Second-batch passives, as delivered | The capacitors (`10µF 50V`, `100µF 50V`, `100µF 25V`, ceramic `104` discs) and all three resistor groups in one frame. Quantities and layout; the values come from the three close-ups below |
+| `capacitors-2026-09-06.jpg` | The capacitors | **`10µF 50V`, `100µF 50V`, `100µF 25V`** read off the sleeves, and one ceramic disc whose print is worn illegible. Quantities as delivered — see [D.7](../receiving-inspection.md#d7--the-capacitors) |
 | `resistors-100k-5pct.jpg` | Resistor group 1 | **100 kΩ ±5 %.** Carbon film, beige body, four bands: brown‑black‑yellow‑gold |
 | `resistors-33k-1pct.jpg` | Resistor group 2 | **33 kΩ ±1 %.** Metal film, blue body, five bands: orange‑orange‑black‑red‑brown |
 | `resistors-1k-5pct.jpg` | Resistor group 3 | **1 kΩ ±5 %.** Mint body, four bands: brown‑black‑red‑gold |

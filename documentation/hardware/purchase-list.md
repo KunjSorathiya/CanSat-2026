@@ -19,7 +19,7 @@ finding, or a scoring recommendation that has been costed.
 | JST-RCY female pigtail | To mate the battery's discharge lead |
 | Header strips | Soldered to both Picos and every module on 2026-09-04 |
 | Power switch, LEDs, and their resistors | Held. An I/O switch and LEDs in two colours, confirmed 2026-09-06 |
-| Capacitors — 10 µF, 100 µF, 0.1 µF `104` | **Received 2026-09-06.** Radial electrolytics at 25 V and 50 V, and ceramic discs |
+| Capacitors — 10 µF 50 V ×1, 100 µF 50 V ×1, 100 µF 25 V ×1 | **Received 2026-09-06** ([D.7](receiving-inspection.md#d7--the-capacitors)). Exactly what the design uses, with no spares |
 | Resistors: 100 kΩ 5 %, 33 kΩ 1 %, 1 kΩ 5 % | **Received 2026-09-06** and read from their bands ([D.6](receiving-inspection.md#d6--the-resistors)). The 33 kΩ pair is the `GP26` divider, 1 kΩ drives both LEDs, 100 kΩ is spare. **No 330 Ω arrived and none is needed** |
 | Hall effect sensor | Held, and **not being used** (decided 2026-09-06). Its supply voltage was never confirmed, and with sensor integration already at its 25-point cap it would have scored nothing. Kept as a spare part, not a planned one |
 | LM393 sound detection sensor | Held, confirmed 3.3 V, and confirmed the **four-pin `AO DO GND VCC` variant** on 2026-09-06. Integrated on `GP27` (level) and `GP15` (threshold duty), logged to the SD card, not transmitted |
@@ -46,10 +46,10 @@ what stop that happening on the soldered board. Values and reasoning:
 
 | Item | Qty | Where it goes | ~₹ |
 |---|---:|---|---:|
-| **100 µF 25 V electrolytic**, two in parallel | 4 | Across the microSD reader's own `3V3` and `GND` pins — two in parallel gives 200 µF, against a [~50 µF requirement](../design/electrical-architecture.md#how-much-bulk-is-actually-needed). 470 µF is not stocked locally and is not needed. **A 25 V electrolytic on a 3.3 V rail has no DC-bias derating**, unlike a ceramic, so the marking is what you get. Buy four: two fitted, one for `VSYS`, one spare | 12 |
+| ~~100 µF electrolytic~~ | — | **Received: one 50 V and one 25 V.** The pair goes in parallel across the microSD's own `3V3` and `GND`, giving 200 µF against a [~50 µF requirement](../design/electrical-architecture.md#how-much-bulk-is-actually-needed). Mixing the two voltage ratings is fine — both are far above 3.3 V, and an electrolytic has no DC-bias derating, so each contributes its full marking. **Nothing is left over for `VSYS`**, which was optional | — |
 
-| **10 µF 25 V electrolytic** | 4 | Across the RA-02's `3.3V` and `GND`. PA key-up is 1.5 mA to 87 mA in microseconds. Two fitted, two spare | 12 |
-| **0.1 µF 50 V ceramic**, marked `104` | 20 | One at **every** module's supply pins. Not optional and not substitutable: every bulk capacitor, of every type, is too slow for fast edges | 40 |
+| ~~10 µF electrolytic~~ | — | **Received: one, 50 V.** It goes across the RA-02's `3.3V` and `GND` — PA key-up is 1.5 mA to 87 mA in microseconds. One is all the design uses; there is no spare | — |
+| **0.1 µF 50 V ceramic**, marked `104` — **STILL SHORT** | **at least 6 more** | Two arrived and six are needed: microSD, RA-02, MPU-6500, BMP280, NEO-6M and the sound board. Not optional and not substitutable — every bulk capacitor, of every type, is too slow for the fast edges these cover. At ₹2 each, buy twenty | 40 |
 
 > Electrolytics are polarised — the stripe marks the **negative** leg, to GND. Backwards they
 > heat and can vent. Ceramics have no polarity.
