@@ -87,6 +87,8 @@ Run against the repository on 2026-09-06. ✅ settled, ⚠️ needs your eyes at
 | 32 | `team_id` is still the `CAN-Team-XX` placeholder | Blocks flight, not soldering |
 | 33 | Antenna centre contacts unphotographed — SMA or RP-SMA | Blocks *reordering* an antenna, not this build |
 | 34 | No reverse-polarity protection anywhere on the vehicle | The JST-RCY is keyed, so the risk is one badly wired pigtail. Step 15 meters it before the first mate |
+| 36 | **The Pico ADC carries a documented ~30 mV offset**, from ~150 µA of ADC current through the 200 Ω filter feeding `ADC_AVDD` (Pico datasheet §4.3). On a 2:1 divider that is **~60 mV referred to the pack** — larger than anything the withdrawn `GP26` capacitor addressed | **Does not block, and needs no wire.** It is a systematic offset, so the step 14 comparison against a metered pack absorbs it into the calibration |
+| 37 | **SMPS ripple reaches the ADC supply.** The datasheet's remedy is to drive `GPIO23` high, forcing the RT6150 into PWM mode; `pico_hal.cpp` never touches it | Firmware only, no wiring. Can be done at any time, and toggled around the reading to keep the light-load efficiency |
 | 35a | **No Schottky between the switch and `VSYS`.** Until one is fitted, USB back-powers the battery whenever both are connected — [D-6](#d-6-a-schottky-goes-between-the-switch-and-vsys) | **Blocks nothing, but changes how you work.** Battery switch OFF whenever USB is in, for every gate from 1 to 14 |
 | 35 | **The RP2040 datasheet is not in this repository.** `datasheets/` holds the Pico datasheet and the BMP280 one; the ADC sample time and sample capacitance that would settle whether a 16.5 kΩ divider needs help are in the RP2040 document | Does not block, and no longer decides anything: the `104` it would have justified is [deferred](#d-7-the-100-nf-at-gp26-is-deferred-not-fitted) until step 14 measures the divider |
 
@@ -511,6 +513,23 @@ will actually count on the board**, from pin 1 at the USB end of the left row.
 
 Everything not listed stays unconnected. That includes `VBUS` (40), `3V3_EN` (37), `RUN` (30),
 `ADC_VREF` (35) and `GP28` (34).
+
+> [!IMPORTANT]
+> **`AGND`, pin 33, is not the same net as the other grounds.** The Pico datasheet: *"there is a
+> separate analog ground plane running under these signals and terminating at this pin."* Pins 3,
+> 8, 13, 18, 23, 28 and 38 are one digital-ground net; pin 33 is a plane of its own that meets
+> them inside the RP2040, not on the board. **It must be wired**, at one point to the GND ring
+> beside pin 38, and the divider's lower leg and the microphone's ground return should go to it
+> rather than to the nearest digital ground. That is the entire reason the plane exists.
+
+> [!NOTE]
+> **`GP28`, pin 34, is deliberately left unwired.** The datasheet offers a zero-reference trick —
+> tie a second ADC channel to ground and subtract it — which would correct the ~30 mV offset in
+> [open item 36](#design-items-still-open). It is not taken, for three reasons: it is inert
+> without firmware that does not exist; the step 14 calibration absorbs a *fixed* offset for
+> free; and pins 33 and 34 are **adjacent**, so it is a one-joint retrofit at any later date.
+> If it is ever added, use a short wire link rather than a solder bridge — a deliberate bridge
+> and an accidental one look identical to the next person inspecting this board.
 
 > [!CAUTION]
 > **`VBUS`, pin 40, is the most dangerous unused pin on this board.** It is the raw 5 V from the

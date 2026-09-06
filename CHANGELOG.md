@@ -10,6 +10,21 @@ development cycle.
 
 ## [Unreleased] — 2026-09-06 (cycle 34)
 
+### Added — `AGND` is its own plane, and the ADC's real error is offset, not impedance
+
+Asked whether the Pico's grounds are all internally connected to `AGND`. **On the board, no.** The datasheet: *"there is a separate analog ground plane running under these signals and terminating at this pin."* Pins 3, 8, 13, 18, 23, 28 and 38 are one digital-ground net; **pin 33 is a plane of its own**, meeting them inside the RP2040 rather than on the PCB. It has to be wired, at one point to the GND ring beside pin 38 — and the divider's lower leg and the microphone's return belong on it rather than on the nearest digital ground, which is the whole reason the plane is there.
+
+Reading that page turned up two things that matter more than the capacitor withdrawn earlier in this cycle ever did.
+
+**The ADC carries a documented ~30 mV offset.** §4.3: the ADC draws about 150 µA through the 200 Ω filter feeding `ADC_AVDD`, *"an inherent offset of about 150 µA × 200 Ω = ~30 mV"*, varying with sampling and temperature. Through a 2:1 divider that is **~60 mV referred to the pack** — comfortably larger than the source-impedance effect the withdrawn `104` was invented to fix. It needs no part: a systematic offset is exactly what the step 14 comparison against a metered pack absorbs into the calibration.
+
+**SMPS ripple reaches the ADC supply, and the fix is free.** Driving `GPIO23` high forces the RT6150 into PWM mode and *"can greatly reduce the inherent ripple"*. `pico_hal.cpp` calls `adc_init()` and two `adc_gpio_init()`s and never touches it. Firmware only, no wiring, and it can be toggled around the reading to keep the light-load efficiency.
+
+**`GP28` stays unwired, deliberately.** The datasheet's zero-reference trick — tie a second ADC channel to ground and subtract — would track the offset as it drifts. It is declined for now: inert without firmware that does not exist, redundant against a one-time calibration on a flight lasting minutes, and pins 33 and 34 are adjacent, so it is a one-joint retrofit whenever it is wanted.
+
+The pattern is worth stating plainly, since it is the fourth time this cycle: **the answers were in a PDF this repository has held since day one.** Three corrections and two genuine improvements came out of finally opening it.
+
+
 ### Fixed — `GND` is on one side of the RA-02's supply pin, not both
 
 Five documents said the RA-02's `3.3V` pin sits **"with `GND` either side of it"**. The transcribed silkscreen, printed directly above that sentence in two of them, says:
