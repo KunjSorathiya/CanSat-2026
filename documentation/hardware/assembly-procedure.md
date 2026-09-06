@@ -207,6 +207,14 @@ USB left, component side up, pin 1 at the bottom-left:
 
 ### The bands that follow
 
+![Vehicle board physical layout](diagrams/board-layout-to-scale.svg)
+
+**Drawn to scale**, hole for hole, at
+[board-layout-to-scale.svg](diagrams/board-layout-to-scale.svg) — regenerate it with
+`python tools/gen_board_layout.py` from the repository root. The sketch below is the same
+thing in one glance:
+
+
 ```text
   TOP EDGE - GND ring, 3V3 ring just inside it
  +---------------------------------------------------------------+
