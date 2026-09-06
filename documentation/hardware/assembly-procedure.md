@@ -364,6 +364,10 @@ analogue lines their own returns.
 
 ## The power path
 
+![Battery to Pico power path](diagrams/power-path-battery-to-pico.svg)
+
+*One picture of the whole chain: [power-path-battery-to-pico.svg](diagrams/power-path-battery-to-pico.svg).*
+
 ```mermaid
 flowchart TD
     BAT["Pro-Range 1S LiPo<br/>1500 mAh 25C · 3.0–4.2 V"]

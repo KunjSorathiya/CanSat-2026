@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 900" width="1320" height="900" font-family="ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="aRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c02626"/>
+    </marker>
+    <marker id="aAmb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c2650a"/>
+    </marker>
+    <marker id="aInk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0f172a"/>
+    </marker>
+  </defs>
+
+  <rect width="1320" height="900" fill="#ffffff"/>
+
+  <text x="40" y="46" font-size="27" font-weight="700" fill="#0f172a">Battery to Pico — the power path</text>
+  <text x="40" y="72" font-size="14.5" fill="#64748b">CanSat 2026 · one 3.3 V rail · no external regulator, because the Pico already contains a better one</text>
+  <line x1="40" y1="90" x2="1280" y2="90" stroke="#e2e8f0" stroke-width="2"/>
+
+  <!-- ================= UNREGULATED SIDE ================= -->
+
+  <!-- battery -->
+  <rect x="40" y="130" width="150" height="104" rx="10" fill="#fff" stroke="#c02626" stroke-width="2.5"/>
+  <text x="115" y="160" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">1S LiPo</text>
+  <text x="115" y="179" font-size="11.5" fill="#64748b" text-anchor="middle">Pro-Range</text>
+  <text x="115" y="195" font-size="11.5" fill="#64748b" text-anchor="middle">1500 mAh · 25C</text>
+  <text x="115" y="218" font-size="12.5" font-weight="700" fill="#c02626" text-anchor="middle">3.0 – 4.2 V</text>
+  <text x="197" y="150" font-size="14" font-weight="700" fill="#c02626">+</text>
+  <text x="105" y="250" font-size="14" font-weight="700" fill="#0f172a">−</text>
+
+  <!-- battery + to JST -->
+  <line x1="190" y1="160" x2="225" y2="160" stroke="#c02626" stroke-width="3"/>
+
+  <!-- JST -->
+  <rect x="225" y="142" width="72" height="36" rx="5" fill="#fff" stroke="#c02626" stroke-width="2"/>
+  <text x="261" y="165" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="middle">JST-RCY</text>
+  <text x="261" y="196" font-size="10.5" fill="#64748b" text-anchor="middle">red = +, metered</text>
+
+  <line x1="297" y1="160" x2="330" y2="160" stroke="#c02626" stroke-width="3"/>
+
+  <!-- switch -->
+  <rect x="330" y="132" width="120" height="56" rx="7" fill="#fff" stroke="#c02626" stroke-width="2.5"/>
+  <text x="390" y="152" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">SPST switch</text>
+  <line x1="352" y1="172" x2="368" y2="172" stroke="#0f172a" stroke-width="2"/>
+  <circle cx="369" cy="172" r="2.6" fill="#0f172a"/>
+  <line x1="371" y1="171" x2="406" y2="163" stroke="#0f172a" stroke-width="2"/>
+  <circle cx="410" cy="172" r="2.6" fill="#0f172a"/>
+  <line x1="411" y1="172" x2="428" y2="172" stroke="#0f172a" stroke-width="2"/>
+  <text x="390" y="208" font-size="10.5" fill="#64748b" text-anchor="middle">in the + lead, ahead of everything</text>
+
+  <!-- switched node -->
+  <line x1="450" y1="160" x2="700" y2="160" stroke="#c02626" stroke-width="3" marker-end="url(#aRed)"/>
+  <circle cx="510" cy="160" r="5.5" fill="#c02626"/>
+  <text x="510" y="122" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="middle">switched node</text>
+  <text x="600" y="150" font-size="11" fill="#64748b" text-anchor="middle">unregulated</text>
+
+  <!-- node down to divider -->
+  <line x1="510" y1="160" x2="510" y2="300" stroke="#c02626" stroke-width="3"/>
+
+  <!-- ================= DIVIDER ================= -->
+  <rect x="400" y="300" width="270" height="190" rx="9" fill="#fdfdfe" stroke="#cbd5e1" stroke-width="1.6"/>
+  <text x="418" y="324" font-size="13" font-weight="700" fill="#0f172a">Battery divider</text>
+
+  <line x1="510" y1="300" x2="510" y2="344" stroke="#c02626" stroke-width="2.5"/>
+  <rect x="497" y="344" width="26" height="34" fill="#fff" stroke="#0f172a" stroke-width="1.8"/>
+  <text x="489" y="366" font-size="11" fill="#0f172a" text-anchor="end">33 kΩ 1 %</text>
+  <line x1="510" y1="378" x2="510" y2="412" stroke="#0f172a" stroke-width="2.5"/>
+  <circle cx="510" cy="395" r="4.5" fill="#0f172a"/>
+  <rect x="497" y="412" width="26" height="34" fill="#fff" stroke="#0f172a" stroke-width="1.8"/>
+  <text x="489" y="434" font-size="11" fill="#0f172a" text-anchor="end">33 kΩ 1 %</text>
+  <line x1="510" y1="446" x2="510" y2="470" stroke="#0f172a" stroke-width="2.5"/>
+
+  <!-- tap out to GP26 -->
+  <line x1="510" y1="395" x2="640" y2="395" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="640" y1="395" x2="640" y2="352" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="640" y1="352" x2="700" y2="352" stroke="#0f172a" stroke-width="2.5" marker-end="url(#aInk)"/>
+  <text x="596" y="386" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="middle">2.10 V at 4.20 V</text>
+
+  <!-- 100 nF on the tap -->
+  <line x1="592" y1="395" x2="592" y2="424" stroke="#0f172a" stroke-width="2"/>
+  <line x1="578" y1="424" x2="606" y2="424" stroke="#0f172a" stroke-width="2.4"/>
+  <line x1="578" y1="431" x2="606" y2="431" stroke="#0f172a" stroke-width="2.4"/>
+  <line x1="592" y1="431" x2="592" y2="470" stroke="#0f172a" stroke-width="2"/>
+  <text x="614" y="432" font-size="10.5" fill="#0f172a">100 nF</text>
+
+  <!-- divider ground out to the left -->
+  <line x1="592" y1="470" x2="410" y2="470" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="410" y1="470" x2="410" y2="810" stroke="#0f172a" stroke-width="2.5"/>
+  <text x="418" y="484" font-size="10.5" fill="#64748b">ratio 2 : 1 · 64 µA · off the switched node</text>
+
+  <!-- ================= PICO ================= -->
+  <rect x="700" y="110" width="340" height="280" rx="12" fill="#fbfcfe" stroke="#334155" stroke-width="2.5"/>
+  <text x="870" y="138" font-size="16" font-weight="700" fill="#0f172a" text-anchor="middle">Raspberry Pi Pico</text>
+
+  <!-- pin badges -->
+  <rect x="666" y="148" width="72" height="24" rx="5" fill="#fff" stroke="#c02626" stroke-width="1.8"/>
+  <text x="702" y="165" font-size="11" font-weight="700" fill="#c02626" text-anchor="middle" font-family="ui-monospace, Consolas, monospace">39 VSYS</text>
+
+  <rect x="666" y="340" width="72" height="24" rx="5" fill="#fff" stroke="#334155" stroke-width="1.8"/>
+  <text x="702" y="357" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="ui-monospace, Consolas, monospace">31 GP26</text>
+
+  <rect x="1002" y="148" width="86" height="24" rx="5" fill="#fff" stroke="#c2650a" stroke-width="1.8"/>
+  <text x="1045" y="165" font-size="11" font-weight="700" fill="#c2650a" text-anchor="middle" font-family="ui-monospace, Consolas, monospace">36 3V3 OUT</text>
+
+  <rect x="1002" y="340" width="86" height="24" rx="5" fill="#fff" stroke="#0f172a" stroke-width="1.8"/>
+  <text x="1045" y="357" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="ui-monospace, Consolas, monospace">38 · 33 GND</text>
+
+  <!-- RT6150 -->
+  <rect x="742" y="200" width="256" height="82" rx="8" fill="#fff" stroke="#c2650a" stroke-width="2.2"/>
+  <text x="870" y="226" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">RT6150 buck-boost</text>
+  <text x="870" y="247" font-size="12" fill="#334155" text-anchor="middle">1.8 – 5.5 V in  →  3.3 V out</text>
+  <text x="870" y="267" font-size="11" fill="#64748b" text-anchor="middle">on the Pico already · nothing external needed</text>
+
+  <line x1="738" y1="160" x2="742" y2="160" stroke="#c02626" stroke-width="3"/>
+  <line x1="770" y1="160" x2="770" y2="200" stroke="#c02626" stroke-width="3"/>
+  <line x1="738" y1="160" x2="770" y2="160" stroke="#c02626" stroke-width="3"/>
+  <line x1="970" y1="200" x2="970" y2="160" stroke="#c2650a" stroke-width="3"/>
+  <line x1="970" y1="160" x2="1002" y2="160" stroke="#c2650a" stroke-width="3"/>
+  <text x="870" y="308" font-size="11" fill="#64748b" text-anchor="middle">RP2040 draws ~35 mA from this same regulator</text>
+
+  <!-- ================= TEST LINK ================= -->
+  <line x1="1088" y1="160" x2="1120" y2="160" stroke="#c2650a" stroke-width="3"/>
+  <rect x="1120" y="138" width="104" height="44" rx="6" fill="#fff" stroke="#c2650a" stroke-width="2.2"/>
+  <circle cx="1146" cy="160" r="5" fill="#c2650a"/>
+  <circle cx="1198" cy="160" r="5" fill="#c2650a"/>
+  <line x1="1146" y1="160" x2="1198" y2="160" stroke="#c2650a" stroke-width="4"/>
+  <text x="1172" y="200" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="middle">test link</text>
+
+  <rect x="1096" y="214" width="196" height="84" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.4"/>
+  <text x="1108" y="234" font-size="10.8" fill="#334155">Pull the jumper, put a meter</text>
+  <text x="1108" y="249" font-size="10.8" fill="#334155">across it, and read total</text>
+  <text x="1108" y="264" font-size="10.8" fill="#334155">peripheral current — never</text>
+  <text x="1108" y="279" font-size="10.8" fill="#334155">measured on this project.</text>
+  <text x="1108" y="294" font-size="10.8" font-weight="700" fill="#991b1b">Solder it shut afterwards.</text>
+
+  <!-- 3V3 route down and back -->
+  <line x1="1224" y1="160" x2="1262" y2="160" stroke="#c2650a" stroke-width="3"/>
+  <line x1="1262" y1="160" x2="1262" y2="560" stroke="#c2650a" stroke-width="3"/>
+  <line x1="1262" y1="560" x2="690" y2="560" stroke="#c2650a" stroke-width="3" marker-end="url(#aAmb)"/>
+
+  <!-- ================= WARNING ================= -->
+  <rect x="700" y="404" width="392" height="104" rx="9" fill="#fef2f2" stroke="#fecaca" stroke-width="1.8"/>
+  <text x="716" y="427" font-size="12.5" font-weight="700" fill="#991b1b">It regulates down to VSYS ≈ 1.8 V</text>
+  <text x="716" y="447" font-size="11.2" fill="#7f1d1d">— far below the cell's ~3.0 V floor. So the 3.3 V rail never</text>
+  <text x="716" y="462" font-size="11.2" fill="#7f1d1d">sags as the pack dies, and nothing warns you. It will keep</text>
+  <text x="716" y="477" font-size="11.2" fill="#7f1d1d">running the vehicle while draining the cell into damage.</text>
+  <text x="716" y="496" font-size="11.2" font-weight="700" fill="#991b1b">There is no hardware cutoff. GP26 + the switch are all there is.</text>
+
+  <!-- ================= DISTRIBUTION NODE ================= -->
+  <rect x="440" y="534" width="250" height="54" rx="8" fill="#fff" stroke="#c2650a" stroke-width="2.5"/>
+  <text x="565" y="556" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">3.3 V distribution node</text>
+  <text x="565" y="576" font-size="11" fill="#64748b" text-anchor="middle">the only supply node on the vehicle</text>
+
+  <rect x="100" y="524" width="306" height="74" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.4"/>
+  <text x="114" y="546" font-size="11.5" font-weight="700" fill="#0f172a">300 mA guidance on pin 36</text>
+  <text x="114" y="564" font-size="10.8" fill="#334155">− 35 mA for the RP2040 itself</text>
+  <text x="114" y="581" font-size="10.8" font-weight="700" fill="#334155">≈ 250 mA for everything else. 19 mA spare.</text>
+
+  <!-- fan out -->
+  <line x1="500" y1="588" x2="270" y2="640" stroke="#c2650a" stroke-width="2.6" marker-end="url(#aAmb)"/>
+  <line x1="565" y1="588" x2="575" y2="640" stroke="#c2650a" stroke-width="2.6" marker-end="url(#aAmb)"/>
+  <line x1="640" y1="588" x2="900" y2="640" stroke="#c2650a" stroke-width="2.6" marker-end="url(#aAmb)"/>
+
+  <!-- loads -->
+  <rect x="120" y="640" width="280" height="120" rx="9" fill="#fff" stroke="#c2650a" stroke-width="2"/>
+  <text x="260" y="665" font-size="13.5" font-weight="700" fill="#0f172a" text-anchor="middle">microSD reader</text>
+  <text x="260" y="685" font-size="11" font-weight="700" fill="#c2650a" text-anchor="middle">STARRED — own pair, direct</text>
+  <text x="260" y="705" font-size="11" fill="#334155" text-anchor="middle">100 µF ∥ 100 µF ∥ 104 at its pins</text>
+  <text x="260" y="723" font-size="10.5" fill="#64748b" text-anchor="middle">~100 mA write spike, a few ms</text>
+  <text x="260" y="742" font-size="10.5" fill="#64748b" text-anchor="middle">this is the wire F-10 killed</text>
+
+  <rect x="430" y="640" width="290" height="120" rx="9" fill="#fff" stroke="#c2650a" stroke-width="2"/>
+  <text x="575" y="665" font-size="13.5" font-weight="700" fill="#0f172a" text-anchor="middle">3V3 ring — light loads</text>
+  <text x="575" y="687" font-size="11" fill="#334155" text-anchor="middle">MPU-6500 · BMP280 · NEO-6M</text>
+  <text x="575" y="705" font-size="11" fill="#334155" text-anchor="middle">LM393 · power LED</text>
+  <text x="575" y="726" font-size="10.5" fill="#64748b" text-anchor="middle">one 104 at every module's pins</text>
+  <text x="575" y="744" font-size="10.5" fill="#64748b" text-anchor="middle">single-digit mA between them</text>
+
+  <rect x="790" y="640" width="260" height="120" rx="9" fill="#fff" stroke="#c2650a" stroke-width="2"/>
+  <text x="920" y="665" font-size="13.5" font-weight="700" fill="#0f172a" text-anchor="middle">SX1278 RA-02</text>
+  <text x="920" y="685" font-size="11" font-weight="700" fill="#c2650a" text-anchor="middle">STARRED — own pair, direct</text>
+  <text x="920" y="705" font-size="11" fill="#334155" text-anchor="middle">10 µF ∥ 104 at its pins</text>
+  <text x="920" y="723" font-size="10.5" fill="#64748b" text-anchor="middle">1.5 mA → 87 mA in microseconds</text>
+  <text x="920" y="742" font-size="10.5" fill="#64748b" text-anchor="middle">45 times a minute</text>
+
+  <!-- ================= GROUND ================= -->
+  <line x1="115" y1="234" x2="115" y2="810" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="260" y1="760" x2="260" y2="810" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="575" y1="760" x2="575" y2="810" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="920" y1="760" x2="920" y2="810" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="1045" y1="364" x2="1045" y2="390" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="1045" y1="390" x2="1150" y2="390" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="1150" y1="390" x2="1150" y2="810" stroke="#0f172a" stroke-width="2.5"/>
+
+  <line x1="80" y1="810" x2="1180" y2="810" stroke="#0f172a" stroke-width="4"/>
+  <text x="90" y="832" font-size="11.5" font-weight="700" fill="#0f172a">GND ring — hand-built, because this board has no plane. AGND (pin 33) ties to it at exactly one point, beside pin 38.</text>
+
+  <!-- ================= LEGEND / FOOTNOTE ================= -->
+  <line x1="40" y1="854" x2="1280" y2="854" stroke="#e2e8f0" stroke-width="2"/>
+  <line x1="44" y1="874" x2="82" y2="874" stroke="#c02626" stroke-width="3.5"/>
+  <text x="90" y="878" font-size="11.5" fill="#334155">3.0 – 4.2 V, unregulated</text>
+  <line x1="256" y1="874" x2="294" y2="874" stroke="#c2650a" stroke-width="3.5"/>
+  <text x="302" y="878" font-size="11.5" fill="#334155">3.3 V, regulated</text>
+  <line x1="428" y1="874" x2="466" y2="874" stroke="#0f172a" stroke-width="3.5"/>
+  <text x="474" y="878" font-size="11.5" fill="#334155">ground / sense</text>
+  <text x="620" y="878" font-size="11.5" fill="#64748b">Pins 31, 33, 36, 38 and 39 are all on the Pico's top row with USB to the left — positions here are logical, not physical.</text>
+</svg>

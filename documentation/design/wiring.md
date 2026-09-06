@@ -308,6 +308,9 @@ that transmits once a second. See
 
 ## Power tree (provisional)
 
+Drawn as built, with pin numbers, voltages and the two starred loads:
+[power-path-battery-to-pico.svg](../hardware/diagrams/power-path-battery-to-pico.svg).
+
 ```mermaid
 flowchart TD
     BAT["1S LiPo · 3.7 V nominal · about 4.2 V full · 1500 mAh"]
