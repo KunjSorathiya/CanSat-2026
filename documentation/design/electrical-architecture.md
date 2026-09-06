@@ -190,6 +190,7 @@ five centimetres away, through the same jumper, does very little.
 | Same module, same pins | **100 nF** | Ceramic `104` | As above |
 | **MPU-6500, BMP280, NEO-6M** | **100 nF each** | Ceramic `104` | Ordinary practice. These draw single-digit milliamps and need nothing bulk |
 | **Pico `VSYS`, near the battery input** | **100 µF** | Electrolytic ≥ 10 V | The battery leads have inductance and the LiPo is at the end of them. Optional; fit it if the rail looks noisy under load |
+| **`GP26`, the divider tap to the `AGND` tie** | **100 nF** | Ceramic `104` | **Not decoupling.** A charge reservoir for the ADC's sample-and-hold, because the divider's 16.5 kΩ source impedance is high for an RP2040 input — and, incidentally, a short to ground for anything the SPI bundle couples in. See [Signal routing](../hardware/assembly-procedure.md#signal-routing-and-why-spacing-is-the-wrong-lever). Do **not** fit the equivalent on `AO`: that line carries the measurement |
 
 The Pico's own 3.3 V rail is already decoupled on the Pico. Nothing needs adding there.
 

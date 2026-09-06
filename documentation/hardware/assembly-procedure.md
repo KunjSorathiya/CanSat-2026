@@ -19,6 +19,7 @@ only new decisions on this page.
 - [Decisions taken here](#decisions-taken-here)
 - [What you must confirm on the bench first](#what-you-must-confirm-on-the-bench-first)
 - [Floorplan](#floorplan)
+- [Signal routing](#signal-routing-and-why-spacing-is-the-wrong-lever)
 - [The power path](#the-power-path)
 - [Physical pin reference](#physical-pin-reference)
 - [Wiring diagrams](#wiring-diagrams)
@@ -72,6 +73,7 @@ Run against the repository on 2026-09-06. ✅ settled, ⚠️ needs your eyes at
 | 24 | Silicone stranded wire, red and black, for the battery lead | ✅ **Held, confirmed 2026-09-06 / KS** |
 | 25 | Male header strips, enough for four module footprints | ✅ **Held, confirmed 2026-09-06 / KS.** Strips were consumed fitting every board on 2026-09-04 and the remainder was never counted; enough survives |
 | 26 | Solder, flux, braid | ⚠️ An iron and solder are recorded; flux and braid are not |
+| 26a | RA-02 and Pico seat in the perfboard grid | ✅ **Confirmed by insertion 2026-09-06 / KS.** A module whose rows drop into holes has whole-pitch row spacing; no caliper reading was needed |
 | 27 | A third 100 µF, for the optional `VSYS` bulk capacitor | ⚠️ Two are consumed by the microSD pair. If no third exists, skip it — it was always optional |
 
 ### Design items still open
@@ -277,8 +279,9 @@ thing that can disagree with the board.
 | Power zone | Left margin, beside pins 36, 38 and 39 | Distribution nodes, test link, both 33 kΩ, switch terminals, battery entry |
 | Both LEDs | Bottom right, near pin 19 | Must sit behind whatever window the airframe gets |
 
-**Dry-fit everything before any solder.** The RA-02's two 8-pin rows and the Pico's two 20-pin
-rows must land on real holes at real spacing; measure, do not assume.
+**The RA-02 seats in the grid**, confirmed by insertion on 2026-09-06. That is the whole of the
+question a caliper was going to answer: a module whose two rows drop into holes is a module
+whose row spacing is a whole multiple of 2.54 mm. The Pico's 7-pitch rows seat likewise.
 
 Four things must be clear before the first joint, and none of them is a component:
 
@@ -288,6 +291,74 @@ Four things must be clear before the first joint, and none of them is a componen
   the sound module and the top-right one is where the microSD wants to go.
 - **The power zone**, before the BMP280 strip creeps up into it.
 - **The USB cutout**, decided with the airframe rather than after it.
+
+---
+
+## Signal routing, and why spacing is the wrong lever
+
+The instinct to hold signal wires three rows apart is right about the risk and wrong about the
+remedy, and on a board with no ground plane the difference matters.
+
+**Wire-to-wire coupling falls logarithmically with separation, not linearly.** For two parallel
+round wires the mutual capacitance goes as `1 / ln(d/r)`. Going from one row of separation
+(2.54 mm) to three (7.62 mm) on 22 AWG changes `ln(d/r)` from about 2.1 to about 3.2 — so the
+coupling drops by roughly a third, not by two thirds. Tripling the gap does not third the
+crosstalk, and it costs three times the routing area, which forces longer runs, which puts the
+coupling back.
+
+**Only two lines on this vehicle are worth protecting**, and neither is protected by spacing:
+
+| Line | Why it is a victim |
+|---|---|
+| `GP26`, pin 31 — the divider tap | Source impedance is 33 kΩ ∥ 33 kΩ = **16.5 kΩ**. That is high for an RP2040 ADC input on its own, before any neighbour is considered |
+| `GP27`, pin 32 — the microphone `AO` | High impedance, and [whether the board buffers it is unread](receiving-inspection.md#d5--the-lm393-sound-module) |
+
+Everything else is either the aggressor or immune to it. SPI0 at **4 MHz** is the only fast
+thing on the board and it is the aggressor; I2C at 400 kHz through 5 kΩ pull-ups has rise times
+near 250 ns; UART0 is 9600 baud; `CS`, `RST`, `DIO0` and the LED lines are static or slow. None
+of those needs a millimetre of clearance from any other. The radio's 87 mA key-up is a real
+disturbance, but it travels the *supply*, and spacing signal wires does nothing about it — that
+is what the star feeds and the local capacitors are for.
+
+**What actually works, in descending order of effect:**
+
+1. **Give the sensitive line its own ground return**, run alongside it or twisted with it, back
+   to `AGND` on pin 33. This is worth an order of magnitude more than separation, because it
+   gives the return current a path next to the signal instead of somewhere across the board.
+2. **Cross, do not parallel.** Coupling scales with the length of the parallel run. A crossing
+   at right angles couples almost nothing, and a 40 mm parallel run couples forty times what a
+   1 mm one does.
+3. **Shorten the run.**
+4. **Lower the victim's impedance** — see the capacitor below.
+5. **Then, distantly, spacing.**
+
+### One part to add: 100 nF from the divider tap to AGND
+
+```text
+Pico pin 31 (GP26) ──┬── divider midpoint
+                     └──[ 100 nF `104` ]── GND, at the pin 33 tie
+```
+
+It does two jobs at once. It gives the RP2040's sample-and-hold a local charge reservoir, so a
+**16.5 kΩ** source no longer has to settle the sampling capacitor on its own; and it shorts any
+coupled glitch to ground before the conversion sees it. The time constant is 1.65 ms against a
+battery read once per second, so it costs nothing that matters.
+
+**Do not fit the equivalent on `AO`.** That line carries the audio envelope the driver reduces
+to a peak-to-peak span, and filtering it would remove the measurement. `AO` gets the ground
+return and the short run instead.
+
+This takes the `104` count from six to **seven**, against about twenty in hand.
+
+### The board has no ground plane, and that is the real weakness
+
+[C.9.3 and C.9.4](receiving-inspection.md#c9--prototype-pcb-quantity-2): copper on one face,
+isolated pads, no rails. Every return current on this vehicle finds its way home through a
+hand-built ring. That is why return paths outrank separation here — on a board with a plane the
+question would barely arise, and the instinct behind it would be sound.
+
+Run the GND ring generously, tie `AGND` to it at exactly one point beside pin 38, and give both
+analogue lines their own returns.
 
 ---
 
@@ -487,6 +558,9 @@ Switched battery node ──[ 33 kΩ ±1 % ]──┬──[ 33 kΩ ±1 % ]─�
                                         └── Pico pin 31 (GP26 / ADC0)
 ```
 
+Plus **100 nF from the tap to the `AGND` tie** — see
+[Signal routing](#signal-routing-and-why-spacing-is-the-wrong-lever) for why.
+
 Ratio 2:1. **2.10 V at the pin on a full 4.20 V cell**, against a 3.3 V input limit; 1.50 V at a
 3.0 V cutoff; 64 µA continuous, off the battery and not off the 3.3 V rail.
 
@@ -622,13 +696,14 @@ no strip: it is soldered down like the RA-02.
 ### 7 · Starred supplies and every capacitor
 
 Run the two point-to-point supply pairs from the distribution nodes to the microSD and the
-RA-02. Then fit all nine capacitors **at each module's own pins**:
+RA-02. Then fit all ten capacitors **at each module's own pins**:
 
 | Module | Fit |
 |---|---|
 | microSD | 100 µF 50 V ∥ 100 µF 25 V ∥ `104` |
 | RA-02 | 10 µF 50 V ∥ `104` |
 | MPU-6500, BMP280, NEO-6M, LM393 | one `104` each |
+| Battery divider tap, `GP26` to the `AGND` tie | one `104` — see [Signal routing](#signal-routing-and-why-spacing-is-the-wrong-lever) |
 
 **Electrolytics are polarised — the stripe marks the negative leg, to GND.** Backwards they heat
 and can vent. Mount them **lying flat**, leads as short as they go, body secured with a tie or a

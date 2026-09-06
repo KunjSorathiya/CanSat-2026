@@ -10,6 +10,25 @@ development cycle.
 
 ## [Unreleased] — 2026-09-06 (cycle 34)
 
+### Added — signal routing, and a capacitor that is not a decoupling capacitor
+
+A build instinct worth answering properly: hold the signal wires three rows apart to avoid interference. It is right about the risk and wrong about the remedy.
+
+**Wire-to-wire coupling falls logarithmically with separation.** Mutual capacitance between parallel round wires goes as `1 / ln(d/r)`, so on 22 AWG the step from one row of separation to three moves `ln(d/r)` from about 2.1 to about 3.2 — a third less coupling for three times the routing area. The longer runs that area forces then put the coupling back.
+
+**And only two lines here are victims at all.** `GP26` carries a divider whose source impedance is 33 k in parallel with 33 k — **16.5 k** — and `GP27` carries an `AO` output the board may or may not buffer. Everything else is either the aggressor (SPI0, at 4 MHz the only fast thing on the vehicle) or immune to it: I2C rises in ~250 ns through its 5 k pull-ups, UART0 is 9600 baud, and `CS`, `RST`, `DIO0` and the LEDs are static. The radio's 87 mA key-up is a genuine disturbance and spacing does nothing about it, because it travels the supply — that is what the star feeds and the local capacitors are for.
+
+What works instead, in order: a ground return run alongside the sensitive line back to `AGND`; crossing at right angles rather than running parallel, since coupling scales with parallel length; shortening the run; lowering the victim's impedance; and only then separation.
+
+**Which adds one part.** A `104` from the `GP26` tap to the `AGND` tie, doing two jobs that are not decoupling: it gives the RP2040's sample-and-hold a local charge reservoir so a 16.5 k source does not have to settle the sampling capacitor alone, and it shorts any coupled glitch before the conversion sees it. 1.65 ms against a battery read once a second. **The equivalent must not be fitted on `AO`** — that line carries the audio envelope the driver reduces to a peak-to-peak span, and filtering it removes the measurement. `104` count six -> seven, against about twenty in hand.
+
+**The real weakness is not spacing, it is that the board has no ground plane.** Copper on one face, isolated pads, no rails ([C.9.3, C.9.4](documentation/hardware/receiving-inspection.md#c9--prototype-pcb-quantity-2)) — so every return current finds its way home through a hand-built ring, and return paths outrank separation for that reason. On a board with a plane the instinct would have been sound.
+
+### Changed — the RA-02 fit question is closed by insertion, not by a caliper
+
+The one measurement that could have stopped the build was the RA-02's row-to-row spacing: not a whole multiple of 2.54 mm and the module cannot be pressed flat. **It seats in the grid.** That is the answer, and it is better evidence than a reading — a module whose two rows drop into holes has whole-pitch spacing by construction.
+
+
 ### Changed — the board has a floorplan, and the microSD is soldered after all
 
 The modules were laid out on the perfboard and photographed. The Pico sits with its **USB facing the left edge**, and that single choice decides the rest of the board: with USB left, the Pico's top pin row carries power at its left end, both ADC channels in the middle and all of SPI at its right end, while the bottom row carries I2C, the GPS and the status LED. **There is no 3.3 V pin on the bottom row at all** — pin 36 is the only supply output the part has.
