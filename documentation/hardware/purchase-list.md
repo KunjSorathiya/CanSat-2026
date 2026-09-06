@@ -28,14 +28,15 @@ finding, or a scoring recommendation that has been costed.
 
 ## 1 · Blocking the soldered board
 
-Without these the board cannot be built.
+**Nothing in this section is outstanding. The board can be built.**
 
-| Item | Qty | Why | ~₹ |
-|---|---:|---|---:|
-| **Perfboard**, 7×9 cm or larger, ideally double-sided plated-through | 2 | The vehicle board, plus one spare. Buy the spare — the first attempt at a soldered board is rarely the one that flies | 100 |
-| **Female headers**, 2.54 mm, 40-pin strips | 4 | **Socket every module rather than soldering it down.** A dead RA-02 or a swapped IMU then costs a minute, not a rebuild. This is also how the Pico itself should mount | 120 |
-| **Solid-core hookup wire**, 22 AWG, several colours | 1 set | Board wiring. Solid core, not stranded — it seats in perfboard holes | 150 |
-| **Silicone stranded wire**, 22 AWG, red and black | 1 m each | Battery leads only. Stranded survives flexing where solid core work-hardens and snaps | 80 |
+| Item | Qty | Why | Status |
+|---|---:|---|---|
+| ~~**Perfboard**~~ | — | The vehicle board, plus one spare | **Held.** 2 × 100 × 100 mm, single-sided, isolated pads, 1.6 mm FR-4 ([C.9](receiving-inspection.md#c9--prototype-pcb-quantity-2)) |
+| ~~**Female headers**~~ | — | Was: socket every module rather than soldering it down | **Cancelled.** Superseded by the [module mounting decision of 2026-09-05](../design/wiring.md#module-mounting) — Pico and RA-02 soldered down, the other four jumpered onto **male** strips. See [D-2](assembly-procedure.md#d-2-no-sockets-the-2026-09-05-mounting-decision-stands) |
+| ~~**Solid-core hookup wire**, 22 AWG, several colours~~ | — | Board wiring. Solid core, not stranded — it seats in perfboard holes | **Held, confirmed 2026-09-06** |
+| ~~**Silicone stranded wire**, 22 AWG, red and black~~ | — | Battery leads only. Stranded survives flexing where solid core work-hardens and snaps | **Held, confirmed 2026-09-06** |
+| ~~**Male header strip**~~ | — | The board end of the four jumpered modules — 30 pins across five footprints | **Held, confirmed 2026-09-06.** Count it against the footprints before cutting any of it |
 
 ## 2 · Capacitors — from [F-10](../testing/bring-up-record.md#findings)
 

@@ -10,6 +10,27 @@ development cycle.
 
 ## [Unreleased] — 2026-09-06 (cycle 34)
 
+### Added — the assembly procedure, and the five contradictions it had to settle
+
+[assembly-procedure.md](documentation/hardware/assembly-procedure.md) is the order this vehicle gets soldered in: thirty-four pre-solder checks, a floorplan, physical Pico pin numbers rather than GPIO numbers, and sixteen steps each ending in a gate from the bring-up record. It exists because the wiring diagram says what connects to what and never said what to do first — and on this vehicle the order is the design. Both faults this project has actually had were supply wires, and both were findable only because one subsystem was powered at a time.
+
+**Writing it down forced five decisions the documentation had left in conflict.**
+
+**The microSD bulk capacitor is 2 × 100 µF, not 470 µF.** Two documents still ask for a 470 µF part that never arrived. The requirement was never 470 µF — it is the ~50 µF the [droop arithmetic](documentation/design/electrical-architecture.md#how-much-bulk-is-actually-needed) computes, and the 470 µF was described in the same paragraph as generous rather than calculated. The delivered pair gives 200 µF, four times the requirement.
+
+**No sockets.** The purchase list still asks for female headers to socket every module including the Pico. That line predates the [mounting decision of 2026-09-05](documentation/design/wiring.md#module-mounting), which decided the opposite and gave its reasons. The later decision wins and the purchase is cancelled.
+
+**The power LED comes off the 3.3 V bus.** The wiring document worried that only a branch on the switched battery node could light immediately at power-on. It does not need one: the Pico's `3V3(OUT)` rises from the RT6150 the moment `VSYS` is energised, with no firmware involved, so the LED lights when the switch closes and dies when it opens. The switch itself goes in the battery positive lead, ahead of everything.
+
+**Jumper board-ends are male header strips — except the microSD's supply pair, which is soldered wire.** The open item offered two options and stated an intent; the intent is taken, with the one exception [F-10](documentation/testing/bring-up-record.md#findings) demands.
+
+**The microSD and the RA-02 are starred off the Pico's supply pins; everything else taps a ring.** Those two are the modules that pulse — a write spike and a PA key-up — and they are the two that failed on a jumper. The other five modules and both LEDs draw single-digit milliamps between them.
+
+**And one measurement the board is now built to take.** A current figure has never been recorded for any device on this vehicle, only rail voltage, because a series connection would not hold on a breadboard. The procedure puts a **two-pin test link in the 3.3 V feed** so a meter can sit in it, and solders the link shut once the readings are taken — a removable shunt is a mechanical failure point on a vehicle that lands hard.
+
+**Three checks failed and all three closed the same day.** Nothing in this repository recorded solid-core hookup wire, silicone battery wire, or how much male header strip survived 2026-09-04 — all three are held, confirmed 2026-09-06 / KS, and the rows now say so. That is the whole point of a check that can fail: the parts were always in the drawer, and the only thing missing was the sentence saying so. **Section 1 of the purchase list is now empty**, and the female headers in it are cancelled rather than bought — they were asking to socket modules the [mounting decision](documentation/design/wiring.md#module-mounting) had already decided to solder down.
+
+
 ### Added — the capacitors, read off their sleeves
 
 The capacitors were in the batch photograph and nowhere else: no crop, no read-out, no quantities. Cropped and transcribed now as D.7. **`10µF 50V`, `100µF 50V` and `100µF 25V`**, read off the sleeves. Mixing the two 100 µF voltage ratings in the microSD pair is fine: both are far above a 3.3 V rail, and an electrolytic has no DC-bias derating, so each contributes its full marking.

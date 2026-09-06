@@ -6,6 +6,7 @@ This directory is the controlled reference for the hardware used by the CanSat 2
 
 - [Hardware Reference](hardware.md) - Single hardware database for the confirmed BOM, electrical specifications, interfaces, integration notes, and unresolved items.
 - [Receiving Inspection Record](receiving-inspection.md) - The fill-in record for the delivered hardware: inventory, photographs, per-board identification, and the questions that must be answered before power is applied.
+- [Assembly Procedure](assembly-procedure.md) - The order the vehicle board is soldered in, the check that gates each step, and the wiring diagrams each step builds from.
 - [Robu Product References](product-pages/README.md) - Exact Robu SKU references, product-page links, source status, and documentation limits.
 - `datasheets/` - Manufacturer datasheets or official technical PDFs downloaded for this project.
 - [`photos/`](photos/README.md) - Photographs of the delivered boards, the evidence behind every fact promoted out of `TBD`.

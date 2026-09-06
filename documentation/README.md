@@ -10,6 +10,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 |---|---|
 | **Build one of these from nothing** | **[Quick Start Guide](quick-start.md)** |
 | **Record the parts that just arrived** | **[Receiving Inspection Record](hardware/receiving-inspection.md)** |
+| **Solder the vehicle board** | **[Assembly Procedure](hardware/assembly-procedure.md)** |
 | Understand the whole project | [Root README](../README.md) |
 | Understand how the software works | [Software Architecture](design/software-architecture.md) |
 | Wire the hardware | [Wiring Diagrams](design/wiring.md) |
@@ -60,6 +61,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | [hardware/README.md](hardware/README.md) | Hardware documentation policy and source hierarchy |
 | [hardware.md](hardware/hardware.md) | The single hardware database: confirmed BOM, specifications, interfaces, open items |
 | [receiving-inspection.md](hardware/receiving-inspection.md) | Unpowered inspection of the delivered parts: inventory, photographs, per-board identification, the four questions blocking the electrical design |
+| [assembly-procedure.md](hardware/assembly-procedure.md) | The pre-solder checks, the five decisions they force, the floorplan, and the sixteen gated build steps |
 | [electrical-compatibility.md](hardware/electrical-compatibility.md) | Per-component compatibility assessment and what must be physically verified |
 | [pico-gpio-map.md](hardware/pico-gpio-map.md) | GPIO reservation and preliminary assignment |
 | [pico-resource-map.md](hardware/pico-resource-map.md) | Peripheral-level resource analysis: I2C, SPI, UART, ADC, interrupts |
