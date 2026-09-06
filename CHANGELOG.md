@@ -10,6 +10,21 @@ development cycle.
 
 ## [Unreleased] — 2026-09-06 (cycle 34)
 
+### Removed — the `GP26` capacitor is deferred, because the reasoning did not survive being asked twice
+
+Asked whether the 100 nF at the divider tap was really needed. On inspection: **no**, and it is now out of the build.
+
+**The load-bearing claim was that 16.5 kΩ is a high source impedance for the ADC's sample-and-hold.** It is not, on any plausible number. A SAR's sampling capacitor runs to a few picofarads; at 5 pF the time constant is about 82 ns and settling to half an LSB at 12 bits wants roughly nine of them — under a microsecond, inside even a maximum-rate sample window. This vehicle reads the battery **once per second**. The RP2040's real figure is still unread, and no plausible value makes this a problem.
+
+**The second claim argued against itself.** The signal-routing section rejects wider pin spacing on the grounds that coupling is not a serious threat on this board. It cannot then be the justification for a capacitor.
+
+**And fitting it was never free.** The part bridges pins 31 and 33 with pin 32 between them, and a bridge onto `GP27` produces a microphone channel that works and lies rather than one that fails visibly. That is a real hazard accepted to guard against a speculative one — the wrong side of the trade.
+
+**D-7 replaces it with a trigger instead of a part.** Step 14 already meters both divider legs and step 15 puts the pack on; compare what `GP26` reports against the pack at its terminals. Agrees within a few tens of millivolts → it was never needed. Reads low, drifts, or jumps → fit it then, on evidence. One `104` stays in the drawer for that; the build consumes **six** again.
+
+This is the third correction in one cycle to a claim this repository made without reading its source — the ADC impedance, the RP2040 datasheet's absence, and USB back-powering. The pattern is the same each time and the rule already exists in the receiving-inspection procedure: a principle is not a specification, and a plausible number is not a measured one.
+
+
 ### Fixed — USB back-powers the battery, and this page said it did not
 
 Asked whether `VBUS` is used anywhere. It is not, and answering that caught a genuine error in this repository's own guidance.

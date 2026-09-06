@@ -88,13 +88,13 @@ Run against the repository on 2026-09-06. ✅ settled, ⚠️ needs your eyes at
 | 33 | Antenna centre contacts unphotographed — SMA or RP-SMA | Blocks *reordering* an antenna, not this build |
 | 34 | No reverse-polarity protection anywhere on the vehicle | The JST-RCY is keyed, so the risk is one badly wired pigtail. Step 15 meters it before the first mate |
 | 35a | **No Schottky between the switch and `VSYS`.** Until one is fitted, USB back-powers the battery whenever both are connected — [D-6](#d-6-a-schottky-goes-between-the-switch-and-vsys) | **Blocks nothing, but changes how you work.** Battery switch OFF whenever USB is in, for every gate from 1 to 14 |
-| 35 | **The RP2040 datasheet is not in this repository.** `datasheets/` holds the Pico datasheet and the BMP280 one; the ADC sample time and sample capacitance that would settle whether a 16.5 kΩ divider needs help are in the RP2040 document | Does not block. The `104` at `GP26` is fitted on judgement in the meantime, and [says so](#one-part-to-add-100-nf-from-the-divider-tap-to-agnd) |
+| 35 | **The RP2040 datasheet is not in this repository.** `datasheets/` holds the Pico datasheet and the BMP280 one; the ADC sample time and sample capacitance that would settle whether a 16.5 kΩ divider needs help are in the RP2040 document | Does not block, and no longer decides anything: the `104` it would have justified is [deferred](#d-7-the-100-nf-at-gp26-is-deferred-not-fitted) until step 14 measures the divider |
 
 ---
 
 ## Decisions taken here
 
-Six places where the repository contradicted itself, stopped short, or — in the last case —
+Seven places where the repository contradicted itself, stopped short, or — in the last two —
 where this page itself was wrong. Each is settled below, with the reason.
 
 ### [D-1] The microSD bulk capacitor is **2 × 100 µF in parallel**, not 470 µF
@@ -346,7 +346,7 @@ coupling back.
 
 | Line | Why it is a victim |
 |---|---|
-| `GP26`, pin 31 — the divider tap | Source impedance is 33 kΩ ∥ 33 kΩ = **16.5 kΩ**. High enough to be worth treating, on the general SAR-converter principle rather than on a number — see the caveat below |
+| `GP26`, pin 31 — the divider tap | Source impedance is 33 kΩ ∥ 33 kΩ = **16.5 kΩ**. Worth knowing about; **not, on inspection, worth a part** — see [D-7](#d-7-the-100-nf-at-gp26-is-deferred-not-fitted) |
 | `GP27`, pin 32 — the microphone `AO` | High impedance, and [whether the board buffers it is unread](receiving-inspection.md#d5--the-lm393-sound-module) |
 
 Everything else is either the aggressor or immune to it. SPI0 at **4 MHz** is the only fast
@@ -368,48 +368,37 @@ is what the star feeds and the local capacitors are for.
 4. **Lower the victim's impedance** — see the capacitor below.
 5. **Then, distantly, spacing.**
 
-### One part to add: 100 nF from the divider tap to AGND
+### [D-7] The 100 nF at `GP26` is **deferred**, not fitted
 
-```text
-pin 31 (GP26) ──┐
-                ├── one 104 straight across, on the copper side
-pin 33 (AGND) ──┘
-     pin 32 (GP27, the microphone AO) sits between them — do not bridge it
-```
+An earlier revision of this page told you to fit a `104` across pins 31 and 33. **Do not fit it
+yet.** The reasoning that put it there did not survive being asked twice.
 
-**Fit it at the Pico, not at the divider.** The two are the same electrical node, but the
-capacitor'''s job is to feed the ADC'''s sample-and-hold, so it belongs at the pin. The geography
-is kind here: on the top row `GP26` is pin 31 and `AGND` is pin 33 — **two pitches apart,
-5.08 mm**, with only pin 32 between them. A `104` disc'''s leads bend to that without complaint.
+**The claim was that 16.5 kΩ is a high source impedance for the ADC's sample-and-hold.** On any
+plausible sampling capacitance it is not. A SAR's sample capacitor is typically a few picofarads;
+at 5 pF the time constant is about 82 ns, and settling to half an LSB at 12 bits wants roughly
+nine of them — under a microsecond, inside even a maximum-rate sample window. This vehicle reads
+the battery **once per second**. The RP2040's actual figure is still unread
+([open item 35](#design-items-still-open)), but no plausible value makes 16.5 kΩ a problem.
 
-**A ceramic, and not an electrolytic.** Not only for the value: an aluminium electrolytic leaks
-microamps, and a few µA through a 16.5 kΩ source is tens to hundreds of millivolts of **offset**
-on the one measurement nothing else can cross-check. A ceramic leaks picoamps. Ceramics also
-have no polarity, unlike the three electrolytics on this board.
+**The second claim was crosstalk**, and it argues against itself: the section above uses "coupling
+is not a serious threat on this board" to reject wider pin spacing. It cannot then be the reason
+for a capacitor.
 
-It does two jobs. It gives the SAR converter's sample-and-hold a local charge reservoir, so a
-**16.5 kΩ** source no longer has to settle the sampling capacitor through itself; and it shorts
-any coupled glitch to ground before the conversion sees it. The time constant is 1.65 ms against
-a battery read once per second, so it costs nothing that matters.
+**And fitting it is not free.** The part bridges pins 31 and 33 with **pin 32 between them**, and
+a solder bridge onto `GP27` yields a microphone channel that works and lies, rather than one that
+obviously fails. That is a real hazard taken on to guard against a speculative one.
 
-> [!WARNING]
-> **This part is a recommendation, and the reasoning behind it is thinner than the rest of this
-> page.** It comes from the general behaviour of SAR converters — a sampling capacitor charged
-> through the source impedance during the sample window — and **not from the RP2040 datasheet,
-> which is not in this repository.** `datasheets/` holds the *Pico* datasheet; the ADC sample
-> time and sample capacitance are in the *RP2040* one. Until somebody reads it, "16.5 kΩ is
-> high" is an engineering expectation, not a measured or documented limit.
->
-> Fit it anyway. It is one `104` out of about twenty, the time constant is irrelevant at a
-> 1 Hz read, and the failure it guards against is a gain error on **the one telemetry quantity
-> nothing else can cross-check**. But it is here on judgement, not on evidence, and it should
-> say so.
+#### The trigger that would change this
 
-**Do not fit the equivalent on `AO`.** That line carries the audio envelope the driver reduces
-to a peak-to-peak span, and filtering it would remove the measurement. `AO` gets the ground
-return and the short run instead.
+Step 14 already meters both divider legs, and step 15 puts the pack on. Compare what `GP26`
+reports against the pack measured directly at the terminals:
 
-This takes the `104` count from six to **seven**, against about twenty in hand.
+| Result | Action |
+|---|---|
+| Agrees within a few tens of mV, stable | The capacitor was never needed. Leave it out |
+| Reads low, drifts, or jumps between samples | **Fit it then** — two joints, on evidence rather than on argument |
+
+One `104` stays reserved for that. The build consumes **six**; a seventh is in the drawer.
 
 ### The board has no ground plane, and that is the real weakness
 
@@ -641,8 +630,8 @@ Switched battery node ──[ 33 kΩ ±1 % ]──┬──[ 33 kΩ ±1 % ]─�
                                         └── Pico pin 31 (GP26 / ADC0)
 ```
 
-Plus **100 nF from the tap to the `AGND` tie** — see
-[Signal routing](#signal-routing-and-why-spacing-is-the-wrong-lever) for why.
+**No capacitor here for now** — see [D-7](#d-7-the-100-nf-at-gp26-is-deferred-not-fitted). One
+`104` stays in the drawer against the step 14 measurement.
 
 Ratio 2:1. **2.10 V at the pin on a full 4.20 V cell**, against a 3.3 V input limit; 1.50 V at a
 3.0 V cutoff; 64 µA continuous, off the battery and not off the 3.3 V rail.
@@ -779,14 +768,14 @@ no strip: it is soldered down like the RA-02.
 ### 7 · Starred supplies and every capacitor
 
 Run the two point-to-point supply pairs from the distribution nodes to the microSD and the
-RA-02. Then fit all ten capacitors **at each module's own pins**:
+RA-02. Then fit all nine capacitors **at each module's own pins**:
 
 | Module | Fit |
 |---|---|
 | microSD | 100 µF 50 V ∥ 100 µF 25 V ∥ `104` |
 | RA-02 | 10 µF 50 V ∥ `104` |
 | MPU-6500, BMP280, NEO-6M, LM393 | one `104` each |
-| Battery divider tap, `GP26` to the `AGND` tie | one `104` — see [Signal routing](#signal-routing-and-why-spacing-is-the-wrong-lever) |
+
 
 **Electrolytics are polarised — the stripe marks the negative leg, to GND.** Backwards they heat
 and can vent. Mount them **lying flat**, leads as short as they go, body secured with a tie or a

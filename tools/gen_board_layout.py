@@ -110,9 +110,9 @@ for pin, note in [(6, 'SDA'), (7, 'SCL'), (9, 'SD CS'), (16, 'TX'), (17, 'RX'), 
 c31, c33, c32 = topcol(31), topcol(33), topcol(32)
 add('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="7" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-dasharray="5 4"/>'
     % (hx(c33) - 11, hy(14) - 11, (hx(c31) - hx(c33)) + 22, 22))
-add('<text x="%.1f" y="%.1f" font-size="10.5" font-weight="700" fill="#6d28d9" text-anchor="middle">104 across pins 31–33, under the board</text>'
+add('<text x="%.1f" y="%.1f" font-size="10.5" font-weight="700" fill="#6d28d9" text-anchor="middle">104 at pins 31–33 is DEFERRED — D-7</text>'
     % ((hx(c31) + hx(c33)) / 2, hy(14) + 20))
-add('<text x="%.1f" y="%.1f" font-size="9.5" font-weight="700" fill="#b91c1c" text-anchor="middle">do not bridge pin 32 between them</text>'
+add('<text x="%.1f" y="%.1f" font-size="9.5" font-weight="700" fill="#b91c1c" text-anchor="middle">not fitted; step 14 decides</text>'
     % ((hx(c31) + hx(c33)) / 2, hy(14) + 33))
 
 # ---- RA-02: pin columns c19 and c25, rows r3..r10 --------------------------
@@ -197,7 +197,7 @@ rows = [
     ('#15803d', 'Header strips', 'IMU, BMP280, GPS, LM393 — 24 pins, jumpered'),
     ('#b45309', 'Power zone', 'nodes, test link, RA-02 bulk cap'),
     ('#b91c1c', 'Switch / battery', 'silicone wire leaves the board here'),
-    ('#7c3aed', '104 at pins 31–33', 'soldered on the copper side, straddling 32'),
+    ('#7c3aed', '104 at pins 31–33', 'deferred — not fitted, see D-7'),
 ]
 y = BY + 34
 for col, name, note in rows:

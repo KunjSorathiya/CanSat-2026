@@ -190,7 +190,7 @@ five centimetres away, through the same jumper, does very little.
 | Same module, same pins | **100 nF** | Ceramic `104` | As above |
 | **MPU-6500, BMP280, NEO-6M** | **100 nF each** | Ceramic `104` | Ordinary practice. These draw single-digit milliamps and need nothing bulk |
 | **Pico `VSYS`, near the battery input** | **100 µF** | Electrolytic ≥ 10 V | The battery leads have inductance and the LiPo is at the end of them. Optional; fit it if the rail looks noisy under load |
-| **`GP26`, the divider tap to the `AGND` tie** | **100 nF** | Ceramic `104` | **Not decoupling, and not from a datasheet.** A charge reservoir for the ADC's sample-and-hold, on the general SAR principle that a 16.5 kΩ source must settle the sampling capacitor through itself. The RP2040 datasheet is not in this repository and its ADC sample timing has not been read — and, incidentally, a short to ground for anything the SPI bundle couples in. See [Signal routing](../hardware/assembly-procedure.md#signal-routing-and-why-spacing-is-the-wrong-lever). Do **not** fit the equivalent on `AO`: that line carries the measurement |
+| ~~`GP26`, the divider tap~~ | — | — | **Deferred, not fitted.** Proposed as a charge reservoir for the ADC's sample-and-hold, then withdrawn: on any plausible sample capacitance a 16.5 kΩ source settles well inside the window, and the battery is read once per second. Step 14 measures the divider against the pack and decides. See [D-7](../hardware/assembly-procedure.md#d-7-the-100-nf-at-gp26-is-deferred-not-fitted) |
 
 The Pico's own 3.3 V rail is already decoupled on the Pico. Nothing needs adding there.
 

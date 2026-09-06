@@ -2589,8 +2589,8 @@
 <text x="656.6" y="608.7" font-size="9.5" font-weight="700" fill="#0f172a" text-anchor="middle">20</text>
 <text x="656.6" y="619.7" font-size="8.5" fill="#475569" text-anchor="middle">DO</text>
 <rect x="401.8" y="439.5" width="62.6" height="22.0" rx="7" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-dasharray="5 4"/>
-<text x="433.1" y="470.5" font-size="10.5" font-weight="700" fill="#6d28d9" text-anchor="middle">104 across pins 31–33, under the board</text>
-<text x="433.1" y="483.5" font-size="9.5" font-weight="700" fill="#b91c1c" text-anchor="middle">do not bridge pin 32 between them</text>
+<text x="433.1" y="470.5" font-size="10.5" font-weight="700" fill="#6d28d9" text-anchor="middle">104 at pins 31–33 is DEFERRED — D-7</text>
+<text x="433.1" y="483.5" font-size="9.5" font-weight="700" fill="#b91c1c" text-anchor="middle">not fitted; step 14 decides</text>
 <rect x="477.8" y="210.7" width="154.4" height="174.8" rx="5" fill="#dbeafe" fill-opacity="0.92" stroke="#1d4ed8" stroke-width="2.2"/>
 <text x="555.0" y="287.9" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="middle">SX1278 RA-02</text>
 <text x="555.0" y="302.9" font-size="10" fill="#475569" text-anchor="middle">soldered down</text>
@@ -2735,7 +2735,7 @@
 <text x="936" y="377.0" font-size="10.5" fill="#64748b">silicone wire leaves the board here</text>
 <rect x="900" y="394.0" width="26" height="13" rx="3" fill="#7c3aed"/>
 <text x="936" y="404.0" font-size="12.5" font-weight="700" fill="#0f172a">104 at pins 31–33</text>
-<text x="936" y="419.0" font-size="10.5" fill="#64748b">soldered on the copper side, straddling 32</text>
+<text x="936" y="419.0" font-size="10.5" fill="#64748b">deferred — not fitted, see D-7</text>
 <line x1="900" y1="452.0" x2="1320" y2="452.0" stroke="#e2e8f0" stroke-width="2"/>
 <text x="900" y="478.0" font-size="14" font-weight="700" fill="#0f172a">Why each thing is there</text>
 <text x="900" y="500.0" font-size="11.2" fill="#334155">RA-02 sits above pins 21–25, so every SPI</text>
