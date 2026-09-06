@@ -10,11 +10,11 @@ development cycle.
 
 ## [Unreleased] — 2026-09-06 (cycle 34)
 
-### Added — the capacitors, and a shortfall the batch shot was hiding
+### Added — the capacitors, read off their sleeves
 
-The capacitors were in the batch photograph and nowhere else: no crop, no read-out, no quantities. Cropped and transcribed now as D.7. **`10µF 50V`, `100µF 50V` and `100µF 25V`, one of each** — exactly what the design uses, with no spares. Mixing the two 100 µF voltage ratings in the microSD pair is fine: both are far above a 3.3 V rail, and an electrolytic has no DC-bias derating, so each contributes its full marking.
+The capacitors were in the batch photograph and nowhere else: no crop, no read-out, no quantities. Cropped and transcribed now as D.7. **`10µF 50V`, `100µF 50V` and `100µF 25V`**, read off the sleeves. Mixing the two 100 µF voltage ratings in the microSD pair is fine: both are far above a 3.3 V rail, and an electrolytic has no DC-bias derating, so each contributes its full marking.
 
-**The `104` ceramics are short and it is worth knowing before the iron is hot.** Six are needed — one at each of the microSD, RA-02, MPU-6500, BMP280, NEO-6M and sound board — and two arrived. They are about two rupees each and no bulk capacitor of any type substitutes for them.
+**A correction, in the same cycle that caused it.** An earlier draft of this entry read a shortfall of `104` ceramics off the photograph. There is none: one of each part was laid out to be identified, and the delivered quantities are as ordered. This repository's own receiving procedure already says a photograph of one board is never evidence that two arrived, and a tray of passives is the same rule. Six `104`s are still what the build consumes — microSD, RA-02, MPU-6500, BMP280, NEO-6M and the sound board — and they remain the one part here with no substitute.
 
 **The disc print is worn illegible**, so their value is on record from the purchase and not from the part. An orange disc looks identical at 100 pF and at 0.1 µF, and the documentation says which of those two kinds of fact it is holding.
 

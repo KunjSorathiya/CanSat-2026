@@ -77,8 +77,8 @@ and do not connect the battery to anything.
 | A.9 | 1S 3.7 V 1500 mAh 25C LiPo | 1125094 | 1 | **1** | Pack flat, no puffing visible | **Delivered as Pro-Range, not Orange.** Do not charge yet. See [D.4](#d4--battery) |
 | A.10 | Universal prototype PCB, 10 x 10 cm | 1031002 | 2 | **2** | No visible damage | Single-sided, isolated pads, edge rails |
 | A.11 | LM393 sound detection sensor | TBD | 1 | **1** | No visible damage | **Second batch, received 2026-09-06.** Four-pin board: `AO DO GND VCC`. See [D.5](#d5--the-lm393-sound-module) |
-| A.12 | Electrolytic capacitors | TBD | — | **3: one 10 µF 50 V, one 100 µF 50 V, one 100 µF 25 V** | No visible damage | Second batch. Sleeve print legible. Exactly what the design uses and no spares — see [D.7](#d7--the-capacitors) |
-| A.13 | Ceramic capacitors, 0.1 µF `104` | TBD | — | **2 visible** | No visible damage | Second batch. Orange discs, **print worn illegible**. **Short: six are needed**, one per module supply pin. See [D.7](#d7--the-capacitors) |
+| A.12 | Electrolytic capacitors, 10 µF and 100 µF | TBD | — | **As ordered, counted by hand 2026-09-06** | No visible damage | Second batch. 50 V and 25 V parts, sleeve print legible. The photograph shows one of each for identification and is **not** the count — see [D.7](#d7--the-capacitors) |
+| A.13 | Ceramic capacitors, 0.1 µF `104` | TBD | — | **As ordered, counted by hand 2026-09-06** | No visible damage | Second batch. Orange discs, **print worn illegible**. See [D.7](#d7--the-capacitors) |
 | A.14 | Resistors: 100 kΩ, 33 kΩ, 1 kΩ | TBD | — | **~10 of each, taped in three groups** | No visible damage | Second batch. **Values read from the colour bands** in the three close-ups — see [D.6](#d6--the-resistors). **No 330 Ω arrived**; 1 kΩ serves both LEDs instead |
 
 > **Counted by hand on 2026-09-05 / KS. Every line matches the quantity ordered.** The
@@ -765,27 +765,21 @@ Three groups arrived taped together and were photographed separately so the band
 Photographed as
 [`capacitors-2026-09-06.jpg`](photos/capacitors-2026-09-06.jpg), cropped from the batch shot.
 
-| Part | Read from | Quantity in the photograph | Where it goes |
-|---|---|---|---|
-| **10 µF 50 V** electrolytic | Sleeve print, legible | **1** | RA-02 supply pins, with a `104` beside it |
-| **100 µF 50 V** electrolytic | Sleeve print, legible | **1** | microSD supply pins — **in parallel with the one below** |
-| **100 µF 25 V** electrolytic | Sleeve print, legible | **1** | microSD supply pins, the other half of the pair |
-| **0.1 µF ceramic disc** | **Print worn illegible.** The value comes from the purchase, not from the part | **2 visible** | One at every module's supply pins |
+**The photograph is a layout for identification, not a count.** One of each part was put out to be photographed; the delivered quantities are as ordered and were counted by hand on 2026-09-06. This document already says a photograph of one board is never evidence that two arrived, and the same rule applies to a tray of passives.
+
+| Part | Value read from | Where it goes |
+|---|---|---|
+| **10 µF 50 V** electrolytic | Sleeve print, legible | RA-02 supply pins, with a `104` beside it |
+| **100 µF 50 V** electrolytic | Sleeve print, legible | microSD supply pins — **in parallel with the one below** |
+| **100 µF 25 V** electrolytic | Sleeve print, legible | microSD supply pins, the other half of the pair |
+| **0.1 µF ceramic disc** | **Print worn illegible.** The value comes from the purchase, not from the part | One at every module's supply pins — six of them |
 
 Two 100 µF in parallel is 200 µF at the microSD, against the
 [~50 µF the write spike actually needs](../design/electrical-architecture.md#how-much-bulk-is-actually-needed).
 Mixing a 50 V and a 25 V part in that pair is fine: both are far above a 3.3 V rail, and an
 electrolytic has no DC-bias derating, so each contributes its full marking.
 
-**Two shortfalls, and only one of them matters:**
-
-- **The `104` ceramics are short.** Every module supply pin wants one — microSD, RA-02,
-  MPU-6500, BMP280, NEO-6M and the sound board is six, and two are visible here. They cost
-  about ₹2 each. **Buy more before the board is built**, because a bulk capacitor of any
-  type is too slow for the fast edges these cover, and this is not a part to be short of
-  halfway through soldering.
-- **One 10 µF rather than the four listed.** One is all the design uses. Spares are only
-  spares.
+**Count the `104` ceramics against the build before starting it.** Six supply pins want one each — microSD, RA-02, MPU-6500, BMP280, NEO-6M and the sound board — and they are the one part here with no substitute, since a bulk capacitor of any type is too slow for the edges they cover. They cost about ₹2 each, so the failure mode is running out halfway through soldering rather than anything expensive.
 
 **The disc print being unreadable is worth stating plainly.** The value on record is what
 was ordered, not what was verified — an orange disc looks the same at 100 pF as at 0.1 µF.
