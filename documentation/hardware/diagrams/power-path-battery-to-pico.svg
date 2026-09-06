@@ -81,7 +81,8 @@
   <line x1="578" y1="424" x2="606" y2="424" stroke="#0f172a" stroke-width="2.4"/>
   <line x1="578" y1="431" x2="606" y2="431" stroke="#0f172a" stroke-width="2.4"/>
   <line x1="592" y1="431" x2="592" y2="470" stroke="#0f172a" stroke-width="2"/>
-  <text x="614" y="432" font-size="10.5" fill="#0f172a">100 nF</text>
+  <text x="614" y="429" font-size="10.5" fill="#0f172a">100 nF `104`</text>
+  <text x="614" y="443" font-size="9.5" fill="#64748b">fit at pins 31–33</text>
 
   <!-- divider ground out to the left -->
   <line x1="592" y1="470" x2="410" y2="470" stroke="#0f172a" stroke-width="2.5"/>

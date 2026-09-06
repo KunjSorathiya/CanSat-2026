@@ -336,9 +336,21 @@ is what the star feeds and the local capacitors are for.
 ### One part to add: 100 nF from the divider tap to AGND
 
 ```text
-Pico pin 31 (GP26) ──┬── divider midpoint
-                     └──[ 100 nF `104` ]── GND, at the pin 33 tie
+pin 31 (GP26) ──┐
+                ├── one 104 straight across, on the copper side
+pin 33 (AGND) ──┘
+     pin 32 (GP27, the microphone AO) sits between them — do not bridge it
 ```
+
+**Fit it at the Pico, not at the divider.** The two are the same electrical node, but the
+capacitor'''s job is to feed the ADC'''s sample-and-hold, so it belongs at the pin. The geography
+is kind here: on the top row `GP26` is pin 31 and `AGND` is pin 33 — **two pitches apart,
+5.08 mm**, with only pin 32 between them. A `104` disc'''s leads bend to that without complaint.
+
+**A ceramic, and not an electrolytic.** Not only for the value: an aluminium electrolytic leaks
+microamps, and a few µA through a 16.5 kΩ source is tens to hundreds of millivolts of **offset**
+on the one measurement nothing else can cross-check. A ceramic leaks picoamps. Ceramics also
+have no polarity, unlike the three electrolytics on this board.
 
 It does two jobs. It gives the SAR converter's sample-and-hold a local charge reservoir, so a
 **16.5 kΩ** source no longer has to settle the sampling capacitor through itself; and it shorts
