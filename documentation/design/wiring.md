@@ -113,7 +113,8 @@ UART0                     RA-02 control
                             GP22 <- DIO1 (optional; release if unused)
 
 Board I/O
-  GP14 -> status LED (through a current-limiting resistor, value TBD)
+  GP14 -> status LED (through 1 kΩ, about 1.3 mA)
+  3V3  -> power LED  (through 1 kΩ, NOT from a GPIO - it must light on power-on)
   GP26 <- ADC0, battery-sense reservation only — nothing connected
   GP27 <- ADC1, sound module AO (additional sensor; absent on a 3-pin board)
   GP15 <- sound module DO, comparator output (pulled down in firmware)
@@ -394,7 +395,31 @@ encodes the mission state
 
 ## Battery monitoring
 
-GP26 / ADC0 is a **reservation only**. No divider is designed and nothing is connected.
+GP26 / ADC0 is no longer a bare reservation: **the divider is chosen, and the parts are
+in hand.**
+
+```text
+  battery + ----[ 33 kΩ 1 % ]----+----[ 33 kΩ 1 % ]---- GND
+                                 |
+                                 +---- GP26 (ADC0)
+```
+
+| Quantity | Value |
+|---|---|
+| Ratio | **2 : 1** — `battery_divider_ratio = 2.0` |
+| `GP26` at a full 4.20 V cell | **2.10 V**, against a 3.3 V input limit |
+| `GP26` at a 3.0 V cutoff cell | 1.50 V |
+| Current drawn from the battery | **64 µA**, continuous |
+| Tolerance | ±1 % on each leg |
+
+**Use the 33 kΩ 1 % parts, not the 100 kΩ 5 % ones**, even though both arrived and both give
+the same ratio. The battery voltage is the one telemetry quantity nothing else can
+cross-check — an altitude can be argued against a GPS fix, an attitude against gravity, but a
+pack voltage is only ever as good as the divider under it. A fifth of the tolerance for
+43 µA more is a trade worth making.
+
+**Fit both legs before powering anything.** A divider with its lower leg missing puts the
+full pack voltage on `GP26`, and 4.2 V on a 3.3 V input is how an RP2040 dies.
 
 ### GP27 and GP15 — the LM393 sound module
 

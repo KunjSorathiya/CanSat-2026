@@ -22,12 +22,15 @@ Taken 2026-09-04, on delivery. Transcribed in
 | `11566-sd-reader-front.jpg` · `-back.jpg` | microSD reader | **No regulator, no level shifter**, supply pin `3V3`, four 10 kΩ pull-ups, header `GND MISO CLK MOSI CS 3V3` |
 | `1125094-lipo-front.jpg` · `-back.jpg` | 1S LiPo | **Pro-Range, not Orange.** `1 Cell 3.7V 25C`, 1500 mAh, JST-RCY and JST-XH leads, no charge parameters printed |
 | `1031002-protoboard-front.jpg` · `-back.jpg` | Prototype PCB | `10*10CM 2.54MM`, single-sided, isolated pads, edge rails, `A`–`K`/`01`–`35` grid |
-| `lm393-sound-front.jpg` **(to be filed)** | LM393 sound module | **Four-pin header `AO DO GND VCC`** — the fact that decides whether the analogue channel exists at all. LM393 SOIC, gain trimpot, electret capsule, two indicator LEDs. Transcribed in [receiving-inspection.md](../receiving-inspection.md) D.5 |
-| `passives-2026-09-06.jpg` **(to be filed)** | Second-batch passives | Delivery evidence for the capacitors and the three resistor groups. **Establishes quantities, not values** — the colour bands are below its resolution and must be metered |
+| `lm393-sound-front.jpg` | LM393 sound module | **Four-pin header `AO DO GND VCC`** — the fact that decides whether the analogue channel exists at all. `LM393` `49M` `BWQ64` SOIC, cermet gain trimpot, electret capsule with `+`/`−` pad marks, `PWR-LED` and `DO-LED` indicators, SMD resistors marked `102` and `201`. Transcribed in [receiving-inspection.md](../receiving-inspection.md) D.5 |
+| `passives-2026-09-06.jpg` | Second-batch passives, as delivered | The capacitors (`10µF 50V`, `100µF 50V`, `100µF 25V`, ceramic `104` discs) and all three resistor groups in one frame. Quantities and layout; the values come from the three close-ups below |
+| `resistors-100k-5pct.jpg` | Resistor group 1 | **100 kΩ ±5 %.** Carbon film, beige body, four bands: brown‑black‑yellow‑gold |
+| `resistors-33k-1pct.jpg` | Resistor group 2 | **33 kΩ ±1 %.** Metal film, blue body, five bands: orange‑orange‑black‑red‑brown |
+| `resistors-1k-5pct.jpg` | Resistor group 3 | **1 kΩ ±5 %.** Mint body, four bands: brown‑black‑red‑gold |
 
 Outstanding re-shoots, all macro:
 
-- The **resistor colour bands**, close enough to read, or the values written down from a meter. The delivery shot shows three taped groups and settles how many arrived, not what they are.
+- ~~The **resistor colour bands**.~~ Settled 2026-09-06 by the three close-ups above. **They should still be metered before fitting** — a photograph proves what is printed on a part, never what the part does.
 
 - Both RF **mating faces**, straight on — the only way to settle SMA against RP-SMA.
 - ~~The **BMP280 die**, to settle BMP280 against BME280.~~ Settled by register instead on 2026-09-05: chip ID `0xD0` returned `0x58` ([F-4](../receiving-inspection.md#findings)). A photograph is no longer needed for this.

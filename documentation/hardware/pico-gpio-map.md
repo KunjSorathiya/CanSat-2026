@@ -119,7 +119,7 @@ An opposite-polarity arrangement remains possible if required by the selected ha
 
 ### Battery ADC Reservation
 
-GPIO26/ADC0 is reserved for future battery-voltage monitoring. This is only a resource reservation:
+GPIO26/ADC0 carries the battery divider: **two 33 kΩ ±1 % parts in series across the pack, tapped at the midpoint**, giving a 2:1 ratio, 2.10 V at `GP26` on a full 4.20 V cell and 64 µA of continuous draw. The parts are in hand ([D.6](receiving-inspection.md#d6--the-resistors)); the divider is not yet built. Until it is built and measured:
 
 - No resistor divider is designed.
 - No resistor values are selected.

@@ -79,7 +79,7 @@ and do not connect the battery to anything.
 | A.11 | LM393 sound detection sensor | TBD | 1 | **1** | No visible damage | **Second batch, received 2026-09-06.** Four-pin board: `AO DO GND VCC`. See [D.5](#d5--the-lm393-sound-module) |
 | A.12 | Electrolytic capacitors, 10 µF and 100 µF | TBD | — | **3 + spares** | No visible damage | Second batch. Radial, 25 V and 50 V parts |
 | A.13 | Ceramic capacitors, 0.1 µF `104` | TBD | — | **present** | No visible damage | Second batch. Orange discs |
-| A.14 | Resistors, three values | TBD | — | **~24, taped in three groups** | No visible damage | Second batch. **Values not yet confirmed** — the colour bands are below the delivery photograph's resolution. Measure each group before fitting |
+| A.14 | Resistors: 100 kΩ, 33 kΩ, 1 kΩ | TBD | — | **~10 of each, taped in three groups** | No visible damage | Second batch. **Values read from the colour bands** in the three close-ups — see [D.6](#d6--the-resistors). **No 330 Ω arrived**; 1 kΩ serves both LEDs instead |
 
 > **Counted by hand on 2026-09-05 / KS. Every line matches the quantity ordered.** The
 > photographs show one unit of each item, and a photograph of one board is never evidence that
@@ -707,10 +707,9 @@ Do not batch this to the end of the week. The gap between observing and recordin
 
 ### D.5 · The LM393 sound module
 
-Received 2026-09-06 and photographed. **The photograph is still to be filed** in
-`documentation/hardware/photos/` under the name `lm393-sound-front.jpg`, cropped to
-the module. The facts below were read from it, and this section is the transcription
-Part C asks for. Link the file here once it is in place.
+Received 2026-09-06 and photographed as
+[`lm393-sound-front.jpg`](photos/lm393-sound-front.jpg), cropped from the batch shot
+[`passives-2026-09-06.jpg`](photos/passives-2026-09-06.jpg).
 
 **Established from the photograph:**
 
@@ -722,7 +721,10 @@ Part C asks for. Link the file here once it is in place.
 | LM393 comparator fitted | 8-pin SOIC on the board |
 | Gain trimpot fitted | Blue multi-turn part beside the IC |
 | Electret capsule fitted | Cylindrical can on its own stalk |
-| Two indicator LEDs | Small SMD parts at the board edge, one power and one threshold |
+| Two indicator LEDs | Silkscreen `PWR-LED` and `DO-LED` |
+| Comparator part marking | `LM393` over `49M` over `BWQ64` |
+| Capsule polarity marked | `+` and `−` on the two capsule pads |
+| Onboard SMD resistors | Marked `102` (1 kΩ) and `201` (200 Ω) |
 
 **Why this mattered.** The firmware supports both board variants because they are sold under
 one name and only the pin count separates them — see
@@ -734,16 +736,27 @@ correct at their defaults.** That closes bring-up row 3.13a.
 
 **Not established, and not to be guessed:**
 
-- The board's own part-number silkscreen is below the photograph's resolution.
+- The board's own part-number silkscreen. The visible legend is functional — pin names,   LED names — and carries no board type or revision.
 - Whether `AO` is buffered or is the raw capsule bias. It affects the level's scale, not
   whether it works, and the trimpot makes it unrecordable anyway — see the millivolts-not-
   decibels note in [sound_level.hpp](../../firmware/flight-computer/include/flight/sound_level.hpp).
-- **The resistor values.** Three taped groups arrived together and the colour bands are
-  below this photograph's resolution. One group has blue bodies, which usually means metal
-  film and 1 % tolerance and is consistent with the 100 kΩ divider pair — *usually* is not
-  a measurement. **Measure each group with the meter before fitting anything.** The divider
-  on `GP26` is the one place a wrong value produces a plausible number rather than an
-  obvious failure.
+- Whether the analogue output is buffered or is the raw capsule bias. Two SMD resistors   are visible (`102`, `201`) but the network cannot be traced from one face.
+
+---
+
+### D.6 · The resistors
+
+Three groups arrived taped together and were photographed separately so the bands could be read. **What follows is read from colour bands, which is what a part claims to be, not what it measures.** Meter one from each group before fitting — it takes half a minute and the `GP26` divider is the one place a wrong value produces a plausible number rather than an obvious failure.
+
+| Photograph | Body | Bands | Value | Use |
+|---|---|---|---|---|
+| [`resistors-100k-5pct.jpg`](photos/resistors-100k-5pct.jpg) | Beige, carbon film | brown‑black‑yellow‑gold | **100 kΩ ±5 %** | Spare. The divider uses the 1 % parts instead |
+| [`resistors-33k-1pct.jpg`](photos/resistors-33k-1pct.jpg) | Blue, metal film | orange‑orange‑black‑red‑brown | **33 kΩ ±1 %** | **The `GP26` battery divider**, two in series |
+| [`resistors-1k-5pct.jpg`](photos/resistors-1k-5pct.jpg) | Mint | brown‑black‑red‑gold | **1 kΩ ±5 %** | **Both LEDs**, power and status |
+
+**Two of these are four-band and one is five-band, and the four-band pair were photographed with the gold tolerance band on the left** — so they read right to left. That is not pedantry: read the wrong way a `brown‑black‑yellow‑gold` part becomes an invalid code rather than a wrong number, which is the good case. The five-band 33 kΩ is the dangerous one, because it reads as a plausible 1.2 kΩ backwards. Its tolerance band is the brown one set slightly apart at the right.
+
+**No 330 Ω arrived**, which the purchase list had asked for. It does not matter: 1 kΩ drives both LEDs at about 1.3 mA, which is visible and *reduces* the load budget. If the power LED proves too dim outdoors, two 1 kΩ in parallel give 500 Ω and 2.6 mA.
 
 ---
 

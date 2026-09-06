@@ -354,22 +354,25 @@ project has measured something, the measurement is named.
 | **MPU-6500** | **~4 mA** | gyro + accel active | continuous | MPU-6500 datasheet: 3.2 mA gyro, 450 µA accel |
 | **BMP280** | **~1 mA** | 83 Hz, high oversampling (row 3.5) | continuous | BMP280 datasheet, 720 µA at maximum rate |
 | **Analogue microphone** | **~5 mA** | continuous | continuous | Electret capsule plus an LM393 comparator and its two indicator LEDs. The capsule itself is under 0.5 mA; almost all of this is the board around it. **Measure it — this is the least certain figure in the table** |
-| **Status LED, 330 Ω** | **~4 mA** | lit | ≤ 50 % duty, it blinks | (3.3 − 2.0) / 330 |
-| **Battery divider, GP26** | ~21 µA | continuous | continuous | 100 kΩ / 100 kΩ from 4.2 V. Draws from the **battery**, not this rail |
+| **Status LED, 1 kΩ** | **~1.3 mA** | lit | ≤ 50 % duty, it blinks | (3.3 − 2.0) / 1000. **330 Ω was budgeted and none arrived** — 1 kΩ is dimmer and cheaper in current, which is the right direction |
+| **Power LED, 1 kΩ** | **~1.3 mA** | lit | **continuous** — it must light on power-on, so it hangs off the 3.3 V rail and not a GPIO | Same arithmetic |
+| **Battery divider, GP26** | ~64 µA | continuous | continuous | 33 kΩ / 33 kΩ from 4.2 V. Draws from the **battery**, not this rail |
 
 ### What that totals
 
 | Case | Peripherals | + RP2040 | Against the 300 mA pin guidance |
 |---|---:|---:|---|
-| **Everything at once** — TX, SD write, GPS acquiring, all sensors, LED | **272 mA** | **307 mA** | **over** |
-| **GPS tracking rather than acquiring** — otherwise the same | **247 mA** | **282 mA** | under, with 18 mA to spare |
-| **Steady state** — TX at 33 % duty, RX otherwise, GPS tracking | **97 mA** | **132 mA** | comfortable |
+| **Everything at once** — TX, SD write, GPS acquiring, all sensors, both LEDs | **271 mA** | **306 mA** | **over** |
+| **GPS tracking rather than acquiring** — otherwise the same | **246 mA** | **281 mA** | under, with 19 mA to spare |
+| **Steady state** — TX at 33 % duty, RX otherwise, GPS tracking | **95 mA** | **130 mA** | comfortable |
 
 Both columns are given because both get quoted. The peripheral column is what leaves the
 `3V3(OUT)` pin; the second adds the RP2040's own draw, which shares the regulator, and is the
 one to compare against Raspberry Pi's 300 mA figure.
 
-> **The microphone added 5 mA to every row above**, and it is a continuous load rather than a duty-cycled one: it draws whether or not anything is listening. That took the tight case from 18 mA of margin to 13, which is the whole reason this table is re-run rather than amended. **Nothing further may join this rail without doing the same**, and the hall effect sensor — when its supply voltage is confirmed — will add a few milliamps more.
+> **The microphone added 5 mA to every row above**, and it is a continuous load rather than a duty-cycled one: it draws whether or not anything is listening. Against that, **the LED resistors came back as 1 kΩ rather than the 330 Ω budgeted** — no 330 Ω was delivered — which drops each LED from 4 mA to 1.3 and hands back most of what the microphone took, even with the power LED now counted as its own continuous load.
+>
+> The net is 19 mA of margin in the realistic case, against 23 before either change. **Nothing further may join this rail without re-running this table.**
 >
 > **An earlier revision of this tally read 316 mA.** The difference is almost entirely the
 > radio: **120 mA is the SX1278's +20 dBm figure and this vehicle transmits at +17 dBm, which
@@ -398,6 +401,10 @@ milliseconds.
 5. **The microphone's `AO` line is analogue and high-impedance.** Keep it short, off the
    SPI0 bundle and away from the antenna lead. That is a signal-integrity rule rather than a
    power one, but it is decided at the same moment as the layout.
+6. **The battery divider is two 33 kΩ 1 % parts**, not the 100 kΩ 5 % ones that also
+   arrived. Same 2:1 ratio and the same 2.1 V at `GP26` on a full cell, but a fifth of
+   the tolerance on the one measurement nothing else can cross-check. 64 µA off the
+   battery is nothing.
 
 ### What has been measured
 

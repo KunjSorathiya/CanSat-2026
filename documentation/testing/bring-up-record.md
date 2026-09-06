@@ -145,7 +145,7 @@ battery-powered test.
 | 2.3 | Rail droop during TX | Must not brown out the Pico | Scope, minimum during TX | | |
 | 2.4 | Idle current | — | Inline meter, vehicle in `READY` | | |
 | 2.5 | Peak current during TX | — | Inline meter or scope across a shunt | | |
-| 2.6 | Battery voltage at the ADC pin | Divider ratio unknown; firmware reports raw pin volts until it is set | Multimeter at GP26 vs battery | | |
+| 2.6 | Battery voltage at the ADC pin | **2.10 V at `GP26` for a 4.20 V cell** — a 33 kΩ/33 kΩ 1 % divider, ratio 2.0 | Multimeter at GP26 and at the battery, together. Set `battery_divider_ratio = 2.0` only once both legs are fitted and this row is taken — until then the firmware reports raw pin volts and says so | | |
 | 2.7 | Endurance, full charge to cutoff | — | Log until telemetry stops | | |
 
 **Until 2.6 is measured and `battery_divider_ratio` set, battery telemetry is the raw ADC

@@ -8,6 +8,24 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-06 (cycle 34)
+
+### Added — the second-batch photographs, and the divider they settle
+
+Five photographs filed: the LM393 module cropped out of the batch shot, the batch shot itself, and one close-up per resistor group. The close-ups exist because the batch shot could not resolve the colour bands, and a delivery photograph that settles quantities but not values is only half of Part C.
+
+**The resistors read as 100 kΩ ±5 % carbon film, 33 kΩ ±1 % metal film and 1 kΩ ±5 %.** Two are four-band and were photographed with the gold tolerance band on the left, so they read right to left; the five-band 33 kΩ is the one that matters to get the right way round, because backwards it reads as a plausible 1.2 kΩ rather than as an invalid code.
+
+**The `GP26` battery divider is now designed rather than reserved:** two 33 kΩ 1 % parts in series across the pack, tapped at the midpoint. Ratio 2.0, 2.10 V at the pin on a full 4.20 V cell against a 3.3 V limit, 64 µA continuous. The 100 kΩ 5 % parts would give the same ratio for a quarter of the current and were not chosen: the pack voltage is the one telemetry quantity nothing else can cross-check, so a fifth of the tolerance is worth 43 µA.
+
+**No 330 Ω arrived and none is needed.** 1 kΩ drives both LEDs at about 1.3 mA instead of 4, which is visible and cheaper in current — it hands back most of what the microphone took last cycle, even with the power LED now counted as its own continuous load. The realistic case is 246 mA of peripherals, 281 with the RP2040, against the 300 mA the pin is rated for.
+
+The module photograph also resolves what the last one could not: `LM393` `49M` `BWQ64` on the comparator, `PWR-LED` and `DO-LED` silkscreen, `+`/`−` marks on the capsule pads, and SMD resistors marked `102` and `201`.
+
+**Values read from bands are what a part claims, not what it measures.** D.6 says so and asks for one from each group to be metered before anything is fitted.
+
+---
+
 ## [Unreleased] — 2026-09-05 (cycle 33)
 
 ### Added — an acoustic sensor, logged and deliberately not transmitted

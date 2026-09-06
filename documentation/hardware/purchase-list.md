@@ -20,7 +20,7 @@ finding, or a scoring recommendation that has been costed.
 | Header strips | Soldered to both Picos and every module on 2026-09-04 |
 | Power switch, LEDs, and their resistors | Held. An I/O switch and LEDs in two colours, confirmed 2026-09-06 |
 | Capacitors — 10 µF, 100 µF, 0.1 µF `104` | **Received 2026-09-06.** Radial electrolytics at 25 V and 50 V, and ceramic discs |
-| Resistors, three values | **Received 2026-09-06**, about 24 in three taped groups. **Values unconfirmed** — meter them before fitting, especially the divider pair |
+| Resistors: 100 kΩ 5 %, 33 kΩ 1 %, 1 kΩ 5 % | **Received 2026-09-06** and read from their bands ([D.6](receiving-inspection.md#d6--the-resistors)). The 33 kΩ pair is the `GP26` divider, 1 kΩ drives both LEDs, 100 kΩ is spare. **No 330 Ω arrived and none is needed** |
 | Hall effect sensor | Held, and **not being used** (decided 2026-09-06). Its supply voltage was never confirmed, and with sensor integration already at its 25-point cap it would have scored nothing. Kept as a spare part, not a planned one |
 | LM393 sound detection sensor | Held, confirmed 3.3 V, and confirmed the **four-pin `AO DO GND VCC` variant** on 2026-09-06. Integrated on `GP27` (level) and `GP15` (threshold duty), logged to the SD card, not transmitted |
 
@@ -71,9 +71,9 @@ the need the night before a launch is the case worth avoiding.
 
 | Item | Qty | Why | ~₹ |
 |---|---:|---|---:|
-| **330 Ω**, ¼ W | 10 | Status LED on GP14. Gives ~4 mA at 3.3 V | 10 |
-| **1 kΩ**, ¼ W | 10 | Power LED. Dimmer than 330 Ω but it is lit for the whole flight, so the ~1.3 mA matters against a rail with no headroom | 10 |
-| **100 kΩ**, ¼ W, 1 % if offered | 10 | Battery divider on GP26 (bring-up row 2.6). Two in series across the battery gives a 2:1 ratio and draws only ~21 µA. **1 % tolerance is worth it here** — this divider is the only thing standing between the telemetry and a wrong battery reading | 20 |
+| ~~330 Ω~~ | — | **Not needed.** None arrived and 1 kΩ serves both LEDs at ~1.3 mA, which is visible and cheaper in current | — |
+| ~~1 kΩ~~, ~~100 kΩ~~ | — | **Received 2026-09-06.** See the table above | — |
+| ~~a 1 % divider pair~~ | — | **Received as 33 kΩ ±1 %**, which is the better divider: same 2:1 ratio, a fifth of the tolerance of the 100 kΩ 5 % parts, 64 µA off the battery | — |
 
 ## 4 · Scoring — the cheapest points left
 
