@@ -87,6 +87,7 @@ Run against the repository on 2026-09-06. ✅ settled, ⚠️ needs your eyes at
 | 32 | `team_id` is still the `CAN-Team-XX` placeholder | Blocks flight, not soldering |
 | 33 | Antenna centre contacts unphotographed — SMA or RP-SMA | Blocks *reordering* an antenna, not this build |
 | 34 | No reverse-polarity protection anywhere on the vehicle | The JST-RCY is keyed, so the risk is one badly wired pigtail. Step 15 meters it before the first mate |
+| 35 | **The RP2040 datasheet is not in this repository.** `datasheets/` holds the Pico datasheet and the BMP280 one; the ADC sample time and sample capacitance that would settle whether a 16.5 kΩ divider needs help are in the RP2040 document | Does not block. The `104` at `GP26` is fitted on judgement in the meantime, and [says so](#one-part-to-add-100-nf-from-the-divider-tap-to-agnd) |
 
 ---
 
@@ -310,7 +311,7 @@ coupling back.
 
 | Line | Why it is a victim |
 |---|---|
-| `GP26`, pin 31 — the divider tap | Source impedance is 33 kΩ ∥ 33 kΩ = **16.5 kΩ**. That is high for an RP2040 ADC input on its own, before any neighbour is considered |
+| `GP26`, pin 31 — the divider tap | Source impedance is 33 kΩ ∥ 33 kΩ = **16.5 kΩ**. High enough to be worth treating, on the general SAR-converter principle rather than on a number — see the caveat below |
 | `GP27`, pin 32 — the microphone `AO` | High impedance, and [whether the board buffers it is unread](receiving-inspection.md#d5--the-lm393-sound-module) |
 
 Everything else is either the aggressor or immune to it. SPI0 at **4 MHz** is the only fast
@@ -339,10 +340,23 @@ Pico pin 31 (GP26) ──┬── divider midpoint
                      └──[ 100 nF `104` ]── GND, at the pin 33 tie
 ```
 
-It does two jobs at once. It gives the RP2040's sample-and-hold a local charge reservoir, so a
-**16.5 kΩ** source no longer has to settle the sampling capacitor on its own; and it shorts any
-coupled glitch to ground before the conversion sees it. The time constant is 1.65 ms against a
-battery read once per second, so it costs nothing that matters.
+It does two jobs. It gives the SAR converter's sample-and-hold a local charge reservoir, so a
+**16.5 kΩ** source no longer has to settle the sampling capacitor through itself; and it shorts
+any coupled glitch to ground before the conversion sees it. The time constant is 1.65 ms against
+a battery read once per second, so it costs nothing that matters.
+
+> [!WARNING]
+> **This part is a recommendation, and the reasoning behind it is thinner than the rest of this
+> page.** It comes from the general behaviour of SAR converters — a sampling capacitor charged
+> through the source impedance during the sample window — and **not from the RP2040 datasheet,
+> which is not in this repository.** `datasheets/` holds the *Pico* datasheet; the ADC sample
+> time and sample capacitance are in the *RP2040* one. Until somebody reads it, "16.5 kΩ is
+> high" is an engineering expectation, not a measured or documented limit.
+>
+> Fit it anyway. It is one `104` out of about twenty, the time constant is irrelevant at a
+> 1 Hz read, and the failure it guards against is a gain error on **the one telemetry quantity
+> nothing else can cross-check**. But it is here on judgement, not on evidence, and it should
+> say so.
 
 **Do not fit the equivalent on `AO`.** That line carries the audio envelope the driver reduces
 to a peak-to-peak span, and filtering it would remove the measurement. `AO` gets the ground
