@@ -10,6 +10,24 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Added — Gate 3 and Gate 4 pass, and the board is complete but for the sound module
+
+Every device on the vehicle answered in one run. **`0x68` and `0x76` on the bus together** — which was the open half of row 3.1 and is now closed — with `0x0C` correctly absent from both scans. Chip ID `0x58`, `WHO_AM_I` `0x70`, barometer at **83.0 Hz**, and the GPS emitting all six sentences cleanly at 162 B/s with zero checksum errors while the radio and card share the board. Gates 5, 6 and 7 repeated in the same run.
+
+**The honest number in there is 3.8.** Read cost was previously 0.282 ms — measured with the barometer alone, because the IMU was not wired. With both sensors it is **0.763 ms mean, 0.833 ms worst**, roughly treble. Still **2.5 % of the 33 ms period**, and now it describes the actual vehicle rather than half of it.
+
+### Added — [F-13]: 0.41 dps of gyro-Z bias movement is the yaw budget
+
+Z bias read **−0.4720 dps** on 2026-09-05 and **−0.0628 dps** on 2026-09-07. X and Y repeated to within 0.09 and 0.05.
+
+Startup calibration removes the bias *present at boot*, so a bias stable across a flight costs nothing. What this shows is that Z bias **moves ~0.4 dps between sessions**, and the obvious driver is temperature — the die read **35.6 °C** on the bench, while flight is colder at altitude and warmer from self-heating. **0.4 dps held for a 180 s flight is 72° of yaw error**, on a vehicle that reports `YR-G` because [it has no magnetometer](documentation/testing/bring-up-record.md#findings) to catch it.
+
+**The number worth having is not the bench bias but the drift after calibration across a temperature change**, and nothing has measured it. A cheap first look: calibrate, warm or cool the board, watch integrated yaw walk.
+
+### Added — [F-14]: the temperature in telemetry is board temperature, not air
+
+The barometer reported **32.96 °C** while the IMU die read **35.6 °C**, both well above a normal room. That is correct for the BMP280's own purpose — it needs die temperature to compensate pressure, and the altitude is unaffected. But the same figure is carried in telemetry where it reads as an air temperature and **is not one**: it is board temperature, biased warm by self-heating and by sitting beside a transmitting radio. Either label the field for what it is or stop treating it as ambient.
+
 ### Changed — three `104`s are deliberately omitted, and the blanket claim is retired
 
 The IMU, the barometer and the GPS are fitted **without** a bypass capacitor. Decided at the bench on 2026-09-07 and recorded as **D-8**, because an omission nobody wrote down looks like an oversight to the next fault investigation — and this repository has already caught a wrong RA-02 pin description and a wrong card capacity that way.
