@@ -10,6 +10,27 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Added — Gates 6 and 7 pass on the soldered board, and the card failed eleven minutes earlier
+
+Everything ran. The card initialised in **31 ms**, wrote 100/100 at a 6.128 ms mean, sustained **3598 writes in 10 s at 100 % duty**, and Gate 7 passed every row it has: `0x12` unchanged after the SD driver raised SPI to 4 MHz, 200 interleaved rounds with zero card-read failures and zero radio misreads, and 30 transmit-then-write rounds clean. **Gate 2's headline number came with it: the 3V3 rail held 3.28–3.29 V through 45 back-to-back transmits**, against 3.26–3.27 V on the breadboard, which closes row 5.4a.
+
+**And the run before it failed completely.** Same board, same card, nothing changed, eleven minutes apart: ACMD41 timed out at 2007 ms with `R1 = 0xFF`. That pair is the finding, not the pass.
+
+**[F-12] is open and must stay open.** `0xFF` is not a slow card — an initialising card answers `0x01` until it answers `0x00`, so the card had stopped responding altogether. **The supply is measured innocent:** the module's own `3V3` read **3.28 V** during the failing run, and the rail carried ~120 mA of radio through 45 transmits without moving. What is left is *mechanical* — the friction-fit card holder, or a joint that moves when the board is handled, and the board was being handled to place meter probes.
+
+**This repository has been here twice already.** [F-5](documentation/testing/bring-up-record.md#findings) was the radio failing 5/5 then passing 45/45 minutes later. [F-6](documentation/testing/bring-up-record.md#findings) was every write failing on one power cycle and 100/100 on the next. Both looked fixed, both were a marginal supply connection, and both took five bench runs to name. One good run is not evidence of a fix — it is the same thing those two looked like.
+
+### Changed — [F-11]'s ~30 ms write stall is no longer rare
+
+The fourth session gave **28.031 ms worst against a 6.128 ms mean**. So the worst case reads 4.814, 29.756, 4.915 and 28.031 ms across four sessions on two different boards: **~30 ms has been seen twice, not once.** A stall that reproduces is a design input rather than an anomaly, and `RawBlockLog` writes twice per telemetry append — so a bad second can block the loop for ~56 ms, close to two whole sensor periods against a 33 ms `sensor_period_ms`.
+
+### Changed — two rows that look finished and are not
+
+**6.3b** has now run four times and **has never once produced the current figure it exists for.** Throughput is settled at 297–367 writes/s; the series-current measurement the Gate 2 load budget waits on has been skipped every session. Marked ⚠️.
+
+**7.3** has passed three times, on both boards, and has never been run for the five minutes it asks for. Also ⚠️. Passing a shorter version of a test repeatedly is not the same as passing it.
+
+
 ### Added — Gate 5 passes on the soldered board, first attempt, and the airtimes did not move
 
 Fifty-five transmits, no failures. `0x12` on the version register, **5/5 at 206 bytes, 5/5 at 255 bytes, 45 of 45 through a 15-second back-to-back burst** with an unbroken line of dots. Rows 5.1, 5.2, 5.3 and 5.4a re-taken and dated 2026-09-07.
