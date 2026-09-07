@@ -95,7 +95,7 @@ bot = [
     ('7',  'GP5',  'MPU-6500 SCL  +  BMP280 SCL', I2C),
     ('8',  'GND',  'spare ground', GND),
     ('9',  'GP6',  'microSD  CS', SPI),
-    ('10', 'GP7',  'MPU-6500 INT  (optional, never read)', I2C),
+    ('10', 'GP7',  'MPU-6500 INT  (wired; firmware must enable)', I2C),
     ('11', 'GP8',  'not connected', NONE),
     ('12', 'GP9',  'not connected', NONE),
     ('13', 'GND',  'spare ground', GND),
@@ -151,7 +151,7 @@ mpu = [
     ('5',  'EDA',   'not connected', NONE),
     ('6',  'ECL',   'not connected', NONE),
     ('7',  'AD0',   'not connected — strapped low, 0x68', NONE),
-    ('8',  'INT',   'pin 10  GP7   (optional)', I2C),
+    ('8',  'INT',   'pin 10  GP7   — separate single pin', I2C),
     ('9',  'NCS',   'not connected', NONE),
     ('10', 'FSYNC', 'not connected', NONE),
 ]

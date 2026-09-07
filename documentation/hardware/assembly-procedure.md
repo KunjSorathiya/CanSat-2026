@@ -87,6 +87,7 @@ Run against the repository on 2026-09-06. ✅ settled, ⚠️ needs your eyes at
 | 32 | `team_id` is still the `CAN-Team-XX` placeholder | Blocks flight, not soldering |
 | 33 | Antenna centre contacts unphotographed — SMA or RP-SMA | Blocks *reordering* an antenna, not this build |
 | 34 | No reverse-polarity protection anywhere on the vehicle | The JST-RCY is keyed, so the risk is one badly wired pigtail. Step 15 meters it before the first mate |
+| 38 | **`INT` is wired but the firmware never enables it.** `mpu9250.cpp` writes `INT_PIN_CFG = 0x02` — `BYPASS_EN` only, for a magnetometer this part does not have — and never writes `INT_ENABLE`. **The pin will sit static, and that is not a fault** | Needs a firmware change to become useful, not a wiring one. See bring-up row 3.14 |
 | 36 | **The Pico ADC carries a documented ~30 mV offset**, from ~150 µA of ADC current through the 200 Ω filter feeding `ADC_AVDD` (Pico datasheet §4.3). On a 2:1 divider that is **~60 mV referred to the pack** — larger than anything the withdrawn `GP26` capacitor addressed | **Does not block, and needs no wire.** It is a systematic offset, so the step 14 comparison against a metered pack absorbs it into the calibration |
 | 37 | **SMPS ripple reaches the ADC supply.** The datasheet's remedy is to drive `GPIO23` high, forcing the RT6150 into PWM mode; `pico_hal.cpp` never touches it | Firmware only, no wiring. Can be done at any time, and toggled around the reading to keep the light-load efficiency |
 | 35a | **No Schottky between the switch and `VSYS`.** Until one is fitted, USB back-powers the battery whenever both are connected — [D-6](#d-6-a-schottky-goes-between-the-switch-and-vsys) | **Blocks nothing, but changes how you work.** Battery switch OFF whenever USB is in, for every gate from 1 to 14 |
@@ -813,8 +814,17 @@ are half-periods: `READY` unarmed is 900 ms on, 900 ms off — **1800 ms full cy
 
 ### 6 · The header field
 
-Solder male header strips for the four jumpered modules — **10 pins (MPU), 6 (BMP280), 4
-(NEO-6M) and 4 (LM393), 24 in total** — at the coordinates recorded in step 1. The microSD needs
+Solder male header strips for the four jumpered modules — **4 pins each for the MPU, BMP280,
+NEO-6M and LM393, plus one separate pin for the IMU's `INT`: 17 in total** — at the coordinates
+recorded in step 1.
+
+**Fit only the pins you actually wire, and put a visible gap before the `INT` pin.** On both
+I2C modules the four signals you need are the *first four* of the header, and the pins you must
+not touch — `AD0` on the IMU, `SDO` and `CSB` on the barometer — come after them. A strip that
+stops at four leaves those with **no pad for a stray jumper to land on**, which is a better
+control than being careful ([C.4.7 / C.3.8](receiving-inspection.md#c4--gy-bmp280-33)). The
+IMU's `INT` is header position 8, so it gets its own pin set clearly apart — never an 8-pin
+strip, which would put a pad back under `AD0`. The microSD needs
 no strip: it is soldered down like the RA-02.
 
 **Gate:** adjacent-pin isolation across every strip.
