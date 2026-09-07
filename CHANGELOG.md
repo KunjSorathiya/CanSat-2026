@@ -10,6 +10,18 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Added — the last sensor fitted is the only one the diagnostic cannot check
+
+The sound module is wired. `bringup_main.cpp` reads the IMU, barometer, GPS, radio and card and reports each live — and **never reads `GP27` or `GP15`**. Grepped: not one reference. So every other sensor on this vehicle can be confirmed in a single run, and this one cannot.
+
+Rows 3.11 and 3.12 have to go through the **flight firmware** instead, which logs `sound_mv_pp`, `sound_clipped` and `sound_gate_pct` into `FLIGHT.CSV` — flash, run, pull the card, read the columns. That works, but it means the last thing fitted is the hardest thing to verify, which is the wrong way round. Recorded as open item 39.
+
+### Fixed — `team_id` is not the placeholder, and that is worse
+
+Open item 32 said `team_id` was still `CAN-Team-XX`. It is not: `main.cpp:40` sets **`CAN-Team-25`**, and that value **passes** `is_valid_team_id()`.
+
+The guard was written to catch an unset identifier — the rulebook's example placeholder — and it has already been satisfied by a number nobody has checked against a registration. **So the safety net will never fire again on this vehicle.** If `25` is not the registered identifier, every packet it ever sends carries the wrong one and nothing in the firmware, the tests or the documentation will say so.
+
 ### Changed — a sweep for everything the built board made false
 
 With the vehicle working, several documents were still describing a project that had never applied power. Corrected across the repository:
