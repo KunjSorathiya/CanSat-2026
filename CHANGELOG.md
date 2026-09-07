@@ -10,6 +10,16 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Added — `tools/read_flight_log.py`, and what it found in the first real log
+
+A recovered `FLIGHT.CSV` reads as good data followed by garbage, and nothing on its face says where one becomes the other — the file is pre-allocated and never truncated, so everything past the last record is whatever was in those blocks before.
+
+**The file already knew.** `RawBlockLog` keeps two alternating header copies and rewrites them after every record, so `next free lba` is always current. The reader takes the valid header copy — checksum-verified, because a torn write has a *higher* sequence number and is exactly the one you must not trust — and stops where the data stops. It also splits by flight on `packet_number` restarting, so several runs in one file come out as `flight-1.csv`, `flight-2.csv`, without the firmware needing to know anything about it.
+
+On the first real log: **67,108,864 bytes in, 17,829 out.** Header sequence 112, boot count 1, next free block 113, 111 records, one flight. It reads a file rather than a raw volume, so it needs no elevation and cannot touch the card.
+
+**And extracting a real log made [F-15] worse than recorded.** The same root cause has a second consequence: `PicoSdLogger::initialize()` writes a hand-rolled **comma**-separated header — `team_id,packet,mission_time,…` — and then `append()` writes the **radio packet**, which is **semicolon**-separated tagged fields: `CAN-Team-25; P-001; Ti-00:00:00:000; A-38.8; …`. The header does not describe the rows, and the file does not open as a spreadsheet — which is the stated reason for writing a header at all. `sd_header()` and `sd_line()` are a matched pair that would produce both correctly, and neither is called.
+
 ### Changed — the startup summary names its faults instead of counting them
 
 First boot after the [F-16] fix: **`SD card OK`**, every subsystem reporting, and `faults active 3` on a vehicle where nothing said FAILED. A count is not actionable. The summary now lists the names — `mag_unavailable watchdog_reboot calibration` tells an operator what to do; `3` tells them to go reading source.
