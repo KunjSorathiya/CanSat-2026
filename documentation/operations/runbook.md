@@ -333,7 +333,7 @@ and pressure, each against time or packet number.
    | Altitude, pressure, temperature | `altitude_m`, `pressure_pa`, `temperature_c` | `altitude`, `pressure`, `temperature` |
    | Attitude | `roll_deg`, `pitch_deg`, `yaw_deg` | `roll`, `pitch`, `yaw` |
    | Acceleration | `ax_mps2`, `ay_mps2`, `az_mps2` | `ax`, `ay`, `az` |
-   | GPS | `gps_valid`, `gps_lat`, `gps_lon`, `gps_alt` | `gps_lat`, `gps_lon`, `gps_alt` (blank when there was no fix) |
+   | GPS | `gps_valid`, `gps_lat`, `gps_lon`, `gps_alt`, `gps_satellites`, `gps_hdop` | `gps_lat`, `gps_lon`, `gps_alt`, `gps_satellites`, `gps_hdop` (all blank when there was no fix — 0 satellites and HDOP 0.0 are both readings a receiver produces, so zeros would describe a perfect fix that never happened). `gps_satellites` and `gps_hdop` are the two numbers the fix gate judged on, recorded beside the position it let through ([F-18](../testing/bring-up-record.md#findings)) |
    | Mission state and faults | `state`, `fault_total` | not carried as columns — they are inside `raw_packet` as `MODE` and `FAULTS` |
    | Acoustic level | `sound_mv_pp`, `sound_clipped`, `sound_gate_pct` | **not carried at all — this is on the card only.** The microphone is an additional sensor and its level is deliberately not transmitted, so the SD log is the only copy. Blank in both columns means no microphone was fitted or it was not reporting; `0.0` means it measured silence, and the two are not the same thing |
    | The packet itself | `packet` | `raw_packet` |

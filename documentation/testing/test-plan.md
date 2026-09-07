@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 78 suites across the whole flight core | ✅ **3675 / 3675 assertions** |
+| `flight_tests` | 80 suites across the whole flight core | ✅ **3688 / 3688 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -157,7 +157,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 78 suites, 3675 assertions
+### `flight_tests` — 80 suites, 3688 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -190,6 +190,8 @@ flowchart LR
 | `test_sound_level_refuses_a_window_it_cannot_scale` | An empty window, a zero full scale, a zero or negative reference, and a window never filled all return 0 rather than dividing by zero or reporting a negative loudness |
 | `test_a_clipped_window_is_reported_as_clipped` | A window touching either end of the converter is flagged, because the level is then a lower bound — and canopy inflation and touchdown are the two events most likely to saturate |
 | `test_the_sound_level_is_logged_and_never_transmitted` | The level appears in the SD row and in no spelling anywhere in the packet, and the CSV header and row carry the same column count |
+| `test_the_log_records_the_numbers_the_gps_gate_judges_on` | `gps_satellites` and `gps_hdop` appear in the header and the row, and stay out of the radio packet — the quantity a decision turns on is recorded next to the decision, and [F-18](bring-up-record.md#findings) was undiagnosable because it was not |
+| `test_no_fix_leaves_the_gps_quality_columns_blank` | With no fix, every GPS column is blank and the row still has the header's column count. 0 satellites and HDOP 0.0 are both real readings, and HDOP 0.0 is perfect geometry, so zeros here would describe a fix that never happened |
 | `test_an_absent_microphone_leaves_the_columns_blank_rather_than_zero` | No sensor writes empty columns, never `0.0` — a working sensor reports zero for silence and the two must stay distinguishable |
 | `test_a_vehicle_without_a_microphone_behaves_as_before` | A null sound pointer flies the full mission, sends packets, and raises no sound fault |
 | `test_a_failed_microphone_costs_a_warning_and_nothing_else` | A microphone that fails to start and fails every read raises a warning, does not fail the self-test, does not reach `fault`, and does not cost a packet |

@@ -2727,6 +2727,87 @@ void test_the_sound_level_is_logged_and_never_transmitted() {
     CHECK(header_commas == line_commas);
 }
 
+// [F-18] The gate refuses a fix on satellite count and HDOP, and neither number was written
+// anywhere -- not the SD row, not the packet. So a log could show a position wandering 50 m
+// and say nothing about why, and the thresholds could not be tuned against real data. The
+// quantity a decision turns on has to be recorded next to the decision.
+void test_the_log_records_the_numbers_the_gps_gate_judges_on() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::TelemetryBuilder builder(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = true;
+    s.baro_valid = true;
+    s.orientation_valid = true;
+    cansat::GpsData fix;
+    fix.valid = true;
+    fix.latitude = 21.220094;
+    fix.longitude = 72.884836;
+    fix.altitude = 15.0;
+    fix.satellites = 9;
+    fix.hdop = 1.4;
+    s.gps = fix;   // gps.valid is the fix flag
+
+    const std::string header = flight::TelemetryBuilder::sd_header();
+    CHECK(header.find("gps_alt,gps_satellites,gps_hdop,sound_mv_pp") != std::string::npos);
+
+    const auto built = builder.build(1, 1000, s);
+    CHECK(built.has_value());
+    const std::string line = builder.sd_line(*built, flight::MissionState::flight, 0);
+    CHECK(line.find(",9,1.4,") != std::string::npos);
+
+    // Still absent from the radio packet: the rulebook fixes that format, and airtime is
+    // the constraint the whole telemetry rate was computed from.
+    CHECK(built->packet.find("HDOP") == std::string::npos);
+    CHECK(built->packet.find("SAT") == std::string::npos);
+}
+
+// No fix means no quality either. A zero satellite count and a zero HDOP are both readings a
+// receiver can produce, and HDOP 0 is the best geometry there is -- writing either where
+// there was no fix at all invents data that would pass any gate.
+void test_no_fix_leaves_the_gps_quality_columns_blank() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::TelemetryBuilder builder(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = true;
+    s.baro_valid = true;
+    s.orientation_valid = true;
+    // s.gps left default: valid == false, no fix
+
+    const auto built = builder.build(1, 1000, s);
+    CHECK(built.has_value());
+    const std::string line = builder.sd_line(*built, flight::MissionState::flight, 0);
+
+    // Split rather than search. ",0,0.0," also matches state,fault_total,altitude further
+    // up the row, so a substring test here passes or fails for the wrong reason.
+    std::vector<std::string> cells;
+    std::string cell;
+    for (const char ch : line) {
+        if (ch == 0x2C) { cells.push_back(cell); cell.clear(); } else { cell += ch; }
+    }
+    cells.push_back(cell);
+
+    const std::string header = flight::TelemetryBuilder::sd_header();
+    std::vector<std::string> names;
+    cell.clear();
+    for (const char ch : header) {
+        if (ch == 0x2C) { names.push_back(cell); cell.clear(); } else { cell += ch; }
+    }
+    names.push_back(cell);
+
+    CHECK(names.size() == cells.size());
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        if (names[i] == "gps_satellites" || names[i] == "gps_hdop" ||
+            names[i] == "gps_lat" || names[i] == "gps_lon" || names[i] == "gps_alt") {
+            CHECK(cells[i].empty());
+        }
+    }
+    CHECK(cells[13] == "0");   // gps_valid, and it is the one that says why the rest are blank
+}
+
 // An unfitted microphone must be distinguishable from a silent one. Zero is a level a
 // working sensor reports; a blank is the absence of a measurement, and a column that cannot
 // tell those apart is worse than no column.
@@ -2940,6 +3021,8 @@ int main(int argc, char** argv) {
     test_sound_level_refuses_a_window_it_cannot_scale();
     test_a_clipped_window_is_reported_as_clipped();
     test_the_sound_level_is_logged_and_never_transmitted();
+    test_the_log_records_the_numbers_the_gps_gate_judges_on();
+    test_no_fix_leaves_the_gps_quality_columns_blank();
     test_an_absent_microphone_leaves_the_columns_blank_rather_than_zero();
     test_a_vehicle_without_a_microphone_behaves_as_before();
     test_a_failed_microphone_costs_a_warning_and_nothing_else();

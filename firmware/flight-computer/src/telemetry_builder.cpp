@@ -92,7 +92,7 @@ std::string TelemetryBuilder::sd_header() {
     // the CSV wants the numbers before it.
     return "mission_ms,packet_number,state,fault_total,altitude_m,pressure_pa,temperature_c,"
            "roll_deg,pitch_deg,yaw_deg,ax_mps2,ay_mps2,az_mps2,gps_valid,gps_lat,gps_lon,"
-           "gps_alt,sound_mv_pp,sound_clipped,sound_gate_pct,packet";
+           "gps_alt,gps_satellites,gps_hdop,sound_mv_pp,sound_clipped,sound_gate_pct,packet";
 }
 
 std::string TelemetryBuilder::sd_line(const Built& b, MissionState state,
@@ -129,8 +129,18 @@ std::string TelemetryBuilder::sd_line(const Built& b, MissionState state,
         out += fixed(r.gps->longitude, config_.gps_latlon_decimals);
         out += ',';
         out += fixed(r.gps->altitude, config_.gps_alt_decimals);
+        out += ',';
+        // The two numbers the fix gate judged on, recorded beside the position it let
+        // through. [F-18] could not be diagnosed from a log because these were computed,
+        // acted on, and then discarded.
+        out += std::to_string(static_cast<unsigned>(r.gps->satellites));
+        out += ',';
+        out += fixed(r.gps->hdop, 1);
     } else {
-        out += ",,";  // gps_lat, gps_lon, gps_alt all empty
+        // No fix means no quality either, and both blanks are load-bearing: 0 satellites
+        // is a reading a receiver produces, and HDOP 0.0 is the best geometry there is.
+        // Written as zeros they would describe a perfect fix that never happened.
+        out += ",,,,";  // gps_lat, gps_lon, gps_alt, gps_satellites, gps_hdop
     }
     // An absent or unfitted microphone leaves both columns empty rather than writing a
     // zero. Zero is a level a working sensor can report -- silence -- and a column that
