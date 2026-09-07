@@ -151,6 +151,14 @@ void Controller::poll(std::uint64_t now_ms) {
         emit_telemetry(mission_ms);
     }
 
+    // One slice of any background scrub, every poll. It costs nothing when none is
+    // running, and it deliberately does not gate on logger_enabled_ alone changing: a
+    // scrub that has started must finish or be abandoned by the logger, not left half done
+    // because a write failed once.
+    if (logger_enabled_) {
+        logger_.erase_step();
+    }
+
     if (logger_enabled_ && sd_flush_task_.due(mission_ms)) {
         if (!logger_.flush()) {
             faults_.report(FaultCode::sd_write, FaultSeverity::warning, mission_ms);

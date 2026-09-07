@@ -167,7 +167,14 @@ public:
     virtual bool flush() = 0;
     // Empties the log. Defaulted to a refusal so a logger that cannot do it says so rather
     // than silently appearing to succeed.
+    //
+    // Returns as soon as the log reads empty. Physically overwriting the old blocks -- what
+    // `tools/prepare_sd_card.py` achieves by deleting and recreating the file -- is minutes
+    // of card writes, so it continues afterwards through erase_step().
     virtual bool erase() { return false; }
+    // One bounded slice of that background scrub. Returns true while more remains, so the
+    // controller can drive it without ever knowing how much is left.
+    virtual bool erase_step() { return false; }
     virtual bool healthy() const = 0;
 };
 

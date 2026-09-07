@@ -1915,6 +1915,84 @@ void test_the_widest_sd_row_still_fits_one_block() {
     }
 }
 
+// reset() + scrub_step() together are meant to leave the region the way
+// tools/prepare_sd_card.py leaves a freshly created file: empty log, fresh header, and the
+// old bytes overwritten with spaces rather than merely stepped over.
+void test_a_reset_log_reads_empty_and_the_old_bytes_are_scrubbed_away() {
+    MemBlocks mem(16);
+    flight::RawBlockLog::Io io;
+    io.ctx = &mem;
+    io.read_block = &MemBlocks::rd;
+    io.write_block = &MemBlocks::wr;
+
+    flight::RawBlockLog log;
+    CHECK(log.begin(io, 0, 16));
+    for (int i = 0; i < 8; ++i) CHECK(log.append_line("secret-row", 10));
+    CHECK(log.record_count() == 8);
+
+    CHECK(log.reset());
+    CHECK(log.record_count() == 0);        // empty immediately, before a single scrub write
+    CHECK(log.scrubbing());                // and the scrub is armed
+    const std::uint32_t boot_before = log.boot_count();
+
+    // Drive it to completion the way the controller does.
+    int guard = 0;
+    while (log.scrub_step(2) && ++guard < 100) {}
+    CHECK(!log.scrubbing());
+    CHECK(log.scrub_blocks_remaining() == 0);
+
+    // Every data block now reads as spaces: the old rows are gone from the media, not just
+    // from the header's reach.
+    std::uint8_t block[512];
+    for (std::uint32_t lba = flight::RawBlockLog::kHeaderBlocks; lba < 16; ++lba) {
+        CHECK(MemBlocks::rd(&mem, lba, block));
+        CHECK(std::memcmp(block, "secret-row", 10) != 0);
+        CHECK(block[0] == ' ');
+    }
+
+    // The boot count is the vehicle's life story, not the file's. An erased card must not
+    // become indistinguishable from one that has never flown.
+    CHECK(log.boot_count() == boot_before);
+
+    // And the log is still usable: the scrub stopped at the write pointer, so appending
+    // after it works and lands in the first data block.
+    CHECK(log.append_line("after-erase", 11));
+    CHECK(log.record_count() == 1);
+    CHECK(MemBlocks::rd(&mem, flight::RawBlockLog::kHeaderBlocks, block));
+    CHECK(std::memcmp(block, "after-erase", 11) == 0);
+}
+
+// The scrub walks down from the end while records append upward. They must never meet on
+// the same block, because that is what lets the log stay open during a scrub that takes
+// minutes on real hardware.
+void test_a_scrub_never_overwrites_a_record_written_during_it() {
+    MemBlocks mem(16);
+    flight::RawBlockLog::Io io;
+    io.ctx = &mem;
+    io.read_block = &MemBlocks::rd;
+    io.write_block = &MemBlocks::wr;
+
+    flight::RawBlockLog log;
+    CHECK(log.begin(io, 0, 16));
+    for (int i = 0; i < 10; ++i) CHECK(log.append_line("old", 3));
+    CHECK(log.reset());
+
+    // Interleave: one scrub slice, one append, until the scrub gives up.
+    int guard = 0;
+    while (log.scrubbing() && ++guard < 100) {
+        log.scrub_step(1);
+        log.append_line("new", 3);
+    }
+    CHECK(!log.scrubbing());
+
+    // Every record written during the scrub survived it.
+    std::uint8_t block[512];
+    for (std::uint32_t i = 0; i < log.record_count(); ++i) {
+        CHECK(MemBlocks::rd(&mem, flight::RawBlockLog::kHeaderBlocks + i, block));
+        CHECK(std::memcmp(block, "new", 3) == 0);
+    }
+}
+
 void test_raw_block_log() {
     MemBlocks mem(8);
     flight::RawBlockLog::Io io;
@@ -3007,6 +3085,40 @@ void test_listening_never_costs_a_packet() {
     CHECK(off.radio.packets.size() > 1);   // and both actually transmitted
 }
 
+// The button is meant to leave the card in the state tools/prepare_sd_card.py leaves it:
+// empty log, fresh header, and the old bytes actually gone. The first two are instant; the
+// third is 64 MB of card writes and cannot be.
+void test_the_erase_reads_empty_immediately_and_scrubs_afterwards() {
+    GroundLink link(true);
+    link.logger.scrub_blocks = 40;         // a card with something on it
+    link.run(4000);
+    CHECK(link.logger.erases >= 1);        // the log read empty on the first command
+    CHECK(link.logger.erase_steps > 0);    // and the scrub is being driven
+}
+
+void test_the_scrub_finishes_without_blocking_telemetry() {
+    // The whole reason the scrub is incremental. A vehicle scrubbing 64 MB must keep
+    // sending its 1 Hz packets throughout, so the packet count may not differ from a run
+    // that never scrubbed at all.
+    GroundLink quiet(true);
+    quiet.run(8000);
+    GroundLink scrubbing(true);
+    scrubbing.logger.scrub_blocks = 400;
+    scrubbing.run(8000);
+    CHECK(scrubbing.logger.scrub_remaining == 0);                       // it completed
+    CHECK(scrubbing.radio.packets.size() == quiet.radio.packets.size());
+    CHECK(scrubbing.radio.packets.size() > 1);
+}
+
+void test_a_vehicle_that_was_never_asked_never_scrubs() {
+    // erase_step() is called every poll; on a vehicle that has erased nothing it must be
+    // free and must not invent work.
+    GroundLink link(false);
+    link.run(4000);
+    CHECK(link.logger.erases == 0);
+    CHECK(link.logger.scrub_remaining == 0);
+}
+
 // And a microphone that fails must cost a warning and a column, never a packet. This is the
 // test that fails if the sensor is ever promoted into the mandatory path.
 void test_a_failed_microphone_costs_a_warning_and_nothing_else() {
@@ -3192,6 +3304,9 @@ int main(int argc, char** argv) {
     test_a_value_too_wide_to_format_invalidates_the_packet();
     test_controller_drops_optional_fields_before_overrunning_the_budget();
     test_gps_coordinate_validation();
+    test_the_erase_reads_empty_immediately_and_scrubs_afterwards();
+    test_the_scrub_finishes_without_blocking_telemetry();
+    test_a_vehicle_that_was_never_asked_never_scrubs();
     test_a_flight_build_has_no_uplink_at_all();
     test_the_bench_build_erases_the_log_on_command();
     test_an_armed_vehicle_refuses_to_erase();
@@ -3225,6 +3340,8 @@ int main(int argc, char** argv) {
     test_telemetry_builder();
     test_sd_log_row_matches_its_header();
     test_the_widest_sd_row_still_fits_one_block();
+    test_a_reset_log_reads_empty_and_the_old_bytes_are_scrubbed_away();
+    test_a_scrub_never_overwrites_a_record_written_during_it();
     test_raw_block_log();
     test_raw_block_log_survives_a_torn_header_write();
     test_controller_sequence_and_degradation();

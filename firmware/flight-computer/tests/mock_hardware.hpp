@@ -162,12 +162,22 @@ public:
         if (fail_erase) return false;
         lines.clear();
         ++erases;
+        scrub_remaining = scrub_blocks;   // the background wipe the real logger starts
         return true;
+    }
+    bool erase_step() override {
+        ++erase_steps;
+        if (scrub_remaining == 0) return false;
+        scrub_remaining -= (scrub_remaining < 4) ? scrub_remaining : 4;
+        return scrub_remaining > 0;
     }
     bool healthy() const override { return healthy_; }
 
     std::vector<std::string> lines;
     int erases = 0;
+    int erase_steps = 0;
+    std::uint32_t scrub_blocks = 0;      // set by a test to model a card worth scrubbing
+    std::uint32_t scrub_remaining = 0;
     bool fail_erase = false;
     bool fail_init = false;
     bool fail_append = false;

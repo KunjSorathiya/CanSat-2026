@@ -57,10 +57,37 @@ bool RawBlockLog::reset() {
     if (!healthy_) return false;
     next_lba_ = base_lba_ + kHeaderBlocks;
     truncated_records_ = 0;
+    // Arm the scrub over everything the log could have written. The header is rewritten
+    // below, so the log is empty from this instant; the scrub only removes bytes that are
+    // already unreachable.
+    scrub_lba_ = base_lba_ + block_count_;
     // The header sequence keeps climbing -- write_header() increments it -- so the reader's
     // "take the copy with the higher sequence" rule still picks the newest, and an erase
     // cannot be mistaken for a torn write that should be ignored.
     return write_header();
+}
+
+bool RawBlockLog::scrub_step(std::uint32_t max_blocks) {
+    if (!scrubbing()) return false;
+    // Spaces, not zeros. These blocks live inside a .csv that opens in a spreadsheet, and
+    // a wall of NULs makes some editors treat the file as binary and truncate it -- the
+    // same reason write_header() pads with spaces.
+    std::uint8_t block[kBlockSize];
+    std::memset(block, ' ', sizeof(block));
+    block[kBlockSize - 1] = '\n';
+
+    for (std::uint32_t done = 0; done < max_blocks && scrubbing(); ++done) {
+        const std::uint32_t lba = scrub_lba_ - 1;
+        if (!io_.write_block(io_.ctx, lba, block)) {
+            // A card that has stopped answering is not a reason to keep hammering it. The
+            // log itself is already reset and consistent; abandoning the scrub loses
+            // nothing a reader could have seen.
+            scrub_lba_ = next_lba_;
+            return false;
+        }
+        scrub_lba_ = lba;
+    }
+    return scrubbing();
 }
 
 bool RawBlockLog::write_header() {

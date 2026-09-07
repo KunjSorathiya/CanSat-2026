@@ -52,6 +52,28 @@ public:
     // that has never been flown.
     bool reset();
 
+    // Overwrites at most `max_blocks` of the not-yet-reused region with spaces, the way
+    // `tools/prepare_sd_card.py` leaves a freshly created file. Returns true while more
+    // remains. Started by reset(); a no-op once finished.
+    //
+    // **It scrubs downward, from the end of the region toward the write pointer.** Records
+    // append upward, so the two ends move apart and can never land on the same block --
+    // which is what lets the log stay open and the vehicle keep logging while a scrub that
+    // takes minutes runs underneath it. The card manages 297-367 blocks/s, so 64 MB is
+    // about seven minutes of continuous writing at the very best; there is no version of
+    // this that is quick, and blocking on it would cost the mandatory 1 Hz downlink and
+    // then the watchdog.
+    //
+    // reset() has already made the log read as empty before the first block is scrubbed,
+    // so power lost halfway through leaves a consistent empty log rather than a half-built
+    // one. The scrub is cosmetic from that point on: it removes bytes a reader would never
+    // have reached anyway.
+    bool scrub_step(std::uint32_t max_blocks);
+    bool scrubbing() const { return healthy_ && scrub_lba_ > next_lba_; }
+    std::uint32_t scrub_blocks_remaining() const {
+        return scrubbing() ? (scrub_lba_ - next_lba_) : 0;
+    }
+
     bool healthy() const { return healthy_; }
     bool full() const { return healthy_ && next_lba_ >= base_lba_ + block_count_; }
     std::uint32_t record_count() const {
@@ -72,6 +94,7 @@ private:
     std::uint32_t base_lba_ = 0;
     std::uint32_t block_count_ = 0;
     std::uint32_t next_lba_ = 0;
+    std::uint32_t scrub_lba_ = 0;   // exclusive; walks down toward next_lba_
     std::uint32_t boot_count_ = 0;
     std::uint32_t header_sequence_ = 0;
     std::uint32_t truncated_records_ = 0;

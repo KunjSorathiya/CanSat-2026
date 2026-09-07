@@ -185,7 +185,21 @@ Two ways to empty it, and the first is the one to use before a launch:
    that also rewrites a stale column header ([F-19](../testing/bring-up-record.md#findings)),
    so a card carried over from an older firmware stops describing its rows wrongly.
 2. **The console's Erase SD log button**, over the uplink, for iterating on the bench
-   without unplugging the vehicle and pulling the card.
+   without unplugging the vehicle and pulling the card. It reaches the same end state as
+   the script — empty log, fresh column header, and the old blocks overwritten with spaces
+   — in two stages. **The log reads empty immediately**, before a single block is
+   scrubbed; the physical overwrite then runs in the background and **takes several
+   minutes**, because the card manages 297–367 blocks/s and the region is 64 MB. Telemetry
+   is unaffected throughout: the scrub walks *down* from the end of the region while
+   records append *up* from the start, so the two never touch the same block, and power
+   lost mid-scrub leaves a consistent empty log rather than a half-built one.
+
+   Two things it cannot do, both consequences of the file already existing: it does not
+   delete and recreate `FLIGHT.CSV`, so it cannot **defragment** the file or change its
+   size. If the firmware ever reports the file as fragmented, that needs the script and a
+   quick-format. It also keeps the **boot count**, deliberately — that is the vehicle's
+   life story rather than the file's, and an erased card should not become
+   indistinguishable from one that has never flown.
 
 **The button will do nothing on a flight build, by design.** `allow_ground_commands`
 defaults to false; set it in the vehicle configuration and reflash to use it, and unset it

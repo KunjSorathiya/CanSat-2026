@@ -108,6 +108,7 @@ public:
     bool append(const std::string& line) override;
     bool flush() override;
     bool erase() override;
+    bool erase_step() override;
     bool healthy() const override { return healthy_; }
 
     // Reported on the bench, like the IMU's WHO_AM_I and the radio's version register.

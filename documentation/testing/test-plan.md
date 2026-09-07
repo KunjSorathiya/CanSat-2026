@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 92 suites across the whole flight core | ✅ **3754 / 3754 assertions** |
+| `flight_tests` | 97 suites across the whole flight core | ✅ **3854 / 3854 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -157,7 +157,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 92 suites, 3754 assertions
+### `flight_tests` — 97 suites, 3854 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -211,6 +211,11 @@ flowchart LR
 | `test_formatter_and_parser_agree_at_the_edges` | The formatter never emits a packet this library's own parser rejects, at every boundary value |
 | `test_a_value_too_wide_to_format_invalidates_the_packet` | A finite value too wide for the formatter's buffer produces an empty field, not the first 63 characters of one — a corrupted reading and a missing one are both rejected, but only one of them looks like a reading |
 | `test_controller_drops_optional_fields_before_overrunning_the_budget` | An over-long packet sheds its optional fields in rulebook priority order instead of being truncated by the radio into something the ground station can only read as corruption |
+| `test_a_reset_log_reads_empty_and_the_old_bytes_are_scrubbed_away` | After `reset()` plus a driven scrub, every data block reads as spaces — the old rows are gone from the media, not merely past the header's reach. The boot count survives, and the log still appends into the first data block afterwards |
+| `test_a_scrub_never_overwrites_a_record_written_during_it` | Interleaving one scrub slice with one append, every record written during the scrub survives. The scrub walks down from the end while records append up, so a scrub that takes minutes on real hardware can run under an open log |
+| `test_the_erase_reads_empty_immediately_and_scrubs_afterwards` | The command empties the log on the first poll and the controller then drives the background scrub |
+| `test_the_scrub_finishes_without_blocking_telemetry` | A run that scrubs 400 blocks transmits exactly as many packets as one that scrubs nothing. The mandatory 1 Hz downlink may not pay for a card wipe |
+| `test_a_vehicle_that_was_never_asked_never_scrubs` | `erase_step()` runs every poll and must be free on a vehicle that has erased nothing |
 | `test_a_flight_build_has_no_uplink_at_all` | `allow_ground_commands` defaults to false, and with it false the radio's receive is **never polled** — this is the test the README's "there is no command uplink" rests on |
 | `test_the_bench_build_erases_the_log_on_command` | Enabled, in `READY` with `ARM-0`, a valid command erases the log |
 | `test_an_armed_vehicle_refuses_to_erase` | `ARM-1` closes the window, and the test asserts the vehicle actually reached `READY` first so it cannot pass for the wrong reason. Everything from arming to recovery holds a log that cannot be recreated |

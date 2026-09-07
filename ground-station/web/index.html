@@ -497,7 +497,7 @@ input[type=file] { display: none; }
     <input type="file" id="file-input" accept=".txt,.tsv,.log,.csv,.bin">
 
     <button class="hbtn" id="erase-btn" disabled
-            title="Erase the vehicle's onboard log. Serial link only, and the vehicle obeys only in READY with ARM-0">Erase SD log</button>
+            title="Erase the vehicle's onboard log, equivalent to prepare_sd_card.py. Serial link only, and the vehicle obeys only in READY with ARM-0">Erase SD log</button>
 
     <button class="hbtn" id="pause-btn" aria-pressed="false" title="Freeze the display; packets keep arriving and are buffered">
       <svg width="14" height="14" aria-hidden="true"><use href="#i-pause" id="pause-icon"/></svg><span id="pause-label">Pause</span>
@@ -2682,7 +2682,10 @@ async function eraseVehicleLog() {
   const team = (latest && latest.team_id) ? latest.team_id : null;
   if (!team) { toast("No packet received yet — the command needs the vehicle's team id"); return; }
   const typed = prompt(
-    "This erases the vehicle's onboard flight log and cannot be undone." +
+    "This erases the vehicle's onboard flight log. It cannot be undone." +
+    "\n\nThe log reads empty at once; the old blocks are then overwritten in the " +
+    "background, which takes several minutes on the card and does not interrupt " +
+    "telemetry. The end state matches tools/prepare_sd_card.py." +
     "\n\nThe vehicle will refuse unless it is in READY with ARM-0 and was built " +
     "with ground commands enabled." +
     "\n\nType ERASE to confirm:");
@@ -2702,7 +2705,7 @@ async function eraseVehicleLog() {
   // Deliberately not "erased". The bridge answers #tx=ok when it put the command on the
   // air, which says nothing about whether the vehicle was listening or agreed to act.
   pushRow({ n: null, cls: "warn", tag: "tx", text: command, note: "erase command sent" });
-  toast("Command sent — watch for #tx=ok, then check the vehicle");
+  toast("Command sent — the log empties at once, the block scrub runs for minutes after");
 }
 $("#erase-btn").addEventListener("click", () => { eraseVehicleLog(); });
 $("#file-input").addEventListener("change", e => {

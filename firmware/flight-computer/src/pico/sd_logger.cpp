@@ -111,6 +111,15 @@ bool PicoSdLogger::erase() {
     return log_.append_line(header.c_str(), header.size());
 }
 
+bool PicoSdLogger::erase_step() {
+    if (!healthy_) return false;
+    // Four blocks a slice. The card's own worst case is a ~30 ms stall on a single write
+    // ([F-11]), so the budget is about how many of those can land in one 33 ms sensor
+    // period rather than about throughput -- and at 297-367 blocks/s a 64 MB region is
+    // minutes of work whatever this number is.
+    return log_.scrub_step(4);
+}
+
 bool PicoSdLogger::append(const std::string& line) {
     if (!healthy_) return false;
     const bool ok = log_.append_line(line.c_str(), line.size());
