@@ -102,10 +102,10 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **133 / 133 tests** |
+| Python ground station | 8 modules | ✅ **134 / 134 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **218 / 218 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **57 / 57 tests** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **59 / 59 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
@@ -376,7 +376,7 @@ fixture the web console reads too: every case escapes to its recorded form, unes
 to the original, and no escaped form contains a separator. The plain text is stored as hex
 because it is allowed to contain tabs and newlines — the same reason the log escapes it.
 
-### `test_documented_commands.py` — 8 tests
+### `test_documented_commands.py` — 9 tests
 
 The commands the documentation tells a reader to run, run. Two defects were found by typing
 documented commands in exactly the form the documents give them, and neither would have been
@@ -390,6 +390,12 @@ mission it recorded; a file that cannot be read fails loudly rather than silentl
 `python src/main.py` invocation in the README, the quick start, the runbook and the
 ground-station README parses against the real argument parser, so a document cannot offer a
 flag the program does not have.
+
+Parsing is not enough on its own. A ninth test requires every documented `live --port`
+command to carry `--framed`, because the bridge frames everything it emits: the quick start's
+end-to-end test omitted the flag while the runbook required it, and the omitted form parses,
+opens the port, runs, and receives nothing. A documented command that fails silently on real
+hardware is worse than one that will not parse.
 
 ### `test_protocol_fixtures.py` — 5 tests
 

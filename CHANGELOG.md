@@ -10,6 +10,67 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Fixed — the console demanded the demo's team of every real vehicle
+
+**Found the first time the radio link ever closed.** Packets from `CAN-Team-25` arrived,
+parsed, and were rejected one after another as `unexpected team identifier` — sitting on
+screen, correct and completely readable, in red.
+
+`const TEAM = "CAN-Team-01"` did two unrelated jobs. It was the demo generator's own
+identity, which is right, and it was also the team the validator and parser demanded of
+**every** source including live serial, which meant the console could only ever accept
+telemetry from a vehicle named after its own demo.
+
+The Python side it is documented as a port of does not do this: `expected_team` defaults to
+`None` and [`validator.py`](ground-station/software/src/validator.py) checks it only when one
+is supplied — `--team` is opt-in. The divergence was in the default rather than the logic,
+which is why the shared protocol fixtures never saw it.
+
+`DEMO_TEAM` now names the generator and `expectedTeam` defaults to null, so the console
+accepts what arrives and displays whose it is. Pinning to one vehicle stays available for a
+launch where other teams are transmitting, and the `CAN-Team-XX` placeholder rejection was
+never conditional and is untouched.
+
+**Two tests, because the behaviour and the wiring fail separately.** One asserts a foreign
+team is accepted with no expected team set and still rejected when pinned; the other asserts
+the console never hands `DEMO_TEAM` back to the validator — the behavioural test takes
+whatever it is passed and cannot see that. Node 57 -> 59.
+
+### Fixed — Web Serial reported every failure as a cancellation
+
+One `catch` wrapped both `requestPort()` and `open()`, so a port another program was holding
+— a serial monitor left open, and Windows COM ports are exclusive — was reported as
+"Serial connection cancelled". An operator is then looking at the radio instead of at their
+own desktop. The two failures are now reported apart, carrying the exception's `name` and
+`message` verbatim.
+
+The unavailable-API message named the browser: "Web Serial needs Chrome/Edge over HTTPS",
+shown to somebody already running Chrome. Chrome exposes the API only to a secure,
+non-opaque origin, so a console opened as a file has no API to call however capable the
+browser is. It now says the page must be served.
+
+### Fixed — the quick start told you to open the port unframed, and nothing failed
+
+The bridge wraps every payload it emits as `$len,crc,payload` and always has. `main.py` builds
+the framed transport only when `--framed` is given, so a station started without it reads the
+port raw and rejects every line.
+
+**The runbook required the flag; [quick-start.md](documentation/quick-start.md)'s end-to-end
+telemetry test did not.** Both commands parse, so the existing guard — every documented
+`python src/main.py` invocation is fed to the real argument parser — passed on both. The
+difference only appears against hardware: the port opens, the reader runs, the packet count
+stays at zero, and the operator is looking at a working radio and a dead-looking link.
+
+Nobody had a bridge with a radio on it to type either command at, which is why two documents
+were free to disagree. **Found while writing up ground-station assembly, before the link was
+first closed rather than after.**
+
+The quick start now carries `--framed` and says why it is not optional. A ninth test in
+`test_documented_commands.py` requires every documented `live --port` command to carry it,
+because parsing was never the property that mattered here: `--replay` stays the deliberate
+exception, since the sample mission is a plain packet file. Python ground station 133 -> 134
+tests, 166 -> 167 Python total.
+
 ### Fixed — [F-15] the log now carries the columns its header names, microphone included
 
 `SdLogger::append()` took `(const TelemetryRecord&, const std::string& packet)` and wrote **only the packet**, discarding its first argument. That one signature caused all three symptoms: the microphone's data reached nothing, the rows were the semicolon-separated radio packet, and the header above them was a second hand-rolled copy of a comma-separated column list that described something else.

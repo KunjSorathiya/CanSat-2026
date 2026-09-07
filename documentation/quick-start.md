@@ -135,7 +135,7 @@ bash tools/build_host.sh
 
 This compiles the shared telemetry library, the whole flight core, the ground-station
 framing library and every host test, runs them, then runs the Python and Node suites.
-Expect **4433 C++ assertions, 166 Python tests and 57 Node tests, all passing, with zero
+Expect **4433 C++ assertions, 167 Python tests and 59 Node tests, all passing, with zero
 compiler warnings.**
 
 ```bash
@@ -484,8 +484,14 @@ outdoors with a clear view before concluding anything is broken.
 
 ```bash
 pip install pyserial     # if you have not already; the live path needs it
-cd ground-station/software && python src/main.py live --port COM5 --team CAN-Team-25
+cd ground-station/software && python src/main.py live --port COM5 --team CAN-Team-25 --framed
 ```
+
+**`--framed` is not optional here.** The bridge wraps every payload as
+`$len,crc,payload` and always has; without the flag the station reads the port unframed and
+rejects every line. The symptom is a dead-looking link on a working radio, which is the
+single most expensive way to be wrong on launch day. Use it whenever the source is real
+hardware; the `--replay` forms below read plain packet files and do not take it.
 
 Without `pyserial` this stops with `pyserial is required for SerialTransport`, which is the
 program telling you exactly what to install rather than failing obscurely.

@@ -133,6 +133,27 @@ class DocumentedCommandsAreRealTests(unittest.TestCase):
                 except SystemExit:
                     self.fail(f"{source} documents a command argparse rejects: {argument_text}")
 
+    def test_every_documented_serial_command_is_framed(self):
+        """A documented `live --port` without `--framed` is a documented dead link.
+
+        The bridge frames everything it emits and always has, so a station reading the port
+        unframed rejects every line. The quick start's end-to-end test omitted the flag while
+        the runbook required it, and the two documents disagreed for as long as nobody had a
+        bridge to type them at. Nothing failed loudly: the port opens, the reader runs, and
+        the packet count stays at zero on a link that is working perfectly.
+
+        `--replay` is the deliberate exception -- the sample mission is a plain packet file.
+        """
+        serial_commands = [(source, text) for source, text in self._documented_invocations()
+                           if text.startswith("live") and "--port" in text]
+        self.assertGreaterEqual(len(serial_commands), 2,
+                                "no documented live-from-serial commands were found")
+        for source, argument_text in serial_commands:
+            with self.subTest(source=source, command=argument_text):
+                self.assertIn("--framed", argument_text,
+                              f"{source} documents a live serial command without --framed, "
+                              "which parses, runs, and receives nothing")
+
 
 class SelfFeedingReplayTests(unittest.TestCase):
     """A replay must never append to the file it is reading.

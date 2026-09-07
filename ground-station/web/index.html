@@ -1128,7 +1128,17 @@ function buildPacket(team, pn, tSec, smp, withGps, cal, arm) {
 /* ================================================================
    6. Console state + pipeline
    ================================================================ */
-const TEAM = "CAN-Team-01";
+// Two different jobs, and one constant used to do both. "CAN-Team-01" is the *demo
+// generator's* own identity; it was also the team the validator demanded of every source,
+// so a real vehicle -- CAN-Team-25 on this project -- had every packet it ever sent
+// rejected as an "unexpected team identifier" while the packets sat there on screen,
+// correct and readable. The console is documented as a port of validator.py, where
+// `expected_team` defaults to None and is checked only when supplied.
+const DEMO_TEAM = "CAN-Team-01";
+// Null accepts whatever arrives, as StreamValidator(None) does on the Python side. Set it
+// to pin the console to one vehicle when other teams are transmitting; the placeholder and
+// malformed-identifier rejections in parsePacket() are unconditional and stay either way.
+let expectedTeam = null;
 const MAX_SAMPLES = 480, MAX_ROWS = 90;
 let validator, health, samples, rows, latest, source, demoTimer, missionT, pn, yawState, anomaly, rowsDirty;
 let origin = null;              // {lat, lon} of the first accepted GPS fix — local ENU datum
@@ -1141,7 +1151,7 @@ const $$ = s => [...document.querySelectorAll(s)];
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 function resetSession() {
-  validator = new StreamValidator(TEAM);
+  validator = new StreamValidator(expectedTeam);
   health = new LinkHealth();
   samples = [];
   rows = [];
@@ -1163,7 +1173,7 @@ function resetSession() {
 
 function ingest(raw, frameKind) {
   health.onFrame(frameKind === "raw" ? "raw" : "packet");
-  const res = parsePacket(raw, TEAM);
+  const res = parsePacket(raw, expectedTeam);
   if (!res.record) {
     health.onPacket(false, 0, false);
     pushRow({ n: null, cls: "bad", tag: "err", text: raw, note: res.error });
@@ -1269,7 +1279,7 @@ function demoTick() {
   const withGps = missionT > 3;
   const calibrated = missionT > 5;                 // ~5 s of stationary pad samples
   const armed = calibrated && missionT > 5;        // arming_delay + calibration settled
-  const packet = buildPacket(TEAM, pn, missionT, smp, withGps, calibrated, armed);
+  const packet = buildPacket(DEMO_TEAM, pn, missionT, smp, withGps, calibrated, armed);
 
   // one dropped packet and one duplicate per mission, to exercise link health
   if (pn === 42 && !anomaly.gap) { anomaly.gap = true; anomaly.dupPacket = null; return; }
@@ -1335,11 +1345,37 @@ function replayFile(file) {
 /* ---- Web Serial ---- */
 let serialPort = null, serialReader = null;
 async function connectSerial() {
-  if (!("serial" in navigator)) { toast("Web Serial needs Chrome/Edge over HTTPS"); return; }
+  // Chrome exposes Web Serial only to a secure, non-opaque origin, so a console opened as a
+  // file has no API to call however capable the browser is. Naming the browser, as this
+  // once did, sends an operator to install a browser they are already running.
+  if (!("serial" in navigator)) {
+    toast("Web Serial needs Chrome or Edge, and this page must be served — " +
+          "http://localhost/... rather than opened as a file");
+    return;
+  }
+  // Two failures, reported apart. Choosing no port is the operator's own decision; failing
+  // to open one they did choose is a fault, and the usual one is a serial monitor still
+  // holding the port -- Windows COM ports are exclusive. Reported as one "cancelled" they
+  // are indistinguishable, and the operator goes looking at the radio instead of at their
+  // own desktop. The exception's name and message are carried through verbatim: this
+  // message is read while a vehicle is on the pad.
+  let port;
   try {
-    serialPort = await navigator.serial.requestPort();
-    await serialPort.open({ baudRate: 115200 });
-  } catch (e) { toast("Serial connection cancelled"); return; }
+    port = await navigator.serial.requestPort();
+  } catch (e) {
+    toast(e && e.name === "NotFoundError"
+      ? "No port chosen - is the bridge plugged in?"
+      : "Port chooser closed");
+    return;
+  }
+  try {
+    await port.open({ baudRate: 115200 });
+  } catch (e) {
+    toast("Could not open the port (" + ((e && e.name) || "error") + ": " +
+          ((e && e.message) || "no detail") + ") - close any serial monitor holding it");
+    return;
+  }
+  serialPort = port;
   stopSources();
   source = "serial";
   resetSession();

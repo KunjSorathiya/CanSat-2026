@@ -781,3 +781,42 @@ test("a southern-hemisphere fix survives the whole console parser", () => {
   assert.ok(Math.abs(record.gps_lat - -18.5) < 1e-6, "latitude lost its sign");
   assert.ok(Math.abs(record.gps_lon - -73.0) < 1e-6, "longitude lost its sign");
 });
+
+
+test("the console does not expect the demo's team of a real vehicle", () => {
+  // The console hard-coded one constant, "CAN-Team-01", as both the demo generator's
+  // identity and the team the validator demanded of every source. A real vehicle --
+  // CAN-Team-25 on this project -- had every packet it sent rejected as an "unexpected team
+  // identifier", on screen, correct and readable, at the moment the radio link first worked.
+  //
+  // The behavioural half: no expected team accepts whatever arrives, exactly as
+  // StreamValidator(None) does in validator.py, where --team is opt-in.
+  const real = "CAN-Team-25; P-459; Ti-00:07:38:001; A--0.5; Pr-101054.30; T-31.4; " +
+               "Ro--0.9; Pi-4.6; Ya-0.2; AX--0.80; AY--0.22; AZ-9.76;";
+  const open = M.parsePacket(real, null);
+  assert.ok(open.record, `a foreign team was rejected with no expected team set: ${open.error}`);
+  assert.strictEqual(open.record.team_id, "CAN-Team-25");
+
+  // Pinning still works -- the check is opt-in, not deleted.
+  assert.strictEqual(M.parsePacket(real, "CAN-Team-01").error, "unexpected team identifier");
+
+  // And the placeholder rejection is unconditional either way.
+  assert.strictEqual(
+    M.parsePacket(real.replace("CAN-Team-25", "CAN-Team-XX"), null).error,
+    "invalid team identifier");
+});
+
+test("the demo's identity is never used as the expected team", () => {
+  // The wiring half. The behavioural test above passes whatever the console passes in, so
+  // it cannot see the console handing DEMO_TEAM back to the validator -- which is the
+  // regression, and the whole of the original defect.
+  const html = readFileSync(CONSOLE_HTML, "utf8");
+  for (const call of ["new StreamValidator(DEMO_TEAM)", "parsePacket(raw, DEMO_TEAM)"]) {
+    assert.ok(!html.includes(call),
+              `the console validates against the demo generator's own team: ${call}`);
+  }
+  assert.ok(html.includes("new StreamValidator(expectedTeam)"),
+            "the validator no longer takes the console's expected team");
+  assert.ok(html.includes("parsePacket(raw, expectedTeam)"),
+            "the parser no longer takes the console's expected team");
+});

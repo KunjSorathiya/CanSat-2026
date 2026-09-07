@@ -404,9 +404,9 @@ bash tools/build_host.sh
 | `sd_card_tests` | microSD init sequence, SDHC vs SDSC addressing, block round trip, bus release, timeouts and write-error paths, against a simulated card | ✅ **613 / 613** |
 | `fat_volume_tests` | FAT32 log-file lookup: MBR and superfloppy volumes, contiguity, a missing file, a card that stops answering, against a synthetic image | ✅ **30 / 30** |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
-| Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **133 / 133** |
+| Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **134 / 134** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
-| Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **57 / 57** |
+| Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **59 / 59** |
 | Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **218 / 218** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
