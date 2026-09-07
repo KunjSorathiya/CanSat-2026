@@ -81,7 +81,29 @@ bool PicoRadio::transmit(const std::string& packet) {
     if (!ok) {
         healthy_ = radio_.healthy();
     }
+    // Transmitting leaves the modem in standby. If the controller is going to listen at
+    // all, the receiver has to be running before it asks -- and putting it back here, right
+    // after the packet is away, gives the whole gap between packets as the listening
+    // window rather than the few milliseconds around the poll.
+    if (listening_) radio_.start_receive();
     return ok;
+}
+
+bool PicoRadio::poll_receive(std::string& out) {
+    if (!healthy_) return false;
+    // The first poll is what turns the receiver on, and only the controller's gate can
+    // reach this function -- so a vehicle with allow_ground_commands false never enters
+    // RX at all, and its radio behaves exactly as it did before any of this existed.
+    if (!listening_) {
+        listening_ = true;
+        radio_.start_receive();
+        return false;
+    }
+    std::uint8_t buffer[256];
+    const std::size_t n = radio_.poll_receive(buffer, sizeof(buffer));
+    if (n == 0) return false;
+    out.assign(reinterpret_cast<const char*>(buffer), n);
+    return true;
 }
 
 #else  // host stubs
@@ -91,6 +113,7 @@ bool PicoRadio::initialize(std::uint8_t) {
     return false;
 }
 bool PicoRadio::transmit(const std::string&) { return false; }
+bool PicoRadio::poll_receive(std::string&) { return false; }
 
 #endif
 

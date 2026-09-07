@@ -172,6 +172,35 @@ Demo mode starts on its own. **File…** replays a packet file or a `raw_packets
 The web console is the fastest way to see link health and mission state; the Python
 pipeline is what writes the authoritative logs. Run both when it matters.
 
+### Erasing the onboard log
+
+The log **appends across power cycles** — the dual-header resume is what makes a brownout
+mid-flight survivable — so a card accumulates every run until something empties it. At 1 Hz
+a 64 MB region holds about **36 hours** of records, and when it does fill the vehicle raises
+`sd_write`, then `sd_unavailable`, and keeps transmitting: logging stops, telemetry does not.
+
+Two ways to empty it, and the first is the one to use before a launch:
+
+1. **Re-prepare the card** with `python tools/prepare_sd_card.py`. This is the only method
+   that also rewrites a stale column header ([F-19](../testing/bring-up-record.md#findings)),
+   so a card carried over from an older firmware stops describing its rows wrongly.
+2. **The console's Erase SD log button**, over the uplink, for iterating on the bench
+   without unplugging the vehicle and pulling the card.
+
+**The button will do nothing on a flight build, by design.** `allow_ground_commands`
+defaults to false; set it in the vehicle configuration and reflash to use it, and unset it
+before you fly. Even enabled, the vehicle obeys only in `READY` with `ARM-0`. The button
+needs a live Web Serial link and the word `ERASE` typed to confirm.
+
+`#tx=ok` from the bridge means the command reached the air. **It does not mean the log was
+erased** — the vehicle may have been armed, out of range, or built with the uplink off.
+Confirm on the vehicle.
+
+> [!WARNING]
+> The command key is four clear-text characters on a link every team shares at sync word
+> `0xF3`. It stops accidents, not people. The protection that matters is the state window
+> and the compile-time default.
+
 ### What gets written
 
 | File | Content |

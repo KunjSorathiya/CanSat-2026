@@ -2898,6 +2898,115 @@ void test_a_vehicle_without_a_microphone_behaves_as_before() {
     CHECK(!ctrl.faults().active(flight::FaultCode::sound_unavailable));
 }
 
+// The uplink gate. Five of these six are about the command being refused, because the cost
+// of a false accept is a flight log that no longer exists.
+namespace {
+struct GroundLink {
+    flight::Configuration c;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+
+    explicit GroundLink(bool allow) {
+        c.team_id = "CAN-Team-25";
+        c.allow_ground_commands = allow;
+    }
+    // Runs to `until_ms`, with the erase command waiting on the air the whole time.
+    void run(std::uint64_t until_ms) {
+        flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+        CHECK(ctrl.initialize());
+        for (std::uint64_t t = 0; t <= until_ms; t += 10) {
+            if (radio.inbox.empty()) {
+                radio.inbox.push_back(
+                    cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log));
+            }
+            ctrl.poll(t);
+        }
+        accepted = ctrl.health().ground_commands_accepted;
+        state = ctrl.state();
+    }
+    std::uint32_t accepted = 0;
+    flight::MissionState state = flight::MissionState::init;
+};
+}  // namespace
+
+void test_a_flight_build_has_no_uplink_at_all() {
+    // allow_ground_commands defaults to false, and this is the property the README's "there
+    // is no command uplink" rests on. The radio is never even polled.
+    flight::Configuration fresh;
+    CHECK(!fresh.allow_ground_commands);
+
+    GroundLink link(false);
+    link.run(4000);
+    CHECK(link.accepted == 0);
+    CHECK(link.logger.erases == 0);
+    CHECK(link.radio.receive_polls == 0);
+}
+
+void test_the_bench_build_erases_the_log_on_command() {
+    GroundLink link(true);
+    link.run(4000);
+    CHECK(link.state == flight::MissionState::ready);
+    CHECK(link.accepted >= 1);
+    CHECK(link.logger.erases >= 1);
+}
+
+void test_an_armed_vehicle_refuses_to_erase() {
+    // ARM-1 means the vehicle is ready to fly. Everything from here to recovery holds a log
+    // that cannot be recreated, so the window shuts at arming rather than at launch.
+    GroundLink link(true);
+    link.c.arming_delay_ms = 0;               // armed from the first poll
+    link.c.require_calibration_to_arm = false;
+    link.run(4000);
+    // It must fail because the vehicle was armed, not because it never reached READY --
+    // a gate test that passes for the wrong reason is worse than no gate test.
+    CHECK(link.state == flight::MissionState::ready);
+    CHECK(link.accepted == 0);
+    CHECK(link.logger.erases == 0);
+}
+
+void test_another_teams_command_erases_nothing() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    c.allow_ground_commands = true;
+    flight::test::MockImu imu; flight::test::MockBarometer baro; flight::test::MockGps gps;
+    flight::test::MockRadio radio; flight::test::MockLogger logger; flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 4000; t += 10) {
+        if (radio.inbox.empty()) {
+            radio.inbox.push_back(
+                cansat::format_command("CAN-Team-07", cansat::CommandKind::erase_log));
+        }
+        ctrl.poll(t);
+    }
+    CHECK(logger.erases == 0);
+    CHECK(ctrl.health().ground_commands_accepted == 0);
+    CHECK(ctrl.health().ground_commands_ignored > 0);   // seen, and refused
+}
+
+void test_a_refused_erase_is_reported_rather_than_swallowed() {
+    GroundLink link(true);
+    link.logger.fail_erase = true;
+    link.run(4000);
+    CHECK(link.logger.erases == 0);
+    CHECK(link.accepted >= 1);   // the command was acted on; the erase itself failed
+}
+
+void test_listening_never_costs_a_packet() {
+    // The uplink must be invisible to the mandatory 1 Hz downlink. Same run, same window,
+    // with and without the feature: the packet count may not move.
+    GroundLink off(false);
+    off.run(6000);
+    GroundLink on(true);
+    on.run(6000);
+    CHECK(off.radio.packets.size() == on.radio.packets.size());
+    CHECK(off.radio.packets.size() > 1);   // and both actually transmitted
+}
+
 // And a microphone that fails must cost a warning and a column, never a packet. This is the
 // test that fails if the sensor is ever promoted into the mandatory path.
 void test_a_failed_microphone_costs_a_warning_and_nothing_else() {
@@ -3083,6 +3192,12 @@ int main(int argc, char** argv) {
     test_a_value_too_wide_to_format_invalidates_the_packet();
     test_controller_drops_optional_fields_before_overrunning_the_budget();
     test_gps_coordinate_validation();
+    test_a_flight_build_has_no_uplink_at_all();
+    test_the_bench_build_erases_the_log_on_command();
+    test_an_armed_vehicle_refuses_to_erase();
+    test_another_teams_command_erases_nothing();
+    test_a_refused_erase_is_reported_rather_than_swallowed();
+    test_listening_never_costs_a_packet();
     test_a_command_round_trips_for_its_own_team();
     test_a_command_for_another_team_is_ignored();
     test_a_command_without_the_key_is_ignored();

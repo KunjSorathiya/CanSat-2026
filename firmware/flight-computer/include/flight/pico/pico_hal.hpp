@@ -71,6 +71,7 @@ public:
     explicit PicoRadio(const Configuration& config) : config_(config) {}
     bool initialize(std::uint8_t sync_word) override;
     bool transmit(const std::string& packet) override;
+    bool poll_receive(std::string& out) override;
     bool healthy() const override { return healthy_; }
 
     // Version register 0x42, read during begin(). 0x12 is the SX1276/77/78 family; a 0x00
@@ -92,6 +93,10 @@ private:
     Configuration config_;
     cansat::Sx1278 radio_;
     bool healthy_ = false;
+    // Latched by the first poll_receive(). A vehicle whose controller never calls it --
+    // which is every flight build, where allow_ground_commands is false -- never enters
+    // RX, so the radio behaves exactly as it did before the uplink existed.
+    bool listening_ = false;
 };
 
 // microSD over the shared SPI0 bus, chip-select on GP6. The breakout is a 3.3 V module
@@ -102,6 +107,7 @@ public:
     bool initialize() override;
     bool append(const std::string& line) override;
     bool flush() override;
+    bool erase() override;
     bool healthy() const override { return healthy_; }
 
     // Reported on the bench, like the IMU's WHO_AM_I and the radio's version register.

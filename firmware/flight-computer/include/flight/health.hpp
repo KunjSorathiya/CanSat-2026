@@ -11,6 +11,12 @@ struct HealthSnapshot {
     MissionState state = MissionState::init;
     std::uint64_t mission_ms = 0;
     std::uint32_t packets_sent = 0;
+    // Ground commands the vehicle acted on, and traffic it looked at and refused.
+    // Both are zero for the whole of any flight build, where the uplink is compiled
+    // in but never enabled -- which makes a non-zero count on a flight log a finding
+    // in itself rather than a statistic.
+    std::uint32_t ground_commands_accepted = 0;
+    std::uint32_t ground_commands_ignored = 0;
     std::uint32_t packets_suppressed = 0;
     std::uint32_t packets_tx_failed = 0;
     std::uint32_t fault_total = 0;

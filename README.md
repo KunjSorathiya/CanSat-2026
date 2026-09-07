@@ -6,7 +6,7 @@
 and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml)
-[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-4502%20assertions-1b5e20)](documentation/testing/test-plan.md)
+[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-4526%20assertions-1b5e20)](documentation/testing/test-plan.md)
 [![Python tests](https://img.shields.io/badge/Python%20tests-37%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
@@ -68,6 +68,13 @@ recovered.
 It has to do all of that on its own. There is no command uplink and no manual trigger: the
 vehicle powers on, calibrates itself, arms itself, detects its own launch and landing, and
 keeps talking through every failure it can survive.
+
+That statement is enforced rather than asserted. A ground-to-vehicle command exists for the
+bench — it erases the onboard log between test runs — but `allow_ground_commands` defaults
+to **false**, so a flight build never enters receive mode and has no uplink to reason about.
+Even enabled, the vehicle acts on a command only in `READY` with `ARM-0`: the window is shut
+for the whole of flight, landing and recovery, which is every state holding a log that
+cannot be recreated. See [operations](documentation/operations/runbook.md#erasing-the-onboard-log).
 
 ---
 
@@ -398,7 +405,7 @@ bash tools/build_host.sh
 
 | Suite | Coverage | Result |
 |---|---|---|
-| `flight_tests` | 86 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math, IMU range encoding, sensor timing, calibration, faults, scheduler, block log and torn-header recovery, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **3730 / 3730** |
+| `flight_tests` | 92 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math, IMU range encoding, sensor timing, calibration, faults, scheduler, block log and torn-header recovery, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **3754 / 3754** |
 | `flight_smoke_test` | Boot, first three packets, GPS parse | ✅ Passed |
 | `sx1278_tests` | LoRa driver register sequence, TX timeout, RX and CRC handling, RSSI conversion, against a fake register bank | ✅ **129 / 129** |
 | `sd_card_tests` | microSD init sequence, SDHC vs SDSC addressing, block round trip, bus release, timeouts and write-error paths, against a simulated card | ✅ **613 / 613** |

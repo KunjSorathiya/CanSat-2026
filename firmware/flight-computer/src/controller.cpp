@@ -1,5 +1,7 @@
 #include "flight/controller.hpp"
 
+#include "cansat/command.hpp"
+
 #include "flight/orientation.hpp"
 #include "flight/sensor_math.hpp"
 
@@ -592,6 +594,8 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         ++health_.packets_tx_failed;
     }
 
+    service_ground_commands(mission_ms);
+
     if (logger_enabled_) {
         if (logger_.append(builder_.sd_line(*built, state_machine_.state(),
                                             faults_.total_occurrences()))) {
@@ -603,6 +607,44 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
                 faults_.report(FaultCode::sd_unavailable, FaultSeverity::warning, mission_ms);
             }
         }
+    }
+}
+
+// The whole of the uplink. It is short on purpose, and every line of it is a refusal.
+//
+// The vehicle flies with `allow_ground_commands` false, so on a flight build this returns
+// before touching the radio and there is no uplink to reason about at all. On the bench,
+// the window is READY with ARM-0 -- on the ground, before launch. It is closed for FLIGHT,
+// LANDED, RECOVERY and FAULT, which is every state in which a log exists that cannot be
+// recreated.
+//
+// Ordering matters: this runs *after* the packet has been transmitted and before the log
+// append, so listening never delays telemetry, and a poll that finds nothing costs one
+// non-blocking call against a 1 Hz budget the radio already fits inside.
+void Controller::service_ground_commands(std::uint64_t mission_ms) {
+    if (!config_.allow_ground_commands) return;
+    if (state_machine_.state() != MissionState::ready) return;
+    if (is_armed(mission_ms)) return;
+
+    std::string received;
+    if (!radio_.poll_receive(received)) return;
+
+    switch (cansat::parse_command(received, config_.team_id)) {
+        case cansat::CommandKind::erase_log: {
+            // A refusal is reported, not swallowed. An operator who pressed the button and
+            // saw nothing happen must be able to tell "erased" from "declined".
+            const bool erased = logger_.erase();
+            ++health_.ground_commands_accepted;
+            if (!erased) {
+                faults_.report(FaultCode::sd_write, FaultSeverity::warning, mission_ms);
+            }
+            break;
+        }
+        case cansat::CommandKind::none:
+            // Anything else on the air: another team's command, a corrupted frame, our own
+            // telemetry looped back. Counted so a link that is delivering junk is visible.
+            ++health_.ground_commands_ignored;
+            break;
     }
 }
 

@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 86 suites across the whole flight core | ✅ **3730 / 3730 assertions** |
+| `flight_tests` | 92 suites across the whole flight core | ✅ **3754 / 3754 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -157,7 +157,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 86 suites, 3730 assertions
+### `flight_tests` — 92 suites, 3754 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -211,6 +211,12 @@ flowchart LR
 | `test_formatter_and_parser_agree_at_the_edges` | The formatter never emits a packet this library's own parser rejects, at every boundary value |
 | `test_a_value_too_wide_to_format_invalidates_the_packet` | A finite value too wide for the formatter's buffer produces an empty field, not the first 63 characters of one — a corrupted reading and a missing one are both rejected, but only one of them looks like a reading |
 | `test_controller_drops_optional_fields_before_overrunning_the_budget` | An over-long packet sheds its optional fields in rulebook priority order instead of being truncated by the radio into something the ground station can only read as corruption |
+| `test_a_flight_build_has_no_uplink_at_all` | `allow_ground_commands` defaults to false, and with it false the radio's receive is **never polled** — this is the test the README's "there is no command uplink" rests on |
+| `test_the_bench_build_erases_the_log_on_command` | Enabled, in `READY` with `ARM-0`, a valid command erases the log |
+| `test_an_armed_vehicle_refuses_to_erase` | `ARM-1` closes the window, and the test asserts the vehicle actually reached `READY` first so it cannot pass for the wrong reason. Everything from arming to recovery holds a log that cannot be recreated |
+| `test_another_teams_command_erases_nothing` | A command naming another team is seen, counted as ignored, and erases nothing — `0xF3` is shared by every team in the competition |
+| `test_a_refused_erase_is_reported_rather_than_swallowed` | A logger that cannot erase raises `sd_write`; an operator who pressed the button can tell "erased" from "declined" |
+| `test_listening_never_costs_a_packet` | Identical runs with the uplink off and on transmit the same number of packets. The mandatory 1 Hz downlink may not pay for a bench feature |
 | `test_a_command_round_trips_for_its_own_team` | A formatted `ERASE_LOG` command parses back to the same command for the team it names |
 | `test_a_command_for_another_team_is_ignored` | A command addressed to `CAN-Team-07` is inert here. `0xF3` is the shared test sync word, so another team's traffic must be structurally inert rather than merely unlikely |
 | `test_a_command_without_the_key_is_ignored` | A missing or wrong `KEY-` field yields no command. The key is four clear-text characters and is **not** security — it makes an accidental trigger implausible, and the real protection is that the vehicle only listens in READY with `ARM-0` |

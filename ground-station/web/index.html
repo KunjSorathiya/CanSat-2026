@@ -496,6 +496,9 @@ input[type=file] { display: none; }
     </div>
     <input type="file" id="file-input" accept=".txt,.tsv,.log,.csv,.bin">
 
+    <button class="hbtn" id="erase-btn" disabled
+            title="Erase the vehicle's onboard log. Serial link only, and the vehicle obeys only in READY with ARM-0">Erase SD log</button>
+
     <button class="hbtn" id="pause-btn" aria-pressed="false" title="Freeze the display; packets keep arriving and are buffered">
       <svg width="14" height="14" aria-hidden="true"><use href="#i-pause" id="pause-icon"/></svg><span id="pause-label">Pause</span>
     </button>
@@ -1381,6 +1384,7 @@ async function connectSerial() {
   resetSession();
   $("#src-mode").textContent = "SERIAL";
   setSource("serial");
+  $("#erase-btn").disabled = false;
   const dec = new FrameDecoder();
   serialReader = serialPort.readable.getReader();
   (async () => {
@@ -2664,6 +2668,43 @@ function setSource(which) {
 $("#src-demo").addEventListener("click", () => { setSource("demo"); startDemo(); });
 $("#src-file").addEventListener("click", () => { $("#file-input").click(); });
 $("#src-serial").addEventListener("click", () => { connectSerial(); });
+
+// Erase the vehicle's onboard log, over the uplink.
+//
+// Three things guard this, and only the third is real. The button is disabled unless a
+// serial link is up. The operator has to type the word, because a mis-click must not be
+// able to destroy a flight log and a confirm dialog is one keystroke from "yes". And the
+// vehicle itself obeys only in READY with ARM-0, with allow_ground_commands compiled off
+// by default -- which is the guard that still holds when this page is not the thing
+// transmitting.
+async function eraseVehicleLog() {
+  if (!serialPort || !serialPort.writable) { toast("Connect the bridge over Web Serial first"); return; }
+  const team = (latest && latest.team_id) ? latest.team_id : null;
+  if (!team) { toast("No packet received yet — the command needs the vehicle's team id"); return; }
+  const typed = prompt(
+    "This erases the vehicle's onboard flight log and cannot be undone." +
+    "\n\nThe vehicle will refuse unless it is in READY with ARM-0 and was built " +
+    "with ground commands enabled." +
+    "\n\nType ERASE to confirm:");
+  if (typed !== "ERASE") { toast("Erase cancelled"); return; }
+
+  const command = team + "; CMD-ERASE_LOG; KEY-7A3F;";
+  try {
+    const writer = serialPort.writable.getWriter();
+    // frameEncode returns an array of byte values, not a string -- wrapping it in a
+    // TextEncoder would transmit the decimal digits of the bytes.
+    await writer.write(new Uint8Array(frameEncode(command)));
+    writer.releaseLock();
+  } catch (e) {
+    toast("Could not send: " + ((e && e.message) || "write failed"));
+    return;
+  }
+  // Deliberately not "erased". The bridge answers #tx=ok when it put the command on the
+  // air, which says nothing about whether the vehicle was listening or agreed to act.
+  pushRow({ n: null, cls: "warn", tag: "tx", text: command, note: "erase command sent" });
+  toast("Command sent — watch for #tx=ok, then check the vehicle");
+}
+$("#erase-btn").addEventListener("click", () => { eraseVehicleLog(); });
 $("#file-input").addEventListener("change", e => {
   if (e.target.files[0]) { setSource("file"); replayFile(e.target.files[0]); }
 });

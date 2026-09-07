@@ -66,6 +66,7 @@ bool host_listening() {
 }
 
 std::uint32_t g_frames_dropped_no_host = 0;
+std::uint32_t g_commands_sent = 0;
 
 void emit(const std::string& payload) {
     if (!host_listening()) {
@@ -122,6 +123,7 @@ int main() {
     }
 
     std::uint8_t buffer[256];
+    ground::FrameReader uplink;   // PC -> bridge, the same framing as bridge -> PC
     std::uint32_t frames = 0;
     std::uint32_t radio_failures = 0;
     std::uint32_t last_status = radio_millis(nullptr);
@@ -136,6 +138,35 @@ int main() {
             if (up) radio.start_receive();
             sleep_ms(200);
         } else {
+            // Uplink, and it is the only thing this bridge ever transmits. A framed line
+            // from the PC is relayed to the air and the receiver put straight back; the
+            // bridge does not inspect the payload, because deciding whether a command is
+            // legitimate is the vehicle's job and duplicating that judgement here would
+            // mean two places to get it wrong.
+            int host_byte;
+            while ((host_byte = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) {
+                std::string command;
+                switch (uplink.feed(static_cast<char>(host_byte), command)) {
+                    case ground::FrameReader::Status::ok: {
+                        const bool sent = radio.transmit(
+                            reinterpret_cast<const std::uint8_t*>(command.data()),
+                            command.size(), 2000);
+                        radio.start_receive();
+                        if (sent) ++g_commands_sent;
+                        emit(sent ? "#tx=ok" : "#tx=failed");
+                        break;
+                    }
+                    case ground::FrameReader::Status::crc_error:
+                        emit("#tx=rejected reason=crc");
+                        break;
+                    case ground::FrameReader::Status::overflow:
+                        emit("#tx=rejected reason=overflow");
+                        break;
+                    case ground::FrameReader::Status::none:
+                        break;
+                }
+            }
+
             const std::size_t n = radio.poll_receive(buffer, sizeof(buffer));
             if (n > 0) {
                 emit(std::string(reinterpret_cast<const char*>(buffer), n));
@@ -153,11 +184,11 @@ int main() {
         const std::uint32_t now = radio_millis(nullptr);
         if (now - last_status >= STATUS_PERIOD_MS) {
             last_status = now;
-            // 160 rather than 128: the worst case this format can produce is 121
-            // characters -- both counters at 4294967295, and an SNR that is whatever
+            // 160 rather than 128: the worst case this format can produce is 136
+            // characters -- all three counters at 4294967295, and an SNR that is whatever
             // float the radio last returned, which formats to 42 characters at its most
-            // negative. That fits 128 with seven bytes to spare, which is not enough
-            // margin for the next field somebody adds. snprintf would truncate rather
+            // negative. That no longer fits 128 at all: `tx=` was the next field somebody
+            // added, exactly as predicted, and it cost 15 of the 39 bytes of headroom. snprintf would truncate rather
             // than overflow, but a silently truncated status line is a field that
             // vanishes exactly when the link is misbehaving.
             char line[160];
@@ -167,11 +198,12 @@ int main() {
             // constant states it correctly right up until the moment it matters.
             std::snprintf(line, sizeof(line),
                           "#state=RX radio=%d frames=%lu dropped=%lu rssi=%d snr=%.1f "
-                          "sync=0x%02X",
+                          "sync=0x%02X tx=%lu",
                           up ? 1 : 0, static_cast<unsigned long>(frames),
                           static_cast<unsigned long>(g_frames_dropped_no_host),
                           radio.last_rssi_dbm(), static_cast<double>(radio.last_snr_db()),
-                          static_cast<unsigned>(SYNC_WORD));
+                          static_cast<unsigned>(SYNC_WORD),
+                          static_cast<unsigned long>(g_commands_sent));
             emit(line);
         }
         sleep_ms(2);

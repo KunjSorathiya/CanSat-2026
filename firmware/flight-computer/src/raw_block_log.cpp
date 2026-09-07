@@ -53,6 +53,16 @@ std::uint32_t header_checksum(const std::uint8_t* block) {
 
 }  // namespace
 
+bool RawBlockLog::reset() {
+    if (!healthy_) return false;
+    next_lba_ = base_lba_ + kHeaderBlocks;
+    truncated_records_ = 0;
+    // The header sequence keeps climbing -- write_header() increments it -- so the reader's
+    // "take the copy with the higher sequence" rule still picks the newest, and an erase
+    // cannot be mistaken for a torn write that should be ignored.
+    return write_header();
+}
+
 bool RawBlockLog::write_header() {
     std::uint8_t block[kBlockSize];
     // Space-pad and newline-terminate the unused tail. The log now lives inside a

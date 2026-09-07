@@ -264,6 +264,17 @@ struct Configuration {
     std::uint8_t sd_max_failures = 10;    // consecutive write failures before SD logging is disabled
 
     // ---- GPS ---------------------------------------------------------------
+    // Ground-to-vehicle maintenance commands. **Defaults to false, and a flight build
+    // leaves it false**: this vehicle's mission is autonomous end to end and the README
+    // says so. Enabled on the bench, it lets the ground station erase the onboard log
+    // between test runs without unplugging the vehicle and pulling the card.
+    //
+    // Even when enabled the vehicle listens only in READY with ARM-0 -- on the ground,
+    // before flight. That is the protection that matters: the command key is clear text
+    // over an unauthenticated link shared with every other team on sync word 0xF3, so
+    // nothing about the message itself can be trusted, and the window in which the
+    // vehicle will act on one is closed for the whole of the flight.
+    bool allow_ground_commands = false;
     std::uint32_t gps_baud = 9600;          // NEO-6M default
     std::uint32_t gps_uart_fifo_bytes = 32; // RP2040 UART FIFO depth
 

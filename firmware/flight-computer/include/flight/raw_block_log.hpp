@@ -38,6 +38,20 @@ public:
     // region is full or a block write fails.
     bool append_line(const char* text, std::size_t len);
 
+    // Empties the log: the next record goes back to the first data block and the file
+    // reads as containing nothing.
+    //
+    // **It does not overwrite the old blocks, and it does not need to.** The reader takes
+    // the header's `next free` and stops there, which is the same mechanism that makes a
+    // 64 MB pre-allocated file readable at all -- everything past the last record has
+    // always been whatever was in those blocks before. Zeroing 131,072 blocks to achieve
+    // the same visible result would take minutes and buy nothing.
+    //
+    // The boot count is kept. It is the vehicle's life story rather than the file's, and
+    // resetting it would make a card that has been erased indistinguishable from a card
+    // that has never been flown.
+    bool reset();
+
     bool healthy() const { return healthy_; }
     bool full() const { return healthy_ && next_lba_ >= base_lba_ + block_count_; }
     std::uint32_t record_count() const {

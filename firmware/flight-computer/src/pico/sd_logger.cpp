@@ -100,6 +100,17 @@ bool PicoSdLogger::initialize() {
     return healthy_;
 }
 
+bool PicoSdLogger::erase() {
+    if (!healthy_) return false;
+    if (!log_.reset()) return false;
+    // Re-lay the column header immediately. Leaving it for the next initialize() is what
+    // [F-19] is: a log that already had records never got the corrected header, so the
+    // file described neither format. An erased log is empty, so this is also the one
+    // moment the header can be rewritten without inventing a row.
+    const std::string header = TelemetryBuilder::sd_header();
+    return log_.append_line(header.c_str(), header.size());
+}
+
 bool PicoSdLogger::append(const std::string& line) {
     if (!healthy_) return false;
     const bool ok = log_.append_line(line.c_str(), line.size());

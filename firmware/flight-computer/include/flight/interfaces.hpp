@@ -145,6 +145,10 @@ public:
     virtual ~Radio() = default;
     virtual bool initialize(std::uint8_t sync_word) = 0;
     virtual bool transmit(const std::string& packet) = 0;
+    // Non-blocking. Returns true and fills `out` when a payload was waiting. Defaulted to
+    // "nothing ever arrives" so a radio that only transmits -- which is every radio this
+    // vehicle flies with, since allow_ground_commands defaults to false -- needs no code.
+    virtual bool poll_receive(std::string& /*out*/) { return false; }
     virtual bool healthy() const = 0;
 };
 
@@ -161,6 +165,9 @@ public:
     // `sd_line()` are a matched pair and the tests hold them to the same column count.
     virtual bool append(const std::string& line) = 0;
     virtual bool flush() = 0;
+    // Empties the log. Defaulted to a refusal so a logger that cannot do it says so rather
+    // than silently appearing to succeed.
+    virtual bool erase() { return false; }
     virtual bool healthy() const = 0;
 };
 

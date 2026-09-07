@@ -56,6 +56,7 @@ private:
     void acquire_sensors(std::uint64_t mission_ms);
     void run_calibration(std::uint64_t mission_ms);
     bool is_armed(std::uint64_t mission_ms) const;
+    void service_ground_commands(std::uint64_t mission_ms);
     void feed_state_machine(std::uint64_t mission_ms);
     void update_mag_calibration(std::uint64_t mission_ms);
     // Compares the magnetometer-referenced heading against the GPS course over ground.

@@ -125,10 +125,19 @@ public:
         packets.push_back(packet);
         return true;
     }
+    bool poll_receive(std::string& out) override {
+        if (inbox.empty()) return false;
+        out = inbox.front();
+        inbox.erase(inbox.begin());
+        ++receive_polls;
+        return true;
+    }
     bool healthy() const override { return healthy_; }
 
     std::uint8_t sync_word_ = 0;
     std::vector<std::string> packets;
+    std::vector<std::string> inbox;   // what the ground is transmitting at us
+    int receive_polls = 0;
     int init_calls = 0;
     bool fail_init = false;
     bool fail_tx = false;
@@ -149,9 +158,17 @@ public:
         return true;
     }
     bool flush() override { return !fail_flush; }
+    bool erase() override {
+        if (fail_erase) return false;
+        lines.clear();
+        ++erases;
+        return true;
+    }
     bool healthy() const override { return healthy_; }
 
     std::vector<std::string> lines;
+    int erases = 0;
+    bool fail_erase = false;
     bool fail_init = false;
     bool fail_append = false;
     bool fail_flush = false;
