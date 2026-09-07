@@ -490,7 +490,7 @@ instead of overwriting earlier data.
 | Radio fails on the pad | Firmware retries with bounded back-off. If the LED shows `FAULT`, power-cycle. Onboard SD logging continues regardless |
 | SD failure | Logging disables itself after 10 consecutive write failures; the mission continues. Not flight-critical |
 | Another team is launching | Power your CanSat completely off. This is a rulebook restriction |
-| Vehicle lands out of sight | Keep the ground station recording — telemetry continues into `RECOVERY`, and the last GPS fix is in the log. Read its **timestamp**, not just its coordinates: the position stops being transmitted once the receiver stops confirming it, so the last logged fix is the last one the vehicle actually stood behind |
+| Vehicle lands out of sight | **Read this before you fly.** With `transmit_gps` false — the default — the position is **not on the air at all**, so the ground station cannot tell you where the vehicle is. Telemetry still continues into `RECOVERY`, which tells you it is alive and roughly how far away by RSSI, and the fix is in the **vehicle's** SD log, which you can only read once you have found it. **If losing sight of it is plausible, set `transmit_gps = true`, raise `worst_case_packet_bytes` to 255 and the period to 850 ms, and reflash** — the vehicle then transmits `GP-Lat`/`GP-Lon`/`GP-Alt` again at 1.18 Hz instead of 1.43. When it is transmitting, read the fix's **timestamp** as well as its coordinates: the position is withdrawn once the receiver stops confirming it, so the last one received is the last the vehicle stood behind |
 
 ---
 

@@ -823,20 +823,25 @@ void test_config_radio_airtime_guard() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
 
-    // Default: SF7/125 kHz, the 255-byte FIFO limit as the budget, 850 ms -> ~400 ms
-    // airtime, ~47 % duty. The period is set from the *measured* airtime rather than this
-    // model, so the check that matters is the measured one below.
+    // Default: SF7/125 kHz, GPS logged rather than transmitted, so a 199-byte worst case
+    // at a 700 ms period -> ~318 ms airtime, ~45 % duty. The period is set from the
+    // *measured* airtime rather than this model, so the check that matters is below.
     CHECK(flight::validate_config(c, why));
-    CHECK(c.worst_case_packet_bytes == cansat::kMaxLoraPayloadBytes);
-    CHECK(approx(flight::worst_case_airtime_ms(c), 399.6, 0.5));
+    CHECK(!c.transmit_gps);
+    CHECK(c.worst_case_packet_bytes == 199);
+    CHECK(c.worst_case_packet_bytes < cansat::kMaxLoraPayloadBytes);
+    CHECK(approx(flight::worst_case_airtime_ms(c), 317.7, 0.5));
     CHECK(flight::channel_duty(c) <= c.max_channel_duty);
-    CHECK(approx(flight::channel_duty(c), 0.470, 0.005));
+    CHECK(approx(flight::channel_duty(c), 0.454, 0.005));
 
     // The real one. Bring-up rows 5.2 and 5.3 measured 406.9 ms for a full-length packet,
     // 1.8 % above the model, twice, on two different boards. A period sized from the model
     // alone would put the true duty over the policy while every test still passed.
     {
-        const double measured_airtime_ms = 406.9;
+        // 406.9 ms was measured for a 255-byte packet, 1.8 % above that packet's model
+        // figure. The same 1.8 % applied to the 199-byte model figure is the honest
+        // estimate for the packet this configuration actually sends.
+        const double measured_airtime_ms = flight::worst_case_airtime_ms(c) * 1.018;
         const double true_duty = measured_airtime_ms / c.telemetry_period_ms;
         CHECK(true_duty <= c.max_channel_duty);
         if (true_duty > c.max_channel_duty) {
@@ -1836,6 +1841,9 @@ void test_sd_log_row_matches_its_header() {
 void test_telemetry_builder() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
+    // This suite checks the packet's field order, GPS included, so it puts GPS on the air.
+    // The default logs it instead -- see Configuration::transmit_gps.
+    c.transmit_gps = true;
     flight::TelemetryBuilder b(c);
 
     flight::SensorSnapshot s;
@@ -2391,6 +2399,10 @@ void test_a_frozen_gps_fix_is_not_reported_as_a_live_position() {
     c.telemetry_period_ms = 500;
     c.radio.bandwidth_hz = 250000;  // 2 Hz needs the wider modem (link-budget.md)
     c.gps_fix_timeout_ms = 3000;
+    // This suite is about a fix ageing out of *telemetry*, so it needs the fix on the air.
+    // The default leaves GPS in the log only -- see Configuration::transmit_gps.
+    c.transmit_gps = true;
+    c.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
     flight::test::MockImu imu;
     flight::test::MockBarometer baro;
     flight::test::MockGps gps;
@@ -2687,6 +2699,9 @@ void test_accel_calibration_is_rotation_invariant() {
 void test_measured_packet_sizes_match_the_link_budget() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
+    // The sizes this pins are the GPS-inclusive ones the 255-byte budget is built from.
+    c.transmit_gps = true;
+    c.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
     flight::TelemetryBuilder builder(c);
 
     flight::SensorSnapshot s;
@@ -2993,6 +3008,67 @@ void test_a_vehicle_without_a_microphone_behaves_as_before() {
     CHECK(ctrl.health().packets_sent > 0);
     CHECK(!ctrl.health().sound_ok);
     CHECK(!ctrl.faults().active(flight::FaultCode::sound_unavailable));
+}
+
+// GPS is not a mandatory telemetry field. It is SEN-011, an additional sensor scored on
+// evidence of data "transmitted **or** logged", and the three GP- fields are 56 of the
+// packet's bytes -- the difference between a 199-byte and a 255-byte worst case, and so
+// between 1.43 Hz and 1.18 Hz on a line the rulebook scores.
+void test_a_fix_reaches_the_log_even_when_it_is_not_transmitted() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    CHECK(!c.transmit_gps);                     // the default
+    flight::TelemetryBuilder builder(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = true;
+    s.baro_valid = true;
+    s.orientation_valid = true;
+    cansat::GpsData fix;
+    fix.valid = true;
+    fix.latitude = 21.220094;
+    fix.longitude = 72.884836;
+    fix.altitude = 15.0;
+    fix.satellites = 9;
+    fix.hdop = 1.4;
+    s.gps = fix;
+
+    const auto built = builder.build(1, 1000, s);
+    CHECK(built.has_value());
+
+    // Not on the air.
+    CHECK(built->packet.find("GP-Lat-") == std::string::npos);
+    CHECK(built->packet.find("GP-Lon-") == std::string::npos);
+    CHECK(built->packet.find("GP-Alt-") == std::string::npos);
+
+    // But every bit of it is in the row, which is what SEN-011 is scored on.
+    const std::string line = builder.sd_line(*built, flight::MissionState::flight, 0);
+    CHECK(line.find("21.220094") != std::string::npos);
+    CHECK(line.find("72.884836") != std::string::npos);
+    CHECK(line.find(",9,1.4,") != std::string::npos);
+}
+
+void test_turning_gps_transmission_on_without_the_budget_is_refused() {
+    // The two settings must move together. Apart, the vehicle builds packets 56 bytes
+    // longer than the airtime budget assumes: the duty check passes on a packet the radio
+    // never sends, and the controller silently drops MODE/FAULTS/CAL/ARM to fit a cap set
+    // for a configuration this no longer is.
+    std::string why;
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    c.transmit_gps = true;                      // budget left at the 199-byte default
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("transmit_gps") != std::string::npos);
+    CHECK(why.find("worst_case_packet_bytes") != std::string::npos);
+
+    // Raising the budget alone is not enough either: 255 bytes will not fit a 700 ms slot.
+    c.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("airtime") != std::string::npos);
+
+    // Both, and it builds.
+    c.telemetry_period_ms = 850;
+    CHECK(flight::validate_config(c, why));
 }
 
 // The rulebook wants continuous telemetry, and "continuous" has to mean the same cadence
@@ -3403,6 +3479,8 @@ int main(int argc, char** argv) {
     test_the_erase_reads_empty_immediately_and_scrubs_afterwards();
     test_the_scrub_finishes_without_blocking_telemetry();
     test_a_vehicle_that_was_never_asked_never_scrubs();
+    test_a_fix_reaches_the_log_even_when_it_is_not_transmitted();
+    test_turning_gps_transmission_on_without_the_budget_is_refused();
     test_the_packet_cadence_is_the_same_in_every_state();
     test_a_flight_build_has_no_uplink_at_all();
     test_the_bench_build_erases_the_log_on_command();

@@ -111,6 +111,27 @@ struct Configuration {
     // the packet silently. `max_channel_duty` is the largest fraction of the channel one
     // packet per telemetry period may occupy — the rest is margin for radio recovery,
     // retries and the receiver's own timing.
+    // Whether the position goes on the air as well as into the log.
+    //
+    // **The rulebook does not require it.** The mandatory packet is team, number, time,
+    // altitude, pressure, temperature, roll, pitch, yaw and the three accelerations; GPS is
+    // SEN-011, an *additional sensor* scored on evidence of data "transmitted **or**
+    // logged". The SD row carries latitude, longitude, altitude, satellites and HDOP
+    // whatever this is set to, so the five scoring points do not depend on it.
+    //
+    // What it does cost: `GP-Lat`/`GP-Lon`/`GP-Alt` are 56 bytes, and they take the
+    // worst-case packet from 199 to exactly 255 -- the LoRa FIFO limit, which is not a
+    // coincidence so much as a ceiling the format has grown into. Airtime scales with
+    // length, the telemetry period is computed from the worst case, and those 56 bytes are
+    // therefore the difference between 1.43 Hz and 1.18 Hz. The rulebook rewards rates
+    // above 1 Hz.
+    //
+    // **And what it costs if it is false: there is no live position.** The ground station
+    // never sees where the vehicle is, during descent or after landing, and the fix exists
+    // only on a card inside a vehicle you have to find first. Set this true for any flight
+    // where losing sight of it is plausible; the budget and period below must move with it,
+    // and validate_config() refuses the combination if they do not.
+    bool transmit_gps = false;
     std::size_t worst_case_packet_bytes = cansat::link::kWorstCasePacketBytes;
     double max_channel_duty = cansat::link::kMaxChannelDuty;
 

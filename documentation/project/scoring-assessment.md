@@ -102,7 +102,7 @@ unsafe deployment.
 | Item | Points | Assessment |
 |---|---:|---|
 | Real-time data transmission | 20 | **20 achievable.** The firmware satisfies every stated condition |
-| Transmission capability & reliability | 5 | **~2–3 as configured.** We sit at the 1 Hz floor |
+| Transmission capability & reliability | 5 | **Improved.** No longer at the floor: **1.43 Hz**, 43 % above the minimum, from moving GPS out of the packet (56 bytes) and sizing the period from measured rather than modelled airtime. The remaining headroom needs 250 kHz bandwidth, which costs 3 dB of sensitivity |
 | Data format compliance | gate | **Compliant** |
 
 What is already right, and verified:
@@ -119,9 +119,16 @@ What is already right, and verified:
   Physics Club provides. Confirmed on the bench: version register `0x12`, airtime within
   1.8 % of the model.
 
-**Where the points are being left:** the rulebook rewards packet rates above 1 Hz. This
-vehicle transmits at exactly 1 Hz, the minimum. See
-[the recommendations](#the-cheapest-points-remaining).
+**Taken 2026-09-08:** the rulebook rewards packet rates above 1 Hz, and this vehicle was at
+exactly the minimum. It now transmits at **1.43 Hz**. Two changes, neither of which costs a
+point elsewhere: GPS moved from the packet to the log — SEN-011 is scored on data
+*transmitted or logged*, so its +5 is untouched — and the period sized from the measured
+airtime rather than the model, which reads 1.8 % low.
+
+**What it costs is not a score, it is recovery.** With the position off the air the ground
+station cannot say where the vehicle is, in descent or after landing, and the fix is on a
+card inside the thing you are looking for. `transmit_gps` restores it at 1.18 Hz. That is a
+launch-day judgement about the site, not a scoring one.
 
 ### C · Parachute, Descent, Stability & Integrity — 25 points
 
@@ -166,7 +173,7 @@ The rulebook explicitly permits any outer material (PVC, plastic, 3D print) and 
 | Data analysis | 20 | ~0 | Tooling ready; needs flight data |
 
 **Code originality — 9 or 10 of 10.** Self-written, no third-party libraries anywhere in the
-flight path, heavily commented, and held by 4703 assertions across 167 Python and 59 Node
+flight path, heavily commented, and held by 4734 assertions across 167 Python and 59 Node
 tests. The drivers for the MPU-9250, BMP280, NEO-6M, SX1278 and the SD card are all written
 here against their datasheets and register maps. This section rewards exactly what this
 repository is.

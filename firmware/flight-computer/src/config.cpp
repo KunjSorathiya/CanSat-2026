@@ -177,6 +177,22 @@ bool validate_config(const Configuration& config, std::string& why) {
         why = "radio.preamble_length must be >= 6 symbols (SX127x minimum)";
         return false;
     }
+    // transmit_gps and the budget have to move together. Left apart, the vehicle would
+    // build packets 56 bytes longer than the airtime budget assumes -- so the duty check
+    // below would pass on a number the radio never sends, and the controller would quietly
+    // drop MODE/FAULTS/CAL/ARM to squeeze each packet back under a cap that was set for a
+    // configuration this no longer is. Diagnostics would vanish exactly when a flight got
+    // interesting, and nothing would say why.
+    if (config.transmit_gps &&
+        config.worst_case_packet_bytes < cansat::link::kWorstCasePacketBytesWithGps) {
+        why = "transmit_gps is set but worst_case_packet_bytes is " +
+              std::to_string(config.worst_case_packet_bytes) +
+              "; the GPS fields take the longest packet to " +
+              std::to_string(cansat::link::kWorstCasePacketBytesWithGps) +
+              " bytes, so the budget must be at least that (and the telemetry period "
+              "re-derived from it)";
+        return false;
+    }
     if (config.worst_case_packet_bytes == 0 ||
         config.worst_case_packet_bytes > cansat::kMaxLoraPayloadBytes) {
         why = "worst_case_packet_bytes must be in 1..255 (LoRa FIFO limit)";

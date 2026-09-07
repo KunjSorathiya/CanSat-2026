@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 98 suites across the whole flight core | ✅ **3931 / 3931 assertions** |
+| `flight_tests` | 100 suites across the whole flight core | ✅ **3962 / 3962 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -157,7 +157,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 98 suites, 3931 assertions
+### `flight_tests` — 100 suites, 3962 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -216,6 +216,8 @@ flowchart LR
 | `test_the_erase_reads_empty_immediately_and_scrubs_afterwards` | The command empties the log on the first poll and the controller then drives the background scrub |
 | `test_the_scrub_finishes_without_blocking_telemetry` | A run that scrubs 400 blocks transmits exactly as many packets as one that scrubs nothing. The mandatory 1 Hz downlink may not pay for a card wipe |
 | `test_a_vehicle_that_was_never_asked_never_scrubs` | `erase_step()` runs every poll and must be free on a vehicle that has erased nothing |
+| `test_a_fix_reaches_the_log_even_when_it_is_not_transmitted` | With the default `transmit_gps` false, no `GP-` field reaches the packet and every one of latitude, longitude, satellites and HDOP reaches the SD row. GPS is SEN-011, scored on data **transmitted or logged**, so the five points survive the 56 bytes coming off the packet |
+| `test_turning_gps_transmission_on_without_the_budget_is_refused` | Setting `transmit_gps` without raising `worst_case_packet_bytes` is refused by name; raising the budget alone is then refused on airtime; both together build. Left apart, the duty check would pass on a packet the radio never sends while the controller quietly dropped `MODE`/`FAULTS`/`CAL`/`ARM` to fit |
 | `test_the_packet_cadence_is_the_same_in_every_state` | A full profile — pad, boost, coast, descent, landing — and **every gap between consecutive packets equals `telemetry_period_ms`**, whatever state the vehicle was in. The test asserts it actually reached `FLIGHT` and `LANDED` first, so it cannot pass on a mission that never left the pad. State detection drives the `MODE` tag and the LED blink; it must never drive the rate |
 | `test_a_flight_build_has_no_uplink_at_all` | `allow_ground_commands` defaults to false, and with it false the radio's receive is **never polled** — this is the test the README's "there is no command uplink" rests on |
 | `test_the_bench_build_erases_the_log_on_command` | Enabled, in `READY` with `ARM-0`, a valid command erases the log |

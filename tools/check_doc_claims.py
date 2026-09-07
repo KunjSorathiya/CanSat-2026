@@ -155,12 +155,12 @@ def main() -> int:
     # 850 ms, 1.18 Hz. Pinned as a value rather than a range because the number is
     # derived: worst-case measured airtime 406.9 ms over the 0.5 duty cap is a floor of
     # 813.8 ms, and it must stay under the 1000 ms rulebook ceiling.
-    checker.check("link profile: 850 ms period", period_ms == 850, str(period_ms))
+    checker.check("link profile: 700 ms period", period_ms == 700, str(period_ms))
     checker.check("telemetry period clears the 1 Hz rulebook minimum",
                   period_ms <= 1000, str(period_ms))
-    checker.check("telemetry period keeps measured duty under the cap",
-                  406.9 / period_ms <= 0.5, f"{406.9 / period_ms:.3f}")
-    checker.check("link profile: 255-byte budget", budget_bytes == 255, str(budget_bytes))
+    # 199: GPS is logged rather than transmitted, so the three GP- fields are not in the
+    # longest packet. 255 is what it becomes when transmit_gps is set.
+    checker.check("link profile: 199-byte budget", budget_bytes == 199, str(budget_bytes))
     checker.check("link profile: sync words 0xF3 / 0xA5",
                   "0xF3" in profile and "0xA5" in profile)
 
@@ -173,6 +173,14 @@ def main() -> int:
     ).time_on_air_ms
     checker.check(f"link-budget.md quotes the computed airtime ({airtime_ms:.1f} ms)",
                   f"{airtime_ms:.1f}" in link_budget, f"{airtime_ms:.1f}")
+
+    # The model reads 1.8 % low against the two hardware measurements (bring-up 5.2/5.3),
+    # so the duty that matters is the model figure with that correction applied. Checking
+    # the model alone would let a period through that the radio cannot actually hold.
+    measured_airtime = airtime_ms * 1.018
+    checker.check("telemetry period keeps measured duty under the cap",
+                  measured_airtime / (period_ms or 1) <= 0.5,
+                  f"{measured_airtime / (period_ms or 1):.3f}")
     for measured in ("118", "167", "212"):
         checker.check(f"link-budget.md quotes the measured {measured}-byte packet size",
                       f"**{measured}**" in link_budget)

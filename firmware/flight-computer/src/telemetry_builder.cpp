@@ -62,10 +62,17 @@ std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
     std::vector<std::string> optional;
     if (s.gps.valid && std::isfinite(s.gps.latitude) && std::isfinite(s.gps.longitude) &&
         std::isfinite(s.gps.altitude)) {
+        // The record always carries the fix: it is what the SD row is rendered from, and
+        // SEN-011 is satisfied by data that is "transmitted or logged". Whether it also
+        // goes on the air is a separate decision, because the three GP- fields are 56 of
+        // the packet's 255 bytes and the whole telemetry rate is computed from the worst
+        // case. See Configuration::transmit_gps.
         record.gps = s.gps;
-        optional.push_back(optional_field("GP-Lat-", s.gps.latitude, config_.gps_latlon_decimals));
-        optional.push_back(optional_field("GP-Lon-", s.gps.longitude, config_.gps_latlon_decimals));
-        optional.push_back(optional_field("GP-Alt-", s.gps.altitude, config_.gps_alt_decimals));
+        if (config_.transmit_gps) {
+            optional.push_back(optional_field("GP-Lat-", s.gps.latitude, config_.gps_latlon_decimals));
+            optional.push_back(optional_field("GP-Lon-", s.gps.longitude, config_.gps_latlon_decimals));
+            optional.push_back(optional_field("GP-Alt-", s.gps.altitude, config_.gps_alt_decimals));
+        }
     }
     for (const auto& extra : extra_optional) {
         if (!extra.empty()) {

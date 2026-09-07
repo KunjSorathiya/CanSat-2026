@@ -41,35 +41,44 @@ inline constexpr std::uint8_t kOfficialSyncWord = 0xA5;  // official launch
 // Budget the full LoRa FIFO, not a typical packet. Measured sizes from the formatter:
 // 118 bytes mandatory-only, 167 with GPS, 206 with GPS and all four diagnostic tags, and
 // 247 for the absolute worst case (longest team id, widest packet number, extreme values).
-// An earlier 200-byte budget was below the *typical* in-flight packet, which would have
-// under-estimated airtime on every transmission. 255 is the only figure that cannot be
-// exceeded, so it is the only honest basis for the budget — and at SF7/125 kHz it still
-// costs only 400 ms, 40 % of a 1 Hz slot.
+// The longest packet **this configuration** can transmit, measured rather than guessed.
+//
+// With the GPS fields on the air it is exactly 255 — the LoRa FIFO limit — which is a
+// ceiling the format grew into rather than a coincidence: 201 bytes of mandatory fields and
+// position, plus 54 bytes of worst-case `MODE`/`FAULTS`/`CAL`/`ARM`/`YR` tags. With
+// `Configuration::transmit_gps` false, which is the default, the three `GP-` fields are
+// logged instead of transmitted and the worst case is **199**.
+//
+// That 56-byte difference is worth having. Airtime scales with length, the telemetry period
+// is computed from the worst case, and 199 bytes buys 1.43 Hz where 255 bytes allows 1.18 —
+// on a scoring line that rewards rates above 1 Hz. The position itself loses nothing: it is
+// in every SD row, and SEN-011 asks for data "transmitted or logged".
 //
 // This is also the runtime cap: the controller drops its optional diagnostic tags rather
-// than let a packet reach the radio's silent 255-byte truncation. Lower it to buy airtime
-// margin, at the cost of dropping diagnostics from the longest packets.
-inline constexpr std::size_t kWorstCasePacketBytes = 255;
-// 850 ms, 1.18 Hz. The rulebook's 1 Hz is a *minimum*, and this is as fast as the link can
+// than let a packet reach the radio's silent 255-byte truncation. Raise it back to 255
+// alongside `transmit_gps`; `validate_config()` refuses the two settings apart.
+inline constexpr std::size_t kWorstCasePacketBytes = 199;
+// The FIFO's own limit, and the figure the budget must return to if GPS is transmitted.
+inline constexpr std::size_t kWorstCasePacketBytesWithGps = 255;
+// 700 ms, 1.43 Hz. The rulebook's 1 Hz is a *minimum*, and this is as fast as the link can
 // be driven without breaking the duty policy below.
 //
 // The arithmetic, and it is deliberately built on the measured airtime rather than the
-// model. A 255-byte packet costs 399.6 ms by the model and **406.9 ms measured on this
-// hardware**, twice, on two different boards (bring-up rows 5.2 and 5.3). At the 50 % duty
-// cap that is a floor of 813.8 ms; 850 leaves the real duty at 47.9 % instead of sitting
-// on the limit. Sizing this from the model instead would have set 800 ms and put the true
-// duty at 50.9 % — over the policy, on a number the model is known to under-read by 1.8 %.
+// model. The model reads 1.8 % low: a 255-byte packet costs 399.6 ms by the model and
+// **406.9 ms measured on this hardware**, twice, on two boards (bring-up rows 5.2 and
+// 5.3). Applying that same 1.8 % to the 199-byte packet's 317.7 ms model figure gives
+// ~323 ms, so the 50 % duty cap is a floor of ~647 ms; 700 leaves the real duty at 46 %
+// instead of sitting on the limit.
 //
 // **A second reason to be under 1000 rather than on it.** At exactly 1 Hz any jitter puts
-// an interval over a second and the vehicle momentarily below the rulebook minimum. 850
-// carries 150 ms of margin against a requirement that is checked, not estimated.
+// an interval over a second and the vehicle momentarily below the rulebook minimum. 700
+// carries 300 ms of margin against a requirement that is checked, not estimated.
 //
-// Going faster needs one of three things, none of which is free: a smaller worst-case
-// packet (255 is already the FIFO limit and the builder's own worst case lands on it), a
-// wider bandwidth (250 kHz halves airtime and costs 3 dB of sensitivity, so range), or a
-// higher duty cap (a regulatory and courtesy question on a band shared with every other
-// team, not an engineering one).
-inline constexpr std::uint32_t kTelemetryPeriodMs = 850;
+// Going faster now needs a wider bandwidth (250 kHz halves airtime and costs 3 dB of
+// sensitivity, so range) or a higher duty cap (a regulatory and courtesy question on a
+// band shared with every other team, not an engineering one). The packet itself has
+// already given up the only 56 bytes it had to give.
+inline constexpr std::uint32_t kTelemetryPeriodMs = 700;
 inline constexpr double kMaxChannelDuty = 0.5;
 
 // The profile as the airtime model sees it.
