@@ -1083,50 +1083,107 @@ void test_a_refused_fix_does_not_disturb_the_last_good_one() {
 // flag defaults to false -- so everything here is about the bench, and about making sure a
 // command can never be produced by accident from traffic that is not one.
 void test_a_command_round_trips_for_its_own_team() {
-    const std::string line = cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log);
-    CHECK(cansat::parse_command(line, "CAN-Team-25") == cansat::CommandKind::erase_log);
+    std::uint32_t pn = 0;
+    const std::string line =
+        cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log, "hunter2", 1);
+    CHECK(cansat::parse_command(line, "CAN-Team-25", "hunter2", pn) ==
+          cansat::CommandKind::erase_log);
+    CHECK(pn == 1);
+}
+
+void test_the_password_never_appears_on_the_wire() {
+    // The whole point of hashing it. A link anyone can listen to must not carry the secret.
+    const std::string line = cansat::format_command(
+        "CAN-Team-25", cansat::CommandKind::erase_log, "hunter2", 1);
+    CHECK(line.find("hunter2") == std::string::npos);
 }
 
 void test_a_command_for_another_team_is_ignored() {
-    // 0xF3 is the shared test sync word: every team in the competition transmits on it, so
-    // another team's command must be inert here rather than merely unlikely.
-    const std::string line = cansat::format_command("CAN-Team-07", cansat::CommandKind::erase_log);
-    CHECK(cansat::parse_command(line, "CAN-Team-25") == cansat::CommandKind::none);
+    std::uint32_t pn = 0;
+    const std::string line =
+        cansat::format_command("CAN-Team-07", cansat::CommandKind::erase_log, "hunter2", 1);
+    CHECK(cansat::parse_command(line, "CAN-Team-25", "hunter2", pn) == cansat::CommandKind::none);
 }
 
-void test_a_command_without_the_key_is_ignored() {
-    CHECK(cansat::parse_command("CAN-Team-25; CMD-ERASE_LOG;", "CAN-Team-25") ==
-          cansat::CommandKind::none);
-    CHECK(cansat::parse_command("CAN-Team-25; CMD-ERASE_LOG; KEY-0000;", "CAN-Team-25") ==
-          cansat::CommandKind::none);
+void test_a_command_with_the_wrong_password_is_ignored() {
+    std::uint32_t pn = 0;
+    const std::string line =
+        cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log, "hunter2", 1);
+    CHECK(cansat::parse_command(line, "CAN-Team-25", "hunter3", pn) == cansat::CommandKind::none);
+    CHECK(cansat::parse_command(line, "CAN-Team-25", "", pn) == cansat::CommandKind::none);
+}
+
+void test_a_token_is_valid_for_exactly_one_packet_number() {
+    // A captured frame is only ever worth the number it was made for. Everything else about
+    // replay protection is the controller's job; this is what makes it possible.
+    std::uint32_t pn = 0;
+    const std::string line =
+        cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log, "hunter2", 10);
+    CHECK(cansat::parse_command(line, "CAN-Team-25", "hunter2", pn) ==
+          cansat::CommandKind::erase_log);
+
+    // Same token, a different declared number: the digest no longer matches.
+    std::string moved = line;
+    const std::size_t at = moved.find("PN-10;");
+    CHECK(at != std::string::npos);
+    moved.replace(at, 6, "PN-11;");
+    CHECK(cansat::parse_command(moved, "CAN-Team-25", "hunter2", pn) == cansat::CommandKind::none);
 }
 
 void test_a_telemetry_packet_is_never_a_command() {
-    // The one that matters most: the vehicle's own downlink, and the ground station's view
-    // of it, must not decode as an instruction if either is ever looped back.
+    std::uint32_t pn = 0;
     const std::string packet =
         "CAN-Team-25; P-001; Ti-00:00:00:000; A-23.0; Pr-101048.55; T-31.4; Ro--1.5; Pi-5.0; "
         "Ya-0.0; AX--0.86; AY--0.25; AZ-9.81; MODE-READY; FAULTS-2; CAL-0; ARM-0; YR-G;";
-    CHECK(cansat::parse_command(packet, "CAN-Team-25") == cansat::CommandKind::none);
+    CHECK(cansat::parse_command(packet, "CAN-Team-25", "hunter2", pn) == cansat::CommandKind::none);
 }
 
 void test_an_unconfigured_vehicle_matches_nothing() {
-    // Empty expected_team must not turn every command into one addressed to us.
-    const std::string line = cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log);
-    CHECK(cansat::parse_command(line, "") == cansat::CommandKind::none);
+    std::uint32_t pn = 0;
+    const std::string line =
+        cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log, "hunter2", 1);
+    CHECK(cansat::parse_command(line, "", "hunter2", pn) == cansat::CommandKind::none);
+    // And a vehicle with no password set must not be commandable at all.
+    CHECK(cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log, "", 1).empty());
 }
 
 void test_a_truncated_command_is_ignored() {
-    const std::string line = cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log);
+    std::uint32_t pn = 0;
+    const std::string line =
+        cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log, "hunter2", 1);
     for (std::size_t cut = 1; cut < line.size(); ++cut) {
-        // Every prefix of a valid command must be inert. A radio delivers partial frames.
-        CHECK(cansat::parse_command(line.substr(0, cut), "CAN-Team-25") ==
+        CHECK(cansat::parse_command(line.substr(0, cut), "CAN-Team-25", "hunter2", pn) ==
               cansat::CommandKind::none);
     }
 }
 
-// A checksum-valid sentence can still carry an impossible position. Those must not reach
-// telemetry: the vehicle should transmit no fix rather than a wrong one.
+// The digest both ends compute. A divergence here is a console that cannot command the
+// vehicle it was built for, and it would show up on the bench as "the button does nothing".
+void test_command_tokens_match_the_shared_fixture(const std::string& repo_root) {
+    const std::string path = repo_root + "/test-data/command-tokens.tsv";
+    std::ifstream file(path);
+    CHECK(file.is_open());
+    std::string line;
+    int rows = 0;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        const std::size_t a = line.find('\t');
+        const std::size_t b = line.find('\t', a + 1);
+        CHECK(a != std::string::npos && b != std::string::npos);
+        const std::string password = line.substr(0, a);
+        const std::uint32_t pn =
+            static_cast<std::uint32_t>(std::stoul(line.substr(a + 1, b - a - 1)));
+        std::string expected = line.substr(b + 1);
+        while (!expected.empty() &&
+               (expected.back() == '\r' || expected.back() == '\n')) {
+            expected.pop_back();
+        }
+        CHECK(cansat::command_token(password, pn) == expected);
+        ++rows;
+    }
+    CHECK(rows >= 8);
+}
+
 void test_a_hemisphere_from_the_wrong_axis_is_rejected() {
     // A sentence can pass its checksum and still carry a hemisphere character that does
     // not belong to the field it is in. Accepting all four on both axes read a latitude
@@ -3170,8 +3227,12 @@ struct GroundLink {
         CHECK(ctrl.initialize());
         for (std::uint64_t t = 0; t <= until_ms; t += 10) {
             if (radio.inbox.empty()) {
-                radio.inbox.push_back(
-                    cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log));
+                // Minted against the number the vehicle has reached, the way the console
+                // mints it from the last packet it received. A token made for any other
+                // number is refused, so the harness has to play by the same rule.
+                radio.inbox.push_back(cansat::format_command(
+                    "CAN-Team-25", cansat::CommandKind::erase_log, c.command_password,
+                    static_cast<std::uint32_t>(radio.packets.size())));
             }
             ctrl.poll(t);
         }
@@ -3204,6 +3265,88 @@ void test_the_bench_build_erases_the_log_on_command() {
     CHECK(link.logger.erases >= 1);
 }
 
+void test_a_replayed_command_erases_nothing() {
+    // The threat this exists for: someone records a command that worked and sends it again.
+    // The token is only valid for the packet number it was minted against, and the vehicle
+    // refuses a number it has already accepted -- so the recording is worth exactly one
+    // erase, the one the operator meant.
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    c.allow_ground_commands = true;
+    // The window is READY with ARM-0, and these runs are long enough that the vehicle
+    // would otherwise arm partway through and refuse for the right reason at the wrong
+    // moment. Held disarmed so each test measures only what it names.
+    c.arming_delay_ms = 600000;
+    flight::test::MockImu imu; flight::test::MockBarometer baro; flight::test::MockGps gps;
+    flight::test::MockRadio radio; flight::test::MockLogger logger; flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    // Let a few packets go out, then command against the current number.
+    for (std::uint64_t ms = 0; ms <= 3000; ms += 10) ctrl.poll(ms);
+    const std::uint32_t pn = static_cast<std::uint32_t>(radio.packets.size());
+    const std::string captured =
+        cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log,
+                               c.command_password, pn);
+
+    radio.inbox.push_back(captured);
+    for (std::uint64_t ms = 3010; ms <= 5000; ms += 10) ctrl.poll(ms);
+    CHECK(logger.erases == 1);
+
+    // The identical frame again, later. Same bytes, same token, and nothing happens.
+    const int erases_after_first = logger.erases;
+    radio.inbox.push_back(captured);
+    for (std::uint64_t ms = 5010; ms <= 8000; ms += 10) ctrl.poll(ms);
+    CHECK(logger.erases == erases_after_first);
+    CHECK(ctrl.health().ground_commands_ignored > 0);
+}
+
+void test_a_command_minted_for_a_future_packet_is_refused() {
+    // Someone who knows the password could pre-compute tokens. Refusing numbers the vehicle
+    // has not reached means a stockpile of them is useless until the moment each is current,
+    // and by then the operator is standing there anyway.
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    c.allow_ground_commands = true;
+    // The window is READY with ARM-0, and these runs are long enough that the vehicle
+    // would otherwise arm partway through and refuse for the right reason at the wrong
+    // moment. Held disarmed so each test measures only what it names.
+    c.arming_delay_ms = 600000;
+    flight::test::MockImu imu; flight::test::MockBarometer baro; flight::test::MockGps gps;
+    flight::test::MockRadio radio; flight::test::MockLogger logger; flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    radio.inbox.push_back(cansat::format_command(
+        "CAN-Team-25", cansat::CommandKind::erase_log, c.command_password, 100000));
+    for (std::uint64_t ms = 0; ms <= 5000; ms += 10) ctrl.poll(ms);
+    CHECK(logger.erases == 0);
+}
+
+void test_a_stale_command_is_refused() {
+    // A frame from an earlier session, replayed after the vehicle has moved on. Valid token,
+    // never used before, and still refused because it is older than the window.
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    c.allow_ground_commands = true;
+    // The window is READY with ARM-0, and these runs are long enough that the vehicle
+    // would otherwise arm partway through and refuse for the right reason at the wrong
+    // moment. Held disarmed so each test measures only what it names.
+    c.arming_delay_ms = 600000;
+    c.command_replay_window = 2;
+    flight::test::MockImu imu; flight::test::MockBarometer baro; flight::test::MockGps gps;
+    flight::test::MockRadio radio; flight::test::MockLogger logger; flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    for (std::uint64_t ms = 0; ms <= 8000; ms += 10) ctrl.poll(ms);
+    CHECK(radio.packets.size() > 4);
+    radio.inbox.push_back(cansat::format_command(
+        "CAN-Team-25", cansat::CommandKind::erase_log, c.command_password, 1));
+    for (std::uint64_t ms = 8010; ms <= 11000; ms += 10) ctrl.poll(ms);
+    CHECK(logger.erases == 0);
+}
+
 void test_an_armed_vehicle_refuses_to_erase() {
     // ARM-1 means the vehicle is ready to fly. Everything from here to recovery holds a log
     // that cannot be recreated, so the window shuts at arming rather than at launch.
@@ -3228,8 +3371,9 @@ void test_another_teams_command_erases_nothing() {
     CHECK(ctrl.initialize());
     for (std::uint64_t t = 0; t <= 4000; t += 10) {
         if (radio.inbox.empty()) {
-            radio.inbox.push_back(
-                cansat::format_command("CAN-Team-07", cansat::CommandKind::erase_log));
+            radio.inbox.push_back(cansat::format_command(
+                "CAN-Team-07", cansat::CommandKind::erase_log, c.command_password,
+                static_cast<std::uint32_t>(radio.packets.size())));
         }
         ctrl.poll(t);
     }
@@ -3484,16 +3628,22 @@ int main(int argc, char** argv) {
     test_the_packet_cadence_is_the_same_in_every_state();
     test_a_flight_build_has_no_uplink_at_all();
     test_the_bench_build_erases_the_log_on_command();
+    test_a_replayed_command_erases_nothing();
+    test_a_command_minted_for_a_future_packet_is_refused();
+    test_a_stale_command_is_refused();
     test_an_armed_vehicle_refuses_to_erase();
     test_another_teams_command_erases_nothing();
     test_a_refused_erase_is_reported_rather_than_swallowed();
     test_listening_never_costs_a_packet();
     test_a_command_round_trips_for_its_own_team();
+    test_the_password_never_appears_on_the_wire();
     test_a_command_for_another_team_is_ignored();
-    test_a_command_without_the_key_is_ignored();
+    test_a_command_with_the_wrong_password_is_ignored();
+    test_a_token_is_valid_for_exactly_one_packet_number();
     test_a_telemetry_packet_is_never_a_command();
     test_an_unconfigured_vehicle_matches_nothing();
     test_a_truncated_command_is_ignored();
+    test_command_tokens_match_the_shared_fixture(repo_root);
     test_a_fix_with_too_few_satellites_is_refused();
     test_a_fix_with_poor_geometry_is_refused();
     test_a_good_fix_still_passes_and_carries_its_quality();

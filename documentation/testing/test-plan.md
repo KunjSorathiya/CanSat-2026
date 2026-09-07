@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 100 suites across the whole flight core | ✅ **3962 / 3962 assertions** |
+| `flight_tests` | 106 suites across the whole flight core | ✅ **4013 / 4013 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -105,7 +105,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Python ground station | 8 modules | ✅ **134 / 134 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **220 / 220 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **59 / 59 tests** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **62 / 62 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
@@ -157,7 +157,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 100 suites, 3962 assertions
+### `flight_tests` — 106 suites, 4013 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -227,7 +227,13 @@ flowchart LR
 | `test_listening_never_costs_a_packet` | Identical runs with the uplink off and on transmit the same number of packets. The mandatory 1 Hz downlink may not pay for a bench feature |
 | `test_a_command_round_trips_for_its_own_team` | A formatted `ERASE_LOG` command parses back to the same command for the team it names |
 | `test_a_command_for_another_team_is_ignored` | A command addressed to `CAN-Team-07` is inert here. `0xF3` is the shared test sync word, so another team's traffic must be structurally inert rather than merely unlikely |
-| `test_a_command_without_the_key_is_ignored` | A missing or wrong `KEY-` field yields no command. The key is four clear-text characters and is **not** security — it makes an accidental trigger implausible, and the real protection is that the vehicle only listens in READY with `ARM-0` |
+| `test_a_command_with_the_wrong_password_is_ignored` | A wrong password, or none, yields no command. The token is a digest of the password and the packet number, so the check is on the digest and the password itself never travels |
+| `test_the_password_never_appears_on_the_wire` | The formatted command does not contain the password anywhere. The link is unencrypted, so this is the property that makes a password worth having at all |
+| `test_a_token_is_valid_for_exactly_one_packet_number` | Moving a valid token to a different `PN-` breaks it. This is what makes a captured frame single-use, and everything the controller does about replay rests on it |
+| `test_command_tokens_match_the_shared_fixture` | Every row of [`test-data/command-tokens.tsv`](../../test-data/command-tokens.tsv) hashes to its recorded token, including a non-ASCII password — the console reads the same file, so a C++/JavaScript divergence fails the build instead of appearing as "the button does nothing" |
+| `test_a_replayed_command_erases_nothing` | The exact frame that worked once, sent again later, erases nothing and is counted as ignored |
+| `test_a_command_minted_for_a_future_packet_is_refused` | A token pre-computed for a packet number the vehicle has not reached is refused, so a stockpile of them is useless |
+| `test_a_stale_command_is_refused` | A valid, never-used token older than `command_replay_window` is refused — a frame from an earlier session cannot be brought back |
 | `test_a_telemetry_packet_is_never_a_command` | The vehicle's own downlink, fed back into the command parser, decodes to nothing — the two directions share a format and must not share a meaning |
 | `test_an_unconfigured_vehicle_matches_nothing` | An empty expected team matches no command, rather than matching every command addressed to anybody |
 | `test_a_truncated_command_is_ignored` | **Every** prefix of a valid command is inert, checked at each cut. A radio delivers partial frames, and the terminating `;` is mandatory for exactly this reason: without it, every truncation but the last character is still a valid erase |

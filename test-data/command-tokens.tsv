@@ -1,0 +1,17 @@
+# Ground-command tokens: the digest both ends must compute from a password and a packet
+# number. Read by the C++ suite and by the web console's Node tests, so the two
+# implementations of FNV-1a cannot drift apart without a build failing.
+#
+# The last row is deliberately non-ASCII: the token is computed over UTF-8 bytes, and a
+# JavaScript implementation that hashed UTF-16 code units would agree on every other row
+# and disagree on that one.
+#
+# password	packet_number	token
+change-me	1	58543cc5429ea08d
+change-me	2	585439c5429e9b74
+change-me	4294967295	f05d614349d5e7fd
+hunter2	0	7b3f654d6b334ed7
+hunter2	1	7b3f644d6b334d24
+a longer pass phrase with spaces	1234	437ff9fa145d8cf8
+p@ssw0rd!#$%	42	4efdb70c6610db29
+éàü	7	6539510faec1815c

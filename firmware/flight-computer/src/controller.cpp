@@ -637,8 +637,24 @@ void Controller::service_ground_commands(std::uint64_t mission_ms) {
     std::string received;
     if (!radio_.poll_receive(received)) return;
 
-    switch (cansat::parse_command(received, config_.team_id)) {
+    std::uint32_t command_pn = 0;
+    switch (cansat::parse_command(received, config_.team_id, config_.command_password,
+                                  command_pn)) {
         case cansat::CommandKind::erase_log: {
+            // The replay check, and it is the reason the packet number is in the command at
+            // all. A token is only ever valid for the one packet number it was computed
+            // against, so refusing numbers we have already accepted, or have not yet
+            // reached, makes a frame recorded off the air useless the moment it is used
+            // once. The window keeps an old recording from working at all.
+            const bool already_used = command_pn <= last_command_pn_;
+            const bool from_the_future = command_pn > packet_number_;
+            const bool stale = packet_number_ - command_pn > config_.command_replay_window;
+            if (already_used || from_the_future || stale) {
+                ++health_.ground_commands_ignored;
+                break;
+            }
+            last_command_pn_ = command_pn;
+
             // A refusal is reported, not swallowed. An operator who pressed the button and
             // saw nothing happen must be able to tell "erased" from "declined".
             const bool erased = logger_.erase();

@@ -203,8 +203,29 @@ Two ways to empty it, and the first is the one to use before a launch:
 
 **The button will do nothing on a flight build, by design.** `allow_ground_commands`
 defaults to false; set it in the vehicle configuration and reflash to use it, and unset it
-before you fly. Even enabled, the vehicle obeys only in `READY` with `ARM-0`. The button
-needs a live Web Serial link and the word `ERASE` typed to confirm.
+before you fly. Even enabled, the vehicle obeys only in `READY` with `ARM-0`.
+
+**Authorising it.** The button asks for the vehicle's `command_password` and shows you the
+packet number it will use. The password is **not transmitted**: the console sends a 64-bit
+digest of the password and that packet number, so the wire never carries the secret and the
+vehicle refuses any packet number it has already accepted, has not yet reached, or that is
+older than `command_replay_window` (64 packets, about 45 seconds at 1.43 Hz). **A recorded
+command is therefore worth exactly one erase — the one you meant.**
+
+Set `command_password` to something of your own and do not commit it. The default in the
+repository is `change-me`, which is a placeholder, not a password.
+
+> [!WARNING]
+> **This is not cryptography and must not be relied on as though it were.** FNV-1a is a
+> hash, not a MAC; the digest is 64 bits; the link is unencrypted. It defeats accidents,
+> corrupted frames, another team's traffic on the shared `0xF3` sync word, and replay of a
+> command someone watched work. It does not defeat somebody who knows the password. What
+> protects the log is that the vehicle listens only in `READY` with `ARM-0`, on the ground,
+> and only if it was built to listen at all.
+
+A wrong password produces a valid-looking frame that the vehicle silently ignores — there is
+no "wrong password" reply, because answering one would tell an attacker they had guessed
+wrong. Watch `#tx=ok` for the send and then check the vehicle itself.
 
 `#tx=ok` from the bridge means the command reached the air. **It does not mean the log was
 erased** — the vehicle may have been armed, out of range, or built with the uplink off.

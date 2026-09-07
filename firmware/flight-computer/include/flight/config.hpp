@@ -296,6 +296,24 @@ struct Configuration {
     // nothing about the message itself can be trusted, and the window in which the
     // vehicle will act on one is closed for the whole of the flight.
     bool allow_ground_commands = false;
+    // The shared secret the erase command is authorised with. **Change it before you use
+    // the feature**, and do not commit the one you use: this default is in a public
+    // repository, which makes it a placeholder rather than a password.
+    //
+    // It never travels. The command carries a 64-bit digest of this string and the packet
+    // number the operator was looking at, so the wire never sees the secret and a captured
+    // frame cannot be replayed -- the vehicle refuses a packet number it has already
+    // accepted or has not yet reached.
+    //
+    // **Not cryptography.** See cansat/command.hpp. It stops accidents, stray frames and
+    // replays; it does not stop somebody who knows the string. What protects the log is
+    // that the vehicle only listens in READY with ARM-0, and only if built for it.
+    std::string command_password = "change-me";
+    // How far back a command's packet number may be before it is stale. At 1.43 Hz this is
+    // about 45 seconds -- long enough for an operator to read a number, type a password and
+    // press a button, short enough that a frame recorded during an earlier session is
+    // useless.
+    std::uint32_t command_replay_window = 64;
     std::uint32_t gps_baud = 9600;          // NEO-6M default
     std::uint32_t gps_uart_fifo_bytes = 32; // RP2040 UART FIFO depth
 

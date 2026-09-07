@@ -47,7 +47,7 @@ function loadConsoleCore() {
   }
 
   const factory = new Function(
-    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S, parseBridgeStatus, syncWordLabel, SYNC_TEST, SYNC_LAUNCH, unescapeRaw, missionStateView };`
+    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S, parseBridgeStatus, syncWordLabel, SYNC_TEST, SYNC_LAUNCH, unescapeRaw, missionStateView, commandToken, formatCommand };`
   );
   return factory();
 }
@@ -819,4 +819,34 @@ test("the demo's identity is never used as the expected team", () => {
             "the validator no longer takes the console's expected team");
   assert.ok(html.includes("parsePacket(raw, expectedTeam)"),
             "the parser no longer takes the console's expected team");
+});
+
+
+test("command tokens match the fixture the firmware reads", () => {
+  // The console mints the token the vehicle checks. If these two implementations of FNV-1a
+  // ever disagree, the symptom on the bench is "the button does nothing" -- a console that
+  // cannot command the vehicle it was built for, with no error anywhere to explain it.
+  const text = readFileSync(new URL("../../../test-data/command-tokens.tsv", import.meta.url), "utf8");
+  let rows = 0;
+  for (const line of text.split("\n")) {
+    if (!line.trim() || line.startsWith("#")) continue;
+    const [password, packetNumber, expected] = line.split("\t");
+    assert.strictEqual(M.commandToken(password, Number(packetNumber)), expected.trim(),
+                       `token mismatch for "${password}" at packet ${packetNumber}`);
+    rows++;
+  }
+  assert.ok(rows >= 8, `expected the full token fixture, got ${rows}`);
+});
+
+test("the password never appears in the frame the console transmits", () => {
+  const command = M.formatCommand("CAN-Team-25", "hunter2", 42);
+  assert.ok(!command.includes("hunter2"), "the password reached the wire");
+  assert.ok(command.includes("PN-42"), "the nonce is missing");
+  assert.ok(command.endsWith(";"), "a command without its terminator is inert by design");
+});
+
+test("a token is bound to one packet number", () => {
+  assert.notStrictEqual(M.commandToken("hunter2", 41), M.commandToken("hunter2", 42));
+  assert.notStrictEqual(M.commandToken("hunter3", 42), M.commandToken("hunter2", 42));
+  assert.strictEqual(M.commandToken("", 42), "", "no password must mint no token");
 });

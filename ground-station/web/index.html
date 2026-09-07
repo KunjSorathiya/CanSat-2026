@@ -1054,6 +1054,32 @@ function missionStateView(mode) {
   const spaced = mode.replace("_", " ");
   return { name: spaced, live: "Mission state " + spaced.toLowerCase(), phase: mode };
 }
+// FNV-1a, 64-bit, over `password + "|" + packetNumber`, as 16 lowercase hex characters.
+// The C++ side computes the identical digest; test-data/command-tokens.tsv holds the agreed
+// answers and both suites read it, so the two implementations cannot drift apart.
+//
+// BigInt rather than Number: 64-bit multiplication overflows a double at the third byte,
+// and the two languages would then agree on nothing. TextEncoder rather than charCodeAt:
+// the digest is over UTF-8 bytes, and a password with an accent in it would otherwise hash
+// differently on each end -- which the fixture's last row exists to catch.
+function commandToken(password, packetNumber) {
+  if (!password) return "";
+  const bytes = new TextEncoder().encode(password + "|" + String(packetNumber));
+  const MASK = (1n << 64n) - 1n;
+  let hash = 14695981039346656037n;
+  for (const b of bytes) {
+    hash = (hash ^ BigInt(b)) & MASK;
+    hash = (hash * 1099511628211n) & MASK;
+  }
+  return hash.toString(16).padStart(16, "0");
+}
+
+function formatCommand(teamId, password, packetNumber) {
+  if (!password) return "";
+  return teamId + "; CMD-ERASE_LOG; PN-" + packetNumber + "; KEY-" +
+         commandToken(password, packetNumber) + ";";
+}
+
 // PORTABLE-CORE:END
 
 /* ================================================================
@@ -2681,20 +2707,27 @@ async function eraseVehicleLog() {
   if (!serialPort || !serialPort.writable) { toast("Connect the bridge over Web Serial first"); return; }
   const team = (latest && latest.team_id) ? latest.team_id : null;
   if (!team) { toast("No packet received yet — the command needs the vehicle's team id"); return; }
-  const typed = prompt(
-    "This erases the vehicle's onboard flight log. It cannot be undone." +
-    "\n\nThe log reads empty at once; the old blocks are then overwritten in the " +
-    "background, which takes several minutes on the card and does not interrupt " +
-    "telemetry. The end state matches tools/prepare_sd_card.py." +
-    "\n\nThe vehicle will refuse unless it is in READY with ARM-0 and was built " +
-    "with ground commands enabled." +
-    "\n\nType ERASE to confirm:");
-  if (typed !== "ERASE") { toast("Erase cancelled"); return; }
+  // The packet number the operator can see, which is also the nonce. A token is valid for
+  // exactly this number and the vehicle refuses one it has already accepted, so a frame
+  // captured off the air is worth one erase — the one that was meant.
+  const pn = latest.packet_number;
+  if (!Number.isFinite(pn)) { toast("No packet number yet — wait for telemetry"); return; }
 
-  const command = team + "; CMD-ERASE_LOG; KEY-7A3F;";
+  const password = prompt(
+    "Erase the vehicle's onboard flight log. This cannot be undone." +
+    "\n\nThe log reads empty at once; the old blocks are then overwritten in the " +
+    "background, which takes several minutes and does not interrupt telemetry. The end " +
+    "state matches tools/prepare_sd_card.py." +
+    "\n\nThe vehicle refuses unless it is in READY with ARM-0 and was built with " +
+    "ground commands enabled." +
+    "\n\nEnter the vehicle password to authorise (packet P-" + pn + "):");
+  if (password === null) { toast("Erase cancelled"); return; }
+  if (!password) { toast("No password entered — nothing sent"); return; }
+
+  const command = formatCommand(team, password, pn);
   try {
     const writer = serialPort.writable.getWriter();
-    // frameEncode returns an array of byte values, not a string -- wrapping it in a
+    // frameEncode returns an array of byte values, not a string — wrapping it in a
     // TextEncoder would transmit the decimal digits of the bytes.
     await writer.write(new Uint8Array(frameEncode(command)));
     writer.releaseLock();
@@ -2702,10 +2735,10 @@ async function eraseVehicleLog() {
     toast("Could not send: " + ((e && e.message) || "write failed"));
     return;
   }
-  // Deliberately not "erased". The bridge answers #tx=ok when it put the command on the
-  // air, which says nothing about whether the vehicle was listening or agreed to act.
+  // The password is never shown and never stored. What goes in the monitor is the frame
+  // that went on the air, which carries only the digest.
   pushRow({ n: null, cls: "warn", tag: "tx", text: command, note: "erase command sent" });
-  toast("Command sent — the log empties at once, the block scrub runs for minutes after");
+  toast("Command sent against P-" + pn + " — a wrong password is refused silently by the vehicle");
 }
 $("#erase-btn").addEventListener("click", () => { eraseVehicleLog(); });
 $("#file-input").addEventListener("change", e => {

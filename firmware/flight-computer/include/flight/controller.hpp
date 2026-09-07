@@ -57,6 +57,9 @@ private:
     void run_calibration(std::uint64_t mission_ms);
     bool is_armed(std::uint64_t mission_ms) const;
     void service_ground_commands(std::uint64_t mission_ms);
+    // Highest packet number a ground command has been accepted against. A token is
+    // valid for exactly one packet number, so this makes every command single-use.
+    std::uint32_t last_command_pn_ = 0;
     void feed_state_machine(std::uint64_t mission_ms);
     void update_mag_calibration(std::uint64_t mission_ms);
     // Compares the magnetometer-referenced heading against the GPS course over ground.
