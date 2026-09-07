@@ -100,7 +100,7 @@ private:
 class PicoSdLogger final : public SdLogger {
 public:
     bool initialize() override;
-    bool append(const cansat::TelemetryRecord& record, const std::string& packet) override;
+    bool append(const std::string& line) override;
     bool flush() override;
     bool healthy() const override { return healthy_; }
 

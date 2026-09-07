@@ -1,6 +1,7 @@
 #include "flight/pico/pico_hal.hpp"
 
 #include "flight/fat_volume.hpp"
+#include "flight/telemetry_builder.hpp"
 
 #include <cstdint>
 
@@ -89,18 +90,19 @@ bool PicoSdLogger::initialize() {
         // A fresh log gets a column header, so the file opens as a spreadsheet rather than
         // as a wall of unlabelled fields. Written as an ordinary record, so it costs one
         // block and needs no special case anywhere else.
-        static constexpr char kCsvHeader[] =
-            "team_id,packet,mission_time,altitude_m,pressure_pa,temperature_c,"
-            "roll_deg,pitch_deg,yaw_deg,ax_mps2,ay_mps2,az_mps2,"
-            "gps_lat,gps_lon,gps_alt_m,mode,faults,cal,armed";
-        log_.append_line(kCsvHeader, sizeof(kCsvHeader) - 1);
+        //
+        // It comes from TelemetryBuilder rather than being written out here again. A
+        // second copy of the column list is how the header came to describe nineteen
+        // comma-separated fields while the rows were semicolon-separated tagged ones.
+        const std::string header = TelemetryBuilder::sd_header();
+        log_.append_line(header.c_str(), header.size());
     }
     return healthy_;
 }
 
-bool PicoSdLogger::append(const cansat::TelemetryRecord&, const std::string& packet) {
+bool PicoSdLogger::append(const std::string& line) {
     if (!healthy_) return false;
-    const bool ok = log_.append_line(packet.c_str(), packet.size());
+    const bool ok = log_.append_line(line.c_str(), line.size());
     if (!ok && log_.full()) {
         healthy_ = false;  // region exhausted; controller stops calling us
     }
@@ -118,7 +120,7 @@ bool PicoSdLogger::initialize() {
     healthy_ = false;
     return false;
 }
-bool PicoSdLogger::append(const cansat::TelemetryRecord&, const std::string&) { return false; }
+bool PicoSdLogger::append(const std::string&) { return false; }
 bool PicoSdLogger::flush() { return false; }
 
 #endif

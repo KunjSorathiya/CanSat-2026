@@ -154,7 +154,12 @@ class SdLogger {
 public:
     virtual ~SdLogger() = default;
     virtual bool initialize() = 0;
-    virtual bool append(const cansat::TelemetryRecord& record, const std::string& packet) = 0;
+    // One rendered CSV line. The logger is deliberately not given the record and left
+    // to decide what a row looks like: that is how the log came to carry the radio packet
+    // under a column header describing something else, and the microphone's data nowhere
+    // at all. Rendering belongs with `TelemetryBuilder`, where `sd_header()` and
+    // `sd_line()` are a matched pair and the tests hold them to the same column count.
+    virtual bool append(const std::string& line) = 0;
     virtual bool flush() = 0;
     virtual bool healthy() const = 0;
 };

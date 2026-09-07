@@ -143,15 +143,15 @@ public:
         healthy_ = !fail_init;
         return healthy_;
     }
-    bool append(const cansat::TelemetryRecord&, const std::string& packet) override {
+    bool append(const std::string& line) override {
         if (fail_append) return false;
-        packets.push_back(packet);
+        lines.push_back(line);
         return true;
     }
     bool flush() override { return !fail_flush; }
     bool healthy() const override { return healthy_; }
 
-    std::vector<std::string> packets;
+    std::vector<std::string> lines;
     bool fail_init = false;
     bool fail_append = false;
     bool fail_flush = false;

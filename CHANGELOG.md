@@ -10,6 +10,26 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Fixed — [F-15] the log now carries the columns its header names, microphone included
+
+`SdLogger::append()` took `(const TelemetryRecord&, const std::string& packet)` and wrote **only the packet**, discarding its first argument. That one signature caused all three symptoms: the microphone's data reached nothing, the rows were the semicolon-separated radio packet, and the header above them was a second hand-rolled copy of a comma-separated column list that described something else.
+
+**The interface now takes one rendered line.** The controller passes `builder_.sd_line(*built, state_machine_.state(), faults_.total_occurrences())`, so rendering lives with `TelemetryBuilder` — where `sd_header()` and `sd_line()` are a matched pair the tests already hold to the same column count. `PicoSdLogger::initialize()` writes `TelemetryBuilder::sd_header()` rather than its own copy of the columns. The logger is now a line writer that decides nothing about what a row looks like, which is what let it drift in the first place.
+
+**Bring-up rows 3.11 and 3.12 are takeable again**, and the additional sensor this vehicle chose over a magnetometer produces data that survives a flight.
+
+### Fixed — the test that should have caught it asserted the opposite of its own name
+
+`test_a_working_microphone_reaches_the_log()`, comment *“A working one reaches the log, and the log alone”*, contained:
+
+```cpp
+for (const std::string& packet : logger.packets) {
+    CHECK(packet.find("250.0") == std::string::npos);   // absent from the LOG
+}
+```
+
+It iterated the **logger** and required the level to be **absent** — asserting the bug, under a name that promised the opposite, and passing. **That is why F-15 survived every host run.** It now checks that the radio does not carry the level, that the log does, and that the log's first line is the builder's header. Three assertions more: flight_tests 3658 -> 3661, total 4430 -> 4433.
+
 ### Added — `tools/read_flight_log.py`, and what it found in the first real log
 
 A recovered `FLIGHT.CSV` reads as good data followed by garbage, and nothing on its face says where one becomes the other — the file is pre-allocated and never truncated, so everything past the last record is whatever was in those blocks before.

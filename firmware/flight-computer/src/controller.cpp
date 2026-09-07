@@ -593,7 +593,8 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
     }
 
     if (logger_enabled_) {
-        if (logger_.append(built->record, built->packet)) {
+        if (logger_.append(builder_.sd_line(*built, state_machine_.state(),
+                                            faults_.total_occurrences()))) {
             sd_consecutive_failures_ = 0;
         } else {
             faults_.report(FaultCode::sd_write, FaultSeverity::warning, mission_ms);

@@ -2759,9 +2759,22 @@ void test_a_working_microphone_reaches_the_log() {
     CHECK(sound.reads > 0);
     CHECK(ctrl.health().sound_ok);
     CHECK(!ctrl.faults().active(flight::FaultCode::sound_unavailable));
-    for (const std::string& packet : logger.packets) {
+    // This assertion used to read `logger.packets` and require the level to be ABSENT --
+    // the exact opposite of this test's name, and the reason F-15 survived: the guard was
+    // pointing the wrong way and passing. The radio must not carry it; the log must.
+    for (const std::string& packet : radio.packets) {
         CHECK(packet.find("250.0") == std::string::npos);
     }
+    CHECK(!logger.lines.empty());
+    bool level_logged = false;
+    for (const std::string& line : logger.lines) {
+        if (line.find("250.0") != std::string::npos) level_logged = true;
+    }
+    CHECK(level_logged);
+
+    // And the header the log opens with must describe the rows that follow it.
+    CHECK(logger.lines.front().find("team_id") == std::string::npos ||
+          logger.lines.front() == flight::TelemetryBuilder::sd_header());
 }
 
 
