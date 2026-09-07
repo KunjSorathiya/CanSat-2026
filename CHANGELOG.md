@@ -8,6 +8,32 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-07 (cycle 35)
+
+### Added — Gate 5 passes on the soldered board, first attempt, and the airtimes did not move
+
+Fifty-five transmits, no failures. `0x12` on the version register, **5/5 at 206 bytes, 5/5 at 255 bytes, 45 of 45 through a 15-second back-to-back burst** with an unbroken line of dots. Rows 5.1, 5.2, 5.3 and 5.4a re-taken and dated 2026-09-07.
+
+**The breadboard could never have told us this.** [F-5](documentation/testing/bring-up-record.md#findings) is the same 206-byte transmit failing 5/5 and then succeeding 45/45 minutes later on an unchanged code path, and [F-10](documentation/testing/bring-up-record.md#findings) proved the cause was the RA-02's 3V3 jumper. Soldering that supply removed the fault instead of hiding it — the first run on the new board, cold, passed every row it was offered.
+
+**And the airtimes did not move: 333.7 ms and 406.9 ms, identical to 0.1 ms**, across a complete change of wiring. The model is independent of the board, which is what makes it safe to build a telemetry rate on.
+
+**Row 5.4a is marked ⚠️ rather than ✅, because the rail voltage was not read.** The row exists to be measured with a meter through the burst and nobody measured it; the 3.26–3.27 V it still quotes is the breadboard figure and is labelled as such. A transmit count is not the measurement that row asks for.
+
+### Fixed — the card is 64 GB, and one row said 32
+
+`receiving-inspection.md` recorded the microSD as 32 GB and reasoned from it that the card is “the top of the SDHC range”. The purchase list and bring-up rows 6.1 and 6.2 have said **HP mx310 64 GB** throughout, and the card in the slot is 64 GB — so it is **SDXC**. Nothing the driver does changes: 6.2 tests block addressing through `high_capacity()`, which is the thing that actually matters. It does explain the exFAT reformat already recorded in Gate 6.
+
+### Changed — row 6.1 has regressed, and says so
+
+Gate 6.1 read ✅ for the breadboard. **The soldered board fails it**, so the row now carries both results and a ❌ date rather than looking settled to the next reader.
+
+**[F-12] ACMD41 times out at 2008 ms with `R1 = 0xFF`** — on the same card that initialised in **32 ms** two days earlier. The byte is the diagnosis and it is not slowness: a card that is initialising answers `0x01` until it answers `0x00`, so `0xFF` means MISO was undriven and the card had stopped answering. That is [F-8](documentation/testing/bring-up-record.md#findings)'s signature one command earlier — ACMD41 is the first moment the card powers its own controller and draws real current.
+
+**Two candidates are already eliminated by evidence in the same run.** The HCS/SDXC trap is not it: `sd_card.cpp` sets `0x40000000` when CMD8 validates, and a 64 GB card denied HCS answers `0x01` forever rather than `0xFF`. The 3.3 V rail is not it: the radio pulled ~120 mA sustained through 45 consecutive transmits at 100 % in that same run. **The fault is therefore downstream of the 3.3 V distribution node** — the module's own supply pair, its joints, or the card contacts — and the next measurement is the module's own `3V3` against `GND` during the 2 s ACMD41 window.
+
+---
+
 ## [Unreleased] — 2026-09-06 (cycle 34)
 
 ### Added — `AGND` is its own plane, and the ADC's real error is offset, not impedance
