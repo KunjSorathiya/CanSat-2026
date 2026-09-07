@@ -10,6 +10,18 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Added — the flight firmware says what is fitted and what answered
+
+The vehicle had no way to tell an operator anything. The launch build carries no debug output by design, so a flashed board that was working and a flashed board that was dead looked identical: an enumerated serial port with nothing on it. `cansat_pico_firmware` now prints a startup summary — IMU, barometer, GPS, radio, SD card and sound, each with OK/FAILED and a note, plus `state`, active fault count, armed and calibrated.
+
+**Three design choices worth stating, because the launch build's silence is a property worth keeping.**
+
+It prints **from inside the flight loop rather than before it**, so it delays nothing and the first telemetry packet still leaves on schedule. It waits ~1.2 s so two health refreshes have run and the numbers describe sensors that were actually read, not init return codes. And it **repeats every 3 s only while unarmed, then stops for good** — because the USB port re-enumerates for a second or two after a flash, so a single print at boot lands before anything is listening, which is exactly how a working vehicle looks dead. In flight the loop is silent again.
+
+**It also makes a failed SD card visible for the first time.** `sd_unavailable` is warning-severity and only `critical_fault` reaches `MissionState::fault`, so a vehicle whose card never initialised would sit in `ready`, blink the normal 0.56 Hz, transmit happily and log nothing, with no local indication at all. The summary now says `SD card FAILED - NOTHING IS BEING LOGGED`.
+
+It partly closes open item 39: the summary reports whether the microphone is fitted, silent or working. It does **not** put the microphone's values anywhere, which remains [F-15].
+
 ### Added — [F-15]: the microphone's data reaches neither the card nor the radio
 
 Chasing an empty `FLIGHT.CSV` turned up something larger than the empty file.

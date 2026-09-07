@@ -47,6 +47,70 @@ flight::Configuration make_config() {
     return config;
 }
 
+#ifdef PICO_BUILD
+// ---- startup summary -------------------------------------------------------------
+// What is fitted and what answered, printed once the sensors have actually been read.
+//
+// It runs from inside the flight loop rather than before it, so it delays nothing: the
+// first telemetry packet still leaves on schedule. And it repeats while the vehicle is
+// unarmed, because the USB port re-enumerates for a second or two after a flash and a
+// single print at boot lands before anything is listening -- which is precisely how a
+// working vehicle looks dead. Once armed it stops for good and the flight loop is silent
+// again, which is the property the launch build is meant to have.
+constexpr std::uint64_t kSummaryFirstMs = 1200;   // two health refreshes in
+constexpr std::uint64_t kSummaryRepeatMs = 3000;
+
+void print_row(const char* subsystem, const char* part, const char* status,
+               const char* note) {
+    std::printf("  %-11s %-10s %-9s %s\n", subsystem, part, status, note);
+}
+
+void print_startup_summary(const flight::Configuration& config,
+                           const flight::Controller& controller) {
+    const flight::HealthSnapshot& h = controller.health();
+    const flight::FaultManager& faults = controller.faults();
+    char note[72];
+
+    std::printf("\n=====================================================\n");
+    std::printf(" CanSat 2026 - flight firmware\n");
+    std::printf("=====================================================\n");
+    std::printf(" team %s | radio %s | telemetry every %lu ms\n", config.team_id.c_str(),
+                config.radio_mode == flight::RadioMode::official ? "OFFICIAL 0xA5"
+                                                                 : "TEST 0xF3",
+                static_cast<unsigned long>(config.telemetry_period_ms));
+    std::printf(" boot: %s\n\n", h.watchdog_reboot ? "WATCHDOG RESET" : "power-on");
+
+    print_row("IMU", "MPU-6500", h.imu_ok ? "OK" : "FAILED",
+              h.mag_present ? "nine-axis" : "six axes, no magnetometer - yaw is YR-G");
+    print_row("Barometer", "BMP280", h.baro_ok ? "OK" : "FAILED", "");
+
+    // No fix is not a failure: indoors it is the expected answer, and the receiver can be
+    // perfectly healthy while it waits for sky. Checksum errors are the number that
+    // separates a quiet receiver from a mis-wired one.
+    std::snprintf(note, sizeof(note), "%lu checksum errors",
+                  static_cast<unsigned long>(h.gps_checksum_errors));
+    print_row("GPS", "NEO-6M", h.gps_fix ? "FIX" : "NO FIX", note);
+
+    print_row("Radio", "SX1278", h.radio_ok ? "OK" : "FAILED", "");
+    print_row("SD card", "-", h.sd_ok ? "OK" : "FAILED",
+              h.sd_ok ? "" : "NOTHING IS BEING LOGGED");
+
+    // sound_ok is false both for "not fitted" and "fitted but silent", and those want
+    // different actions from an operator. The fault log is what separates them.
+    const bool sound_silent = faults.active(flight::FaultCode::sound_unavailable);
+    print_row("Sound", "LM393",
+              h.sound_ok ? "OK" : (sound_silent ? "SILENT" : "NOT FITTED"),
+              h.sound_ok ? "" : (sound_silent ? "wired but no signal" : "optional sensor"));
+
+    std::printf("\n state %s | faults active %lu | armed %s | calibrated %s\n",
+                flight::to_string(h.state),
+                static_cast<unsigned long>(h.fault_active), h.armed ? "yes" : "no",
+                h.calibrated ? "yes" : "no");
+    std::printf(" telemetry is running. This summary repeats until the vehicle arms.\n");
+    std::printf("=====================================================\n");
+}
+#endif  // PICO_BUILD
+
 }  // namespace
 
 int main() {
@@ -95,9 +159,19 @@ int main() {
     watchdog_enable(2000, true);
 #endif
 
+#ifdef PICO_BUILD
+    std::uint64_t next_summary_ms = kSummaryFirstMs;
+#endif
+
     while (true) {
         controller.poll(now_ms());
 #ifdef PICO_BUILD
+        // Bench aid only. It stops the moment the vehicle arms, so nothing prints in
+        // flight and the launch build keeps its silence where it matters.
+        if (!controller.health().armed && controller.mission_ms() >= next_summary_ms) {
+            print_startup_summary(config, controller);
+            next_summary_ms = controller.mission_ms() + kSummaryRepeatMs;
+        }
         watchdog_update();
 #endif
         // The tick is configuration, not a literal: validate_config() checks it against
