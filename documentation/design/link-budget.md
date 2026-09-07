@@ -189,7 +189,7 @@ Defined once, in [`cansat/link_profile.hpp`](../../firmware/common/include/cansa
 | CRC | on | Corruption must be detectable, not silently accepted |
 | TX power | 17 dBm | RA-02 PA_BOOST maximum without PA_DAC |
 | Sync word | 0xF3 test / 0xA5 official | **Rulebook-fixed** |
-| Telemetry period | 1000 ms | 1 Hz rulebook minimum at ~40 % worst-case channel occupancy |
+| Telemetry period | 850 ms | **1.18 Hz at ~47 % worst-case channel occupancy.** The rulebook's 1 Hz is a minimum, and this is the fastest the duty cap allows. Derived from the **measured** 406.9 ms airtime (bring-up 5.2/5.3), which is 1.8 % above the model — sizing from the model would have given 800 ms and a true duty of 50.9 %, over the policy |
 
 Resulting budget: **399.6 ms worst-case airtime, 40 % channel duty, 60 % of the channel
 free.** A typical 212-byte in-flight packet costs about 335 ms, or 34 %.

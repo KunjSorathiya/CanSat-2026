@@ -152,7 +152,14 @@ def main() -> int:
     checker.check("link profile: SF7", spreading_factor == 7, str(spreading_factor))
     checker.check("link profile: 125 kHz", bandwidth == 125000, str(bandwidth))
     checker.check("link profile: CR 4/5", coding_rate == 5, str(coding_rate))
-    checker.check("link profile: 1000 ms period", period_ms == 1000, str(period_ms))
+    # 850 ms, 1.18 Hz. Pinned as a value rather than a range because the number is
+    # derived: worst-case measured airtime 406.9 ms over the 0.5 duty cap is a floor of
+    # 813.8 ms, and it must stay under the 1000 ms rulebook ceiling.
+    checker.check("link profile: 850 ms period", period_ms == 850, str(period_ms))
+    checker.check("telemetry period clears the 1 Hz rulebook minimum",
+                  period_ms <= 1000, str(period_ms))
+    checker.check("telemetry period keeps measured duty under the cap",
+                  406.9 / period_ms <= 0.5, f"{406.9 / period_ms:.3f}")
     checker.check("link profile: 255-byte budget", budget_bytes == 255, str(budget_bytes))
     checker.check("link profile: sync words 0xF3 / 0xA5",
                   "0xF3" in profile and "0xA5" in profile)

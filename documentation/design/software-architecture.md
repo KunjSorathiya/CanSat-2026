@@ -191,7 +191,7 @@ flowchart TD
     F -- no --> H["run_calibration"]
     G --> H
     H --> I["feed_state_machine"]
-    I --> J{"telemetry task due? 1000 ms"}
+    I --> J{"telemetry task due? 850 ms"}
     J -- yes --> K["emit_telemetry"]
     J -- no --> L{"SD flush due? 2000 ms"}
     K --> L
@@ -513,7 +513,7 @@ packet file, or a live Web Serial connection to the bridge Pico.
 |---|---:|---|---|
 | Main tick | 2 ms | `loop_tick_ms` | The loop is non-blocking; the delay only yields. Bounded above twice over: it sets scheduling jitter (under 6 % of the 33 ms acquisition period) **and** it must drain the GPS UART before its 32-byte FIFO fills, which at 9600 baud takes 33 ms. `validate_config()` enforces both |
 | Sensor acquisition and orientation | 33 ms | `sensor_period_ms` | 30 Hz attitude and altitude-rate update; bounded by the barometer, see [sensor-rates.md](sensor-rates.md) |
-| Telemetry packet | 1000 ms | `telemetry_period_ms` | 1 Hz — the fastest the SF7/125 kHz modem sustains with duty margin. **1000 ms is also the enforced ceiling** for the rulebook minimum. See [link-budget.md](link-budget.md) |
+| Telemetry packet | 850 ms | `telemetry_period_ms` | **1.18 Hz — the fastest the SF7/125 kHz modem sustains inside the 50 % duty cap.** Sized from the *measured* 406.9 ms airtime, not the model's 399.6: the model under-reads by 1.8 %, and 800 ms would have put the true duty at 50.9 %. **1000 ms remains the enforced ceiling** for the rulebook minimum, and 850 keeps 150 ms of margin against jitter crossing it. See [link-budget.md](link-budget.md) |
 | SD flush | 2000 ms | `sd_flush_period_ms` | Appends happen per packet; this is the sync |
 | Battery sample | 1000 ms | `battery_period_ms` | |
 | Health refresh | 1000 ms | `health_period_ms` | |
@@ -553,7 +553,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 97 C++ suites with 3854 assertions, plus the LoRa driver (101) and the microSD driver (581) against simulated devices, 167 Python tests including an end-to-end trace, and 59 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 98 C++ suites with 3931 assertions, plus the LoRa driver (101) and the microSD driver (581) against simulated devices, 167 Python tests including an end-to-end trace, and 59 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Verified on the soldered vehicle board, 2026-09-07.** Gates 3, 4, 5, 6 and 7 all pass: both I2C sensors on one bus, clean NMEA, airtime within 1.8 % of the model over 55 transmits, the card writing and sustaining ~300 writes/s, and the shared SPI0 bus clean across 200 interleaved rounds. See the [bring-up record](../testing/bring-up-record.md). **Not verified: the sound module, the battery divider, the switch and the antenna's range performance** |

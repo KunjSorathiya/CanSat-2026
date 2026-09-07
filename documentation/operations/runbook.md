@@ -60,7 +60,7 @@ config.radio_mode = flight::RadioMode::test;  // ::official for the launch
 > total loss of telemetry — the receiver simply never sees a packet.
 >
 > **The 2026 revision made stray transmission five times more expensive: -1 point per 2
-> packets, where the earlier rulebook said per 10.** This vehicle transmits at 1 Hz, so that
+> packets, where the earlier rulebook said per 10.** This vehicle transmits at 1.18 Hz, so that
 > is half a point per second. Ninety seconds of a CanSat accidentally left on during someone
 > else's launch costs more than the entire 25-point telemetry section is worth.
 >
@@ -175,7 +175,7 @@ pipeline is what writes the authoritative logs. Run both when it matters.
 ### Erasing the onboard log
 
 The log **appends across power cycles** — the dual-header resume is what makes a brownout
-mid-flight survivable — so a card accumulates every run until something empties it. At 1 Hz
+mid-flight survivable — so a card accumulates every run until something empties it. At 1.18 Hz
 a 64 MB region holds about **36 hours** of records, and when it does fill the vehicle raises
 `sd_write`, then `sd_unavailable`, and keeps transmitting: logging stops, telemetry does not.
 
@@ -313,7 +313,7 @@ Link health on the ground station:
 
 | Indicator | Healthy | Investigate |
 |---|---|---|
-| Rate | Steady at the configured rate, 1 Hz by default | Falling rate means range or power trouble |
+| Rate | Steady at the configured rate, **1.18 Hz** (850 ms) by default | Falling rate means range or power trouble. Anything below 1.00 Hz is a rulebook failure, not just a warning |
 | Loss % | Near zero | Rising loss means range, antenna or orientation |
 | CRC errors | Zero | Non-zero means transport corruption, not sensor trouble |
 | Missing | Zero | Gaps in numbering mean lost packets over the air |

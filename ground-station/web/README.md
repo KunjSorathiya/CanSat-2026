@@ -7,7 +7,7 @@ for CanSat-2026 telemetry. Open it directly, or serve the folder.
 
 | Source | Use |
 |---|---|
-| **Demo** | replays a generated drone-lift mission (READY → FLIGHT → LANDED → RECOVERY) at 2 Hz (the demo generator paces itself; the flight radio runs at 1 Hz, see [link-budget.md](../../documentation/design/link-budget.md)); auto-starts, and deliberately injects one dropped packet and one duplicate so link health is exercised |
+| **Demo** | replays a generated drone-lift mission (READY → FLIGHT → LANDED → RECOVERY) at 2 Hz (the demo generator paces itself; the flight radio runs at 1.18 Hz, see [link-budget.md](../../documentation/design/link-budget.md)); auto-starts, and deliberately injects one dropped packet and one duplicate so link health is exercised |
 | **File…** | replays a packet file — plain newline packets, a `raw_packets.tsv` from the Python logger, or a framed `.bin` |
 | **Web Serial** | connects to the ground-station bridge Pico over USB (Chrome/Edge, HTTPS or `localhost`), decoding the `$len,crc,payload` framing live |
 

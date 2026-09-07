@@ -823,12 +823,31 @@ void test_config_radio_airtime_guard() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
 
-    // Default: SF7/125 kHz, the 255-byte FIFO limit as the budget, 1 Hz -> ~400 ms
-    // airtime, ~40 % duty.
+    // Default: SF7/125 kHz, the 255-byte FIFO limit as the budget, 850 ms -> ~400 ms
+    // airtime, ~47 % duty. The period is set from the *measured* airtime rather than this
+    // model, so the check that matters is the measured one below.
     CHECK(flight::validate_config(c, why));
     CHECK(c.worst_case_packet_bytes == cansat::kMaxLoraPayloadBytes);
     CHECK(approx(flight::worst_case_airtime_ms(c), 399.6, 0.5));
-    CHECK(flight::channel_duty(c) < 0.45);
+    CHECK(flight::channel_duty(c) <= c.max_channel_duty);
+    CHECK(approx(flight::channel_duty(c), 0.470, 0.005));
+
+    // The real one. Bring-up rows 5.2 and 5.3 measured 406.9 ms for a full-length packet,
+    // 1.8 % above the model, twice, on two different boards. A period sized from the model
+    // alone would put the true duty over the policy while every test still passed.
+    {
+        const double measured_airtime_ms = 406.9;
+        const double true_duty = measured_airtime_ms / c.telemetry_period_ms;
+        CHECK(true_duty <= c.max_channel_duty);
+        if (true_duty > c.max_channel_duty) {
+            std::cerr << "  measured duty " << true_duty << " exceeds the "
+                      << c.max_channel_duty << " policy at a "
+                      << c.telemetry_period_ms << " ms period\n";
+        }
+    }
+
+    // And it still clears the rulebook minimum with margin, rather than sitting on it.
+    CHECK(c.telemetry_period_ms < 1000);
 
     // The former default of SF9 puts one packet at ~1 s of airtime: not sustainable.
     c.radio.spreading_factor = 9;
@@ -2976,6 +2995,83 @@ void test_a_vehicle_without_a_microphone_behaves_as_before() {
     CHECK(!ctrl.faults().active(flight::FaultCode::sound_unavailable));
 }
 
+// The rulebook wants continuous telemetry, and "continuous" has to mean the same cadence
+// everywhere. The vehicle detects its state and says so in the MODE tag, changes its LED
+// blink, and changes nothing at all about how often it transmits. This is true today only
+// because telemetry_task_ is configured once from one period with no state term -- an
+// accident away from becoming false, which is what this test is for.
+void test_the_packet_cadence_is_the_same_in_every_state() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    c.arming_delay_ms = 0;
+    c.require_calibration_to_arm = false;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+
+    // Real telemetry period, but the state thresholds sped up so a mission fits a test.
+    c.launch_confirm_ms = 100;
+    c.min_flight_ms = 200;
+    c.landing_confirm_ms = 200;
+
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    // Fly a profile. Launch is detected from acceleration, not altitude, so the boost has
+    // to be in the IMU: pad, boost, coast down, at rest.
+    std::vector<std::size_t> counts;
+    std::vector<flight::MissionState> seen;
+    std::size_t last_count = 0;
+    for (std::uint64_t ms = 0; ms <= 60000; ms += 10) {
+        const double t_s = ms / 1000.0;
+        double altitude = 0.0;
+        double az = flight::sensors::kStandardGravity;
+        if (t_s > 10.0 && t_s <= 12.0) {          // boost, above launch_accel_mps2
+            az = 60.0;
+            altitude = (t_s - 10.0) * 20.0;
+        } else if (t_s > 12.0 && t_s <= 32.0) {   // coast and descend
+            az = 5.0;
+            altitude = 40.0 + (t_s - 12.0) * 13.0;
+            if (t_s > 22.0) altitude = 170.0 - (t_s - 22.0) * 17.0;
+        }
+        baro.sample.altitude_m = altitude;
+        imu.sample.az_mps2 = az;
+        ctrl.poll(ms);
+        if (radio.packets.size() != last_count) {
+            last_count = radio.packets.size();
+            counts.push_back(static_cast<std::size_t>(ms));
+            seen.push_back(ctrl.state());
+        }
+    }
+
+    // The profile has to have actually moved through states, or this proves nothing.
+    bool saw_flight = false, saw_landed_or_recovery = false;
+    for (const flight::MissionState s : seen) {
+        if (s == flight::MissionState::flight) saw_flight = true;
+        if (s == flight::MissionState::landed || s == flight::MissionState::recovery) {
+            saw_landed_or_recovery = true;
+        }
+    }
+    CHECK(saw_flight);
+    CHECK(saw_landed_or_recovery);
+    CHECK(counts.size() > 10);
+
+    // Every gap between consecutive packets is the configured period, whatever state the
+    // vehicle was in when it sent them.
+    for (std::size_t i = 1; i < counts.size(); ++i) {
+        const std::size_t gap = counts[i] - counts[i - 1];
+        CHECK(gap == c.telemetry_period_ms);
+        if (gap != c.telemetry_period_ms) {
+            std::cerr << "  packet " << i << " came " << gap
+                      << " ms after the last, in state "
+                      << flight::to_string(seen[i]) << "\n";
+        }
+    }
+}
+
 // The uplink gate. Five of these six are about the command being refused, because the cost
 // of a false accept is a flight log that no longer exists.
 namespace {
@@ -3307,6 +3403,7 @@ int main(int argc, char** argv) {
     test_the_erase_reads_empty_immediately_and_scrubs_afterwards();
     test_the_scrub_finishes_without_blocking_telemetry();
     test_a_vehicle_that_was_never_asked_never_scrubs();
+    test_the_packet_cadence_is_the_same_in_every_state();
     test_a_flight_build_has_no_uplink_at_all();
     test_the_bench_build_erases_the_log_on_command();
     test_an_armed_vehicle_refuses_to_erase();
