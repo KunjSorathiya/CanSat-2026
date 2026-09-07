@@ -10,6 +10,20 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Fixed — [F-16] the radio sat *selected* through the card's entire initialisation
+
+The new startup summary earned its place in one boot: `SD card FAILED - NOTHING IS BEING LOGGED`. The card had passed twelve consecutive times under the bring-up image and failed every time under the flight firmware, which share the same drivers deliberately — so the difference had to be the order they run in, and it was.
+
+**`BoardPins::lora_cs` (GP17) was configured only inside `PicoRadio::initialize()`**, and `Controller::initialize()` calls `logger_.initialize()` **before** `radio_.initialize()`. Through the whole of the SD initialisation GP17 was therefore an unconfigured pad — and an RP2040 pad resets with its pull-down enabled (`PADS_BANK0` reset value `0x56`, `PDE` set), which holds the line **LOW**, which on the RA-02 means **selected**. The radio drove MISO for the entire sequence and every response the card sent came back corrupted.
+
+The bring-up image passed because it initialises the radio first — `NSS` was already high before the card was touched. Twelve passes and a string of failures, same hardware, same drivers, different order.
+
+**The fix puts both chip selects with the bus rather than with the drivers.** `ensure_spi0()` now drives `lora_cs` and `sd_cs` high as part of bringing SPI0 up, so the order the drivers initialise in stops mattering — which is the property a shared bus needs and never had. The drivers keep their own setup; it is idempotent.
+
+**This is separate from [F-12]**, which was intermittent and measured on the bring-up image. F-12 stays open: eleven clean runs bound it and do not close it.
+
+Worth noting what found this. The bug has been in the flight firmware since the SD logger existed, through every host test and every documentation check, because **no host test can see a pad's reset state.** What exposed it was a vehicle that could finally say which subsystem had failed.
+
 ### Added — the flight firmware says what is fitted and what answered
 
 The vehicle had no way to tell an operator anything. The launch build carries no debug output by design, so a flashed board that was working and a flashed board that was dead looked identical: an enumerated serial port with nothing on it. `cansat_pico_firmware` now prints a startup summary — IMU, barometer, GPS, radio, SD card and sound, each with OK/FAILED and a note, plus `state`, active fault count, armed and calibrated.

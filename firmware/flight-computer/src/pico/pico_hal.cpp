@@ -37,6 +37,24 @@ void ensure_spi0() {
     gpio_set_function(BoardPins::spi_sck, GPIO_FUNC_SPI);
     gpio_set_function(BoardPins::spi_mosi, GPIO_FUNC_SPI);
     gpio_set_function(BoardPins::spi_miso, GPIO_FUNC_SPI);
+
+    // Both chip selects belong to the bus, not to the drivers that happen to use them.
+    // Whichever device initialises first would otherwise run with the other device's CS
+    // still in its reset state -- and an RP2040 pad resets with its pull-down enabled
+    // (PADS_BANK0 reset value 0x56, PDE set), which holds the line LOW, which on both of
+    // these parts means *selected*. The controller initialises the card before the radio,
+    // so the radio sat selected and drove MISO through the whole of the card's
+    // initialisation sequence, and every response the card sent came back corrupted.
+    //
+    // Deselecting both here makes the order the drivers run in stop mattering, which is
+    // the property a shared bus needs.
+    gpio_init(BoardPins::lora_cs);
+    gpio_set_dir(BoardPins::lora_cs, GPIO_OUT);
+    gpio_put(BoardPins::lora_cs, 1);
+    gpio_init(BoardPins::sd_cs);
+    gpio_set_dir(BoardPins::sd_cs, GPIO_OUT);
+    gpio_put(BoardPins::sd_cs, 1);
+
     g_spi_ready = true;
 }
 
