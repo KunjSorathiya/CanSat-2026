@@ -26,6 +26,7 @@ INC=(
 
 COMMON_SRC=(
   "$ROOT/firmware/common/src/telemetry.cpp"
+  "$ROOT/firmware/common/src/command.cpp"
 )
 FLIGHT_CORE_SRC=(
   "$ROOT/firmware/flight-computer/src/config.cpp"

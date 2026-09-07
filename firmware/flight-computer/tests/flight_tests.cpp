@@ -2,6 +2,7 @@
 #include "cansat/link_profile.hpp"
 #include "cansat/lora_airtime.hpp"
 #include "cansat/sx1278.hpp"
+#include "cansat/command.hpp"
 #include "cansat/telemetry.hpp"
 #include "flight/config.hpp"
 #include "flight/controller.hpp"
@@ -1052,6 +1053,52 @@ void test_a_refused_fix_does_not_disturb_the_last_good_one() {
     CHECK(parser.fixes_rejected() == 1);
     // And a genuine loss of fix still clears it.
     CHECK(!feed_nmea(parser, nmea("GPGGA,120002.00,,,,,0,00,,,M,,M,,")));
+}
+
+// Ground-to-vehicle maintenance commands. The vehicle flies with no uplink -- the config
+// flag defaults to false -- so everything here is about the bench, and about making sure a
+// command can never be produced by accident from traffic that is not one.
+void test_a_command_round_trips_for_its_own_team() {
+    const std::string line = cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log);
+    CHECK(cansat::parse_command(line, "CAN-Team-25") == cansat::CommandKind::erase_log);
+}
+
+void test_a_command_for_another_team_is_ignored() {
+    // 0xF3 is the shared test sync word: every team in the competition transmits on it, so
+    // another team's command must be inert here rather than merely unlikely.
+    const std::string line = cansat::format_command("CAN-Team-07", cansat::CommandKind::erase_log);
+    CHECK(cansat::parse_command(line, "CAN-Team-25") == cansat::CommandKind::none);
+}
+
+void test_a_command_without_the_key_is_ignored() {
+    CHECK(cansat::parse_command("CAN-Team-25; CMD-ERASE_LOG;", "CAN-Team-25") ==
+          cansat::CommandKind::none);
+    CHECK(cansat::parse_command("CAN-Team-25; CMD-ERASE_LOG; KEY-0000;", "CAN-Team-25") ==
+          cansat::CommandKind::none);
+}
+
+void test_a_telemetry_packet_is_never_a_command() {
+    // The one that matters most: the vehicle's own downlink, and the ground station's view
+    // of it, must not decode as an instruction if either is ever looped back.
+    const std::string packet =
+        "CAN-Team-25; P-001; Ti-00:00:00:000; A-23.0; Pr-101048.55; T-31.4; Ro--1.5; Pi-5.0; "
+        "Ya-0.0; AX--0.86; AY--0.25; AZ-9.81; MODE-READY; FAULTS-2; CAL-0; ARM-0; YR-G;";
+    CHECK(cansat::parse_command(packet, "CAN-Team-25") == cansat::CommandKind::none);
+}
+
+void test_an_unconfigured_vehicle_matches_nothing() {
+    // Empty expected_team must not turn every command into one addressed to us.
+    const std::string line = cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log);
+    CHECK(cansat::parse_command(line, "") == cansat::CommandKind::none);
+}
+
+void test_a_truncated_command_is_ignored() {
+    const std::string line = cansat::format_command("CAN-Team-25", cansat::CommandKind::erase_log);
+    for (std::size_t cut = 1; cut < line.size(); ++cut) {
+        // Every prefix of a valid command must be inert. A radio delivers partial frames.
+        CHECK(cansat::parse_command(line.substr(0, cut), "CAN-Team-25") ==
+              cansat::CommandKind::none);
+    }
 }
 
 // A checksum-valid sentence can still carry an impossible position. Those must not reach
@@ -3036,6 +3083,12 @@ int main(int argc, char** argv) {
     test_a_value_too_wide_to_format_invalidates_the_packet();
     test_controller_drops_optional_fields_before_overrunning_the_budget();
     test_gps_coordinate_validation();
+    test_a_command_round_trips_for_its_own_team();
+    test_a_command_for_another_team_is_ignored();
+    test_a_command_without_the_key_is_ignored();
+    test_a_telemetry_packet_is_never_a_command();
+    test_an_unconfigured_vehicle_matches_nothing();
+    test_a_truncated_command_is_ignored();
     test_a_fix_with_too_few_satellites_is_refused();
     test_a_fix_with_poor_geometry_is_refused();
     test_a_good_fix_still_passes_and_carries_its_quality();

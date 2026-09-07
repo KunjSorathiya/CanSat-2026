@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 80 suites across the whole flight core | ✅ **3688 / 3688 assertions** |
+| `flight_tests` | 86 suites across the whole flight core | ✅ **3730 / 3730 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -157,7 +157,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 80 suites, 3688 assertions
+### `flight_tests` — 86 suites, 3730 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -211,6 +211,12 @@ flowchart LR
 | `test_formatter_and_parser_agree_at_the_edges` | The formatter never emits a packet this library's own parser rejects, at every boundary value |
 | `test_a_value_too_wide_to_format_invalidates_the_packet` | A finite value too wide for the formatter's buffer produces an empty field, not the first 63 characters of one — a corrupted reading and a missing one are both rejected, but only one of them looks like a reading |
 | `test_controller_drops_optional_fields_before_overrunning_the_budget` | An over-long packet sheds its optional fields in rulebook priority order instead of being truncated by the radio into something the ground station can only read as corruption |
+| `test_a_command_round_trips_for_its_own_team` | A formatted `ERASE_LOG` command parses back to the same command for the team it names |
+| `test_a_command_for_another_team_is_ignored` | A command addressed to `CAN-Team-07` is inert here. `0xF3` is the shared test sync word, so another team's traffic must be structurally inert rather than merely unlikely |
+| `test_a_command_without_the_key_is_ignored` | A missing or wrong `KEY-` field yields no command. The key is four clear-text characters and is **not** security — it makes an accidental trigger implausible, and the real protection is that the vehicle only listens in READY with `ARM-0` |
+| `test_a_telemetry_packet_is_never_a_command` | The vehicle's own downlink, fed back into the command parser, decodes to nothing — the two directions share a format and must not share a meaning |
+| `test_an_unconfigured_vehicle_matches_nothing` | An empty expected team matches no command, rather than matching every command addressed to anybody |
+| `test_a_truncated_command_is_ignored` | **Every** prefix of a valid command is inert, checked at each cut. A radio delivers partial frames, and the terminating `;` is mandatory for exactly this reason: without it, every truncation but the last character is still a valid erase |
 | `test_a_fix_with_too_few_satellites_is_refused` | A quality-1 GGA reporting three satellites is refused and counted — a receiver announces a fix the moment it has any solution, and three satellites cannot produce a 3D one ([F-18](bring-up-record.md#findings)) |
 | `test_a_fix_with_poor_geometry_is_refused` | Eight satellites at HDOP 20 are refused: geometry, not count, is what produces a large confident wrong position |
 | `test_a_good_fix_still_passes_and_carries_its_quality` | Eight satellites at HDOP 0.9 still pass, and `satellites` and `hdop` are both readable afterwards — a gate whose inputs are not recorded cannot be tuned in the field |
