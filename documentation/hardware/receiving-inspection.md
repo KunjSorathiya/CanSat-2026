@@ -117,6 +117,15 @@ Not on the BOM, but Part C cannot be completed without them. Record what you act
 > reading** — it is the strap's effect rather than its cause, measured through the same bus the
 > firmware will use.
 >
+> **What closing those four rows by address does *not* establish is impedance.** A part answering
+> at `0x76` proves `SDO` is *low*; it says nothing about whether it is low through a 10 kΩ resistor
+> or tied hard to ground — and the difference matters the moment anyone drives that pin. A
+> resistor strap overridden with 3.3 V costs ~330 µA and moves the address; **a hard tie driven to
+> 3.3 V is a short across the rail.** C.4.7 and C.3.8 exist to close that with a meter, now that a
+> working one is available. Neither pin has any reason to be connected on this vehicle — both are
+> strapped correctly and there is one of each part — so the cheapest control is to fit **4-pin
+> strips** and leave those positions with no pad to land on.
+>
 > **Before trusting any meter here, short its probes: it must read ≤0.5 Ω and hold steady.**
 
 ---
@@ -334,8 +343,10 @@ J1 (opposite row, reading from the same end)
 | C.4.2 | Pin count and labels: 4-pin I2C or 6-pin I2C/SPI | Silkscreen | **6 pins**, in order `VCC GND SCL SDA CSB SDO` — the I2C/SPI variant, not the 4-pin I2C-only board | Photo 2026-09-04 |
 | C.4.3 | Onboard regulator present? Part marking | Magnifier | **None.** The board carries only the sensor, four resistors and two capacitors — consistent with the 3.3 V-only `GY-BMP280-3.3` the BOM ordered | Photo 2026-09-04 |
 | C.4.4 | Bus pull-ups fitted? Marked value | Magnifier | **Yes** — four resistors marked `103` (10 kΩ) | Photo 2026-09-04 |
-| C.4.5 | SDO strapped high or low as delivered | Continuity to VCC/GND — **closed instead by the address the part answers at** | **LOW.** The barometer answers at `0x76`, which requires SDO pulled low | Bus scan 2026-09-05 / KS |
+| C.4.5 | SDO strapped high or low as delivered | Continuity to VCC/GND — **closed instead by the address the part answers at** | **LOW.** The barometer answers at `0x76`, which requires SDO pulled low. **Level only — the strap's *impedance* was never measured** and remains unknown, see the note below | Bus scan 2026-09-05 / KS — level closed, impedance open |
 | C.4.6 | Expected I2C address implied by C.4.5 | `0x76` or `0x77` | **`0x76`** — matches `Bmp280::Options::address` and what wiring.md assumes. No firmware change needed | Bus scan 2026-09-05 / KS |
+| C.4.7 | **`SDO` strap impedance** — resistor or hard tie | ~10 kΩ, or near 0 Ω | Resistance from `SDO` to `GND` on the module, unpowered | | |
+| C.3.8 | **`AD0` strap impedance** on the IMU — the same question | ~10 kΩ, or near 0 Ω | Resistance from `AD0` to `GND` on the module, unpowered | | |
 
 > C.4.3 is the useful half of this table: **no regulator means no 5 V tolerance.** This board
 > must be fed 3.3 V, which is what the design already intends, and feeding it from a 5 V
