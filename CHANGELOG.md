@@ -10,6 +10,21 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Added — [F-15]: the microphone's data reaches neither the card nor the radio
+
+Chasing an empty `FLIGHT.CSV` turned up something larger than the empty file.
+
+**The sound data is read, validated, fault-managed, counted into `health_.sound_ok` — and then discarded.** The chain breaks in two places:
+
+1. `TelemetryBuilder::build()` copies the sound fields into `Built`, and `sd_line()` renders them. **But `sd_line()` and `sd_header()` are called only from `flight_tests.cpp`** — nothing in the flight path calls either.
+2. `PicoSdLogger::append()` is declared `(const cansat::TelemetryRecord&, const std::string& packet)` and **writes only `packet`**, discarding its first argument. It never sees `Built` at all.
+
+The packet carries no sound either: its optional fields are GPS lat/lon/alt plus `MODE`, `FAULTS`, `CAL`, `ARM` and `YR`, and `telemetry.cpp` mentions sound nowhere.
+
+**So the additional sensor this vehicle chose over a magnetometer produces nothing that survives the flight.** Bring-up rows 3.11 and 3.12 instruct the operator to read `sound_mv_pp` and `sound_gate_pct` “in the SD log”, and those values are not in the SD log and never were. The rows are untakeable as written, and the scoring credit rests on data nobody can recover.
+
+The tests did not catch it because they exercise `sd_line()` directly — the renderer is correct and well covered. **What is missing is the call.** No firmware change is made here: the fix touches the `SdLogger::append()` interface, which is a design decision and not one to take while the board is being wired.
+
 ### Fixed — `CAN-Team-25` is the registered identifier, confirmed against the registration
 
 Closed 2026-09-07 / KS. The number in `main.cpp` is correct.
