@@ -366,7 +366,7 @@ boards, and agrees to within 1.8 % every time.**
 | 5.1 | RA-02 version register | 0x12 | `sx1278.cpp` | Read register 0x42 over SPI — `cansat_bringup_firmware` reports it | **0x12.** Re-read **on the soldered board 2026-09-07**, twice in one run — standalone and again with the microSD on the bus | ✅ 2026-09-07 / KS |
 | 5.2 | Airtime, 206-byte packet, SF7/125 kHz | **328 ms** | [link-budget.md](../design/link-budget.md) | Scope DIO0, TX start to TxDone | **333.7 ms**, mean of 5, all 5 sent. +5.8 ms (1.8 %) over the 327.9 ms model. Reproduced to 0.1 ms across **four** sessions, including one that failed all 5 before [F-5](#findings) was closed, and **the soldered board on 2026-09-07 — 333.7 ms, 5/5, first attempt** | ✅ 2026-09-07 / KS |
 | 5.3 | Airtime, full 255-byte packet | **400 ms** | Same | Same, with a padded packet | **406.9 ms**, all 5 sent. +7.3 ms (1.8 %) over the 399.6 ms model. Identical to 0.1 ms across **four** sessions — the successful transmissions timed the same whether or not their neighbours failed, which is what pointed at supply rather than timing. **406.9 ms, 5/5 on the soldered board 2026-09-07**, unchanged to 0.1 ms across a complete change of wiring | ✅ 2026-09-07 / KS |
-| 5.4 | Achieved telemetry rate | **1.00 Hz** | `telemetry_period_ms` | Packet numbers per second at the ground station | | |
+| 5.4 | Achieved telemetry rate | **1.00 Hz** | `telemetry_period_ms` | Packet numbers per second at the ground station | **1.0000 Hz.** `P-001` at `Ti-00:00:00:000` to `P-066` at `Ti-00:01:05:001` — 65 intervals in 65.001 s, on the first link ever closed. Mission-clock jitter never exceeded **4 ms** against the 1000 ms period (worst `:004` at P-008, `:003` at P-044) | ✅ 2026-09-07 / KS |
 | 5.5 | Channel occupancy at 1 Hz | ~33 % typical, 40 % worst case | [link-budget.md](../design/link-budget.md) | 5.2 ÷ 1000 ms | **33.4 % typical, 40.7 % worst case**, from the measured airtimes | ✅ 2026-09-05 / KS |
 | 5.4a | **Sustained transmit, back to back** | Every packet sent; the rail holds | 15 s of continuous transmits, one character printed per attempt; meter on DC volts across the 3V3 rail | **45 attempts in 15.0 s: 45 sent, 0 failed. 3.0 packets/s at 206 bytes — 100 % duty against the 333.7 ms airtime, so the radio is transmitting continuously.** **The 3V3 rail held 3.26–3.27 V** throughout. Taken on the same power cycle in which 5.2 failed all 5 and 5.3 failed 3 of 5, minutes earlier.<br><br>**Re-taken on the soldered board 2026-09-07: 45 attempts in 15.0 s, 45 sent, 0 failed, 3.0 packets/s** — an unbroken run of dots, no `x` anywhere. **Rail measured on the re-run: 3.28–3.29 V through the burst**, against 3.26–3.27 V on the breadboard. Better, and the direction the soldered supply and the RA-02's 10 µF were expected to move it. The microSD module's own `3V3` read **3.28 V** in the same session | ✅ 2026-09-07 / KS |
 | 5.6 | RSSI at 10 m | −28 dBm free-space | [link-budget.md](../design/link-budget.md) | Bridge status line | | |
@@ -376,8 +376,16 @@ boards, and agrees to within 1.8 % every time.**
 | 5.10 | SNR at maximum range | Positive | — | Bridge status line | | |
 | 5.11 | Packet loss at maximum range | < 1 % | — | Ground-station loss counter over 200 packets | | |
 | 5.12 | Range at which loss reaches 5 % | Predicted well beyond 1 km | [link-budget.md](../design/link-budget.md) | Walk out until loss climbs | | |
-| 5.13 | Both sync words verified | 0xF3 and 0xA5 both link | Rulebook | Reflash **both** Picos, confirm each | | |
+| 5.13 | Both sync words verified | 0xF3 and 0xA5 both link | Rulebook | Reflash **both** Picos, confirm each | **Half taken. `0xF3` links** — 66/66 packets, both ends reporting `sync=0xF3`. `0xA5` has not been tried, and it is a reflash of both Picos, so this row stays open until it is | |
 
+> **First measured RSSI, 2026-09-07: −44 dBm at bench range**, ranging −39 to −45 over the
+> run, with SNR 7.2 to 10.8 dB. **This does not fill 5.6.** That row is 10 m and this was a
+> benchtop metre or two, and the number is already 16 dB below the −28 dBm the model predicts
+> at *ten times* the distance. That direction is expected — see the note below — but it is
+> the reason 5.6 to 5.9 have to be walked rather than inferred. Against the roughly −123 dBm
+> SF7 sensitivity floor there is ~79 dB of margin at the bench, which is a starting point and
+> not a range figure.
+>
 > **The RSSI predictions are free-space path loss with 17 dBm transmit and 0 dBi antennas,
 > and nothing else.** Real readings will be weaker — commonly by 10–20 dB — because of
 > antenna efficiency, polarisation mismatch while the vehicle tumbles, the vehicle's own
@@ -565,13 +573,28 @@ bus together.
 
 ## Gate 8 · End to end
 
+> **The link closed for the first time on 2026-09-07.** Vehicle to RA-02 to ground-station
+> Pico to USB to the web console, sync word `0xF3`, 66 packets, `P-001` through `P-066`, not
+> one gap and not one duplicate. Gate 8 has a bench link.
+>
+> **Two things about the first run are worth keeping.** The bridge's own status line and the
+> packet stream agree exactly — `frames` incremented once per packet with `dropped=0` — so
+> the radio delivered everything it heard and USB carried everything the radio delivered.
+> And `CAL-1` arrived at `P-005`, four seconds in, with altitude stepping from `A-23.0` to
+> `A-0.2` in the same packet: calibration replacing the assumed reference pressure with the
+> measured one, visible in telemetry rather than inferred.
+>
+> **8.1 and 8.2 are recorded as partial on purpose.** Both ask for a 500-packet window and
+> this run was 66. 66 clean packets is a link; it is not the loss figure those rows exist to
+> produce, and writing it in as one would be claiming a measurement that was not taken.
+
 | # | Quantity | Predicted | How to measure | Measured | Verdict |
 |---|---|---|---|---|---|
-| 8.1 | Packet numbering | Sequential from `P-001`, no gaps | Ground-station validator over 500 packets | | |
-| 8.2 | Ground-station packet loss, bench | 0 % | Loss counter | | |
+| 8.1 | Packet numbering | Sequential from `P-001`, no gaps | Ground-station validator over 500 packets | **66/66 sequential from `P-001`, no gaps, no duplicates** — but the row asks for 500 and this was 66. Partial | |
+| 8.2 | Ground-station packet loss, bench | 0 % | Loss counter | **0 % over 66 packets.** The bridge's own `frames` counter incremented exactly one per packet with `dropped=0` throughout, so nothing was lost on the radio *or* between the radio and USB. 66 is not the 500 of 8.1; partial for the same reason | |
 | 8.3 | CRC errors on the USB link | 0 | Link health panel | | |
 | 8.4 | Mission clock vs wall clock | Within 1 % | Compare `Ti-` with a stopwatch over 10 minutes | | |
-| 8.5 | Altitude at rest | ≈ 0.0 m after calibration | Read `A-` on the bench | | |
+| 8.5 | Altitude at rest | ≈ 0.0 m after calibration | Read `A-` on the bench | **−0.5 m to +0.1 m across 62 stationary packets**, after `CAL-1` at P-005. Before calibration the same bench read `A-23.0` — the reference pressure being replaced by the measured one, which is the mechanism working | ✅ 2026-09-07 / KS |
 | 8.6 | Altitude vs a known height | Within a few metres | Carry the vehicle up a measured staircase | | |
 | 8.7 | Attitude vs a known orientation | Within a few degrees | Place on a level surface, then on each face | | |
 | 8.8 | `WHO_AM_I` of the IMU | `0x71` or `0x73` | Read at initialisation; the health report carries it | **`0x70` — an MPU-6500.** Not the nine-axis part the module was sold as. Read with `cansat_bringup_firmware` | ❌ 2026-09-05 / KS — see [F-1](../hardware/receiving-inspection.md#findings) |
