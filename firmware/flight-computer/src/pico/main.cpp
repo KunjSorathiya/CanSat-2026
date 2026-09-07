@@ -35,8 +35,10 @@ void tick_delay_ms(std::uint32_t ms) {
 
 flight::Configuration make_config() {
     flight::Configuration config;
-    // >>> SET THIS to the registered competition identifier before any launch or
-    //     official test. The formatter rejects the "CAN-Team-XX" placeholder.
+    // CONFIRMED registered competition identifier, 2026-09-07. This is not a
+    // placeholder and must not be "corrected" to one: the formatter and
+    // validate_config() reject only the rulebook's "CAN-Team-XX" example, so a
+    // wrong-but-well-formed number here would never be caught by anything.
     config.team_id = "CAN-Team-25";
     // 1 Hz: the fastest the default SF7/125 kHz modem sustains with margin. See
     // documentation/design/link-budget.md before raising this.

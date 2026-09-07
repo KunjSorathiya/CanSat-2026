@@ -10,6 +10,14 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Fixed — `CAN-Team-25` is the registered identifier, confirmed against the registration
+
+Closed 2026-09-07 / KS. The number in `main.cpp` is correct.
+
+**It was still worth asking, and the reason is the shape of the guard.** `is_valid_team_id()` rejects exactly one thing — the rulebook's `CAN-Team-XX` example — so any well-formed identifier passes. A wrong team number would have flown, on every packet, with the firmware, the tests and the documentation all silent. The guard tells you the field was *set*; it can never tell you it was set *correctly*. Only a person with the registration can.
+
+The comment in `main.cpp` used to read *“SET THIS to the registered competition identifier”*, which invites the next reader to treat `25` as a stand-in and change it. It now records the confirmation and says plainly that it must not be “corrected” back. TEL-006 carries the same note, for the same reason.
+
 ### Added — the last sensor fitted is the only one the diagnostic cannot check
 
 The sound module is wired. `bringup_main.cpp` reads the IMU, barometer, GPS, radio and card and reports each live — and **never reads `GP27` or `GP15`**. Grepped: not one reference. So every other sensor on this vehicle can be confirmed in a single run, and this one cannot.
