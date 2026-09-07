@@ -10,6 +10,18 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Changed — eleven consecutive passes bound [F-12], and do not close it
+
+Ten power-cycled runs after the first pass, no failures. The record on the soldered board is now **3 failures in the first 4 runs, 0 in the next 11.**
+
+**What ten clean runs are worth, stated honestly.** By the rule of three, zero failures in ten trials bounds the per-run rate at about **30 % with 95 % confidence** — a weak bound. A fault that bites once in ten runs survives this test 35 % of the time, so this rules out a frequent fault and nothing more.
+
+**The clustering is the stronger evidence.** Three failures in the first four runs and none in the next eleven is very unlikely if the rate were constant, which favours *something changed* over *random intermittent*. That is genuinely good news. The open part is that **nobody can name what changed** — the connections were checked and the board was handled to place meter probes, and either could have moved a marginal contact into a good position.
+
+**And a static bench run is the wrong test for a mechanical fault on a vehicle that is launched.** The supply was measured innocent during a failing run — 3.28 V at the module's own pins — so this is not [F-10](documentation/testing/bring-up-record.md#findings) repeating; what is left moves. Provocation and vibration are the tests that would settle it, and neither has been run.
+
+Next on this row: flex the board and press the card mid-run to try to provoke it, reflow the module's six joints, and re-take 6.1 after any mechanical work.
+
 ### Added — Gates 6 and 7 pass on the soldered board, and the card failed eleven minutes earlier
 
 Everything ran. The card initialised in **31 ms**, wrote 100/100 at a 6.128 ms mean, sustained **3598 writes in 10 s at 100 % duty**, and Gate 7 passed every row it has: `0x12` unchanged after the SD driver raised SPI to 4 MHz, 200 interleaved rounds with zero card-read failures and zero radio misreads, and 30 transmit-then-write rounds clean. **Gate 2's headline number came with it: the 3V3 rail held 3.28–3.29 V through 45 back-to-back transmits**, against 3.26–3.27 V on the breadboard, which closes row 5.4a.
