@@ -197,17 +197,17 @@ flowchart LR
     classDef done fill:#1b5e20,stroke:#1b5e20,color:#fff
     classDef partial fill:#e65100,stroke:#e65100,color:#fff
     classDef todo fill:#37474f,stroke:#37474f,color:#fff
-    class G1,G4,G5,G6 partial
-    class G2,G3,G7,G8,G9 todo
+    class G1,G2,G3,G4,G5,G6 partial
+    class G7,G8,G9 todo
 ```
 
 | Gate | Status | What is missing |
 |---|---|---|
 | 1 · Requirements locked | 🟠 Partial | Requirements extracted and gates defined, but ten organizer questions are unanswered — including the dimension and altitude contradictions |
-| 2 · Electrical architecture approved | ⬜ Not passed | No regulator selected; module supplies unresolved |
-| 3 · Power system tested | ⬜ Not passed | No switch, no LED, no divider, no measurement |
-| 4 · Sensors individually verified | 🟠 Partial | The IMU and barometer read on hardware and their rates, biases and noise are recorded; the GPS delivers NMEA at 9600 baud. The magnetometer, the microSD and every reading on the shared bus are still unmeasured |
-| 5 · Telemetry verified | 🟠 Partial | The RA-02 answers `0x12` and transmits: measured airtime is within 1.8 % of the model, and channel occupancy 33.4 % typical. **No link has been established** — one radio transmitting is not two radios talking |
+| 2 · Electrical architecture approved | 🟠 Partial | **Resolved and built, except the battery end.** No regulator is fitted and none is needed — every load runs from the Pico's `3V3(OUT)`, measured at **3.28–3.29 V under 45 back-to-back transmits** and 3.28–3.30 V at 100 % write duty. Missing: the switch, the divider, and the Schottky that stops USB back-powering the pack |
+| 3 · Power system tested | 🟠 Partial | **The rail is measured** under each load individually and holds. Missing: the switch, the LEDs, the divider, the series-current figure that four sessions have skipped, and the rail under radio **and** card simultaneously |
+| 4 · Sensors individually verified | 🟠 Partial | **Both I2C sensors verified together on the soldered board 2026-09-07** — `0x68` and `0x76` on one bus, `0x0C` correctly absent, rates, biases and noise recorded. GPS delivers all six NMEA sentences with zero checksum errors. The microSD writes and sustains ~300 writes/s. Missing: a GPS fix outdoors, the sound module, and [F-13](../testing/bring-up-record.md#findings)'s gyro drift across temperature |
+| 5 · Telemetry verified | 🟠 Partial | The RA-02 answers `0x12` and transmits: measured airtime is within 1.8 % of the model, and channel occupancy 33.4 % typical. **No link has been established** — one radio transmitting is not two radios talking. Transmit itself is now proven on the soldered board: 55 transmits, zero failures, airtime within 1.8 % of the model on both packet sizes |
 | 6 · Ground station verified | 🟠 Partial | The bridge image runs on its Pico, enumerates over USB and emits status frames at a verified 1 Hz with byte-exact CRC framing. The receive pipeline has still never seen a packet that arrived over the air |
 | 7 · Mechanical and recovery verified | ⬜ Not passed | Nothing built |
 | 8 · Full system integration | ⬜ Not passed | Blocked by gates 2–7 |

@@ -6,13 +6,18 @@ uses. `BoardPins` in
 source of truth in code; this page and
 [pico-gpio-map.md](../hardware/pico-gpio-map.md) must always agree with it.
 
-> [!WARNING]
-> **This is a provisional signal map, not an approved schematic.** No wire in this
-> document has been built or measured. The breakout variants are now identified and their
-> headers transcribed, but **no regulator is selected and no rail has been powered** — see
-> [electrical-compatibility.md](../hardware/electrical-compatibility.md) and
-> [pre-procurement-design-status.md](../hardware/pre-procurement-design-status.md).
-> Do not connect the LiPo to any module, or to GPIO26, on the basis of this page.
+> [!NOTE]
+> **This map is built and measured, as of 2026-09-07.** Every signal on this page exists as
+> solder on the vehicle board, and every device it names has answered: Gates 3, 4, 5, 6 and 7
+> all pass ([bring-up record](../testing/bring-up-record.md)). **No regulator is fitted and none
+> is needed** — every load runs from the Pico's own `3V3(OUT)`, which held **3.28–3.29 V through
+> 45 back-to-back transmits** and 3.28–3.30 V at 100 % microSD write duty.
+>
+> **Three things on this page are still unbuilt**, and none of them is a signal: the sound
+> module, the battery divider on `GP26`, and the switch and Schottky in the battery lead.
+> **Until that Schottky exists, do not leave the battery connected while USB is plugged in** —
+> `VBUS` reaches `VSYS` through the Pico's own `D1` and charges the pack with nothing
+> controlling it ([D-6](../hardware/assembly-procedure.md#d-6-a-schottky-goes-between-the-switch-and-vsys)).
 
 ---
 

@@ -17,9 +17,10 @@ The architecture is based on the confirmed hardware list and the current require
 | GY-BMP280-3.3 | 1 | Pressure, altitude-related, and temperature measurement | Confirmed hardware. Chip ID `0x58` on 2026-09-05 — a BMP280, not a BME280 ([F-4](../hardware/receiving-inspection.md#findings)); answers at `0x76`, so SDO is strapped low |
 | Micro SD card reader | 1 | Onboard data storage | Confirmed hardware; breakout variant and documentation TBD |
 | Orange 3.7 V 1500 mAh 25C 1S LiPo | 1 | Primary power source | Confirmed hardware |
-| AMS1117-3.3 regulator module | TBD | Previously planned 3.3 V peripheral rail | Not recommended for direct 1S-to-3.3 V regulation |
-| Manual power switch | 1 required | Main power control | Hardware not selected |
-| Power LED | 1 required | Visible power indication | Hardware not selected |
+| ~~AMS1117-3.3 regulator module~~ | 0 | Previously planned 3.3 V peripheral rail | **Not used, and none is needed.** Rejected on dropout, then made unnecessary: every load runs from the Pico's own `3V3(OUT)`, measured holding 3.28–3.29 V under the harshest load the vehicle can produce |
+| Manual power switch | 1 required | Main power control | **Held** — an I/O switch, obtained 2026-09-06. Goes in the battery positive lead, ahead of everything. Not yet fitted |
+| Power LED | 1 required | Visible power indication | **Held** — LEDs in two colours plus 1 kΩ resistors, obtained 2026-09-06. Runs from the 3.3 V bus, not a GPIO, so it lights on power-on. Not yet fitted |
+| **Schottky diode, 1 A** | 1 required | Stops USB back-powering the pack | **Not held — the only outstanding purchase.** See [D-6](../hardware/assembly-procedure.md#d-6-a-schottky-goes-between-the-switch-and-vsys) |
 | Universal single-sided prototype PCB | 1 | Onboard prototype assembly | Confirmed hardware |
 
 ## Separate Ground Station Hardware
@@ -448,14 +449,14 @@ settles.
 The following items or decisions are required before assembling the onboard electrical prototype:
 
 - ~~3.3 V voltage regulator~~ — **resolved: none needed.** Every load runs from the Pico's `3V3(OUT)`, and both the radio and the microSD have been measured holding that rail alone at 100 % duty (rows 5.4a, 6.3b). The [power budget](#power-budget) records how little headroom that leaves.
-- Manual power switch with suitable voltage/current and mechanical ratings; exact part TBD.
-- Visible power LED; current-limiting component and branch design TBD.
+- ~~Manual power switch~~ — **held**, an I/O switch obtained 2026-09-06; fitted at step 15.
+- ~~Visible power LED~~ — **held and designed**: 3.3 V bus → 1 kΩ → LED → GND, ~1.3 mA, lit whenever the switch is closed and before any firmware runs.
 - ~~Required resistors and capacitors~~ — **selected**, from the measured load profile rather than from module documentation, which has still not been read. See [Decoupling](#decoupling).
-- Connectors compatible with the selected modules, prototype board, battery, and antenna cable; exact parts TBD.
+- ~~Connectors~~ — **resolved**: JST-RCY for the battery, male header strips for the four jumpered modules, u.FL to SMA for the antenna. All mate; the RF chain was confirmed with no adapter.
 - Wiring and suitable strain relief for power, signals, and antenna connections; sizes and types TBD.
 - LiPo charging and protection solution appropriate for the confirmed battery; exact solution TBD.
 - Any required level-shifting or signal-protection components after logic-level review; hardware TBD.
-- Test points or measurement access for battery and 3.3 V rail; implementation TBD.
+- ~~Test points~~ — **resolved**: a 2-pin test link in the 3.3 V feed, so a meter can sit in series for the current figure that has never been taken. Soldered shut once read.
 
 The egg, parachute, and mechanical hardware are required by the competition but are outside this electrical prototype list. They still affect packaging, wiring, antenna placement, and impact survivability.
 

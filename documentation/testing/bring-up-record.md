@@ -279,8 +279,9 @@ confident wrong number.
 
 ## Gate 5 · Radio
 
-**The most valuable gate in this document.** Everything about the telemetry rate rests on
-computed airtime that has never been observed.
+**The most valuable gate in this document.** Everything about the telemetry rate rested on
+computed airtime that had never been observed. **It has now been observed four times, on two
+boards, and agrees to within 1.8 % every time.**
 
 > **Re-taken 2026-09-07 on the soldered board, and this is the run that matters.** 5.1, 5.2
 > and 5.3 passed on the first attempt — `0x12`, 5/5 at 206 bytes, 5/5 at 255 bytes — and 5.4a

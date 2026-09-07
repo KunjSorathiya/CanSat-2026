@@ -10,6 +10,24 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Changed — a sweep for everything the built board made false
+
+With the vehicle working, several documents were still describing a project that had never applied power. Corrected across the repository:
+
+**`wiring.md`'s headline warning said “no wire in this document has been built or measured”.** Every signal on that page is now solder, and every device it names has answered. It is a note rather than a warning, and it now names the three things that genuinely are unbuilt — the sound module, the divider, and the switch and Schottky — plus the one live hazard: **do not leave the battery connected while USB is plugged in until the Schottky exists.**
+
+**`pico-gpio-map.md` was YELLOW**, pending “physical breakout verification and electrical compatibility”. Both are done and it is **GREEN**, with the two wired-but-inert pins named so nobody debugs them. The historical assessment is kept below it, because it records what the map rested on before hardware existed.
+
+**`software-architecture.md` claimed no hardware bring-up had been performed.** Five gates say otherwise.
+
+**The electrical architecture listed the switch and the power LED as “hardware not selected”** when both have been held since 2026-09-06, and still carried the AMS1117 as a TBD when it is neither used nor needed. The Schottky is added as the one part still to buy. Four items in *Required Hardware Before Prototype* are struck through with what resolved them.
+
+**The development gates moved**: 2 and 3 from not-passed to partial, and 4 and 5 re-described against what the soldered board has actually shown.
+
+**Two requirement rows said “hardware not built”** — true of the structure, misleading about the avionics, which are complete. They now distinguish the two.
+
+No firmware was changed. Three code items are decided but deliberately not applied while the board is being wired: `battery_divider_ratio` stays `0.0f` until step 14 measures it, `team_id` stays the placeholder until a registration exists, and the `INT_ENABLE` and `GPIO23` changes are proposals in open items 37 and 38 rather than edits.
+
 ### Added — Gate 3 and Gate 4 pass, and the board is complete but for the sound module
 
 Every device on the vehicle answered in one run. **`0x68` and `0x76` on the bus together** — which was the open half of row 3.1 and is now closed — with `0x0C` correctly absent from both scans. Chip ID `0x58`, `WHO_AM_I` `0x70`, barometer at **83.0 Hz**, and the GPS emitting all six sentences cleanly at 162 B/s with zero checksum errors while the radio and card share the board. Gates 5, 6 and 7 repeated in the same run.

@@ -119,7 +119,7 @@ An opposite-polarity arrangement remains possible if required by the selected ha
 
 ### Battery ADC Reservation
 
-GPIO26/ADC0 carries the battery divider: **two 33 kΩ ±1 % parts in series across the pack, tapped at the midpoint**, giving a 2:1 ratio, 2.10 V at `GP26` on a full 4.20 V cell and 64 µA of continuous draw. The parts are in hand ([D.6](receiving-inspection.md#d6--the-resistors)); the divider is not yet built. Until it is built and measured:
+GPIO26/ADC0 carries the battery divider: **two 33 kΩ ±1 % parts in series across the pack, tapped at the midpoint**, giving a 2:1 ratio, 2.10 V at `GP26` on a full 4.20 V cell and 64 µA of continuous draw. The parts are in hand ([D.6](receiving-inspection.md#d6--the-resistors)) and metered; **the divider is the last analogue item to build**, at step 14 of the [assembly procedure](assembly-procedure.md). Until it is built and measured:
 
 - No resistor divider is designed.
 - No resistor values are selected.
@@ -312,6 +312,20 @@ The following uncertainties do not prevent this logical allocation, although the
 - RF connector type
 
 ## Engineering Decision
+
+**GREEN, as of 2026-09-07 - the allocation is built, and every pin on it has been exercised on
+hardware.** This section was YELLOW while the map depended on physical breakout verification and
+electrical compatibility. Both are now done: the modules were identified from the delivered
+boards rather than their listings, the vehicle board is soldered, and Gates 3, 4, 5, 6 and 7 all
+pass on it - I2C0 carrying `0x68` and `0x76` together, UART0 carrying clean NMEA, and SPI0
+carrying the radio and the card at 4 MHz with zero misreads across 200 interleaved rounds.
+
+Two assignments are wired but inert, and both say so where they are used: `GP22` (RA-02 `DIO1`)
+and `GP7` (IMU `INT`) are configured as inputs and never read. `GP26` and `GP27` are assigned
+but not yet built - the divider and the sound module are the last two things to fit.
+
+The historical assessment follows, and is kept because it records what the map rested on before
+hardware existed:
 
 **YELLOW - The GPIO allocation is technically valid according to the Pico alternate-function model, but it depends on physical breakout verification and electrical compatibility.**
 
