@@ -10,6 +10,32 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Changed — three `104`s are deliberately omitted, and the blanket claim is retired
+
+The IMU, the barometer and the GPS are fitted **without** a bypass capacitor. Decided at the bench on 2026-09-07 and recorded as **D-8**, because an omission nobody wrote down looks like an oversight to the next fault investigation — and this repository has already caught a wrong RA-02 pin description and a wrong card capacity that way.
+
+These documents carried a blanket claim that the `104`s are *“not optional and not substitutable”*. **That is true where it was written from — the microSD's ~100 mA write spike and the RA-02's 1.5 to 87 mA key-up — and both remain fitted. It does not generalise.**
+
+| Module | Draw | Why the omission holds |
+|---|---:|---|
+| MPU-6500 | ~4 mA | Carries **its own 10 µF tantalum** and 0402 passives, seen at C.3.5 |
+| BMP280 | ~1 mA | Single-digit mA on a 400 kHz bus with ~250 ns rise times through 5 kΩ pull-ups |
+| NEO-6M | ~45 mA tracking | **Has its own onboard regulator**, and its load is essentially **DC** — which a 100 nF does not address |
+
+**The GPS is the largest of the three by current and still the strongest case for omission**, which is worth saying because current is the intuitive reason to fit one and it is the wrong reason here. Count goes from six `104`s to **three** — microSD, RA-02 and the sound board — across the procedure, the decoupling table, the receiving record, the purchase list and the wiring schedule. If any of the three ever misbehaves, this is the first thing to eliminate.
+
+### Added — the GPS shares a board with a 50 mW transmitter, and nothing had said so
+
+A **+17 dBm** 433 MHz PA sits on the same 100 mm board as a GPS receiver working near **−130 dBm** behind an active patch antenna. **No document in this repository mentioned it until now** — searched, and there was not one line.
+
+433 MHz has no low-order harmonic on L1: 1575.42 MHz against a 3rd harmonic of 1299 and a 4th of 1732, so the obvious mechanism is off the table. What remains is **front-end overload** — the patch antenna's LNA driven toward compression by a strong nearby carrier, costing sensitivity with nothing in band. Symptoms would be fewer satellites, slower acquisition, or a fix that drops on key-up.
+
+**It is cheap to measure and now has a row.** 4.5 already asked whether the fix survives transmission; new row **4.5a** asks the harder question — satellite count and C/N0 with the radio idle, then at flight duty from the same position without moving the vehicle. Row 4.2 already logged the format to use. Mitigations are physical and free: maximum antenna separation, patch skyward with the LoRa antenna perpendicular, pigtail routed away. **Decide the placement before the structure is designed around it** — that is the point where it stops being free. Recorded as an electrical risk as well.
+
+### Fixed — the README described a vehicle two weeks out of date
+
+The status line still called F-5 and F-6 open when [F-10](documentation/testing/bring-up-record.md#findings) closed both, and quoted breadboard rail figures. It now says what is true: the board is soldered, Gates 5, 6 and 7 pass on it, the rail held 3.28–3.29 V through 45 back-to-back transmits, and the open intermittent is F-12. The assembly procedure's parts table also still said the card was 32 GB.
+
 ### Changed — eleven consecutive passes bound [F-12], and do not close it
 
 Ten power-cycled runs after the first pass, no failures. The record on the soldered board is now **3 failures in the first 4 runs, 0 in the next 11.**

@@ -78,7 +78,7 @@ and do not connect the battery to anything.
 | A.10 | Universal prototype PCB, 10 x 10 cm | 1031002 | 2 | **2** | No visible damage | Single-sided, isolated pads, edge rails |
 | A.11 | LM393 sound detection sensor | TBD | 1 | **1** | No visible damage | **Second batch, received 2026-09-06.** Four-pin board: `AO DO GND VCC`. See [D.5](#d5--the-lm393-sound-module) |
 | A.12 | Electrolytic capacitors, 10 µF and 100 µF | TBD | — | **As ordered, counted by hand 2026-09-06** | No visible damage | Second batch. 50 V and 25 V parts, sleeve print legible. The photograph shows one of each for identification and is **not** the count — see [D.7](#d7--the-capacitors) |
-| A.13 | Ceramic capacitors, 0.1 µF `104` | TBD | 20 | **~20, counted by hand 2026-09-06** | No visible damage | Second batch. Orange discs, **print worn illegible**. Six are consumed by the build, so there is ample margin. See [D.7](#d7--the-capacitors) |
+| A.13 | Ceramic capacitors, 0.1 µF `104` | TBD | 20 | **~20, counted by hand 2026-09-06** | No visible damage | Second batch. Orange discs, **print worn illegible**. **Three** are consumed by the build as fitted, so there is ample margin. See [D.7](#d7--the-capacitors) |
 | A.14 | Resistors: 100 kΩ, 33 kΩ, 1 kΩ | TBD | — | **~10 of each, taped in three groups** | No visible damage | Second batch. **Values read from the colour bands** in the three close-ups — see [D.6](#d6--the-resistors). **No 330 Ω arrived**; 1 kΩ serves both LEDs instead |
 
 > **Counted by hand on 2026-09-05 / KS. Every line matches the quantity ordered.** The
@@ -773,14 +773,14 @@ Photographed as
 | **10 µF 50 V** electrolytic | Sleeve print, legible | RA-02 supply pins, with a `104` beside it |
 | **100 µF 50 V** electrolytic | Sleeve print, legible | microSD supply pins — **in parallel with the one below** |
 | **100 µF 25 V** electrolytic | Sleeve print, legible | microSD supply pins, the other half of the pair |
-| **0.1 µF ceramic disc** | **Print worn illegible.** The value comes from the purchase, not from the part | One at every module's supply pins — six of them |
+| **0.1 µF ceramic disc** | **Print worn illegible.** The value comes from the purchase, not from the part | microSD, RA-02 and the sound board — **three of them.** The IMU, barometer and GPS are deliberately without, see [D-8](assembly-procedure.md#d-8-three-104s-are-deliberately-omitted) |
 
 Two 100 µF in parallel is 200 µF at the microSD, against the
 [~50 µF the write spike actually needs](../design/electrical-architecture.md#how-much-bulk-is-actually-needed).
 Mixing a 50 V and a 25 V part in that pair is fine: both are far above a 3.3 V rail, and an
 electrolytic has no DC-bias derating, so each contributes its full marking.
 
-**Six `104` ceramics are consumed by the build** — microSD, RA-02, MPU-6500, BMP280, NEO-6M and the sound board — against about twenty in hand, so there is ample margin. They are the one part here with no substitute, since a bulk capacitor of any type is too slow for the edges they cover.
+**Three `104` ceramics are consumed by the build as fitted** — microSD, RA-02 and the sound board. The IMU, barometer and GPS are deliberately without one ([D-8](assembly-procedure.md#d-8-three-104s-are-deliberately-omitted)); the parts are held against those three ever misbehaving. Against about twenty in hand, so there is ample margin. They are the one part here with no substitute, since a bulk capacitor of any type is too slow for the edges they cover.
 
 **The disc print being unreadable is worth stating plainly.** The value on record is what
 was ordered, not what was verified — an orange disc looks the same at 100 pF as at 0.1 µF.

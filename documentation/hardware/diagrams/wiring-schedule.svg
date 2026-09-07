@@ -475,24 +475,24 @@
 <text x="912.0" y="1107.5" font-size="11.5" fill="#1e293b">10 µF 50 V ∥ 104</text>
 <rect x="760.0" y="1114.0" width="700.0" height="21.0" fill="#f8fafc"/>
 <rect x="760.0" y="1114.0" width="3.5" height="21.0" fill="#c2650a"/>
-<text x="804.0" y="1128.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">MPU-6500</text>
+<text x="804.0" y="1128.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">LM393</text>
 <text x="912.0" y="1128.5" font-size="11.5" fill="#1e293b">104</text>
-<rect x="760.0" y="1135.0" width="3.5" height="21.0" fill="#c2650a"/>
-<text x="804.0" y="1149.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">BMP280</text>
-<text x="912.0" y="1149.5" font-size="11.5" fill="#1e293b">104</text>
+<rect x="760.0" y="1135.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="804.0" y="1149.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">MPU-6500</text>
+<text x="912.0" y="1149.5" font-size="11.5" fill="#94a3b8">none — omitted, D-8</text>
 <rect x="760.0" y="1156.0" width="700.0" height="21.0" fill="#f8fafc"/>
-<rect x="760.0" y="1156.0" width="3.5" height="21.0" fill="#c2650a"/>
-<text x="804.0" y="1170.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">NEO-6M</text>
-<text x="912.0" y="1170.5" font-size="11.5" fill="#1e293b">104</text>
-<rect x="760.0" y="1177.0" width="3.5" height="21.0" fill="#c2650a"/>
-<text x="804.0" y="1191.5" font-size="11.5" font-weight="600" fill="#c2650a" font-family="ui-monospace, Consolas, monospace">LM393</text>
-<text x="912.0" y="1191.5" font-size="11.5" fill="#1e293b">104</text>
+<rect x="760.0" y="1156.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="804.0" y="1170.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">BMP280</text>
+<text x="912.0" y="1170.5" font-size="11.5" fill="#94a3b8">none — omitted, D-8</text>
+<rect x="760.0" y="1177.0" width="3.5" height="21.0" fill="#94a3b8"/>
+<text x="804.0" y="1191.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">NEO-6M</text>
+<text x="912.0" y="1191.5" font-size="11.5" fill="#94a3b8">none — omitted, D-8</text>
 <rect x="760.0" y="1198.0" width="700.0" height="21.0" fill="#f8fafc"/>
 <rect x="760.0" y="1198.0" width="3.5" height="21.0" fill="#94a3b8"/>
 <text x="804.0" y="1212.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace">GP26 divider</text>
-<text x="912.0" y="1212.5" font-size="11.5" fill="#94a3b8">none — deferred, see D-7</text>
+<text x="912.0" y="1212.5" font-size="11.5" fill="#94a3b8">none — deferred, D-7</text>
 <rect x="760.0" y="1219.0" width="3.5" height="21.0" fill="#94a3b8"/>
 <text x="804.0" y="1233.5" font-size="11.5" font-weight="600" fill="#64748b" font-family="ui-monospace, Consolas, monospace"></text>
-<text x="912.0" y="1233.5" font-size="11.5" fill="#94a3b8">nine total · stripe → GND on every electrolytic</text>
+<text x="912.0" y="1233.5" font-size="11.5" fill="#94a3b8">six fitted · stripe → GND on every electrolytic</text>
 <text x="40" y="1246" font-size="11.5" font-weight="700" fill="#991b1b">Pin 40 VBUS is live 5 V and nothing here tolerates 5 V. AGND (33) is a separate plane — tie it once, beside pin 38. Battery switch OFF whenever USB is connected until the Schottky is fitted.</text>
 </svg>

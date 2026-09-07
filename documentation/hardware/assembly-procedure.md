@@ -67,7 +67,7 @@ Run against the repository on 2026-09-06. ✅ settled, ⚠️ needs your eyes at
 | 18 | Capacitors | ✅ 10 µF 50 V, 100 µF 50 V, 100 µF 25 V, ~20 × `104`. **The `104` print is worn illegible** — their value is on record from the purchase, not from the part |
 | 19 | Switch and LEDs | ✅ Obtained 2026-09-06. An I/O switch and LEDs in two colours |
 | 20 | Battery, charger, JST-RCY pigtail | ✅ Pack healthy at 3.92 V, red confirmed positive on the meter |
-| 21 | microSD card | ✅ 32 GB, block-addressed |
+| 21 | microSD card | ✅ **HP mx310 64 GB**, block-addressed. SDXC, so it ships exFAT and needs reformatting |
 | 22 | Antenna chain | ✅ Mates hand-tight, no adapter |
 | 23 | Hookup wire — solid core 22 AWG, several colours | ✅ **Held, confirmed 2026-09-06 / KS.** The repository had no record of it; the record is this row |
 | 24 | Silicone stranded wire, red and black, for the battery lead | ✅ **Held, confirmed 2026-09-06 / KS** |
@@ -96,7 +96,7 @@ Run against the repository on 2026-09-06. ✅ settled, ⚠️ needs your eyes at
 
 ## Decisions taken here
 
-Seven places where the repository contradicted itself, stopped short, or — in the last two —
+Eight places where the repository contradicted itself, stopped short, or — in two of them —
 where this page itself was wrong. Each is settled below, with the reason.
 
 ### [D-1] The microSD bulk capacitor is **2 × 100 µF in parallel**, not 470 µF
@@ -193,6 +193,31 @@ better circuit. It is also a part nobody here has, and the diode is sufficient.
 
 **Until the diode is fitted, the rule is procedural and fragile:** the battery switch is OFF
 whenever a USB cable is in.
+
+### [D-8] Three `104`s are deliberately omitted
+
+**Decided 2026-09-07 at the bench.** The IMU, the barometer and the GPS are fitted **without**
+a bypass capacitor. This is a deliberate omission with reasons, not an oversight, and it is
+recorded here so that no future fault investigation has to re-derive it — or worse, assume the
+parts are present because a table said nine.
+
+The blanket claim these documents carried — that the `104`s are *"not optional and not
+substitutable"* — is true where it was written from, and that is the **microSD** and the
+**RA-02**. Both remain fitted. It does not generalise:
+
+| Module | Draw | Why the omission holds |
+|---|---:|---|
+| **MPU-6500** | ~4 mA | Carries **its own 10 µF tantalum** and 0402 passives ([C.3.5](receiving-inspection.md#c3--mpu-9250)). Already locally decoupled |
+| **BMP280** | ~1 mA | Single-digit milliamps on a 400 kHz bus whose rise times are ~250 ns through 5 kΩ pull-ups |
+| **NEO-6M** | ~45 mA tracking, ~70 mA acquiring | **Has its own onboard regulator** ([product page record](product-pages/README.md)), so its input is locally regulated — and its load is essentially **DC**, which a 100 nF does nothing for |
+
+The GPS is the largest of the three by current and still the strongest case for omission, which
+is worth stating because the current figure is the intuitive reason to fit one and it is the
+wrong reason here.
+
+**If any of these three ever misbehaves, this is the first thing to eliminate.** A `104` across
+the module's strip pins on the board — two adjacent holes, seconds to fit — recovers most of
+the benefit for a load this small, without soldering to a module hanging on jumpers.
 
 ---
 
@@ -797,13 +822,16 @@ no strip: it is soldered down like the RA-02.
 ### 7 · Starred supplies and every capacitor
 
 Run the two point-to-point supply pairs from the distribution nodes to the microSD and the
-RA-02. Then fit all nine capacitors **at each module's own pins**:
+RA-02. Then fit **six** capacitors, all **at each module's own pins**:
 
-| Module | Fit |
-|---|---|
-| microSD | 100 µF 50 V ∥ 100 µF 25 V ∥ `104` |
-| RA-02 | 10 µF 50 V ∥ `104` |
-| MPU-6500, BMP280, NEO-6M, LM393 | one `104` each |
+| Module | Fit | Why this one |
+|---|---|---|
+| microSD | 100 µF 50 V ∥ 100 µF 25 V ∥ `104` | ~100 mA write spike. This is [F-10](../testing/bring-up-record.md#findings)'s module |
+| RA-02 | 10 µF 50 V ∥ `104` | 1.5 mA → 87 mA PA key-up in microseconds, 45 times a minute |
+| LM393 sound | one `104` | Ordinary practice; the analogue channel is the one that would show noise |
+| ~~MPU-6500~~ | — | **Omitted, deliberately — [D-8](#d-8-three-104s-are-deliberately-omitted)** |
+| ~~BMP280~~ | — | **Omitted, deliberately** |
+| ~~NEO-6M~~ | — | **Omitted, deliberately** |
 
 
 **Electrolytics are polarised — the stripe marks the negative leg, to GND.** Backwards they heat

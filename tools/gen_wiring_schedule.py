@@ -200,12 +200,12 @@ block(40, DY, 700, 'Discretes', 'power path, divider, LEDs', disc, numcol=False)
 caps = [
     ('', 'microSD', '100 µF 50 V ∥ 100 µF 25 V ∥ 104', P33),
     ('', 'RA-02', '10 µF 50 V ∥ 104', P33),
-    ('', 'MPU-6500', '104', P33),
-    ('', 'BMP280', '104', P33),
-    ('', 'NEO-6M', '104', P33),
     ('', 'LM393', '104', P33),
-    ('', 'GP26 divider', 'none — deferred, see D-7', NONE),
-    ('', '', 'nine total · stripe → GND on every electrolytic', NONE),
+    ('', 'MPU-6500', 'none — omitted, D-8', NONE),
+    ('', 'BMP280', 'none — omitted, D-8', NONE),
+    ('', 'NEO-6M', 'none — omitted, D-8', NONE),
+    ('', 'GP26 divider', 'none — deferred, D-7', NONE),
+    ('', '', 'six fitted · stripe → GND on every electrolytic', NONE),
 ]
 block(760, DY, 700, 'Capacitors', 'all at each module’s own pins', caps, numcol=False)
 

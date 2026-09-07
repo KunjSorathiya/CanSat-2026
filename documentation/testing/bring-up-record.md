@@ -255,6 +255,7 @@ confident wrong number.
 | 4.3 | NMEA checksum errors | ≈ 0 | `gps_checksum_errors` in the health snapshot | **0** over an 18 s indoor run. Re-check with a fix, when the sentences carry populated fields and get longer | ⚠️ 2026-09-05 / KS — provisional, taken without a fix |
 | 4.4 | Position accuracy | — | Compare with a known surveyed point or a phone | | |
 | 4.5 | Fix held while the radio transmits | No dropouts | Watch the fix flag through 50 transmissions | | |
+| 4.5a | **Satellite count and C/N0 while the radio transmits** | No measurable drop | Outdoors, with a fix: record satellite count and the C/N0 figures from `$GPGSV` with the radio idle, then repeat at flight transmit duty **from the same position without moving the vehicle**. 4.2 already logged the format — PRN 04 at 28 dB-Hz | | |
 
 > **The receiver runs at 1 Hz, not the 5 Hz the supplier listing advertised.** Five complete
 > sentence cycles arrived in five seconds. 5 Hz is a NEO-6M *capability*, reached by sending it
