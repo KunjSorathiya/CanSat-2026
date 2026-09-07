@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 74 suites across the whole flight core | ✅ **3661 / 3661 assertions** |
+| `flight_tests` | 78 suites across the whole flight core | ✅ **3675 / 3675 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -157,7 +157,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 74 suites, 3661 assertions
+### `flight_tests` — 78 suites, 3675 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -209,6 +209,10 @@ flowchart LR
 | `test_formatter_and_parser_agree_at_the_edges` | The formatter never emits a packet this library's own parser rejects, at every boundary value |
 | `test_a_value_too_wide_to_format_invalidates_the_packet` | A finite value too wide for the formatter's buffer produces an empty field, not the first 63 characters of one — a corrupted reading and a missing one are both rejected, but only one of them looks like a reading |
 | `test_controller_drops_optional_fields_before_overrunning_the_budget` | An over-long packet sheds its optional fields in rulebook priority order instead of being truncated by the radio into something the ground station can only read as corruption |
+| `test_a_fix_with_too_few_satellites_is_refused` | A quality-1 GGA reporting three satellites is refused and counted — a receiver announces a fix the moment it has any solution, and three satellites cannot produce a 3D one ([F-18](bring-up-record.md#findings)) |
+| `test_a_fix_with_poor_geometry_is_refused` | Eight satellites at HDOP 20 are refused: geometry, not count, is what produces a large confident wrong position |
+| `test_a_good_fix_still_passes_and_carries_its_quality` | Eight satellites at HDOP 0.9 still pass, and `satellites` and `hdop` are both readable afterwards — a gate whose inputs are not recorded cannot be tuned in the field |
+| `test_a_refused_fix_does_not_disturb_the_last_good_one` | A refused sentence leaves the previous position untouched and the vehicle still holding a fix; only a genuine `quality <= 0` clears it. Declining an update is not the same as losing the fix |
 | `test_a_hemisphere_from_the_wrong_axis_is_rejected` | A latitude marked `E` or `W`, or a longitude marked `N` or `S`, is rejected rather than read as a sign — a sentence that passed its checksum can still carry a hemisphere character from the other axis, and taking it puts the fix on the wrong side of the equator |
 | `test_gps_coordinate_validation` | A checksum-valid sentence carrying an impossible position is rejected: the vehicle transmits no fix rather than a wrong one |
 | `test_orientation_survives_the_wrap_and_the_poles` | The quaternion state stays well formed across the ±180° roll seam and through a 20 s tumble at 100 °/s about all three axes — including the ±90° pitch singularity that broke the previous Euler integration |

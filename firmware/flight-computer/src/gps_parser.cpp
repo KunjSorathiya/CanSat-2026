@@ -167,11 +167,29 @@ bool NmeaParser::apply_sentence() {
             parse_coordinate(fields[4], fields[5][0], 180.0, 'E', 'W', lon) &&
             parse_double(fields[9], alt) &&
             alt >= kMinGpsAltitudeM && alt <= kMaxGpsAltitudeM) {
+            const long sats = std::strtol(fields[7], nullptr, 10);
+            const std::uint8_t satellites =
+                (sats < 0) ? 0 : static_cast<std::uint8_t>(sats > 255 ? 255 : sats);
+            // An absent HDOP field is not a good one. Treated as unusable rather than as
+            // zero, which would be the best possible geometry and would pass every gate.
+            double hdop = 0.0;
+            const bool hdop_present = parse_double(fields[8], hdop) && hdop > 0.0;
+
+            // The quality gates. Refusing a fix leaves the previous one exactly as it was:
+            // a poor sentence must not erase a position the vehicle already had, and it
+            // must not be mistaken for the receiver reporting no fix, which is what the
+            // quality <= 0 path above means.
+            if (satellites < kMinGpsSatellites || !hdop_present || hdop > kMaxGpsHdop) {
+                ++fixes_rejected_;
+                ++sentences_parsed_;
+                return true;
+            }
+
             latest_.latitude = lat;
             latest_.longitude = lon;
             latest_.altitude = alt;
-            long sats = std::strtol(fields[7], nullptr, 10);
-            latest_.satellites = (sats < 0) ? 0 : static_cast<std::uint8_t>(sats > 255 ? 255 : sats);
+            latest_.satellites = satellites;
+            latest_.hdop = hdop;
             latest_.valid = true;
             ++sentences_parsed_;
             return true;

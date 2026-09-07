@@ -29,6 +29,11 @@ struct GpsData {
     double time_of_day_s = 0.0;       // UTC seconds since midnight, when time_valid
     bool time_valid = false;
     std::uint8_t satellites = 0;
+    // Horizontal dilution of precision: how much the satellites' *geometry* multiplies
+    // ranging error. It is not an accuracy in metres and it is not a signal strength --
+    // eight satellites bunched in one part of the sky give a high HDOP and a confident,
+    // wrong position, which is the failure that looks like data rather than like an error.
+    double hdop = 0.0;
     // Ground track, from RMC. Speed over ground in m/s, and course over ground in
     // degrees clockwise from TRUE north.
     //

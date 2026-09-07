@@ -996,6 +996,64 @@ bool feed_nmea(flight::NmeaParser& parser, const std::string& sentence) {
     return parser.has_fix();
 }
 
+// Wraps an NMEA body in its "$", checksum and terminator, so a test states the sentence it
+// means rather than a checksum somebody has to recompute by hand when a field changes.
+std::string nmea(const std::string& body) {
+    std::uint8_t checksum = 0;
+    for (const char c : body) checksum ^= static_cast<std::uint8_t>(c);
+    char tail[8];
+    std::snprintf(tail, sizeof(tail), "*%02X", static_cast<unsigned>(checksum));
+    return "$" + body + tail + "\r\n";
+}
+
+// [F-18] A receiver that never moved produced fixes 55.6 m apart in one second, and an
+// altitude spanning 49.8 m on a bench. The parser accepted every one of them: it rejected
+// only quality <= 0, then stored the satellite count without ever testing it. Fix *quality*
+// was parsed and discarded, so a 4-satellite fix with poor geometry was carried into
+// telemetry exactly like a 12-satellite one.
+void test_a_fix_with_too_few_satellites_is_refused() {
+    flight::NmeaParser parser;
+    // Three satellites cannot produce a 3D fix, and the receiver still reports quality 1.
+    CHECK(!feed_nmea(parser, nmea("GPGGA,120000.00,2110.0000,N,07246.9980,E,1,03,1.0,15.0,M,0.0,M,,")));
+    CHECK(parser.fixes_rejected() == 1);
+    CHECK(!parser.latest().valid);   // and it must not invent a position either
+}
+
+void test_a_fix_with_poor_geometry_is_refused() {
+    flight::NmeaParser parser;
+    // Eight satellites, but an HDOP of 20 -- all bunched in one part of the sky. This is
+    // the case that produces a large, confident, wrong position.
+    CHECK(!feed_nmea(parser, nmea("GPGGA,120000.00,2110.0000,N,07246.9980,E,1,08,20.0,15.0,M,0.0,M,,")));
+    CHECK(parser.fixes_rejected() == 1);
+}
+
+void test_a_good_fix_still_passes_and_carries_its_quality() {
+    flight::NmeaParser parser;
+    // The sentence the existing tests use. The gate must not cost a fix that was always
+    // fine -- and the numbers it judged on must be readable afterwards, because a gate
+    // whose inputs are not recorded cannot be tuned in the field.
+    CHECK(feed_nmea(parser, nmea("GPGGA,120000.00,2110.0000,N,07246.9980,E,1,08,0.9,15.0,M,0.0,M,,")));
+    CHECK(parser.latest().satellites == 8);
+    CHECK(parser.latest().hdop > 0.89 && parser.latest().hdop < 0.91);
+    CHECK(parser.fixes_rejected() == 0);
+}
+
+void test_a_refused_fix_does_not_disturb_the_last_good_one() {
+    // Degrade rather than stop: a bad sentence must not erase a position the vehicle
+    // already had. Losing the fix outright is what the no-fix path is for.
+    flight::NmeaParser parser;
+    CHECK(feed_nmea(parser, nmea("GPGGA,120000.00,2110.0000,N,07246.9980,E,1,08,0.9,15.0,M,0.0,M,,")));
+    const double kept_lat = parser.latest().latitude;
+    // Still a fix afterwards -- the vehicle has not lost its position, it has declined an
+    // update. That is exactly the distinction the quality <= 0 path does *not* make, and
+    // asserting !has_fix() here would be asserting the wrong behaviour.
+    CHECK(feed_nmea(parser, nmea("GPGGA,120001.00,2111.0000,N,07247.9980,E,1,03,1.0,15.0,M,0.0,M,,")));
+    CHECK(parser.latest().latitude == kept_lat);
+    CHECK(parser.fixes_rejected() == 1);
+    // And a genuine loss of fix still clears it.
+    CHECK(!feed_nmea(parser, nmea("GPGGA,120002.00,,,,,0,00,,,M,,M,,")));
+}
+
 // A checksum-valid sentence can still carry an impossible position. Those must not reach
 // telemetry: the vehicle should transmit no fix rather than a wrong one.
 void test_a_hemisphere_from_the_wrong_axis_is_rejected() {
@@ -2895,6 +2953,10 @@ int main(int argc, char** argv) {
     test_a_value_too_wide_to_format_invalidates_the_packet();
     test_controller_drops_optional_fields_before_overrunning_the_budget();
     test_gps_coordinate_validation();
+    test_a_fix_with_too_few_satellites_is_refused();
+    test_a_fix_with_poor_geometry_is_refused();
+    test_a_good_fix_still_passes_and_carries_its_quality();
+    test_a_refused_fix_does_not_disturb_the_last_good_one();
     test_a_hemisphere_from_the_wrong_axis_is_rejected();
     test_orientation_survives_the_wrap_and_the_poles();
     test_calibration_rejects_a_steady_rotation_as_bias();
