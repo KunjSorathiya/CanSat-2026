@@ -102,10 +102,22 @@ void print_startup_summary(const flight::Configuration& config,
               h.sound_ok ? "OK" : (sound_silent ? "SILENT" : "NOT FITTED"),
               h.sound_ok ? "" : (sound_silent ? "wired but no signal" : "optional sensor"));
 
-    std::printf("\n state %s | faults active %lu | armed %s | calibrated %s\n",
-                flight::to_string(h.state),
-                static_cast<unsigned long>(h.fault_active), h.armed ? "yes" : "no",
-                h.calibrated ? "yes" : "no");
+    std::printf("\n state %s | armed %s | calibrated %s\n", flight::to_string(h.state),
+                h.armed ? "yes" : "no", h.calibrated ? "yes" : "no");
+
+    // A count is not actionable. Three active faults on a vehicle where every subsystem
+    // reports OK is a puzzle; "mag_unavailable watchdog_reboot calibration" is an answer.
+    if (h.fault_active == 0) {
+        std::printf(" faults: none\n");
+    } else {
+        std::printf(" faults active (%lu):", static_cast<unsigned long>(h.fault_active));
+        for (std::uint8_t i = 0; i < static_cast<std::uint8_t>(flight::FaultCode::count);
+             ++i) {
+            const auto code = static_cast<flight::FaultCode>(i);
+            if (faults.active(code)) std::printf(" %s", flight::fault_name(code));
+        }
+        std::printf("\n");
+    }
     std::printf(" telemetry is running. This summary repeats until the vehicle arms.\n");
     std::printf("=====================================================\n");
 }

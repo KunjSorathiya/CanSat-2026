@@ -10,6 +10,12 @@ development cycle.
 
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
+### Changed — the startup summary names its faults instead of counting them
+
+First boot after the [F-16] fix: **`SD card OK`**, every subsystem reporting, and `faults active 3` on a vehicle where nothing said FAILED. A count is not actionable. The summary now lists the names — `mag_unavailable watchdog_reboot calibration` tells an operator what to do; `3` tells them to go reading source.
+
+Row 6.1a records the pass: the card initialises under the flight firmware, first boot after the fix. That row exists separately from 6.1 because the bring-up image could never have shown the failure — it initialises the radio first.
+
 ### Fixed — [F-16] the radio sat *selected* through the card's entire initialisation
 
 The new startup summary earned its place in one boot: `SD card FAILED - NOTHING IS BEING LOGGED`. The card had passed twelve consecutive times under the bring-up image and failed every time under the flight firmware, which share the same drivers deliberately — so the difference had to be the order they run in, and it was.
