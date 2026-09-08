@@ -97,14 +97,15 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 106 suites across the whole flight core | ✅ **4013 / 4013 assertions** |
+| `flight_tests` | 113 suites across the whole flight core | ✅ **4107 / 4107 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **129 / 129 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **134 / 134 tests** |
+| Python ground station | 8 modules | ✅ **140 / 140 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **220 / 220 claims** |
+| Python simulations | `simulations/descent.py` — canopy sizing, the closed-form fall against both of its own limits, ISA air density, and the mass-tolerance argument | ✅ **40 / 40 tests** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **244 / 244 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **62 / 62 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
@@ -157,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 106 suites, 4013 assertions
+### `flight_tests` — 113 suites, 4107 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -184,8 +185,15 @@ flowchart LR
 | `test_fault_manager` | Report, clear, occurrence counting, severity escalation, critical latching |
 | `test_state_machine_full_mission` | The full `INIT` to `RECOVERY` path with realistic inputs, including the 5 s post-impact window |
 | `test_state_machine_fault_paths` | `FAULT` is reachable from every operational state and does not stop telemetry |
+| `test_a_hovering_drone_is_not_a_landing` | [F-20](bring-up-record.md#findings). A full drone profile at the real thresholds — a 3 m/s climb to 30 m, a twenty-second hover, then release — never leaves `FLIGHT` before the descent, lands three seconds after touchdown, and spends the post-impact window on the ground. It used to reach `LANDED` at 18.0 s and `RECOVERY` at 23.0 s, twelve seconds before release |
+| `test_a_lift_slower_than_the_rest_threshold_is_not_a_landing` | The exposure is wider than hovering: a climb at 0.8 m/s is below `landing_altitude_rate_max_mps`, so every sample of it reads as "not descending". Forty-five seconds of it declares nothing |
+| `test_the_descent_gate_does_not_survive_a_state_change` | The gate belongs to one `FLIGHT`, not to the vehicle. A descent seen before the state began cannot authorise a landing inside it |
+| `test_one_descending_sample_does_not_open_the_descent_gate` | A barometric spike every second, never held, leaves the gate shut — and with it shut, no landing is declared however long the vehicle sits at rest |
+| `test_the_descent_and_rest_thresholds_may_not_overlap` | `validate_config()` refuses a descent threshold at or below the at-rest threshold, and a zero confirm window: either would let one sample mean both "descending" and "stopped" |
+| `test_the_link_profile_is_compulsorily_faster_than_1_hz` | The ceiling, the jitter margin, the shipped period and `validate_config()` all agree. Every period at or above the rulebook's 1000 ms is refused, **including 1000 itself** |
+| `test_a_default_vehicle_transmits_faster_than_1_hz` | The guard is only worth having if the packets come out at that spacing: a mission is flown and every measured gap between transmitted packets is the configured period, with none reaching a second |
 | `test_a_refused_configuration_says_which_setting_was_wrong` | A rejected configuration keeps the reason `validate_config()` gave, so two different rules produce two different messages rather than one generic phrase, and an accepted configuration leaves it empty |
-| `test_config_validation` | The `CAN-Team-XX` placeholder, a telemetry period over 1000 ms, and a post-impact window under 5000 ms are all rejected |
+| `test_config_validation` | The `CAN-Team-XX` placeholder, a telemetry period at or above 1000 ms — the rulebook figure itself included — and a post-impact window under 5000 ms are all rejected |
 | `test_sound_level_reduces_a_window_to_its_envelope` | An ADC window becomes its peak-to-peak span in millivolts; the same span at a different bias reads the same, and silence reads zero |
 | `test_sound_level_refuses_a_window_it_cannot_scale` | An empty window, a zero full scale, a zero or negative reference, and a window never filled all return 0 rather than dividing by zero or reporting a negative loudness |
 | `test_a_clipped_window_is_reported_as_clipped` | A window touching either end of the converter is flagged, because the level is then a lower bound — and canopy inflation and touchdown are the two events most likely to saturate |
@@ -360,12 +368,22 @@ line is still a status line, escaped control characters come back exactly, a pla
 packets is untouched, and the behaviour can be turned off for a file that legitimately
 begins with a date.
 
-### `test_health.py` — 7 tests
+### `test_health.py` — 13 tests
 
 Connection flag, packet and loss counters, CRC and status frame accounting, snapshot key
 stability. Plus three rate-estimator tests added after a live defect was found: a paced
 2 Hz stream reads 2.00 Hz, a same-instant burst cannot inflate the rate, and the rate
 falls to zero once the link drops instead of freezing at its last value.
+
+**And six for the rulebook rate verdict**, which is the receiving end of a rule the vehicle
+enforces at the transmitting end. The vehicle refuses to build at or below **1 Hz**; the
+ground station reports whether what actually arrived cleared it, because those are different
+questions once the link starts losing packets. The tests pin the three-valued answer: the
+flight profile's **1.43 Hz** passes, exactly 1.00 Hz passes (it meets the minimum — the
+vehicle is the end that refuses to sit there, not this one), 0.5 Hz fails, and a link that
+is too new or has dropped reports `None` rather than `False`. "Not measured yet" and
+"measured, and too slow" call for very different reactions from an operator, and a boolean
+cannot say the first.
 
 ### `test_app.py` — 17 tests
 

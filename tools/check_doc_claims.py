@@ -59,16 +59,18 @@ def suite_counts() -> dict[str, int] | None:
                "fat_volume": "fat_volume"}.get(name)
         if key:
             counts[key] = int(total)
-    # unittest prints "Ran N tests" once per discovery run: ground station first, tooling second.
+    # unittest prints "Ran N tests" once per discovery run. tools/build_host.sh runs three,
+    # in this order: ground station, tooling, simulations. The order is load-bearing -- it
+    # is read positionally -- and build_host.sh says so where the runs are defined.
     ran = [int(n) for n in re.findall(r"^Ran (\d+) tests?", log, re.MULTILINE)]
-    if len(ran) >= 2:
-        counts["python_ground"], counts["python_tools"] = ran[0], ran[1]
+    if len(ran) >= 3:
+        counts["python_ground"], counts["python_tools"], counts["python_sims"] = ran[:3]
     node = re.search(r"^\D*pass (\d+)$", log, re.MULTILINE)
     if node:
         counts["node"] = int(node.group(1))
 
     required = {"flight_tests", "sx1278", "sd_card", "fat_volume", "python_ground",
-                "python_tools", "node"}
+                "python_tools", "python_sims", "node"}
     return counts if required <= counts.keys() else None
 
 
@@ -731,10 +733,15 @@ def main() -> int:
     # sentence is the first thing a reader of a compliance document sees, and it is a count
     # of the table directly beneath it -- which is exactly the kind of number that is
     # updated once and then never again.
+    #
+    # The id pattern is {2,4} letters, not {3}. It was {3}, which matched TEL- and SEN- and
+    # silently skipped every GS- and SW- row: the check passed on 116 while the table held
+    # 127. A count that quietly excludes eleven rows is worse than no count, because it
+    # reads as verified.
     requirements = read("documentation/requirements/requirements.md")
-    complete_rows = len(re.findall(r"^\| [A-Z]{3}-[0-9a-z]+ \|.*\| Complete \|",
+    complete_rows = len(re.findall(r"^\| [A-Z]{2,4}-[0-9a-z]+ \|.*\| Complete \|",
                                    requirements, re.MULTILINE))
-    total_rows = len(re.findall(r"^\| [A-Z]{3}-[0-9a-z]+ \|", requirements, re.MULTILINE))
+    total_rows = len(re.findall(r"^\| [A-Z]{2,4}-[0-9a-z]+ \|", requirements, re.MULTILINE))
     checker.check(f"requirements.md counts its own {complete_rows} of {total_rows} rows",
                   f"{complete_rows} of the {total_rows} requirement rows" in requirements,
                   f"{complete_rows}/{total_rows}")
@@ -876,7 +883,8 @@ def main() -> int:
             checker.check(f"test-plan.md states {suite} ran {n} assertions",
                           f"**{n} / {n} assertions**" in test_plan, str(n))
         for suite, label in (("python_ground", "Python ground station"),
-                             ("python_tools", "Python tooling")):
+                             ("python_tools", "Python tooling"),
+                             ("python_sims", "Python simulations")):
             n = counts[suite]
             checker.check(f"test-plan.md states {label} ran {n} tests",
                           f"**{n} / {n} tests**" in test_plan, str(n))
@@ -890,7 +898,7 @@ def main() -> int:
         # The README carries the same results table as the test plan, in shorter form. It
         # is the first page anyone reads, so it is the worst place for a stale figure.
         for suite in ("flight_tests", "sx1278", "sd_card", "fat_volume", "python_ground",
-                      "python_tools", "node"):
+                      "python_tools", "python_sims", "node"):
             n = counts[suite]
             checker.check(f"README's results table states {suite} at {n}",
                           f"**{n} / {n}**" in readme, str(n))
@@ -898,7 +906,8 @@ def main() -> int:
                       f"{len(suites)} suites:" in readme, str(len(suites)))
         checker.check(f"README states {len(listed)} syntax-checked translation units",
                       f"{len(listed)} translation units" in readme, str(len(listed)))
-        python_total = counts["python_ground"] + counts["python_tools"]
+        python_total = (counts["python_ground"] + counts["python_tools"] +
+                        counts["python_sims"])
         checker.check(f"quick-start.md states {cpp_total} C++ assertions",
                       f"**{cpp_total} C++ assertions" in quick_start, str(cpp_total))
         checker.check(f"quick-start.md states {python_total} Python tests",
@@ -911,11 +920,124 @@ def main() -> int:
         checker.check(f"software-architecture.md states {python_total} Python and {node} Node tests",
                       f"{python_total} Python tests" in architecture and f"{node} Node tests" in architecture)
 
+        # The README's status table quotes one number for the whole suite. It is the first
+        # sentence anybody reads about this project, it is the easiest figure in the
+        # repository to leave behind, and it had been left behind: it said 4395 while the
+        # suites reported several hundred more.
+        all_total = cpp_total + python_total + node
+        checker.check(f"README states {all_total} automated checks in total",
+                      f"{all_total} automated checks" in readme, str(all_total))
+
+    # ---- the netlist is generated, and must match what generates it -----------------
+    # electrical/schematics/vehicle-netlist.tsv is derived from flight::BoardPins. Two ways
+    # it can rot: the generator's own table drifts from the firmware, or the committed file
+    # drifts from the generator because nobody re-ran it. Both are checked here rather than
+    # left to be noticed by somebody with a multimeter.
+    sys.path.insert(0, str(REPO_ROOT / "tools"))
+    import gen_netlist  # noqa: E402
+
+    netlist_problems = gen_netlist.verify(gen_netlist.board_pins())
+    checker.check("the netlist agrees with flight::BoardPins",
+                  not netlist_problems, "; ".join(netlist_problems[:3]))
+    committed = gen_netlist.OUTPUT_PATH
+    # Compared with newlines normalised: the generator writes LF, and a checkout on
+    # Windows may hand it back as CRLF.
+    on_disk = (committed.read_text(encoding="utf-8").replace("\r\n", "\n")
+               if committed.exists() else None)
+    checker.check("the committed netlist matches tools/gen_netlist.py",
+                  on_disk == gen_netlist.build(),
+                  "run python tools/gen_netlist.py")
+
+    # The envelope drawing is generated the same way and rots the same way. The other two
+    # generators (board layout, wiring schedule) write their file at import time rather
+    # than returning it, so they cannot be checked from here without also rewriting the
+    # file -- a check that repairs what it is checking is not a check.
+    import gen_envelope_drawing  # noqa: E402
+
+    drawing = REPO_ROOT / gen_envelope_drawing.OUTPUT_PATH
+    drawn = (drawing.read_text(encoding="utf-8").replace(chr(13) + chr(10), chr(10))
+             if drawing.exists() else None)
+    checker.check("the committed envelope drawing matches tools/gen_envelope_drawing.py",
+                  drawn == gen_envelope_drawing.build(),
+                  "run python tools/gen_envelope_drawing.py")
+
+    # ---- the descent model's answers, where documents quote them --------------------
+    # The canopy diameter is the one number the mechanical build takes straight out of a
+    # simulation, and two documents state it in prose. A drag coefficient or a target rate
+    # changed in the model would otherwise leave those documents describing a parachute
+    # nobody is going to build.
+    sys.path.insert(0, str(REPO_ROOT / "simulations"))
+    import descent  # noqa: E402
+
+    mechanical = read("mechanical/README.md")
+    simulations_readme = read("simulations/README.md")
+    nominal = descent.descend()
+    worst = descent.descend(mass_kg=0.550, temperature_c=35.0)
+    for label, result in (("nominal 500 g", nominal), ("550 g on a hot day", worst)):
+        centimetres = f"{result.diameter_m * 100:.1f} cm"
+        checker.check(f"mechanical/README.md states the {label} canopy at {centimetres}",
+                      centimetres in mechanical, centimetres)
+        checker.check(f"simulations/README.md states the {label} canopy at {centimetres}",
+                      centimetres in simulations_readme, centimetres)
+    descent_seconds = f"{nominal.total_time_s:.2f} s"
+    checker.check(f"the descent is documented as {descent_seconds}",
+                  descent_seconds in mechanical and descent_seconds in simulations_readme,
+                  descent_seconds)
+    conops = read("documentation/mission/concept-of-operations.md")
+    checker.check(f"concept-of-operations.md states the {descent_seconds} descent",
+                  descent_seconds in conops, descent_seconds)
+    # Packets during the descent is the finding, not the arithmetic: a handful of packets is
+    # the whole over-the-air dataset, and it moves with the telemetry period.
+    packets = descent.descend(telemetry_period_ms=float(period_ms or 700)).packets_in_descent
+    checker.check(f"the descent is documented as {packets} packets",
+                  f"**{packets}**" in simulations_readme and f"| **{packets}** |" in conops,
+                  str(packets))
+
+    # ---- the requirements table counts itself, and its ids are unique ---------------
+    # Two different requirements were both numbered GS-002 for three days, which is the
+    # kind of thing that is invisible in a 127-row table and fatal in a traceability
+    # argument. The row count and the Complete count are quoted in the paragraph above the
+    # table, and both had drifted -- it said 116 rows when there were 127.
+    requirement_rows = re.findall(r"^\| ([A-Z]{2,4}-[0-9]+[a-z]?) \| (.*)$",
+                                  read("documentation/requirements/requirements.md"),
+                                  re.MULTILINE)
+    ids = [rid for rid, _ in requirement_rows]
+    duplicates = sorted({rid for rid in ids if ids.count(rid) > 1})
+    checker.check("every requirement id is unique", not duplicates, ", ".join(duplicates))
+
     # ---- rulebook constants that must never drift -----------------------------------
     checker.check("post-impact window is at least the rulebook's 5 s",
                   (constant(config, "post_impact_transmission_ms") or 0) >= 5000)
-    checker.check("telemetry period never exceeds the 1 Hz rulebook minimum",
-                  (period_ms or 0) <= 1000)
+    # The rulebook's 1 Hz is a MINIMUM, and this vehicle is built to sit above it rather
+    # than on it. Three things enforce that -- a static_assert in link_profile.hpp,
+    # validate_config() at runtime, and this -- and they have to agree, because the whole
+    # point is that no single edit can quietly put a flight build back at 1 Hz.
+    profile = read("firmware/common/include/cansat/link_profile.hpp")
+    rulebook_period = constant(profile, "kRulebookMinRatePeriodMs")
+    jitter_margin = constant(profile, "kTelemetryJitterMarginMs")
+    checker.check("the rulebook minimum period is stated as 1000 ms",
+                  rulebook_period == 1000, str(rulebook_period))
+    checker.check("the telemetry ceiling leaves a jitter margin below it",
+                  (jitter_margin or 0) > 0, str(jitter_margin))
+    ceiling = (rulebook_period or 0) - (jitter_margin or 0)
+    checker.check(f"the telemetry ceiling is {ceiling} ms, below the rulebook period",
+                  0 < ceiling < (rulebook_period or 0), str(ceiling))
+    checker.check("the shipped telemetry period is inside that ceiling",
+                  0 < (period_ms or 0) <= ceiling, str(period_ms))
+    # And the runtime guard has to enforce the same ceiling, not a looser one of its own.
+    checker.check("validate_config() rejects a period above the ceiling",
+                  "kMaxTelemetryPeriodMs" in read("firmware/flight-computer/src/config.cpp"))
+    rate_hz = 1000.0 / float(period_ms or 1)
+    checker.check(f"the shipped rate ({rate_hz:.2f} Hz) is above the rulebook minimum",
+                  rate_hz > 1.0, f"{rate_hz:.2f}")
+    # The figure the documentation quotes for that rate, in the four places it appears.
+    quoted = f"{rate_hz:.2f} Hz"
+    for name, body in (("README.md", readme),
+                       ("test-plan.md", test_plan),
+                       ("link-budget.md", read("documentation/design/link-budget.md")),
+                       ("concept-of-operations.md",
+                        read("documentation/mission/concept-of-operations.md"))):
+        checker.check(f"{name} states the {quoted} telemetry rate", quoted in body, quoted)
 
     # Last, and counting itself: the number of claims this script checks is itself a figure
     # the test plan quotes, so adding a check here without updating that row fails here.

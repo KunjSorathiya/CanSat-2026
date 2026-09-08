@@ -10,7 +10,8 @@ it would score today, and what the cheapest remaining points are.
 > knowable. Every number below is stated with what it assumes.
 
 **Assessed 2026-09-05, against the bring-up state recorded in
-[bring-up-record.md](../testing/bring-up-record.md).**
+[bring-up-record.md](../testing/bring-up-record.md). Section B's rate and section C's
+descent figures were revised 2026-09-08.**
 
 ---
 
@@ -147,6 +148,21 @@ the stream.
 **Descent time is scored comparatively** — longer stable descents score higher, subject to
 ≤ 5 m/s. That makes chute sizing a competitive decision, not just a safety one.
 
+**And the decision now has arithmetic under it.** [`simulations/descent.py`](../../simulations/descent.py)
+sizes the canopy: **80.0 cm** flat diameter brings 550 g down at exactly 5.00 m/s on a hot
+day. Three things follow that are worth knowing before any cloth is cut:
+
+- **Size at the top of the mass tolerance, not the nominal mass.** Canopy area is linear in
+  mass, so ±10 % of mass is ±10 % of area but only ~5 % of diameter. A canopy sized at 500 g
+  and flown at 550 g **breaks the 5 m/s cap**; one sized at 550 g is compliant across the
+  whole band and costs 6 cm of cloth.
+- **Scoring rewards a slow descent, and the cap is a ceiling on rate, not a target.** Sizing
+  *larger* than 80 cm descends more slowly and scores better, at the cost of more drift and a
+  bulkier pack. That is a live trade, and this is the tool to make it with.
+- **The descent is 6.45 seconds.** At 1.43 Hz that is **nine packets** — the entire
+  over-the-air descent dataset. Section E's data analysis marks will come from the SD log,
+  which runs at 30 Hz, not from the radio.
+
 ### D · Structural & Material Innovation — 30 points
 
 | Item | Points | Status |
@@ -173,10 +189,14 @@ The rulebook explicitly permits any outer material (PVC, plastic, 3D print) and 
 | Data analysis | 20 | ~0 | Tooling ready; needs flight data |
 
 **Code originality — 9 or 10 of 10.** Self-written, no third-party libraries anywhere in the
-flight path, heavily commented, and held by 4785 assertions across 167 Python and 62 Node
+flight path, heavily commented, and held by 4879 assertions across 213 Python and 62 Node
 tests. The drivers for the MPU-9250, BMP280, NEO-6M, SX1278 and the SD card are all written
 here against their datasheets and register maps. This section rewards exactly what this
 repository is.
+
+**Since this was assessed, three things have been added that strengthen it further:** an
+authorised ground-to-vehicle command that is inert by construction, a GPS fix gate on
+satellite count and HDOP, and a descent model held to closed-form limits by its own tests.
 
 **Sensor integration — 25 of 25.** The mandatory set is complete and worth 15 in the
 2026 revision (it was worth nothing in the previous one — **this is a scoring change in our

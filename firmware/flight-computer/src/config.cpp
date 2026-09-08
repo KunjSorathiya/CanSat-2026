@@ -25,8 +25,24 @@ bool validate_config(const Configuration& config, std::string& why) {
         why = "team_id must be a registered CAN-Team-<id> (not the CAN-Team-XX placeholder)";
         return false;
     }
-    if (config.telemetry_period_ms == 0 || config.telemetry_period_ms > 1000) {
-        why = "telemetry_period_ms must be in 1..1000 (>= 1 Hz rulebook minimum)";
+    // Strictly faster than 1 Hz, not merely "at least" it. The rulebook's 1 packet per
+    // second is a floor the vehicle must never be found below, and a period of exactly
+    // 1000 ms is on the line rather than above it -- any jitter in the loop, the radio or
+    // the receiver puts a measured interval past a second. The margin and the reasoning
+    // are in cansat/link_profile.hpp; this is the runtime half of enforcing it, and it is
+    // the one that catches a period set by hand at a call site rather than taken from the
+    // profile.
+    if (config.telemetry_period_ms == 0 ||
+        config.telemetry_period_ms > cansat::link::kMaxTelemetryPeriodMs) {
+        const double rate_hz = config.telemetry_period_ms == 0
+                                   ? 0.0
+                                   : 1000.0 / static_cast<double>(config.telemetry_period_ms);
+        why = "telemetry_period_ms " + std::to_string(config.telemetry_period_ms) +
+              " gives " + to_int_string(rate_hz * 100.0) +
+              " centi-Hz; the rulebook minimum is 1 Hz and this vehicle must transmit "
+              "strictly faster than it, so the period must be in 1.." +
+              std::to_string(cansat::link::kMaxTelemetryPeriodMs) +
+              " ms (see documentation/design/link-budget.md)";
         return false;
     }
     if (config.sensor_period_ms == 0) {
@@ -85,6 +101,22 @@ bool validate_config(const Configuration& config, std::string& why) {
     }
     if (config.post_impact_transmission_ms < 5000) {
         why = "post_impact_transmission_ms must be >= 5000 (rulebook post-impact minimum)";
+        return false;
+    }
+    // The descent gate and the at-rest test read the same quantity from opposite ends, so
+    // their thresholds must not overlap. If the rate that counts as descending were at or
+    // below the rate that counts as stopped, one sample could satisfy both -- which is
+    // precisely the confusion the gate exists to remove.
+    if (!(config.landing_descent_rate_mps > config.landing_altitude_rate_max_mps)) {
+        why = "landing_descent_rate_mps must be greater than landing_altitude_rate_max_mps: "
+              "the gate that says the vehicle descended and the test that says it stopped "
+              "moving would otherwise both accept the same sample";
+        return false;
+    }
+    if (config.landing_descent_confirm_ms == 0) {
+        why = "landing_descent_confirm_ms must be non-zero: a single noisy barometer sample "
+              "would otherwise open the descent gate and re-admit the hover that F-20 "
+              "describes (documentation/mission/concept-of-operations.md)";
         return false;
     }
     if (!(config.reference_pressure_pa > 0.0)) {

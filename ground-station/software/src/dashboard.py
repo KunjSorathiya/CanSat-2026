@@ -83,6 +83,11 @@ _VALIDATION_FIELDS = [
 _LINK_FIELDS = [
     ("connected", "Connected"),
     ("rate_hz", "Rate (Hz)"),
+    # The rulebook's 1 Hz is a minimum, and reading a rate is not the same as judging it.
+    # The vehicle refuses to build at or below 1 Hz; this is the receiving end saying
+    # whether what arrived actually cleared it. `None` means "not yet enough link to
+    # judge", which is why the value is rendered rather than compared here.
+    ("rate_meets_rulebook", ">= 1 Hz rulebook"),
     ("packets_ok", "Packets OK"),
     ("packets_invalid", "Packets invalid"),
     ("missing", "Missing"),

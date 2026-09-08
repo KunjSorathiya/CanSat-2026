@@ -18,6 +18,7 @@ ground station, operating on launch day, and analysing the flight afterwards.
 - [Building the firmware](#building-the-firmware)
 - [Running the ground station](#running-the-ground-station)
 - [Launch-day procedure](#launch-day-procedure)
+- [If the link reads 1 Hz](#if-the-link-reads-1-hz)
 - [Reading telemetry in flight](#reading-telemetry-in-flight)
 - [Post-flight analysis](#post-flight-analysis)
 - [Troubleshooting](#troubleshooting)
@@ -310,6 +311,27 @@ Confirm on the vehicle.
 - [ ] Egg condition and structural state photographed
 
 ---
+
+## If the link reads 1 Hz
+
+**It is not the vehicle's configuration.** `validate_config()` refuses any telemetry period
+above 950 ms and the profile will not compile above it, so no build can ship at or below
+1 Hz. The ground station says so out loud when the received rate falls short — the
+headless station prints `RATE BELOW THE RULEBOOK MINIMUM` and the dashboard carries a
+`>= 1 Hz rulebook` row.
+
+Work through it in this order:
+
+1. **Read the vehicle's startup summary.** It prints `telemetry every 700 ms (1.43 Hz)`. If
+   it says anything else, the image is older than the period change — reflash it. This is
+   the usual answer.
+2. **Check the bridge's own status cadence.** `#state=RX` is emitted once a second by design
+   and is unrelated to the telemetry rate. Reading the status line as the packet rate is an
+   easy mistake to make.
+3. **Compare `frames` on the bridge with `packets_ok` at the station.** Frames arriving but
+   packets not accepted is a parser or team-id problem, not a rate one.
+4. **Check the loss counter.** A vehicle transmitting at 1.43 Hz over a link losing a third
+   of its packets is received at about 1 Hz, and the fix is the link, not the period.
 
 ## Reading telemetry in flight
 

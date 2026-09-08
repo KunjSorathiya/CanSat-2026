@@ -113,6 +113,16 @@ if command -v python >/dev/null 2>&1; then
 
   echo "== running Python tooling tests =="
   ( cd "$ROOT" && log python -m unittest discover -s tools/tests -p "test_*.py" )
+
+  # The descent model sizes the parachute and predicts the descent. It is pinned to
+  # closed-form limits that can be checked by hand, because the mechanical build takes a
+  # canopy diameter from it and there is no second source for that number.
+  #
+  # Order matters here: check_doc_claims.py reads the "Ran N tests" lines this log
+  # accumulates positionally -- ground station, tooling, simulations -- so a new discovery
+  # run goes at the END of this block, never between the two above it.
+  echo "== running simulation tests =="
+  ( cd "$ROOT" && log python -m unittest discover -s simulations/tests -p "test_*.py" )
 fi
 
 # The web console is a single self-contained HTML file with no build step. Its parser,

@@ -256,7 +256,7 @@ stateDiagram-v2
     SELF_TEST --> READY: mandatory sensors OK
     SELF_TEST --> FAULT: self-test failed
     READY --> FLIGHT: armed and boost over 30 m/s2 or climb over 15 m, held 300 ms
-    FLIGHT --> LANDED: after 3 s minimum flight, at rest and vertical rate under 1 m/s, held 3 s
+    FLIGHT --> LANDED: descent observed, then at rest and vertical rate under 1 m/s held 3 s, no sooner than 3 s into flight
     LANDED --> RECOVERY: 5 s post-impact window elapsed
     READY --> FAULT: critical fault
     FLIGHT --> FAULT: critical fault
@@ -295,6 +295,24 @@ parachute opened.
 - but that hold is **bounded**, because an estimate frozen at a descent rate would prevent
   the landing from ever being detected. See
   [sensor-rates.md](sensor-rates.md#why-over-sampling-a-sensor-corrupts-vertical-speed).
+
+**And being at rest is necessary but not sufficient, because a hover is also at rest.** A
+vehicle hanging under a hovering drone reads 1 g with no vertical motion — which is the
+at-rest test, exactly. Held for `landing_confirm_ms` that was a landing, and on a drone
+profile it fired **twelve seconds before release**: `min_flight_ms` is aimed at a
+boost-then-coast rocket where the vehicle is genuinely moving, but on a lift `FLIGHT` is
+entered at `launch_altitude_gain_m` *during the ascent*, so its three seconds are gone before
+the hover begins ([F-20](../testing/bring-up-record.md#findings)).
+
+**The descent gate closes it.** A vehicle cannot land without descending first, so
+`StateMachine` latches once the vertical rate has been below `-landing_descent_rate_mps`
+(2 m/s) for `landing_descent_confirm_ms` (1 s), and refuses `FLIGHT → LANDED` until it
+has. The at-rest timer does not start without it, so a hover cannot accumulate towards a
+landing and then fire when the gate opens; the latch clears on any state change, so a descent
+seen earlier cannot authorise a landing later; and `validate_config()` refuses a descent
+threshold at or below the at-rest threshold, since one sample could then mean both. The gate
+is physical rather than threshold-tuned, which is the point — no hover, however long or
+however gentle the lift, can satisfy it.
 
 Both failure directions are survivable and neither breaks rulebook compliance — telemetry
 continues in every state — but they are wrong in different ways. A missed landing leaves
@@ -553,7 +571,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 106 C++ suites with 4013 assertions, plus the LoRa driver (101) and the microSD driver (581) against simulated devices, 167 Python tests including an end-to-end trace, and 62 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 113 C++ suites with 4107 assertions, plus the LoRa driver (129) and the microSD driver (613) against simulated devices, 213 Python tests including an end-to-end trace, and 62 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Verified on the soldered vehicle board, 2026-09-07.** Gates 3, 4, 5, 6 and 7 all pass: both I2C sensors on one bus, clean NMEA, airtime within 1.8 % of the model over 55 transmits, the card writing and sustaining ~300 writes/s, and the shared SPI0 bus clean across 200 interleaved rounds. See the [bring-up record](../testing/bring-up-record.md). **Not verified: the sound module, the battery divider, the switch and the antenna's range performance** |

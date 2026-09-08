@@ -1,5 +1,0 @@
-Raw and processed data captured during testing.
-
-protocol-fixtures.tsv also lives here: it is not captured data but the shared parser
-fixture set, read by the C++, Python and JavaScript telemetry parsers so they cannot
-disagree about what a valid packet is.

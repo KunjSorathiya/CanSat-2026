@@ -8,6 +8,329 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-08 (cycle 37)
+
+Two changes to flight behaviour, and both are about a rule the vehicle was following in
+spirit and not in mechanism: it landed when it had not descended, and it was fast enough
+only because nobody had set it slower.
+
+### Fixed — F-20: the descent gate
+
+**A landing may no longer be declared until a real descent has been observed.**
+
+`StateMachine` latches `descent_observed_` once the vertical rate has been below
+`-landing_descent_rate_mps` (**2 m/s**) for `landing_descent_confirm_ms` (**1 s**) during
+this `FLIGHT`, and refuses `FLIGHT → LANDED` until it is set. Three properties make it hold
+rather than merely usually work:
+
+- **The at-rest timer does not start without it.** Gating only the final transition would
+  have let a hover accumulate three seconds of "at rest" and then fire the instant the gate
+  happened to open.
+- **The latch belongs to one `FLIGHT`.** It clears in `enter()`, so a descent seen in an
+  earlier state cannot authorise a landing in this one.
+- **`validate_config()` refuses thresholds that could overlap.** The descent rate must
+  exceed the at-rest rate — otherwise a single sample could mean both "descending" and
+  "stopped", which is the exact confusion the gate exists to remove — and the confirm
+  window may not be zero, or one noisy barometer sample re-admits the hover.
+
+**Why these numbers.** They sit in the wide gap between the two things they separate. The
+mission descends at up to 5 m/s and reaches terminal rate in about half a second, so the
+gate opens roughly a second into a 6.45 s descent with five seconds to spare; a failed
+parachute falls far faster and opens it sooner. A hovering drone, a gentle lift and
+barometric noise are all far below 2 m/s. They are **PROVISIONAL** like every other
+detection threshold and want tuning against real drop data.
+
+**The same reproduction, re-run against the fixed state machine:**
+
+```text
+t= 10362 ms  alt=  16.1 m  rate= +3.0 m/s   READY -> FLIGHT      <-- during the ascent, correct
+t= 44022 ms  alt=   0.0 m  rate= +0.0 m/s   FLIGHT -> LANDED     <-- 3 s after touchdown
+t= 49038 ms  alt=   0.0 m  rate= +0.0 m/s   LANDED -> RECOVERY   <-- window spent on the ground
+```
+
+It used to reach `LANDED` at 18.018 s and `RECOVERY` at 23.034 s — twelve seconds before
+release.
+
+**One consequence, stated rather than discovered later.** If the barometer fails during
+descent the vertical rate never goes negative, the gate never opens, and the vehicle stays
+in `FLIGHT` after touchdown. **Telemetry continues**, which is what REC-008 actually
+requires; what is lost is the vehicle's own declaration that it landed. That is a strictly
+better failure than declaring one in mid-air, and it is the same class of degradation as
+every other barometer loss on this vehicle.
+
+**An altitude gate would also have worked** — refusing a landing unless `altitude_agl_m` is
+near the ground baseline — and was rejected because it leans on barometric altitude still
+being trustworthy after several minutes of drift. The descent gate does not.
+
+Five tests. `test_a_hovering_drone_is_not_a_landing` flies the whole drone profile at the
+real thresholds; the other four cover the slow-lift case, the latch clearing on a state
+change, a spike that never opens the gate, and the two configuration rules.
+
+### Fixed — a test that flew 170 m up and back down without descending
+
+Found by the gate rather than by anyone looking.
+`test_the_packet_cadence_is_the_same_in_every_state` set the mock barometer's
+`altitude_m` through a full ascent and descent and **never moved `pressure_pa`**. The
+controller updates its vertical-rate estimate only when the pressure changes — a repeated
+reading means no fresh conversion, not a stationary vehicle — so the vertical rate was
+**exactly zero for the entire profile**. The test still reached `LANDED`, because at-rest
+was satisfied the moment the acceleration came back to 1 g, so nothing noticed.
+
+The profile now derives pressure from altitude. The test's own subject is packet cadence
+and is unaffected; what changed is that the mission it flies is now a mission.
+
+### Changed — the vehicle can no longer be built at 1 Hz
+
+The rulebook requires **at least** one packet per second. Everything in the tree enforced
+exactly that: `static_assert(kTelemetryPeriodMs <= 1000)`, and `validate_config()` accepting
+`1..1000`. So a period of 1000 ms — 1.00 Hz — built and ran, and would have been compliant
+on paper and wrong in two ways at once.
+
+**It sits on the requirement.** What a ground station measures is the transmit period plus
+whatever jitter the loop, the radio and the receiver add. At exactly 1000 ms every one of
+those puts an interval past a second and the vehicle momentarily below a requirement that is
+*checked*, not estimated. **And it scores nothing**: rate above 1 Hz is a scored line in the
+2026 revision, and 1.00 Hz is the floor of it.
+
+So the profile now carries a hard ceiling rather than a default:
+
+| Constant | Value | Meaning |
+|---|---:|---|
+| `kRulebookMinRatePeriodMs` | 1000 ms | The rulebook's 1 Hz, as a period |
+| `kTelemetryJitterMarginMs` | 50 ms | Against measured mission-clock jitter of under **4 ms** — bring-up row 5.4 |
+| **`kMaxTelemetryPeriodMs`** | **950 ms** | The slowest period any build may carry, **1.053 Hz** |
+| `kTelemetryPeriodMs` | 700 ms | What this vehicle ships, **1.43 Hz** |
+
+Enforced four times over, because a flight build silently at 1 Hz is precisely the failure
+this is for:
+
+1. **Compile time.** `static_assert(kTelemetryPeriodMs <= kMaxTelemetryPeriodMs)`.
+2. **Startup.** `validate_config()` refuses anything above the ceiling, naming the rate it
+   was given. This is the layer that catches a period written by hand at a call site rather
+   than taken from the profile.
+3. **The claim checker.** `check_doc_claims.py` holds the three constants to each other, and
+   holds the documented rate to what the profile computes.
+4. **The receiving end.** `LinkHealth.rate_meets_rulebook` reports whether what *arrived*
+   cleared 1 Hz, which is a different question once the link starts losing packets. It
+   answers three ways — compliant, not compliant, or **not yet enough link to judge** —
+   because "not measured" and "measured, and too slow" call for very different reactions and
+   a boolean cannot say the first. The headless station prints
+   `RATE BELOW THE RULEBOOK MINIMUM` with the likely cause; the dashboard carries a
+   `>= 1 Hz rulebook` row.
+
+**And one stale comment that would have cost somebody an afternoon.** `make_config()` in the
+vehicle's `main.cpp` said *"1 Hz: the fastest the default SF7/125 kHz modem sustains with
+margin"* directly above the line assigning **700 ms**. It is now correct, and the startup
+summary prints the rate in Hz beside the period — `telemetry every 700 ms (1.43 Hz)` —
+because the question this summary is most likely to be consulted about is "the link is
+running at 1 Hz and I do not know why", and the usual answer is an image flashed before the
+period changed. The runbook now has a section that says so and lists the four things to
+check in order.
+
+### Changed — counts
+
+flight_tests 106 suites / 4013 assertions → **113 / 4107**. Python ground station
+134 → **140**. Documented claims 235 → **244**, the new ones covering the rate ceiling, the
+three constants agreeing with each other, and the quoted rate in four documents.
+
+---
+
+## [Unreleased] — 2026-09-08 (cycle 36)
+
+A repository-wide currency pass, and the parts of the project that had never been analysed
+at all. Five directories that had held nothing but a `.gitkeep` since day one now hold work,
+and the analysis needed to fill two of them produced a finding in the flight software.
+
+### Added — F-20: the vehicle declares a landing while hanging under the drone
+
+**Found by writing down what the mission actually does, and reproduced against the
+unmodified `StateMachine`.**
+
+Landing detection asks two questions: is acceleration within 2.5 m/s² of 1 g, and is
+vertical speed below 1 m/s? **A vehicle hovering under a drone answers yes to both.** Held
+for `landing_confirm_ms` — three seconds — that is a landing.
+
+Driven with a 3 m/s climb to 30 m and a 20-second hover before release:
+
+```text
+t= 10362 ms  alt=  16.1 m  rate= +3.0 m/s   READY -> FLIGHT
+t= 18018 ms  alt=  30.0 m  rate= +0.0 m/s   FLIGHT -> LANDED     <-- still under the drone
+t= 23034 ms  alt=  30.0 m  rate= +0.0 m/s   LANDED -> RECOVERY   <-- 12 s before release
+```
+
+`MODE-` then reads `RECOVERY` through the entire real descent, so anything that segments the
+flight by mission state is wrong. The five-second post-impact window is spent in the air —
+REC-008 is still physically satisfied, because `RECOVERY` transmits, but the vehicle's own
+declaration that it landed is gone. And `RECOVERY` is terminal, so it never returns.
+
+**`min_flight_ms` does not catch it.** That guard suppresses landing detection for the first
+three seconds of `FLIGHT`, which is aimed at a boost-then-coast profile where the vehicle is
+genuinely moving. On a drone lift, `FLIGHT` is entered at 15 m *during the ascent*, so those
+three seconds are used up long before the hover. The exposure is also wider than hovering:
+**any three-second interval with a vertical rate under 1 m/s** does it, including a gentle
+lift at less than 1 m/s.
+
+**Not fixed, deliberately.** Changing launch or landing detection is a mission-logic decision
+for the team, not something to slip into a documentation pass. The candidate fix is recorded
+where it can be argued with: a vehicle cannot land without descending first, so latch a flag
+once a sustained descent has actually been observed and refuse `FLIGHT → LANDED` until it is
+set. That is physical rather than threshold-tuned, and a hover cannot satisfy it.
+
+Recorded as [F-20](documentation/testing/bring-up-record.md#findings) and written up in
+[concept-of-operations.md](documentation/mission/concept-of-operations.md#the-hover-problem-f-20).
+
+### Added — the descent model, and a parachute that has a size
+
+`REC-005` said *"Parachute size and system - TBD"* against a **mandatory** 5 m/s descent
+requirement. The rulebook fixes the release altitude, the mass and the descent cap; nothing
+in the repository had turned those three numbers into a parachute.
+
+[`simulations/descent.py`](simulations/descent.py) does, from `S = 2 m g / (ρ Cd v²)`, with
+the descent time from the closed-form solution of `m dv/dt = mg − ½ρCdSv²` rather than
+height ÷ rate — the vehicle starts at rest and accelerates into the terminal rate. Air
+density comes from the gas law taking **pressure and temperature the vehicle itself
+measures**, so a descent computed after a flight can use the air it was actually falling
+through.
+
+**The answers.** 73.7 cm at 500 g and ISA; **80.0 cm sized at 550 g on a 35 °C day**, which
+is the case that has to still pass.
+
+**Three findings came out of it, and two were not what anyone was looking for:**
+
+- **Size at the top of the mass tolerance.** Area is linear in mass, so ±10 % of mass is
+  ±10 % of area but only ~5 % of diameter. A canopy sized at 500 g and flown at 550 g
+  **breaks the 5 m/s cap**. Sized at 550 g it is compliant across the whole band for 6 cm of
+  extra cloth. `test_sizing_at_the_top_of_the_tolerance_covers_the_whole_band` asserts it.
+- **The descent is 6.45 seconds — nine packets at 1.43 Hz.** That is the entire
+  over-the-air descent dataset. It is an argument for the SD log being the primary record
+  rather than a backup, and it means one lost packet is 11 % of the descent.
+- **Drag coefficient is the dominant uncertainty and paper cannot close it.** The spread
+  between canopy types is larger than every other term combined. A drop test with a known
+  mass and a stopwatch closes it.
+
+40 tests, pinned to three independent things: the ISA sea-level density, the free-fall limit
+`t → √(2y/g)` *including its leading correction term*, and the terminal limit
+`t → y/v + v ln2 / g`. Asserting "close to free fall" at one height only says the tolerance
+was chosen generously; asserting the shape of the departure pins the physics.
+
+### Added — the board does not fit, and the drawing says so
+
+The rulebook envelope is 12 cm across. The vehicle board is 100 × 100 mm. **A 100 mm square
+has a 141.4 mm diagonal, and a 120 mm circle inscribes only an 84.9 mm square** — so the
+board does not fit flat, and nothing in the repository had noticed, because the two numbers
+were decided a week apart in different documents.
+
+Edge-on as a spine it fits with 20 mm to spare, costs nothing, and puts the antenna along the
+vehicle axis where it wants to be. The alternative is cutting the board to 84.9 mm and
+stacking two decks, which is a rebuild — the current floorplan uses the full 100 mm in both
+axes.
+
+[`tools/gen_envelope_drawing.py`](tools/gen_envelope_drawing.py) draws it to scale in
+elevation and section, with the arithmetic written out beside it. Every coordinate is derived
+from the dimensions at the top of the file, so changing a requirement moves the drawing rather
+than making it wrong, and `check_doc_claims.py` fails the build if the committed SVG stops
+matching its generator.
+
+### Added — the netlist, generated from the firmware
+
+The wiring existed in three places: `BoardPins`, a drawing, and whatever is soldered. The
+first two can be held together mechanically, and now are.
+
+[`electrical/schematics/vehicle-netlist.tsv`](electrical/schematics/vehicle-netlist.tsv) —
+25 nets, 87 connections, 23 reference designators — is generated by
+[`tools/gen_netlist.py`](tools/gen_netlist.py), and every GPIO row carries the name of the
+`flight::BoardPins` constant it comes from. **The generator refuses to write a netlist whose
+pin numbers disagree with the header**, and it also fails if the firmware assigns a GPIO that
+no net mentions. Both conditions are checked again in `check_doc_claims.py`, so the committed
+file cannot drift from the generator either.
+
+There is no schematic file and there should not be: the vehicle is a point-to-point perfboard
+build, and a schematic of one is correct on the day it is drawn. What is actually useful is a
+table you can work a multimeter through, and that is what this is — including the ordering
+that matters, which is probing each net against its *neighbours*, not just within itself. A
+bridged pin reads as a perfectly good connection when you only check continuity.
+
+### Added — five empty directories, filled
+
+Each had held a one-line `.gitkeep` since the first commit.
+
+| Directory | Now holds |
+|---|---|
+| `documentation/mission/` | [concept-of-operations.md](documentation/mission/concept-of-operations.md) — the mission from power-on to recovery, phase by phase, with the data budget and the failure behaviour of each phase. **Writing it found F-20** |
+| `simulations/` | The descent model, its 40 tests, and a README carrying the answers and the rules anything added here has to follow |
+| `mechanical/` | Envelope, the board-fit constraint, the canopy spec, a first mass budget with every figure's source named, and generated drawings |
+| `electrical/` | The netlist, the authority hierarchy for electrical facts, and what a fabricated PCB would need |
+| `avionics/` | Per-subsystem summaries — power, sensors, telemetry — against what was actually measured, quoting the documents that own each number rather than competing with them |
+
+**The mass budget is a plan, not a measurement, and says so on its face.** Nothing has been
+weighed; every component figure is a vendor number marked as unverified. What the table is
+*for* is its shape: the avionics are of the order of 70 g against a 500 g budget, so the
+structure has ~380 g to spend and mass is very unlikely to be the binding constraint. The
+120 mm section is.
+
+### Fixed — a repository that had got ahead of its own README
+
+The board was built, the link had closed, and the front page still said **"The hardware has
+not been touched."** A sweep against the source found eleven more of the same kind:
+
+| Claim | Was | Is |
+|---|---|---|
+| Total automated checks | 4395 | **5054** |
+| Python test badge | 37 | **207** |
+| Hardware badge | "not yet verified" | board built, link closed |
+| Firmware drivers | "the microSD driver and the flight image as a whole have not [run]" | every driver has, and running the flight image is what found F-16 and F-19 |
+| Mechanical | "blocked on a rulebook contradiction" | unblocked since 2026-09-05, and now sized |
+| Pin table | `MPU-9250`, and no microphone pins | `MPU-6500`, `GP15` and `GP27` added |
+| "The three hardware blockers" | all three open | all three closed, with how each closed |
+| BOM statuses | written before anything was built | per-item state, measured where measured |
+| Telemetry rate (README, `requirements.md`, `telemetry-protocol.md`) | "1 Hz default" | **1.43 Hz** |
+| `timeline.md` | status date 2026-09-04, phase 5 "not started — blocking", 36 suites / 537 assertions, 76 Python tests | 2026-09-08, phase 5 substantially complete, 106 suites / 4013 assertions, 207 Python tests |
+| `software-architecture.md` | LoRa driver 101, microSD 581 | 129 and 613 |
+
+**Two of the corrections were not staleness but errors.**
+
+`requirements.md` had **two different requirements both numbered `GS-002`** — the original
+dual-ground-station compatibility row, and one added when the 2026 revision named the official
+radios. In a 127-row traceability table that is invisible and fatal. The newer one is now
+`GS-006`; the original keeps its number, because that is the one this changelog records as
+new. A uniqueness check now runs on every id.
+
+And **the check that counts the requirements table was counting 116 of its 127 rows.** The
+pattern matched three-letter ids, so every `GS-` and `SW-` row was silently skipped — and the
+paragraph above the table, which said "35 of the 116", passed. A count that quietly excludes
+eleven rows is worse than no count, because it reads as verified.
+
+Ten requirement rows were re-stated against work that had overtaken them: `PWR-006` and
+`PWR-007` asked for a regulator that turned out not to be needed; `MEC-001`, `MEC-002` and
+`MEC-006` waited on a clarification the 2026 revision has given; `REC-001`, `REC-005` and
+`REC-006` said `Blocked` for a parachute that now has a size; `TEL-005` said 1 Hz; and
+`REC-008` gained F-20 as a caveat.
+
+Bring-up rows **5.4** and **5.5** were marked superseded rather than corrected: both were
+measured at the 1000 ms period, and the prediction column now reads 1.43 Hz and 46 % duty.
+The measurements stand as evidence that the scheduler holds its configured rate; they are not
+evidence about the rate now configured, and the difference is worth a re-take rather than an
+edit.
+
+### Changed — more of the documentation is now checked rather than trusted
+
+`tools/check_doc_claims.py` grew from 220 claims to **235**, and the new ones are all of the
+kind that would otherwise rot quietly:
+
+- the total automated-check figure the README opens with;
+- the simulations suite's own count, and the Python total that now includes it;
+- the netlist against `BoardPins`, **and** the committed netlist against its generator;
+- the committed envelope drawing against its generator;
+- the canopy diameter, descent time and packet count where three documents quote them;
+- every requirement id being unique, and the row count no longer skipping two prefixes.
+
+`build_host.sh` runs the simulations suite. Its three `unittest` discovery runs are read
+**positionally** by the claim checker, so the file now says so where the runs are defined and
+`CONTRIBUTING.md` repeats it — a new discovery run inserted in the middle would silently
+re-label two suites.
+
+---
+
 ## [Unreleased] — 2026-09-07 (cycle 35)
 
 ### Fixed — the console demanded the demo's team of every real vehicle

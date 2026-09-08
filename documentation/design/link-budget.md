@@ -1,6 +1,6 @@
 # Radio Link Budget and Telemetry Rate
 
-Why the CanSat transmits at 1 Hz, why the modem runs at SF7, and why no amount of software
+Why the CanSat transmits at 1.43 Hz, why the modem runs at SF7, and why no amount of software
 makes the radio go faster.
 
 This document is the source of the numbers in `firmware/common/include/cansat/link_profile.hpp`.
@@ -225,27 +225,68 @@ range-limited for a CanSat descent; they are **not** a measured link budget. Ant
 polarisation mismatch during tumbling, body blockage by the vehicle structure, and the
 ground station's own noise floor are all unmeasured.
 
+## The 1 Hz minimum is a floor this vehicle cannot be configured onto
+
+The rulebook requires **at least** one packet per second, and the 2026 revision separately
+scores rates above it. A period of exactly 1000 ms satisfies the letter of that and is still
+the wrong number to build, for two independent reasons:
+
+1. **It sits *on* the requirement.** What a ground station measures is the transmit period
+   plus whatever jitter the loop, the radio and the receiver add. At exactly 1000 ms every
+   one of those pushes an interval past a second, and the vehicle is momentarily below a
+   requirement that is *checked*, not estimated. Measured mission-clock jitter is under
+   **4 ms** (bring-up row 5.4), so the 50 ms margin below is more than an order of magnitude
+   of headroom.
+2. **It scores nothing.** Rate above 1 Hz is a scored line, and 1.00 Hz is the floor of it.
+
+So the profile carries a hard ceiling rather than a default:
+
+| Constant | Value | Meaning |
+|---|---:|---|
+| `kRulebookMinRatePeriodMs` | 1000 ms | The rulebook's 1 Hz, as a period |
+| `kTelemetryJitterMarginMs` | 50 ms | Margin against measured jitter of under 4 ms |
+| **`kMaxTelemetryPeriodMs`** | **950 ms** | **The slowest period any build may carry — 1.053 Hz** |
+| `kTelemetryPeriodMs` | 700 ms | What this vehicle actually ships — **1.43 Hz** |
+
+**Nothing can be configured past that ceiling**, at compile time or at run time. A period of
+exactly 1000 ms is refused, and that is the point of the guard rather than an off-by-one.
+
 ## Guards in the code
 
-Three layers, so an impossible configuration cannot reach the pad:
+Four layers, so an impossible or merely compliant-on-paper configuration cannot reach the pad:
 
 1. **Compile time.** `link_profile.hpp` `static_assert`s that the profile's worst-case
    airtime fits inside its own telemetry period at the duty limit, that the packet fits the
-   LoRa FIFO, and that the period satisfies the 1 Hz minimum. An impossible default is a
-   build error.
+   LoRa FIFO, and that the period is **at or below `kMaxTelemetryPeriodMs`** — not merely at
+   or below the rulebook's 1000 ms. An impossible *or* borderline default is a build error.
 2. **Startup.** `flight::validate_config()` recomputes the airtime for the *actual* runtime
    configuration and refuses to start the mission loop with a message naming the airtime,
-   the required minimum period and this document.
+   the required minimum period and this document. It applies the same 950 ms ceiling, which
+   is the layer that catches a period written by hand at a call site rather than taken from
+   the profile.
 3. **Test.** `test_link_profile_is_shared_by_both_ends()` asserts the vehicle's radio
    configuration and the bridge's default `Sx1278Settings` are identical field by field. A
    modem mismatch receives nothing and is indistinguishable from dead hardware, so it is
-   worth a dedicated test.
+   worth a dedicated test. `test_the_link_profile_is_compulsorily_faster_than_1_hz()` holds
+   the three layers to each other, and
+   `test_a_default_vehicle_transmits_faster_than_1_hz()` flies a mission and measures the
+   gaps between transmitted packets — because a guard on a constant is only worth having if
+   the packets actually come out at that spacing.
+4. **The receiving end.** The ground station reports whether the rate that *arrived* cleared
+   1 Hz (`LinkHealth.rate_meets_rulebook`), which is a different question from what the
+   vehicle transmitted once the link starts losing packets. It answers three ways —
+   compliant, not compliant, or not yet enough link to judge — because "not measured" and
+   "measured, and too slow" call for very different reactions.
+
+> **If a live link reads 1 Hz**, the vehicle is not the cause: no build can be configured
+> that way. The usual explanation is an image flashed before the period changed. The vehicle's
+> startup summary prints the rate in Hz for exactly this reason.
 
 ## Changing the profile
 
 1. Edit the constants in `firmware/common/include/cansat/link_profile.hpp`.
-2. Rebuild. If the `static_assert` fires, the combination cannot meet the rulebook minimum —
-   the message says which constraint failed.
+2. Rebuild. If a `static_assert` fires, the combination either cannot meet the rulebook
+   minimum or only just meets it — the message says which constraint failed.
 3. Re-run `python tools/link_budget.py --sweep --payload 255` and update the table above.
 4. Run `bash tools/build_host.sh`. The shared-profile test proves both ends still agree.
 5. Reflash **both** Picos. Flashing only one produces a dead link.

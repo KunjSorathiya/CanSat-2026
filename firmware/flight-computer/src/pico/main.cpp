@@ -74,10 +74,18 @@ void print_startup_summary(const flight::Configuration& config,
     std::printf("\n=====================================================\n");
     std::printf(" CanSat 2026 - flight firmware\n");
     std::printf("=====================================================\n");
-    std::printf(" team %s | radio %s | telemetry every %lu ms\n", config.team_id.c_str(),
+    // The rate is printed in Hz as well as in milliseconds, and it is not decoration: the
+    // failure this summary is most likely to be consulted about is "the link is running at
+    // 1 Hz and I do not know why", whose usual cause is an image flashed before the period
+    // changed. A line that says 1.43 Hz settles that in one glance.
+    std::printf(" team %s | radio %s | telemetry every %lu ms (%.2f Hz)\n",
+                config.team_id.c_str(),
                 config.radio_mode == flight::RadioMode::official ? "OFFICIAL 0xA5"
                                                                  : "TEST 0xF3",
-                static_cast<unsigned long>(config.telemetry_period_ms));
+                static_cast<unsigned long>(config.telemetry_period_ms),
+                config.telemetry_period_ms == 0
+                    ? 0.0
+                    : 1000.0 / static_cast<double>(config.telemetry_period_ms));
     std::printf(" boot: %s\n\n", h.watchdog_reboot ? "WATCHDOG RESET" : "power-on");
 
     print_row("IMU", "MPU-6500", h.imu_ok ? "OK" : "FAILED",

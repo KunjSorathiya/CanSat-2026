@@ -19,6 +19,33 @@
 
 namespace cansat::link {
 
+// ---- The telemetry-rate floor, and why it is not 1000 ms ---------------------------
+//
+// The rulebook states 1 packet per second as a MINIMUM, and the 2026 revision separately
+// scores rates above it. A period of exactly 1000 ms satisfies the letter of that and is
+// still the wrong number to build, for two independent reasons:
+//
+//   1. It sits ON the requirement. The interval a ground station measures is the
+//      transmit period plus whatever jitter the loop, the radio and the receiver add. At
+//      exactly 1000 ms every one of those pushes an interval past a second, and the
+//      vehicle is momentarily below a requirement that is checked rather than estimated.
+//      Measured mission-clock jitter is under 4 ms (bring-up row 5.4), so 50 ms of margin
+//      is more than an order of magnitude of headroom -- cheap, and it means the vehicle
+//      is never at the line.
+//
+//   2. It scores nothing. Rate above 1 Hz is a scored line, and 1.00 Hz is the floor of
+//      it.
+//
+// So the ceiling below is a HARD LIMIT, not a default. It is enforced three times over,
+// because a flight build silently running at 1 Hz is exactly the failure this is for:
+// a static_assert at the bottom of this file refuses to compile a profile above it,
+// validate_config() refuses to run a Configuration above it, and check_doc_claims.py
+// refuses to pass a repository whose documentation disagrees with it.
+inline constexpr std::uint32_t kRulebookMinRatePeriodMs = 1000;  // 1 Hz, the rulebook floor
+inline constexpr std::uint32_t kTelemetryJitterMarginMs = 50;    // >12x the measured jitter
+inline constexpr std::uint32_t kMaxTelemetryPeriodMs =
+    kRulebookMinRatePeriodMs - kTelemetryJitterMarginMs;          // 950 ms, 1.053 Hz
+
 // ---- Modem ----------------------------------------------------------------------
 // PROVISIONAL: 433 MHz band; the exact channel is an open question for the organisers.
 inline constexpr std::uint32_t kFrequencyHz = 433'000'000;
@@ -101,8 +128,10 @@ inline constexpr double kChannelDuty = kWorstCaseAirtimeMs / kTelemetryPeriodMs;
 // not a flight-day discovery.
 static_assert(kWorstCasePacketBytes <= kMaxLoraPayloadBytes,
               "worst-case packet exceeds the 255-byte LoRa FIFO");
-static_assert(kTelemetryPeriodMs <= 1000,
-              "telemetry period must satisfy the rulebook 1 Hz minimum");
+static_assert(kTelemetryPeriodMs <= kMaxTelemetryPeriodMs,
+              "telemetry period must be STRICTLY faster than the rulebook's 1 Hz minimum, "
+              "with jitter margin: see kMaxTelemetryPeriodMs above");
+static_assert(kTelemetryPeriodMs > 0, "telemetry period must be non-zero");
 static_assert(kChannelDuty <= kMaxChannelDuty,
               "link profile cannot sustain its telemetry period: reduce the spreading "
               "factor, widen the bandwidth, shorten the packet, or slow the schedule "

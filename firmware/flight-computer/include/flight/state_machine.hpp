@@ -32,6 +32,12 @@ public:
     // True while LANDED and still inside the mandatory post-impact transmission window.
     bool post_impact_window_active(std::uint64_t now_ms) const;
 
+    // True once a real descent has been observed during this FLIGHT. Landing detection is
+    // refused until it is: see the descent gate in state_machine.cpp. Exposed because it
+    // is the difference between "has not landed yet" and "cannot declare a landing", and
+    // an operator watching a bench test deserves to be able to tell those apart.
+    bool descent_observed() const { return descent_observed_; }
+
 private:
     void enter(MissionState next, std::uint64_t now_ms);
 
@@ -40,6 +46,11 @@ private:
     std::uint64_t entered_ms_ = 0;
     std::uint64_t launch_condition_since_ms_ = 0;
     std::uint64_t rest_condition_since_ms_ = 0;
+    // The descent gate. `descent_since_ms_` times the current run of descending samples;
+    // `descent_observed_` latches once one of those runs is long enough, and clears only
+    // on a state change.
+    std::uint64_t descent_since_ms_ = 0;
+    bool descent_observed_ = false;
 };
 
 }  // namespace flight

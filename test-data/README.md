@@ -9,6 +9,8 @@ implementation on purpose.
 | [`validator-scenarios.tsv`](validator-scenarios.tsv) | the Python and JavaScript **validators** | Packet sequences with the verdict the validator must reach: gaps, duplicates, reboots, wrong team, clock regressions, implausible fixes |
 | [`framing-cases.tsv`](framing-cases.tsv) | the C++, Python and JavaScript **frame decoders** | Byte streams with the exact frames and counters each must produce, including every recovery path |
 | [`raw-log-escapes.tsv`](raw-log-escapes.tsv) | the Python **logger** and the JavaScript **console** | Escaped/plain pairs for the raw log's four escape rules, plain text stored as hex because it contains tabs and newlines |
+| [`optional-tag-cases.tsv`](optional-tag-cases.tsv) | the C++, Python and JavaScript **parsers** | How each optional tag splits into a key and a value. The mandatory block is positional and nobody disagrees about it; the optional tags are where three implementations can quietly diverge |
+| [`command-tokens.tsv`](command-tokens.tsv) | the C++ **command authoriser** and the JavaScript **console** | The digest both ends must compute from a password and a packet number, so the two implementations of FNV-1a cannot drift apart |
 | [`sample-mission.txt`](sample-mission.txt) | anyone following the documentation | A replayable mission, so every documented `replay` command runs against a file that exists |
 
 ## `sample-mission.txt`

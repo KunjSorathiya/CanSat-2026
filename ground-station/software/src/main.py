@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 from app import GroundStation
+from health import RULEBOOK_MIN_RATE_HZ
 from transport import FileReplayTransport
 
 
@@ -58,7 +59,20 @@ def _run_live(args: argparse.Namespace) -> int:
             while True:
                 time.sleep(2.0)
                 snap = station.snapshot()
-                print(snap["link"])
+                link = snap["link"]
+                print(link)
+                # The rulebook's 1 Hz is a minimum, and a rate printed inside a dict of
+                # ten other numbers is easy to read past. This says it in words, and only
+                # when there is something to say: None means the link has not been up long
+                # enough to judge, which is not the same as failing.
+                if link.get("rate_meets_rulebook") is False:
+                    print("  RATE BELOW THE RULEBOOK MINIMUM: {rate} Hz received "
+                          "against a required {minimum} Hz. Check the vehicle's "
+                          "configured telemetry period — a flight build cannot be "
+                          "slower than 1 Hz, so an image flashed before the period "
+                          "changed is the usual cause."
+                          .format(rate=link.get("rate_hz"),
+                                  minimum=RULEBOOK_MIN_RATE_HZ))
                 validation = snap.get("validation", {})
                 if validation.get("restarts"):
                     print("  VEHICLE RESTARTED {restarts} time(s) — packet numbering "

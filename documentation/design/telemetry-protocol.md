@@ -404,7 +404,7 @@ Each test record must contain a requirement reference, method, expected result, 
 | P-001 initialization | Packet numbering starts at `P-001` | Cold-start and inspect first valid transmitted packet | First valid packet is `P-001` | Packet log |
 | Sequential numbering | Numbers increment sequentially | Analyze long packet sequence | No unexpected gaps, duplicates, or resets | Packet analysis report |
 | 1 Hz minimum | At least 1 packet/s | Measure timestamps and receive intervals under representative load | Rate never violates the documented test acceptance condition | Rate and loss log |
-| Higher-rate stability | 1 Hz default; 2 Hz over a 250 kHz modem | Range-test both profiles and compare measured loss | Chosen rate is stable, low-loss, and compatible with power/airtime | Comparison report |
+| Higher-rate stability | **1.43 Hz default** (700 ms, 199-byte packet, GPS logged rather than transmitted); 1.18 Hz with GPS on the air; higher still only over a 250 kHz modem, which costs 3 dB of sensitivity | Range-test each profile and compare measured loss | Chosen rate is stable, low-loss, and compatible with power/airtime | Comparison report |
 | Corrupted packets | Mandatory corruption is detected | Inject malformed fields and corrupted frames | No telemetry point is produced; fault is classified | Parser test results |
 | Missing packets | Loss is detected | Drop packets in a controlled stream | Missing sequence is recorded separately from sensor faults | Ground-station log |
 | Invalid sensor fields | Sensor-invalid data is rejected | Simulate unavailable, stale, NaN, and initialization-failure states | No malformed mandatory packet is accepted | Fault-injection results |

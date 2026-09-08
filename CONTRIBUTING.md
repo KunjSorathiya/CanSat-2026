@@ -34,16 +34,26 @@ flowchart LR
 
 ```text
 firmware/common/            shared telemetry format, link profile, airtime model,
-                            SX1278 driver (cansat::)
+                            command authorisation, SX1278 driver (cansat::)
 firmware/flight-computer/   flight core (flight::) + Pico HAL (src/pico/)
 firmware/ground-station/    bridge firmware + USB framing (ground::)
 ground-station/software/    Python receive pipeline
 ground-station/web/         single-file browser console + its Node test harness
-tools/                      build, syntax check, link-budget calculator,
+simulations/                mission analysis that runs: the descent model + its tests
+avionics/                   per-subsystem status summaries (power, sensors, telemetry)
+electrical/                 netlist, PCB notes
+mechanical/                 envelope, mass budget, drawings, CAD
+tools/                      build, syntax check, link-budget calculator, netlist and
+                            drawing generators, SD-card and flight-log utilities,
                             documentation-claim checker, SDK stubs
-test-data/                  protocol fixtures shared by all three parsers
+test-data/                  fixtures shared by all three parsers
 documentation/              all engineering documentation
 ```
+
+**Two of those directories hold generated files.** `electrical/schematics/vehicle-netlist.tsv`
+and `mechanical/drawings/envelope-and-board-fit.svg` are written by scripts in `tools/`, and
+`check_doc_claims.py` fails the build if the committed file no longer matches its generator.
+Edit the generator, run it, and commit both.
 
 ---
 
@@ -89,8 +99,11 @@ Three guards make this enforceable rather than a promise:
 - **[`test-data/protocol-fixtures.tsv`](test-data/protocol-fixtures.tsv)** — 32 packets with
   a recorded verdict each, read by the C++, Python **and** JavaScript parsers. A parser that
   disagrees fails the build.
-- **`tools/check_doc_claims.py`** — 56 numbers from the documentation compared against the
-  source that defines them, including every pin in the wiring table.
+- **`tools/check_doc_claims.py`** — 235 documented claims compared against the source that
+  defines them: every pin in the wiring table, every test count, every relative link and
+  heading anchor, the generated netlist and drawing, and the canopy diameter the mechanical
+  build takes out of a simulation. **When you state a number in a document, add a check for
+  it** rather than trusting the next reader to notice it has gone stale.
 - **`ground-station/web/tests/console_core.test.mjs`** — the web console's logic is
   extracted from `index.html` between the `PORTABLE-CORE` markers and run under Node, so
   keep new presentation code *below* the END marker or the harness will reject it.
@@ -138,6 +151,14 @@ frameworks.
 - **Python** — add a `unittest` case under `ground-station/software/tests/`.
 - **Web console** — add a case to `ground-station/web/tests/console_core.test.mjs`.
 - **Tooling** — add a case under `tools/tests/`.
+- **Simulations** — add a case under `simulations/tests/`. A model has to be pinned to
+  something independent: a closed-form limit, a published reference vector, or a value that
+  can be computed by hand. `test_descent.py` uses all three.
+
+> `build_host.sh` reads the three `unittest` discovery runs **positionally** — ground
+> station, tooling, simulations — to hold the documented test counts to what the suites
+> report. A new discovery run goes at the end of that block, never between the existing
+> ones.
 
 `bash tools/build_host.sh` runs all of them, plus the documentation-claim check.
 
@@ -162,8 +183,11 @@ Documentation is part of the change, not a follow-up.
 | Pin assignment | `config.hpp`, `pico-gpio-map.md`, `wiring.md` |
 | Packet format | `telemetry-protocol.md`, both parsers, the web console |
 | Mission behaviour or thresholds | `software-architecture.md`, `flight-computer/README.md` |
+| Mission profile, timings, or what a phase does | `mission/concept-of-operations.md` |
 | Test coverage | `test-plan.md` |
+| A measurement taken on hardware | `testing/bring-up-record.md` — and a finding row if it disagreed with the prediction |
 | Operating procedure | `runbook.md` |
+| A subsystem's state | the relevant `avionics/*/README.md`, `electrical/README.md` or `mechanical/README.md` |
 | Anything notable | `CHANGELOG.md` |
 
 Follow the [documentation rules](documentation/README.md#documentation-rules): evidence

@@ -655,6 +655,9 @@ flight::Configuration fast_state_config() {
     c.landing_accel_epsilon_mps2 = 2.5;
     c.landing_altitude_rate_max_mps = 1.0;
     c.landing_confirm_ms = 200;
+    // Scaled with the rest. The gate itself is exercised at its real value by
+    // test_a_hovering_drone_is_not_a_landing().
+    c.landing_descent_confirm_ms = 50;
     c.post_impact_transmission_ms = 5000;
     return c;
 }
@@ -684,11 +687,14 @@ void test_state_machine_full_mission() {
     sm.update(150, di);
     CHECK(sm.state() == flight::MissionState::flight);
 
-    // Coast: not at rest yet.
+    // Coast: not at rest yet, and descending hard enough to open the descent gate.
     di.accel_magnitude_mps2 = 5.0;
     di.altitude_rate_mps = -20.0;
     sm.update(300, di);
     CHECK(sm.state() == flight::MissionState::flight);
+    CHECK(!sm.descent_observed());          // one sample is not a descent
+    sm.update(360, di);                     // held past landing_descent_confirm_ms
+    CHECK(sm.descent_observed());
 
     // At rest past min_flight_ms, held for landing_confirm_ms -> LANDED.
     di.accel_magnitude_mps2 = flight::sensors::kStandardGravity;
@@ -703,6 +709,304 @@ void test_state_machine_full_mission() {
     sm.update(650 + 5000, di);
     CHECK(sm.state() == flight::MissionState::recovery);
     CHECK(!sm.post_impact_window_active(650 + 5000));
+}
+
+// ----------------------------------------------------------------------------
+// F-20. "At rest" -- about 1 g, and no vertical motion -- is also a perfect description of
+// a vehicle hanging under a hovering drone. Before the descent gate this declared a
+// landing at 18.0 s of a lift with a 20 s hover: twelve seconds before release, after
+// which the whole real descent happened in RECOVERY and the mandatory post-impact window
+// had already been spent in the air.
+//
+// The profile below is the real one, at the real thresholds -- not a scaled-down test
+// config -- because the numbers that made this fire are the flight numbers.
+void test_a_hovering_drone_is_not_a_landing() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    flight::StateMachine sm(c);
+
+    flight::DetectionInputs di;
+    di.self_test_ok = true;
+    di.sensors_ok = true;
+    sm.begin_self_test(0);
+    sm.update(0, di);
+    CHECK(sm.state() == flight::MissionState::ready);
+
+    // A drone lift: three seconds on the pad, a 3 m/s climb to 30 m, then a 20 s hover
+    // before the release. The vehicle is armed once the arming delay has elapsed.
+    auto lift_sample = [&](std::uint64_t ms) {
+        const double t = ms / 1000.0;
+        di.armed = ms >= c.arming_delay_ms;
+        di.accel_magnitude_mps2 = flight::sensors::kStandardGravity;
+        if (t < 5.0) {                       // on the ground
+            di.altitude_agl_m = 0.0;
+            di.altitude_rate_mps = 0.0;
+        } else if (t < 15.0) {               // climbing at 3 m/s
+            di.altitude_agl_m = 3.0 * (t - 5.0);
+            di.altitude_rate_mps = 3.0;
+        } else {                             // hovering at 30 m
+            di.altitude_agl_m = 30.0;
+            di.altitude_rate_mps = 0.0;
+        }
+    };
+
+    bool entered_flight = false;
+    std::uint64_t left_flight_at = 0;
+    flight::MissionState left_for = flight::MissionState::init;
+    for (std::uint64_t ms = 0; ms <= 35000; ms += 33) {
+        lift_sample(ms);
+        sm.update(ms, di);
+        if (sm.state() == flight::MissionState::flight) entered_flight = true;
+        const bool ok = sm.state() == flight::MissionState::ready ||
+                        sm.state() == flight::MissionState::flight;
+        if (!ok && left_flight_at == 0) {
+            left_flight_at = ms;
+            left_for = sm.state();
+        }
+    }
+    // The whole assertion, made once: through the climb and a twenty-second hover the
+    // vehicle never leaves FLIGHT. It used to reach LANDED at 18.0 s and RECOVERY at
+    // 23.0 s. Recording *when* it went wrong is the useful half of the failure.
+    CHECK(left_flight_at == 0);
+    if (left_flight_at != 0) {
+        std::cerr << "  left FLIGHT at " << left_flight_at << " ms for "
+                  << flight::to_string(left_for) << "\n";
+    }
+    // ...and it did reach FLIGHT, or the test above proves nothing. The altitude
+    // condition fires during the ascent, which is correct: MIS-004 wants telemetry to
+    // reflect the climb.
+    CHECK(entered_flight);
+    CHECK(sm.state() == flight::MissionState::flight);
+    CHECK(!sm.descent_observed());
+
+    // Release. The canopy takes load and the vehicle descends at the rulebook cap.
+    bool landed_mid_descent = false;
+    for (std::uint64_t ms = 35000; ms <= 41500; ms += 33) {
+        di.altitude_rate_mps = -5.0;
+        di.altitude_agl_m = 30.0 - 5.0 * ((ms - 35000) / 1000.0);
+        if (di.altitude_agl_m < 0.0) di.altitude_agl_m = 0.0;
+        sm.update(ms, di);
+        if (sm.state() != flight::MissionState::flight) landed_mid_descent = true;
+    }
+    CHECK(!landed_mid_descent);
+    // A second into that descent the gate is open, with five seconds of the 6.45 s
+    // descent still to run.
+    CHECK(sm.descent_observed());
+
+    // Touchdown, and now the same at-rest condition that the hover produced does mean a
+    // landing.
+    for (std::uint64_t ms = 41500; ms <= 45000; ms += 33) {
+        di.altitude_rate_mps = 0.0;
+        di.altitude_agl_m = 0.0;
+        sm.update(ms, di);
+    }
+    CHECK(sm.state() == flight::MissionState::landed);
+    // And the post-impact window is spent on the ground, where the rulebook wants it.
+    CHECK(sm.post_impact_window_active(45100));
+}
+
+// The exposure is wider than hovering. Any run of samples with a vertical rate under
+// landing_altitude_rate_max_mps satisfies the at-rest test, which includes a lift gentle
+// enough to stay below it -- so a slow ascent must not read as a landing either.
+void test_a_lift_slower_than_the_rest_threshold_is_not_a_landing() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    flight::StateMachine sm(c);
+
+    flight::DetectionInputs di;
+    di.self_test_ok = true;
+    di.sensors_ok = true;
+    sm.begin_self_test(0);
+    sm.update(0, di);
+
+    // Climb at 0.8 m/s: below landing_altitude_rate_max_mps (1.0), so every sample of it
+    // reads as "not descending" to the at-rest test. Forty seconds of it.
+    std::uint64_t declared_at = 0;
+    for (std::uint64_t ms = 0; ms <= 45000; ms += 33) {
+        di.armed = ms >= c.arming_delay_ms;
+        di.accel_magnitude_mps2 = flight::sensors::kStandardGravity;
+        di.altitude_rate_mps = 0.8;
+        di.altitude_agl_m = 0.8 * (ms / 1000.0);
+        sm.update(ms, di);
+        if (declared_at == 0 && (sm.state() == flight::MissionState::landed ||
+                                 sm.state() == flight::MissionState::recovery)) {
+            declared_at = ms;
+        }
+    }
+    CHECK(declared_at == 0);
+    if (declared_at != 0) {
+        std::cerr << "  declared a landing during a 0.8 m/s climb at " << declared_at
+                  << " ms\n";
+    }
+    CHECK(sm.state() == flight::MissionState::flight);
+    CHECK(!sm.descent_observed());
+}
+
+// The gate belongs to one FLIGHT. A descent observed before this state began -- the state
+// machine having been driven through an earlier profile -- must not authorise a landing
+// inside it.
+void test_the_descent_gate_does_not_survive_a_state_change() {
+    const flight::Configuration c = fast_state_config();
+    flight::StateMachine sm(c);
+    flight::DetectionInputs di;
+    di.self_test_ok = true;
+    sm.begin_self_test(0);
+    sm.update(0, di);
+    di.armed = true;
+
+    // Launch, descend enough to open the gate, then land.
+    di.accel_magnitude_mps2 = 60.0;
+    sm.update(10, di);
+    sm.update(150, di);
+    CHECK(sm.state() == flight::MissionState::flight);
+    di.accel_magnitude_mps2 = 5.0;
+    di.altitude_rate_mps = -20.0;
+    sm.update(300, di);
+    sm.update(400, di);
+    CHECK(sm.descent_observed());
+
+    // A critical fault forces FAULT from FLIGHT, which is a state change.
+    di.critical_fault = true;
+    sm.update(500, di);
+    CHECK(sm.state() == flight::MissionState::fault);
+    CHECK(!sm.descent_observed());
+}
+
+// A single noisy barometer sample must not open the gate. The confirm window is what
+// separates a descent from a spike, and validate_config() refuses to run without one.
+void test_one_descending_sample_does_not_open_the_descent_gate() {
+    flight::Configuration c = fast_state_config();
+    c.landing_descent_confirm_ms = 500;
+    flight::StateMachine sm(c);
+    flight::DetectionInputs di;
+    di.self_test_ok = true;
+    sm.begin_self_test(0);
+    sm.update(0, di);
+    di.armed = true;
+    di.accel_magnitude_mps2 = 60.0;
+    sm.update(10, di);
+    sm.update(150, di);
+    CHECK(sm.state() == flight::MissionState::flight);
+
+    di.accel_magnitude_mps2 = flight::sensors::kStandardGravity;
+    // A spike every second, never held. The run restarts each time.
+    bool gate_opened = false;
+    for (std::uint64_t ms = 200; ms <= 6000; ms += 100) {
+        di.altitude_rate_mps = (ms % 1000 == 0) ? -9.0 : 0.0;
+        sm.update(ms, di);
+        if (sm.descent_observed()) gate_opened = true;
+    }
+    CHECK(!gate_opened);
+    // ...and with nothing to authorise it, no landing is declared however long the vehicle
+    // sits at rest.
+    CHECK(sm.state() == flight::MissionState::flight);
+}
+
+// The two thresholds read the same quantity from opposite ends. If the rate that counts as
+// descending were at or below the rate that counts as stopped, one sample could satisfy
+// both -- exactly the confusion the gate exists to remove.
+void test_the_descent_and_rest_thresholds_may_not_overlap() {
+    std::string why;
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    CHECK(flight::validate_config(c, why));
+
+    c.landing_descent_rate_mps = c.landing_altitude_rate_max_mps;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("landing_descent_rate_mps") != std::string::npos);
+
+    c.landing_descent_rate_mps = c.landing_altitude_rate_max_mps - 0.1;
+    CHECK(!flight::validate_config(c, why));
+
+    c.landing_descent_rate_mps = 2.0;
+    CHECK(flight::validate_config(c, why));
+
+    c.landing_descent_confirm_ms = 0;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("landing_descent_confirm_ms") != std::string::npos);
+}
+
+// The rulebook's 1 Hz is a floor, and this vehicle is built to be above it rather than on
+// it. Three things enforce that and they must agree with each other: the profile's own
+// constant, the ceiling, and what validate_config() will accept.
+void test_the_link_profile_is_compulsorily_faster_than_1_hz() {
+    // The ceiling is below the rulebook period, not equal to it.
+    CHECK(cansat::link::kMaxTelemetryPeriodMs < cansat::link::kRulebookMinRatePeriodMs);
+    CHECK(cansat::link::kRulebookMinRatePeriodMs - cansat::link::kMaxTelemetryPeriodMs ==
+          cansat::link::kTelemetryJitterMarginMs);
+    // The shipped profile is inside it, and comfortably: this is the value a flight build
+    // actually carries.
+    CHECK(cansat::link::kTelemetryPeriodMs <= cansat::link::kMaxTelemetryPeriodMs);
+    CHECK(cansat::link::kTelemetryPeriodMs == 700);
+
+    // The default Configuration takes it from the profile rather than repeating it, so a
+    // vehicle built with no explicit period is already above 1 Hz.
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    CHECK(c.telemetry_period_ms == cansat::link::kTelemetryPeriodMs);
+    const double rate_hz = 1000.0 / static_cast<double>(c.telemetry_period_ms);
+    CHECK(rate_hz > 1.0);
+    CHECK(rate_hz > 1.4);
+
+    std::string why;
+    CHECK(flight::validate_config(c, why));
+
+    // Every period at or above the rulebook figure is refused, including the figure
+    // itself. A vehicle cannot be configured onto the line.
+    for (std::uint32_t period : {1000u, 1001u, 1500u, 2000u, 60000u}) {
+        c.telemetry_period_ms = period;
+        CHECK(!flight::validate_config(c, why));
+    }
+    // Nor can it be configured just under the ceiling and just over it.
+    c.telemetry_period_ms = cansat::link::kMaxTelemetryPeriodMs;
+    CHECK(flight::validate_config(c, why));
+    c.telemetry_period_ms = cansat::link::kMaxTelemetryPeriodMs + 1;
+    CHECK(!flight::validate_config(c, why));
+}
+
+// The controller schedules from the configured period, so the guard above is only worth
+// having if the packets actually come out at that spacing. Fly a mission and measure the
+// gaps between transmitted packets.
+void test_a_default_vehicle_transmits_faster_than_1_hz() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    c.require_calibration_to_arm = false;
+    c.calib_samples = 4;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    std::vector<std::uint64_t> sent_at;
+    std::size_t last = 0;
+    for (std::uint64_t ms = 0; ms <= 30000; ms += 2) {
+        ctrl.poll(ms);
+        if (radio.packets.size() != last) {
+            last = radio.packets.size();
+            sent_at.push_back(ms);
+        }
+    }
+    CHECK(sent_at.size() > 20);
+
+    // No interval may reach a second, and the average rate must clear 1 Hz with the
+    // margin the profile promises.
+    std::uint64_t worst_gap = 0;
+    for (std::size_t i = 1; i < sent_at.size(); ++i) {
+        const std::uint64_t gap = sent_at[i] - sent_at[i - 1];
+        CHECK(gap == c.telemetry_period_ms);
+        if (gap > worst_gap) worst_gap = gap;
+    }
+    CHECK(worst_gap < cansat::link::kRulebookMinRatePeriodMs);
+    const double span_s = (sent_at.back() - sent_at.front()) / 1000.0;
+    const double measured_hz = (sent_at.size() - 1) / span_s;
+    CHECK(measured_hz > 1.0);
+    if (!(measured_hz > 1.0)) {
+        std::cerr << "  measured " << measured_hz << " Hz over " << span_s << " s\n";
+    }
 }
 
 void test_state_machine_fault_paths() {
@@ -773,9 +1077,23 @@ void test_config_validation() {
     CHECK(flight::validate_config(c, why));
     CHECK(why.empty());
 
-    c.telemetry_period_ms = 2000;  // slower than 1 Hz minimum
+    c.telemetry_period_ms = 2000;  // slower than the 1 Hz minimum
     CHECK(!flight::validate_config(c, why));
-    c.telemetry_period_ms = 1000;
+    // Exactly 1 Hz is refused too, and that is the point of the guard rather than an
+    // off-by-one: the rulebook figure is a floor, and a vehicle sitting on it goes below
+    // it on the first millisecond of jitter.
+    c.telemetry_period_ms = cansat::link::kRulebookMinRatePeriodMs;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("strictly faster") != std::string::npos);
+    // One millisecond over the ceiling is refused; the ceiling itself is accepted.
+    c.telemetry_period_ms = cansat::link::kMaxTelemetryPeriodMs + 1;
+    CHECK(!flight::validate_config(c, why));
+    c.telemetry_period_ms = cansat::link::kMaxTelemetryPeriodMs;
+    CHECK(flight::validate_config(c, why));
+    // And zero, which is neither fast nor slow but a stopped scheduler.
+    c.telemetry_period_ms = 0;
+    CHECK(!flight::validate_config(c, why));
+    c.telemetry_period_ms = cansat::link::kTelemetryPeriodMs;
 
     c.post_impact_transmission_ms = 3000;  // below rulebook 5 s
     CHECK(!flight::validate_config(c, why));
@@ -3171,6 +3489,14 @@ void test_the_packet_cadence_is_the_same_in_every_state() {
             if (t_s > 22.0) altitude = 170.0 - (t_s - 22.0) * 17.0;
         }
         baro.sample.altitude_m = altitude;
+        // The pressure has to move with the altitude, and this profile used not to move
+        // it at all. The controller updates its vertical-rate estimate only when the
+        // pressure changes -- a repeated reading means no fresh conversion, not a
+        // stationary vehicle -- so a profile that flew 170 m up and back down on a
+        // constant pressure produced a vertical rate of exactly zero throughout. The test
+        // still reached LANDED, because at-rest was satisfied the moment the acceleration
+        // came back to 1 g, so nothing ever noticed. The descent gate noticed.
+        baro.sample.pressure_pa = 101325.0 * std::exp(-altitude / 8434.0);
         imu.sample.az_mps2 = az;
         ctrl.poll(ms);
         if (radio.packets.size() != last_count) {
@@ -3599,6 +3925,13 @@ int main(int argc, char** argv) {
     test_scheduler();
     test_fault_manager();
     test_state_machine_full_mission();
+    test_a_hovering_drone_is_not_a_landing();
+    test_a_lift_slower_than_the_rest_threshold_is_not_a_landing();
+    test_the_descent_gate_does_not_survive_a_state_change();
+    test_one_descending_sample_does_not_open_the_descent_gate();
+    test_the_descent_and_rest_thresholds_may_not_overlap();
+    test_the_link_profile_is_compulsorily_faster_than_1_hz();
+    test_a_default_vehicle_transmits_faster_than_1_hz();
     test_state_machine_fault_paths();
     test_config_validation();
     test_sound_level_reduces_a_window_to_its_envelope();

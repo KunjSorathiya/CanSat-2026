@@ -13,6 +13,19 @@ from dataclasses import dataclass, field
 # Packet arrivals inside this window define the reported rate.
 RATE_WINDOW_S = 5.0
 
+# The rulebook requires at least one packet per second. It is a MINIMUM the vehicle must
+# never be found below -- and the vehicle firmware refuses to build at or below it, with
+# 50 ms of jitter margin (cansat::link::kMaxTelemetryPeriodMs). This is the receiving end
+# of the same rule: the ground station says out loud whether what actually arrived meets
+# it, rather than leaving an operator to read a number and do the comparison themselves.
+RULEBOOK_MIN_RATE_HZ = 1.0
+
+# How long the link has to have been up before the rate is worth judging. The rate window
+# is five seconds and a fresh link has one or two packets in it, so a station that judged
+# immediately would report non-compliance for the first few seconds of every session and
+# teach its operator to ignore the indicator.
+RATE_JUDGEMENT_AFTER_S = RATE_WINDOW_S
+
 
 @dataclass
 class LinkHealth:
@@ -81,6 +94,23 @@ class LinkHealth:
         return round((count - 1) / span, 2)
 
     @property
+    def rate_meets_rulebook(self) -> bool | None:
+        """Is the received rate at or above the rulebook's 1 Hz minimum?
+
+        ``None`` while there is not yet enough of a link to judge -- no connection, or
+        fewer than ``RATE_JUDGEMENT_AFTER_S`` seconds of it. That is deliberately distinct
+        from ``False``: "not measured yet" and "measured, and too slow" call for very
+        different reactions from an operator, and a boolean cannot say the first.
+        """
+        if not self.connected or self.last_rx_at is None:
+            return None
+        if not self._arrivals:
+            return None
+        if (self._arrivals[-1] - self._arrivals[0]) < RATE_JUDGEMENT_AFTER_S:
+            return None
+        return self.rate_hz >= RULEBOOK_MIN_RATE_HZ
+
+    @property
     def seconds_since_rx(self) -> float | None:
         if self.last_rx_at is None:
             return None
@@ -97,6 +127,7 @@ class LinkHealth:
         return {
             "connected": self.connected,
             "rate_hz": self.rate_hz,
+            "rate_meets_rulebook": self.rate_meets_rulebook,
             "packets_ok": self.packets_ok,
             "packets_invalid": self.packets_invalid,
             "missing": self.missing_packets,

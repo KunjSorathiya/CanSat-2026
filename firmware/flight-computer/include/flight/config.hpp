@@ -76,11 +76,16 @@ struct Configuration {
     // Radio and sensor rates are deliberately decoupled. Sensors and the state estimator
     // run fast enough for flight dynamics; the radio runs as fast as its airtime allows.
     //
-    // 1000 ms = 1 Hz, the rulebook minimum, at ~32 % channel occupancy with the default
-    // SF7/125 kHz modem. 2 Hz is only reachable with a wider bandwidth or a shorter
-    // packet — validate_config() rejects the combinations that are not physically
-    // achievable rather than letting the scheduler silently under-run.
-    std::uint32_t telemetry_period_ms = cansat::link::kTelemetryPeriodMs;  // cap 1000
+    // 700 ms = 1.43 Hz on the default SF7/125 kHz modem and the 199-byte packet, at 46 %
+    // channel occupancy against a 50 % policy.
+    //
+    // **The rulebook's 1 Hz is a minimum this vehicle must never be found sitting on.**
+    // `validate_config()` refuses any period above `kMaxTelemetryPeriodMs` (950 ms), so a
+    // build cannot ship at or below 1 Hz however the field is set -- and the profile
+    // itself will not compile above it. Going faster than 700 ms needs a wider bandwidth
+    // or a shorter packet; validate_config() rejects the combinations that are not
+    // physically achievable rather than letting the scheduler silently under-run.
+    std::uint32_t telemetry_period_ms = cansat::link::kTelemetryPeriodMs;  // hard cap 950
     // 33 ms = ~30 Hz acquisition, state estimation and altitude rate. Both sensors can
     // supply data faster than this: the barometer's configured preset runs at 83 Hz and
     // the IMU at 200 Hz. validate_config() refuses a period the barometer cannot keep up
@@ -265,6 +270,27 @@ struct Configuration {
     double landing_accel_epsilon_mps2 = 2.5;     // ||a| - g| below this implies at rest
     double landing_altitude_rate_max_mps = 1.0;  // |vertical speed| below this implies not descending
     std::uint32_t landing_confirm_ms = 3000;     // rest condition must hold this long
+
+    // ---- The descent gate ---------------------------------------------------
+    // A landing may not be declared until a real descent has been observed. Without this
+    // the vehicle declares a landing while **hovering under the drone that is about to
+    // release it** -- 1 g and no vertical motion is exactly what "at rest" tests for, and
+    // three seconds of hover was enough ([F-20], documentation/mission/
+    // concept-of-operations.md). min_flight_ms does not help: on a drone lift FLIGHT is
+    // entered during the ascent, so its window is spent before the hover begins.
+    //
+    // 2 m/s of descent, held for a second. Both numbers are chosen to sit in the wide gap
+    // between the two things they have to separate:
+    //
+    //   * The mission descends at up to 5 m/s (the rulebook cap), reaching terminal rate
+    //     in about half a second, and the whole descent from 30.48 m lasts 6.45 s. So the
+    //     gate opens roughly a second into the descent with five seconds to spare, and a
+    //     failed parachute -- which falls far faster -- opens it sooner still.
+    //   * A hovering drone, a gentle lift and barometric noise are all far below 2 m/s.
+    //
+    // PROVISIONAL, like every other detection threshold here: tune against real drop data.
+    double landing_descent_rate_mps = 2.0;            // descend faster than this to arm the gate
+    std::uint32_t landing_descent_confirm_ms = 1000;  // and hold it this long
 
     // ---- Post-impact --------------------------------------------------------
     std::uint32_t post_impact_transmission_ms = 5000;  // >= rulebook 5 s minimum after impact

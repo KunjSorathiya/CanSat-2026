@@ -6,13 +6,15 @@
 and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml)
-[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-4785%20assertions-1b5e20)](documentation/testing/test-plan.md)
-[![Python tests](https://img.shields.io/badge/Python%20tests-37%20passing-1b5e20)](documentation/testing/test-plan.md)
+[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-4879%20assertions-1b5e20)](documentation/testing/test-plan.md)
+[![Python tests](https://img.shields.io/badge/Python%20tests-213%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
 [![Link](https://img.shields.io/badge/telemetry-433%20MHz%20LoRa-4527a0)](documentation/design/telemetry-protocol.md)
-[![Hardware](https://img.shields.io/badge/hardware-not%20yet%20verified-b71c1c)](documentation/project/timeline.md)
+[![Hardware](https://img.shields.io/badge/hardware-board%20built%20%C2%B7%20link%20closed-1b5e20)](documentation/testing/bring-up-record.md)
+[![Mechanical](https://img.shields.io/badge/mechanical-not%20started-b71c1c)](mechanical/README.md)
 
+[Mission profile](documentation/mission/concept-of-operations.md) ·
 [Architecture](documentation/design/software-architecture.md) ·
 [Wiring](documentation/design/wiring.md) ·
 [Timeline](documentation/project/timeline.md) ·
@@ -28,10 +30,10 @@ and streams telemetry from power-on through recovery.**
 
 | Layer | State |
 |---|---|
-| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 4395 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
-| 🟡 **Firmware drivers** | The IMU, barometer, GPS and radio drivers **have run on real silicon** and their numbers are recorded. The microSD driver and the flight image as a whole have not |
+| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 5154 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
+| 🟢 **Firmware drivers** | **Every driver has run on real silicon** and its numbers are recorded — IMU, barometer, GPS, radio and microSD. **The flight image itself runs**: it was flashed, it printed its startup summary, it wrote a card, and it produced [F-16](documentation/testing/bring-up-record.md#findings) and [F-19](documentation/testing/bring-up-record.md#findings), which are defects only a running image could have found |
 | 🟢 **Hardware** | **The vehicle board is built and every device on it works** — **34 of 91 recorded measurements taken.** **The radio link closed end to end on 2026-09-07** — 66 packets, `P-001` to `P-066`, no gaps, no duplicates, 1.0000 Hz, −44 dBm at bench range, so Gate 8 has a bench link. Gates 3, 4, 5, 6 and 7 all pass on the soldered board — the IMU and barometer share I2C0 (`0x68` and `0x76`, `0x0C` correctly absent), the GPS emits clean NMEA at 162 B/s, the radio sends 5/5, 5/5 and 45/45 with airtimes within 1.8 % of the model, the card writes 100/100 and sustains ~300 writes/s, and the shared SPI0 bus passes every row. **Power is answered:** the Pico's own 3.3 V rail held **3.28–3.29 V through 45 back-to-back transmits** and 3.28–3.30 V at 100 % write duty, so no separate rail is needed. Sensor read costs 0.833 ms worst against a 33 ms period. **Open:** [F-12](documentation/testing/bring-up-record.md#findings), a card intermittent that failed three of its first four runs and has passed twelve since with the supply measured innocent; and [F-17](documentation/testing/bring-up-record.md#findings), **yaw measured drifting more than a full revolution in a 36.8-minute stationary log** — and, more usefully, holding to ±0.8° for the first 15 minutes before switching to 0.4 dps, which is **70° over a 3-minute flight** on a vehicle with no magnetometer; and [F-18](documentation/testing/bring-up-record.md#findings), a stationary GPS jumping 55.6 m in one second because nothing gates a fix on satellite count or HDOP. Still to fit: the sound module, the switch, the divider, and the Schottky |
-| 🔴 **Mechanical** | Structure, egg chamber and parachute **not started** — blocked on a rulebook contradiction |
+| 🟡 **Mechanical** | Structure, egg chamber and parachute **not started** — but **no longer blocked**. The 2026 revision settled the dimensions, and the parachute is now sized: a **80.0 cm** flat canopy brings 550 g down at 5.00 m/s on a hot day, computed by [`simulations/descent.py`](simulations/descent.py) and pinned by tests. The envelope has also produced its first real constraint — **a 100 × 100 mm board does not fit flat in a 12 cm section**, so it mounts edge-on ([mechanical/README.md](mechanical/README.md)) |
 
 > [!IMPORTANT]
 > This project does not claim compliance for anything it has not evidenced. Owning a
@@ -75,6 +77,15 @@ to **false**, so a flight build never enters receive mode and has no uplink to r
 Even enabled, the vehicle acts on a command only in `READY` with `ARM-0`: the window is shut
 for the whole of flight, landing and recovery, which is every state holding a log that
 cannot be recreated. See [operations](documentation/operations/runbook.md#erasing-the-onboard-log).
+
+**The mission minute by minute** — what the vehicle, the ground station and the operators are
+each doing from power-on to recovery — is
+[concept-of-operations.md](documentation/mission/concept-of-operations.md). Writing it turned
+up [F-20](documentation/testing/bring-up-record.md#findings): the vehicle **declared a landing
+while hovering under the drone**, three seconds into any hover and up to twelve seconds before
+release, because 1 g with no vertical motion describes a hover exactly as well as it describes
+a landing. **Fixed by a descent gate** — a landing may not be declared until a real descent
+has been observed — and the same reproduction now lands three seconds after touchdown.
 
 ---
 
@@ -349,20 +360,22 @@ receipt time and the reason.
 
 | Subsystem | Component | Qty | Purpose | Status |
 |---|---|---:|---|---|
-| Flight computer | Raspberry Pi Pico | 2 | Vehicle + ground bridge | Confirmed; not integrated |
-| Telemetry | SX1278 RA-02 433 MHz LoRa | 2 | Vehicle + ground radio | Confirmed; configuration provisional |
-| Telemetry | 433 MHz antenna, SMA | 2 | Radio antennas | Confirmed; **connector gender disputed** |
-| Telemetry | 10 cm IPEX-to-SMA RG1.13 cable | 2 | Radio to antenna | Confirmed |
-| Sensors | Sold as MPU-9250; **delivered an MPU-6500** — accelerometer + gyroscope, no magnetometer | 1 | Acceleration and angular rate | **Identified on the bench:** `WHO_AM_I` `0x70`, and `0x0C` never answers ([F-1](documentation/hardware/receiving-inspection.md#findings)) |
-| Sensors | GY-BMP280-3.3 | 1 | Pressure, altitude, temperature | Confirmed; unverified |
-| Sensors | NEO-6M GPS with EEPROM | 1 | Position and timing | Confirmed; unverified |
-| Storage | microSD card reader | 1 | Onboard logging | Confirmed; **highest-risk item** |
-| Power | Orange 3.7 V 1500 mAh 25C 1S LiPo | 1 | Primary power | Confirmed; treat as variable-voltage |
-| Power | 3.3 V regulated supply | TBD | Peripheral rail | **Not selected** |
-| Prototyping | 10 × 10 cm universal PCB | 2 | Electronics mounting | Confirmed |
+| Flight computer | Raspberry Pi Pico | 2 | Vehicle + ground bridge | 🟢 **Both built and running.** Vehicle image and bridge image both flashed and working |
+| Telemetry | SX1278 RA-02 433 MHz LoRa | 2 | Vehicle + ground radio | 🟢 **Link closed 2026-09-07**, 66 packets, 0 % loss. Modem parameters remain provisional |
+| Telemetry | 433 MHz antenna, SMA | 2 | Radio antennas | 🟢 Mated and radiating; the gender question resolved on inspection |
+| Telemetry | 10 cm IPEX-to-SMA RG1.13 cable | 2 | Radio to antenna | 🟢 Fitted |
+| Sensors | Sold as MPU-9250; **delivered an MPU-6500** — accelerometer + gyroscope, no magnetometer | 1 | Acceleration and angular rate | 🟠 **Working, but it is the wrong part:** `WHO_AM_I` `0x70`, and `0x0C` never answers ([F-1](documentation/hardware/receiving-inspection.md#findings)). Bias and noise measured |
+| Sensors | GY-BMP280-3.3 | 1 | Pressure, altitude, temperature | 🟢 **Verified on the bus at `0x76`**, 83.0 Hz output as predicted |
+| Sensors | NEO-6M GPS with EEPROM | 1 | Position and timing | 🟠 **Talking** — all six NMEA sentences, 0 checksum errors. **No fix acquired yet** |
+| Sensors | LM393 sound module, 4-pin | 1 | Additional sensor — acoustic level | 🟠 Fitted; its data reaches neither the card nor the radio ([F-15](documentation/testing/bring-up-record.md#findings)) |
+| Storage | microSD card reader | 1 | Onboard logging | 🟠 **Writes 100/100 and sustains ~300 writes/s.** Still carries [F-12](documentation/testing/bring-up-record.md#findings), an unexplained intermittent |
+| Power | Orange 3.7 V 1500 mAh 25C 1S LiPo | 1 | Primary power | 🟠 Held and charged. **Never yet used to power the vehicle** — that needs the switch and the Schottky |
+| Power | ~~3.3 V regulated supply~~ | — | ~~Peripheral rail~~ | 🟢 **Not needed.** The Pico's own rail carries every load, measured |
+| Prototyping | 10 × 10 cm universal PCB | 2 | Electronics mounting | 🟢 One built, one spare. **Note it does not fit a 12 cm section laid flat** |
 
-Not in the BOM and mandatory: **manual ON/OFF switch**, **visible power LED**, **egg
-chamber**, **parachute**.
+Still to fit, and the first two are mandatory requirements: **manual ON/OFF switch**,
+**visible power LED**, the **Schottky diode**, and the **battery divider**. Still to build:
+**egg chamber** and **parachute** — see [mechanical/README.md](mechanical/README.md).
 </details>
 
 <details>
@@ -370,30 +383,51 @@ chamber**, **parachute**.
 
 | GPIO | Function | Device |
 |---:|---|---|
-| GP4 / GP5 | I2C0 SDA / SCL | MPU-9250 + BMP280 |
+| GP4 / GP5 | I2C0 SDA / SCL | MPU-6500 + BMP280 |
 | GP16 / GP18 / GP19 | SPI0 MISO / SCK / MOSI | RA-02 + microSD |
 | GP17 | Chip select | RA-02 |
 | GP6 | Chip select | microSD |
 | GP20 / GP21 / GP22 | RESET / DIO0 / DIO1 | RA-02 |
 | GP12 / GP13 | UART0 TX / RX | NEO-6M |
-| GP7 | Interrupt | MPU-9250 |
+| GP7 | Interrupt | MPU-6500 — wired, firmware does not enable it |
 | GP14 | Status LED | External LED |
-| GP26 | ADC0 | Battery sense — **reservation only** |
+| GP15 | Comparator input | LM393 sound module `DO` |
+| GP26 | ADC0 | Battery sense — divider not fitted |
+| GP27 | ADC1 | LM393 sound module `AO` |
 
 `BoardPins` in [`config.hpp`](firmware/flight-computer/include/flight/config.hpp) is the
-source of truth. Diagrams: [wiring.md](documentation/design/wiring.md)
+source of truth, and the machine-readable
+[netlist](electrical/schematics/vehicle-netlist.tsv) is generated from it — the generator
+refuses to run if the two disagree. Diagrams: [wiring.md](documentation/design/wiring.md) ·
+[wiring schedule](documentation/hardware/diagrams/wiring-schedule.svg)
 </details>
 
-### The three hardware blockers
+### The three hardware blockers — all three are closed
 
-1. **No regulator is selected.** The AMS1117-3.3 was assessed and rejected for direct 1S
-   LiPo to 3.3 V regulation — a full cell at ≈ 4.2 V does not clear its high-load dropout,
-   and its 3.3 V output is below the microSD reader's stated 4.5–5.5 V input range.
-2. **The microSD reader may not be compatible** with any rail the vehicle can produce
-   easily. See [sd-module-analysis.md](documentation/hardware/sd-module-analysis.md).
-3. **The exact breakout variants are undocumented.** Board-level supply, logic levels,
-   regulators, pull-ups and pinouts stay `TBD` until physically verified — a chip datasheet
-   does not describe a breakout board.
+They are kept here rather than deleted, because how they closed is more useful than the
+fact that they did.
+
+1. ~~**No regulator is selected.**~~ **None is needed.** The AMS1117-3.3 was assessed and
+   rejected — a full cell at ≈ 4.2 V does not clear its high-load dropout. Then the Pico's
+   own regulator was measured carrying every load: **3.28–3.29 V through 45 back-to-back
+   transmits**, 3.28–3.30 V at 100 % write duty. One rail, no external part.
+2. ~~**The microSD reader may not be compatible.**~~ **The delivered board is a 3.3 V board.**
+   It has no regulator and no level shifter, its supply pin is printed `3V3`, and its whole
+   parts list is four 10 kΩ pull-ups and two capacitors. The listing that described a
+   4.5–5.5 V board described a different product —
+   [sd-module-analysis.md](documentation/hardware/sd-module-analysis.md).
+3. ~~**The exact breakout variants are undocumented.**~~ **Every board has been inspected and
+   photographed**, and one of them was not what it was sold as — the IMU is a six-axis
+   MPU-6500 ([receiving-inspection.md](documentation/hardware/receiving-inspection.md)).
+   That is precisely the risk this blocker existed to catch.
+
+### What is actually blocking now
+
+| Blocker | Why | Cost |
+|---|---|---|
+| **The Schottky diode is not bought** | Without it USB back-powers the LiPo, so the battery switch must be OFF whenever a cable is connected — which is most of bring-up | ~₹10, the only outstanding purchase |
+| **Switch, LEDs and divider are not fitted** | Two of them are mandatory requirements, and the power LED is **5 of the cheapest points in the rulebook** | Held, an evening |
+| **Nothing mechanical exists** | The largest block of unclaimed points, and it is no longer waiting on anybody — see [mechanical/README.md](mechanical/README.md) | Weeks |
 
 ---
 
@@ -405,16 +439,17 @@ bash tools/build_host.sh
 
 | Suite | Coverage | Result |
 |---|---|---|
-| `flight_tests` | 106 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math, IMU range encoding, sensor timing, calibration, faults, scheduler, block log and torn-header recovery, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **4013 / 4013** |
+| `flight_tests` | 113 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math, IMU range encoding, sensor timing, calibration, faults, scheduler, block log and torn-header recovery, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **4107 / 4107** |
 | `flight_smoke_test` | Boot, first three packets, GPS parse | ✅ Passed |
 | `sx1278_tests` | LoRa driver register sequence, TX timeout, RX and CRC handling, RSSI conversion, against a fake register bank | ✅ **129 / 129** |
 | `sd_card_tests` | microSD init sequence, SDHC vs SDSC addressing, block round trip, bus release, timeouts and write-error paths, against a simulated card | ✅ **613 / 613** |
 | `fat_volume_tests` | FAT32 log-file lookup: MBR and superfloppy volumes, contiguity, a missing file, a card that stops answering, against a synthetic image | ✅ **30 / 30** |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
-| Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **134 / 134** |
+| Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **140 / 140** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
+| Python (simulations) | Descent model: canopy sizing, the closed-form fall against both its own limits, ISA air density, the mass-tolerance argument | ✅ **40 / 40** |
 | Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **62 / 62** |
-| Documented claims | Numbers in the documentation checked against the source that defines them, test counts included | ✅ **220 / 220** |
+| Documented claims | Numbers in the documentation checked against the source that defines them — test counts, the generated netlist, and the descent model's canopy diameter included | ✅ **244 / 244** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
@@ -423,9 +458,11 @@ arming cannot trigger a launch; invalid mandatory data suppresses a packet witho
 consuming its number; `crc16_ccitt("123456789") == 0x29B1`; and the vehicle and the bridge
 are proven to configure the same radio modem.
 
-**What is not covered:** real sensors, the radio link, SD media, power behaviour, and the
-mechanical system. Everything above runs without hardware; none of it is evidence that the
-vehicle flies.
+**What is not covered:** the mechanical system, a real descent, and any of it in flight.
+Everything above runs without hardware. The sensors, the radio link, the card and the power
+rail are no longer in this list — they have been measured, and the numbers are in
+[bring-up-record.md](documentation/testing/bring-up-record.md) — but a bench is not a flight,
+and none of this is evidence that the vehicle flies.
 **Details:** [test-plan.md](documentation/testing/test-plan.md)
 
 ---
@@ -448,17 +485,17 @@ requirement is satisfied in flight.
 | Gyroscope and accelerometer | MPU-9250-family driver + datasheet scaling, tested | 🟢 **Read on hardware:** bias, noise and acquisition rate recorded |
 | Roll, pitch, yaw, X/Y/Z acceleration fields | Mahony quaternion filter over accelerometer, gyroscope and magnetometer; yaw is magnetic once calibrated and labelled `YR-M`/`YR-G` either way | 🟠 Implemented; **the delivered IMU has no magnetometer**, so yaw is gyro-integrated and drifts. Roll and pitch are still absolutely referenced by gravity |
 | Continuous telemetry, power-on to recovery | Automatic; continues in every state including `FAULT` | 🟡 Implemented, unverified |
-| At least one packet per second | 1 Hz default, chosen from measured packet size and LoRa airtime; `validate_config()` refuses any period the radio cannot sustain | 🟡 Implemented, radio unverified |
+| At least one packet per second | **1.43 Hz** (700 ms), sized from *measured* airtime rather than the model, which reads 1.8 % low. **The rulebook figure is a floor this vehicle cannot be configured onto:** `validate_config()` refuses any period above 950 ms and a `static_assert` refuses to compile one, so a build physically cannot ship at or below 1 Hz. The ground station reports whether what arrived cleared it | 🟢 **Rate demonstrated on a closed link**, at the 1 Hz configuration it then carried |
 | Correct team identifier in every packet | Formatter enforces it; `CAN-Team-XX` is rejected | 🟢 Implemented and enforced |
 | Required packet format, numbering from `P-001` | Byte-exact formatter, tested against the rulebook example | 🟢 Implemented and tested |
 | Sync words `0xA5` launch, `0xF3` test | `RadioMode` selects it; procedure documented | 🟡 Implemented, link unverified |
 | Others powered off during another team's launch | Procedure documented in the runbook | 🟡 Documented |
-| Manual ON/OFF switch and visible power LED | Neither in the BOM; firmware drives a status LED on GP14 | 🔴 Not satisfied |
+| Manual ON/OFF switch and visible power LED | **Both parts are held, neither is fitted.** The power LED must light the instant the switch closes, so it goes on the rail rather than on a GPIO; the firmware separately drives a status LED on GP14 whose blink rate names the mission state | 🔴 Not satisfied |
 | Automatic telemetry at power-on | No manual trigger anywhere in the firmware | 🟡 Implemented, unverified |
-| Descent rate ≤ 5 m/s | No descent system | ⬜ Not started |
+| Descent rate ≤ 5 m/s | No descent system built, but it is **sized**: an 80.0 cm flat canopy at 550 g on a hot day, from [`simulations/descent.py`](simulations/descent.py) | 🟡 Computed, nothing built |
 | Stable descent, intact after landing | Mechanical design not started | ⬜ Not started |
 | ≥ 5 s of telemetry after impact | `LANDED` holds 5 s; config validation refuses less | 🟡 Implemented and tested |
-| Size and mass limits | Blocked by the rulebook contradiction | 🔴 Blocked |
+| Size and mass limits | **Requirement locked by the 2026 revision** — 21 cm (+7 cm) × 12 cm, 500 g ± 10 %. The avionics are ~70 g of that, so the structure has ~380 g to spend. Nothing has been weighed | 🟡 Unblocked, unbuilt |
 | Dual-ground-station evaluation | Bridge firmware implemented | 🟡 Implemented, compatibility unverified |
 | Four hours for post-launch analysis | CSV export + documented workflow; graphs not produced | 🟡 Partial |
 | Preliminary and final reports | Not prepared | ⬜ Not started |
@@ -512,17 +549,27 @@ firmware/
 ground-station/
   software/            Python receive pipeline + tests
   web/                 single-file browser telemetry console
+avionics/              per-subsystem summaries against what was measured
+  power/  sensors/  telemetry/
+electrical/
+  schematics/          machine-readable netlist, generated from the firmware
+  PCB/                 board layout — perfboard today, nothing fabricated
+mechanical/            envelope, mass budget, canopy spec  (nothing built)
+  CAD/  drawings/
+simulations/           descent model + tests
 tools/                 host build, Pico syntax check, LoRa link-budget calculator,
-                       documentation-claim checker, SDK stubs
+                       netlist and drawing generators, documentation-claim checker,
+                       SD-card and flight-log utilities, SDK stubs
+test-data/             shared fixtures the C++, Python and JavaScript parsers all read
 documentation/
   requirements/        rulebook, requirement checklist, gates
-  design/              architecture, protocol, wiring, electrical
-  hardware/            BOM, compatibility, GPIO map, datasheets
-  project/             timeline, phases, risks
-  testing/             test plan and verification record
+  mission/             concept of operations — the flight, minute by minute
+  design/              architecture, protocol, wiring, electrical, link budget
+  hardware/            BOM, inspection, assembly, compatibility, GPIO map, datasheets
+  project/             timeline, phases, risks, scoring
+  testing/             test plan and the bring-up measurement record
   operations/          runbook and launch-day procedure
   audit/               repository audits
-electrical/  mechanical/  simulations/  test-data/   (awaiting hardware work)
 ```
 
 ---
@@ -531,6 +578,7 @@ electrical/  mechanical/  simulations/  test-data/   (awaiting hardware work)
 
 | Document | What it is for |
 |---|---|
+| [Concept of Operations](documentation/mission/concept-of-operations.md) | The mission from power-on to recovery: what happens, when, and what each part is doing |
 | [Software Architecture](documentation/design/software-architecture.md) | How the code is organised and why — flowcharts, fault model, timing budget |
 | [Wiring Diagrams](documentation/design/wiring.md) | Signal wiring, pin table, bus rules, power tree, bring-up order |
 | [Telemetry Protocol](documentation/design/telemetry-protocol.md) | Wire format, validation policy, radio configuration |
@@ -538,7 +586,11 @@ electrical/  mechanical/  simulations/  test-data/   (awaiting hardware work)
 | [Requirements Checklist](documentation/requirements/requirements.md) | Every requirement, its status, and the development gates |
 | [Project Timeline](documentation/project/timeline.md) | History, phase plan, critical path, risk register |
 | [Test Plan](documentation/testing/test-plan.md) | What is tested, what is not, and the hardware test plan |
+| [Bring-Up Record](documentation/testing/bring-up-record.md) | Every prediction paired with what was actually measured, and twenty findings |
+| [Scoring Assessment](documentation/project/scoring-assessment.md) | Where the project stands against the 200-point rulebook, and the cheapest points left |
 | [Operations Runbook](documentation/operations/runbook.md) | Configuration, builds, launch day, troubleshooting |
+| [Avionics](avionics/README.md) · [Electrical](electrical/README.md) · [Mechanical](mechanical/README.md) | Per-subsystem summaries: parts, measurements, open items |
+| [Simulations](simulations/README.md) | The descent model — canopy sizing, descent time, telemetry yield |
 | [Repository Audit](documentation/audit/2026-09-04-repository-audit.md) | File-by-file verification of every claim made here |
 | [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) | What changed; how to work on it |
 
@@ -547,6 +599,9 @@ electrical/  mechanical/  simulations/  test-data/   (awaiting hardware work)
 <div align="center">
 
 **Nothing in this repository is claimed as flight-ready.**
-The software is built and tested. The hardware has not been touched.
+
+The software is built and tested. The board is built, and every device on it has answered on
+a bench. Nothing has flown, nothing mechanical exists, and the vehicle has never run on its
+own battery.
 
 </div>
