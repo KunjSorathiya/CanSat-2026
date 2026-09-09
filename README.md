@@ -7,7 +7,7 @@ and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml)
 [![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-4879%20assertions-1b5e20)](documentation/testing/test-plan.md)
-[![Python tests](https://img.shields.io/badge/Python%20tests-213%20passing-1b5e20)](documentation/testing/test-plan.md)
+[![Python tests](https://img.shields.io/badge/Python%20tests-229%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
 [![Link](https://img.shields.io/badge/telemetry-433%20MHz%20LoRa-4527a0)](documentation/design/telemetry-protocol.md)
@@ -30,7 +30,7 @@ and streams telemetry from power-on through recovery.**
 
 | Layer | State |
 |---|---|
-| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 5154 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
+| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 5170 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
 | 🟢 **Firmware drivers** | **Every driver has run on real silicon** and its numbers are recorded — IMU, barometer, GPS, radio and microSD. **The flight image itself runs**: it was flashed, it printed its startup summary, it wrote a card, and it produced [F-16](documentation/testing/bring-up-record.md#findings) and [F-19](documentation/testing/bring-up-record.md#findings), which are defects only a running image could have found |
 | 🟢 **Hardware** | **The vehicle board is built and every device on it works** — **34 of 91 recorded measurements taken.** **The radio link closed end to end on 2026-09-07** — 66 packets, `P-001` to `P-066`, no gaps, no duplicates, 1.0000 Hz, −44 dBm at bench range, so Gate 8 has a bench link. Gates 3, 4, 5, 6 and 7 all pass on the soldered board — the IMU and barometer share I2C0 (`0x68` and `0x76`, `0x0C` correctly absent), the GPS emits clean NMEA at 162 B/s, the radio sends 5/5, 5/5 and 45/45 with airtimes within 1.8 % of the model, the card writes 100/100 and sustains ~300 writes/s, and the shared SPI0 bus passes every row. **Power is answered:** the Pico's own 3.3 V rail held **3.28–3.29 V through 45 back-to-back transmits** and 3.28–3.30 V at 100 % write duty, so no separate rail is needed. Sensor read costs 0.833 ms worst against a 33 ms period. **Open:** [F-12](documentation/testing/bring-up-record.md#findings), a card intermittent that failed three of its first four runs and has passed twelve since with the supply measured innocent; and [F-17](documentation/testing/bring-up-record.md#findings), **yaw measured drifting more than a full revolution in a 36.8-minute stationary log** — and, more usefully, holding to ±0.8° for the first 15 minutes before switching to 0.4 dps, which is **70° over a 3-minute flight** on a vehicle with no magnetometer; and [F-18](documentation/testing/bring-up-record.md#findings), a stationary GPS jumping 55.6 m in one second because nothing gates a fix on satellite count or HDOP. Still to fit: the sound module, the switch, the divider, and the Schottky |
 | 🟡 **Mechanical** | Structure, egg chamber and parachute **not started** — but **no longer blocked**. The 2026 revision settled the dimensions, and the parachute is now sized: a **80.0 cm** flat canopy brings 550 g down at 5.00 m/s on a hot day, computed by [`simulations/descent.py`](simulations/descent.py) and pinned by tests. The envelope has also produced its first real constraint — **a 100 × 100 mm board does not fit flat in a 12 cm section**, so it mounts edge-on ([mechanical/README.md](mechanical/README.md)) |
@@ -446,10 +446,10 @@ bash tools/build_host.sh
 | `fat_volume_tests` | FAT32 log-file lookup: MBR and superfloppy volumes, contiguity, a missing file, a card that stops answering, against a synthetic image | ✅ **30 / 30** |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
 | Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **140 / 140** |
-| Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **33 / 33** |
+| Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **49 / 49** |
 | Python (simulations) | Descent model: canopy sizing, the closed-form fall against both its own limits, ISA air density, the mass-tolerance argument | ✅ **40 / 40** |
 | Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **62 / 62** |
-| Documented claims | Numbers in the documentation checked against the source that defines them — test counts, the generated netlist, and the descent model's canopy diameter included | ✅ **255 / 255** |
+| Documented claims | Numbers in the documentation checked against the source that defines them — test counts, the generated netlist, and the descent model's canopy diameter included | ✅ **261 / 261** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
@@ -536,6 +536,13 @@ The mechanical design is no longer blocked on the organizers.
 4. What scoring thresholds apply where the rulebook rewards higher performance? The 2026 revision rewards packet rates above 1 Hz and longer stable descents, but names no thresholds
 5. What are the actual report, media, video and arrival deadlines?
 6. What interface and data format do the official dual ground stations use? The 2026 revision names the radios — SX1278 RA-02 or nRF24L01 — but not the framing or the host-side format
+7. **How is the 12 cm "across" limit measured on a non-cylindrical CanSat?** `Cansat_D1` is
+   prismatic — 115 × 110 mm in section — so **both faces are inside 120 mm while the
+   corner-to-corner diagonal is 159.1 mm.** As a width limit it passes; as a diameter it is
+   **33 % over**, and exceeding a dimensional limit by more than 10 % is a disqualification
+   rather than a scored deduction. The vehicle is drone-released and never passes through a
+   tube, which argues for the width reading — but being wrong costs the flight, and the
+   fallback is a structural redesign plus a board rebuild
 
 ---
 

@@ -56,8 +56,9 @@ Four items, all held or cheap, and two of them are mandatory requirements.
 | Item | Requirement | Why it matters | State |
 |---|---|---|---|
 | **Manual ON/OFF switch** | [PWR-001](../../documentation/requirements/requirements.md), mandatory | There is no way to turn the vehicle on and off | Held, not fitted |
-| **Power LED**, immediate | PWR-002, PWR-003, mandatory | Must light **the instant the switch closes**, so it goes on the rail and not on a GPIO — a firmware-driven LED is not immediate | Held, not fitted |
+| **Power LED**, immediate | PWR-002, PWR-003, mandatory | **Red 5 mm on the regulated `+3V3` rail**, not a GPIO — a firmware-driven LED waits for boot and cannot be immediate. On `+3V3` rather than the switched battery node so brightness does not fade with the cell: [the indicator LEDs](../../documentation/design/electrical-architecture.md#the-indicator-leds). **1 kΩ gives it 1.3 mA, which is bench-bright and marginal outdoors** — 220–470 Ω is the better choice and is not held | Held, not fitted |
 | **Schottky diode**, 1 A | Pico datasheet §4.5 | Without it **USB back-powers the LiPo**. Until it is in, the battery switch must be OFF whenever a USB cable is connected — which is most of bring-up | **Not bought.** ~₹10, the only outstanding purchase |
+| **Status LED** on GP14 | — | **Green 5 mm.** Its blink rate names the mission state, and bring-up rows 1.1–1.3 cannot be taken without it. **Measure its forward voltage first**: a 5 mm green is either ~2.0 V or ~3.1 V, and at 3.3 V through 1 kΩ that is the difference between 1.3 mA and 0.1 mA | Held, not fitted |
 | **Battery divider**, 33 kΩ / 33 kΩ → GP26 | — | `battery_divider_ratio` stays 0 and the firmware reports the raw pin voltage rather than inventing a scale | Resistors held, not fitted |
 
 **Not a 1N4001.** A silicon diode drops 0.7 V for nothing here; the part is a `1N5817`,

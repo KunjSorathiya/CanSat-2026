@@ -9,7 +9,7 @@ the thing to edit.
 
 | Drawing | Source | What it shows |
 |---|---|---|
-| [`envelope-and-board-fit.svg`](envelope-and-board-fit.svg) | [`tools/gen_envelope_drawing.py`](../../tools/gen_envelope_drawing.py) | The 21 cm (+7 cm) × 12 cm rulebook envelope in elevation and section, with the 100 × 100 mm vehicle board in both candidate orientations, and the arithmetic that rules one of them out |
+| [`envelope-and-board-fit.svg`](envelope-and-board-fit.svg) | [`tools/gen_envelope_drawing.py`](../../tools/gen_envelope_drawing.py) | The 21 cm (+7 cm) × 12 cm rulebook envelope in elevation and section, with **the actual `Cansat_D1` design inside it**, drawn against both readings of "12 cm across" — as a width limit and as a diameter — because a prismatic body answers them differently. **Its dimensions are read from the STEP**, not typed, so the drawing cannot disagree with the model |
 
 Regenerate after changing a dimension:
 
@@ -26,7 +26,7 @@ rather than implied by an empty directory.
 
 | Drawing | Blocked on |
 |---|---|
-| Structure general arrangement | Board orientation and material choice |
+| Structure general arrangement | Material choice. **Board orientation is settled** — a 100 mm board fits the 115 × 110 mm section flat |
 | Egg chamber section, with cushioning | Chamber design |
 | Parachute cutting pattern — gores, vent, hem, line lengths | Canopy type; the **diameter is already computed** ([simulations](../../simulations/README.md)) |
 | Harness and bridle arrangement | Structure |

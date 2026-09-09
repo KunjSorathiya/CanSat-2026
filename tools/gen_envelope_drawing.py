@@ -1,41 +1,54 @@
 #!/usr/bin/env python3
-"""Draws the rulebook envelope to scale, with the vehicle board inside it.
+"""Draws the rulebook envelope to scale, with the actual design inside it.
 
     python tools/gen_envelope_drawing.py
 
 The 2026 guidelines fix the envelope at 21 cm tall (+7 cm for the egg chamber) by 12 cm
-across. The vehicle board is a 100 x 100 mm perfboard. Those two numbers do not obviously
-fit together, and the arithmetic that decides it -- a 100 mm square has a 141.4 mm diagonal,
-while a 120 mm circle inscribes only an 84.9 mm square -- is the kind of thing that is
-much easier to believe once drawn.
+across. What "12 cm across" means is not fixed, and the design is prismatic rather than
+cylindrical, so the two readings give different answers:
 
-Everything here is derived from the constants at the top. Nothing is a hand-placed
-coordinate, so changing a dimension moves the drawing rather than making it wrong.
+  * as a **width** limit, a 115 x 110 mm section passes on both faces;
+  * as a **diameter**, its 159.1 mm corner-to-corner diagonal is 33 % over, and the
+    rulebook's disqualification threshold is 10 %.
+
+That is an open question for the organizers, and it is much easier to ask once drawn.
+
+**The design's dimensions are read from the STEP file**, not typed here, so the drawing
+cannot disagree with the model. Change the model, re-export, re-run this: the drawing
+follows. `check_doc_claims.py` fails the build if the committed SVG stops matching what
+this produces.
 """
 
 from __future__ import annotations
 
 import io
 import math
+import sys
+from pathlib import Path
 
-# ---- Dimensions, all in millimetres ------------------------------------------------
-# Rulebook, 2026 revision: 21 cm body + 7 cm egg chamber, 12 cm across. See
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from cad_dimensions import read_step  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DESIGN_STEP = REPO_ROOT / "mechanical/CAD/Cansat_D1.step"
+OUTPUT_PATH = REPO_ROOT / "mechanical/drawings/envelope-and-board-fit.svg"
+
+# ---- Rulebook dimensions, all in millimetres ---------------------------------------
+# 2026 revision: 21 cm body + 7 cm egg chamber, 12 cm across. See
 # documentation/requirements/requirements.md GEN-004.
 BODY_HEIGHT_MM = 210.0
 CHAMBER_HEIGHT_MM = 70.0
-DIAMETER_MM = 120.0
+ACROSS_MM = 120.0
 
 # The perfboard actually held: 2 x 100 x 100 mm, 1.6 mm FR-4. See
 # documentation/hardware/receiving-inspection.md C.9.
 BOARD_MM = 100.0
 
-# The largest square that fits inside the envelope's circular cross-section, if the board
-# is laid flat as a horizontal deck: s = d / sqrt(2).
-INSCRIBED_SQUARE_MM = DIAMETER_MM / math.sqrt(2.0)
+# The largest square that fits inside a circle of the envelope diameter, if "across" is
+# read as a diameter: s = d / sqrt(2).
+INSCRIBED_SQUARE_MM = ACROSS_MM / math.sqrt(2.0)
 
-OUTPUT_PATH = "mechanical/drawings/envelope-and-board-fit.svg"
-
-SCALE = 2.2          # px per mm
+SCALE = 2.0          # px per mm
 MARGIN = 120.0       # px — wide enough on the left for two stacked dimension lines
 
 BLUE = "#0d47a1"
@@ -44,6 +57,7 @@ RED = "#b71c1c"
 AMBER = "#b45309"
 SLATE = "#475569"
 GREY = "#94a3b8"
+PURPLE = "#6d28d9"
 
 
 def esc(text: str) -> str:
@@ -65,6 +79,20 @@ class Canvas:
         self.add(f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" fill="{fill}" '
                  f'font-weight="{weight}" text-anchor="{anchor}" {family}>{esc(body)}</text>')
 
+    def rect(self, x: float, y: float, w: float, h: float, *, fill: str = "none",
+             stroke: str = "none", width: float = 1.0, dash: str = "",
+             rx: float = 0.0) -> None:
+        d = f' stroke-dasharray="{dash}"' if dash else ""
+        r = f' rx="{rx}"' if rx else ""
+        self.add(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}"{r} '
+                 f'fill="{fill}" stroke="{stroke}" stroke-width="{width}"{d}/>')
+
+    def circle(self, cx: float, cy: float, r: float, *, fill: str = "none",
+               stroke: str = "none", width: float = 1.0, dash: str = "") -> None:
+        d = f' stroke-dasharray="{dash}"' if dash else ""
+        self.add(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{fill}" '
+                 f'stroke="{stroke}" stroke-width="{width}"{d}/>')
+
     def render(self) -> str:
         head = (f'<svg xmlns="http://www.w3.org/2000/svg" '
                 f'viewBox="0 0 {self.width:.0f} {self.height:.0f}" '
@@ -75,175 +103,163 @@ class Canvas:
         return "\n".join([head, bg, *self.parts, "</svg>"])
 
 
-def dimension(canvas: Canvas, x1: float, y1: float, x2: float, y2: float,
-              label: str, offset: float = 0.0, vertical: bool = False) -> None:
-    """A dimension line with arrow ticks and a label, in the style of a drawing."""
-    canvas.add(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
-               f'stroke="{SLATE}" stroke-width="1.1"/>')
+def dimension(c: Canvas, x1: float, y1: float, x2: float, y2: float, label: str,
+              offset: float = 0.0, vertical: bool = False) -> None:
+    """A dimension line with tick ends and a label, in the style of a drawing."""
+    c.add(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+          f'stroke="{SLATE}" stroke-width="1.1"/>')
     for px, py in ((x1, y1), (x2, y2)):
         if vertical:
-            canvas.add(f'<line x1="{px - 5:.1f}" y1="{py:.1f}" x2="{px + 5:.1f}" '
-                       f'y2="{py:.1f}" stroke="{SLATE}" stroke-width="1.1"/>')
+            c.add(f'<line x1="{px - 5:.1f}" y1="{py:.1f}" x2="{px + 5:.1f}" '
+                  f'y2="{py:.1f}" stroke="{SLATE}" stroke-width="1.1"/>')
         else:
-            canvas.add(f'<line x1="{px:.1f}" y1="{py - 5:.1f}" x2="{px:.1f}" '
-                       f'y2="{py + 5:.1f}" stroke="{SLATE}" stroke-width="1.1"/>')
+            c.add(f'<line x1="{px:.1f}" y1="{py - 5:.1f}" x2="{px:.1f}" '
+                  f'y2="{py + 5:.1f}" stroke="{SLATE}" stroke-width="1.1"/>')
     mx, my = (x1 + x2) / 2.0, (y1 + y2) / 2.0
     if vertical:
-        canvas.add(f'<g transform="translate({mx + offset:.1f},{my:.1f}) rotate(-90)">'
-                   f'<text font-size="12.5" fill="{SLATE}" text-anchor="middle" '
-                   f'dy="-4">{esc(label)}</text></g>')
+        c.add(f'<g transform="translate({mx + offset:.1f},{my:.1f}) rotate(-90)">'
+              f'<text font-size="12.5" fill="{SLATE}" text-anchor="middle" '
+              f'dy="-4">{esc(label)}</text></g>')
     else:
-        canvas.text(mx, my + offset, label, size=12.5, fill=SLATE, anchor="middle")
+        c.text(mx, my + offset, label, size=12.5, fill=SLATE, anchor="middle")
 
 
 def build() -> str:
-    total_height = BODY_HEIGHT_MM + CHAMBER_HEIGHT_MM
-    elevation_w = DIAMETER_MM * SCALE
-    elevation_h = total_height * SCALE
-    section_d = DIAMETER_MM * SCALE
+    design = read_step(DESIGN_STEP)
+    # Longest extent stands up the vehicle; the other two are its cross-section.
+    height_mm, wide_mm, deep_mm = design.sorted_extents
+    diagonal_mm = design.footprint_diagonal
 
-    left = MARGIN
-    top = 150.0
-    gap = 190.0
-    section_x = left + elevation_w + gap
-    # The right-hand column carries the arithmetic and the two mounting options as text;
-    # 340 px is what the longest of those lines needs at 12.5 px.
-    canvas_w = section_x + section_d + MARGIN + 340.0
-    canvas_h = top + elevation_h + 190.0
-    c = Canvas(canvas_w, canvas_h)
-
-    c.text(40, 48, "CanSat 2026 — rulebook envelope and board fit", size=26, weight="700")
-    c.text(40, 74,
-           "2026 guidelines: 21 cm body (+7 cm egg chamber) × 12 cm across. "
-           f"Drawn to scale at {SCALE} px/mm.", size=13.5, fill="#64748b")
-    c.text(40, 96,
-           "The envelope is fixed. Nothing mechanical is built, so every part of this "
-           "drawing except the two dimensions is a proposal.", size=12.5, fill=AMBER)
-
-    # ---- Elevation ---------------------------------------------------------------
+    env_w = ACROSS_MM * SCALE
     chamber_h = CHAMBER_HEIGHT_MM * SCALE
     body_h = BODY_HEIGHT_MM * SCALE
-    c.text(left, top - 16, "ELEVATION", size=13, weight="700", fill=BLUE)
+    section_d = ACROSS_MM * SCALE
 
-    c.add(f'<rect x="{left:.1f}" y="{top:.1f}" width="{elevation_w:.1f}" '
-          f'height="{chamber_h:.1f}" fill="#fff7ed" stroke="{AMBER}" '
-          f'stroke-width="2" stroke-dasharray="7 5"/>')
-    c.text(left + elevation_w / 2, top + chamber_h / 2 - 4, "egg chamber allowance",
+    left = MARGIN
+    top = 168.0
+    gap = 200.0
+    section_x = left + env_w + gap
+    canvas_w = section_x + section_d + MARGIN + 360.0
+    canvas_h = top + chamber_h + body_h + 120.0
+    c = Canvas(canvas_w, canvas_h)
+
+    c.text(40, 48, "CanSat 2026 — rulebook envelope and the Cansat_D1 design",
+           size=25, weight="700")
+    c.text(40, 74,
+           f"2026 guidelines: 21 cm body (+7 cm egg chamber) × 12 cm across. "
+           f"Design read from {DESIGN_STEP.relative_to(REPO_ROOT).as_posix()}. "
+           f"Drawn to scale at {SCALE} px/mm.", size=13, fill="#64748b")
+    c.text(40, 96,
+           '"12 cm across" is not defined as a width or a diameter, and for a prismatic '
+           "body those give different answers. Both are drawn.", size=12.5, fill=AMBER)
+
+    # ---- Elevation -----------------------------------------------------------------
+    c.text(left, top - 16, "ELEVATION", size=13, weight="700", fill=BLUE)
+    c.rect(left, top, env_w, chamber_h, fill="#fff7ed", stroke=AMBER, width=2, dash="7 5")
+    c.text(left + env_w / 2, top + chamber_h / 2 - 4, "egg chamber allowance",
            size=12, fill=AMBER, anchor="middle")
-    c.text(left + elevation_w / 2, top + chamber_h / 2 + 13, "70 mm — optional",
+    c.text(left + env_w / 2, top + chamber_h / 2 + 13, "70 mm — not designed",
            size=11.5, fill=AMBER, anchor="middle")
 
     body_top = top + chamber_h
-    c.add(f'<rect x="{left:.1f}" y="{body_top:.1f}" width="{elevation_w:.1f}" '
-          f'height="{body_h:.1f}" rx="4" fill="#eef4ff" stroke="{BLUE}" '
-          f'stroke-width="2.5"/>')
+    c.rect(left, body_top, env_w, body_h, rx=4, fill="#eef4ff", stroke=BLUE, width=2.5)
 
-    # The board as a vertical spine: 100 mm wide inside a 120 mm envelope, 100 mm of the
-    # 210 mm height. This is the orientation that fits without cutting anything.
-    board_px = BOARD_MM * SCALE
-    spine_x = left + (elevation_w - board_px) / 2.0
-    spine_y = body_top + (body_h - board_px) / 2.0
-    c.add(f'<rect x="{spine_x:.1f}" y="{spine_y:.1f}" width="{board_px:.1f}" '
-          f'height="{board_px:.1f}" fill="#e8f2ea" stroke="{GREEN}" stroke-width="2.5"/>')
-    c.text(spine_x + board_px / 2, spine_y + board_px / 2 - 8,
-           "vehicle board, edge-mounted", size=12.5, weight="600", fill=GREEN,
-           anchor="middle")
-    c.text(spine_x + board_px / 2, spine_y + board_px / 2 + 10, "100 × 100 mm",
-           size=12, fill=GREEN, anchor="middle", mono=True)
-    c.text(spine_x + board_px / 2, spine_y + board_px / 2 + 28, "FITS AS DRAWN",
-           size=12, weight="700", fill=GREEN, anchor="middle")
+    # The design, seated at the bottom of the body envelope.
+    d_w, d_h = wide_mm * SCALE, height_mm * SCALE
+    dx = left + (env_w - d_w) / 2.0
+    dy = body_top + body_h - d_h
+    c.rect(dx, dy, d_w, d_h, fill="#e8f2ea", stroke=GREEN, width=2.5)
+    c.text(dx + d_w / 2, dy + d_h / 2 - 20, "Cansat_D1", size=13, weight="700",
+           fill=GREEN, anchor="middle")
+    c.text(dx + d_w / 2, dy + d_h / 2 - 2,
+           f"{wide_mm:.1f} × {height_mm:.1f} mm", size=12, fill=GREEN,
+           anchor="middle", mono=True)
+    c.text(dx + d_w / 2, dy + d_h / 2 + 18,
+           f"{BODY_HEIGHT_MM - height_mm:.1f} mm of height unused",
+           size=11.5, fill=GREEN, anchor="middle")
 
-    dimension(c, left - 26, top, left - 26, body_top + body_h, "280 mm max overall",
+    dimension(c, left - 30, top, left - 30, body_top + body_h, "280 mm max overall",
               offset=-8, vertical=True)
-    dimension(c, left - 52, body_top, left - 52, body_top + body_h, "210 mm body",
+    dimension(c, left - 58, body_top, left - 58, body_top + body_h, "210 mm body",
               offset=-8, vertical=True)
-    dimension(c, left, body_top + body_h + 30, left + elevation_w,
-              body_top + body_h + 30, "120 mm across", offset=18)
+    dimension(c, left, body_top + body_h + 32, left + env_w,
+              body_top + body_h + 32, "120 mm across", offset=18)
 
-    # ---- Section ------------------------------------------------------------------
+    # ---- Section --------------------------------------------------------------------
     cx = section_x + section_d / 2.0
-    cy = top + chamber_h + body_h / 2.0
-    r = section_d / 2.0
+    cy = body_top + body_h / 2.0
     c.text(section_x, top - 16, "SECTION — looking down", size=13, weight="700", fill=BLUE)
 
-    c.add(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="#eef4ff" '
-          f'stroke="{BLUE}" stroke-width="2.5"/>')
+    # Reading A: 120 mm as a width limit -> a square.
+    c.rect(cx - section_d / 2, cy - section_d / 2, section_d, section_d,
+           fill="#eef4ff", stroke=BLUE, width=2.5)
+    c.text(cx, cy - section_d / 2 - 10, 'if "across" is a WIDTH', size=12,
+           weight="600", fill=BLUE, anchor="middle")
 
-    # The 100 mm square laid flat: its diagonal is 141.4 mm and it does not fit.
-    flat = BOARD_MM * SCALE
-    c.add(f'<rect x="{cx - flat / 2:.1f}" y="{cy - flat / 2:.1f}" width="{flat:.1f}" '
-          f'height="{flat:.1f}" fill="none" stroke="{RED}" stroke-width="2.2" '
-          f'stroke-dasharray="8 5"/>')
-    diag = BOARD_MM * math.sqrt(2.0) * SCALE
-    c.add(f'<line x1="{cx - flat / 2:.1f}" y1="{cy - flat / 2:.1f}" '
-          f'x2="{cx + flat / 2:.1f}" y2="{cy + flat / 2:.1f}" stroke="{RED}" '
-          f'stroke-width="1.2" stroke-dasharray="3 3"/>')
-    c.add(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{diag / 2:.1f}" fill="none" '
-          f'stroke="{RED}" stroke-width="1" stroke-dasharray="2 6"/>')
+    # Reading B: 120 mm as a diameter -> a circle inscribed in that square.
+    c.circle(cx, cy, section_d / 2, stroke=PURPLE, width=2.2, dash="9 5")
+    c.text(cx, cy + section_d / 2 + 20, 'if "across" is a DIAMETER', size=12,
+           weight="600", fill=PURPLE, anchor="middle")
 
-    # The largest square that does fit.
-    ins = INSCRIBED_SQUARE_MM * SCALE
-    c.add(f'<rect x="{cx - ins / 2:.1f}" y="{cy - ins / 2:.1f}" width="{ins:.1f}" '
-          f'height="{ins:.1f}" fill="#e8f2ea" stroke="{GREEN}" stroke-width="2.2"/>')
-    c.text(cx, cy + 5, f"{INSCRIBED_SQUARE_MM:.1f} mm", size=12.5, weight="700",
+    # The design's actual cross-section.
+    sw, sd = wide_mm * SCALE, deep_mm * SCALE
+    c.rect(cx - sw / 2, cy - sd / 2, sw, sd, fill="#e8f2ea", stroke=GREEN, width=2.5)
+    c.text(cx, cy - 4, f"{wide_mm:.0f} × {deep_mm:.0f}", size=13, weight="700",
            fill=GREEN, anchor="middle", mono=True)
-    c.text(cx, cy + 22, "largest flat deck", size=11.5, fill=GREEN, anchor="middle")
+    c.text(cx, cy + 14, "Cansat_D1", size=11.5, fill=GREEN, anchor="middle")
 
-    key_y = cy + r + 46
-    c.text(section_x, key_y, "100 × 100 mm board laid flat — 141.4 mm diagonal",
-           size=12.5, weight="600", fill=RED)
-    c.text(section_x, key_y + 18,
-           "does NOT fit a 120 mm section. Cut to 84.9 mm, or mount it edge-on.",
-           size=12, fill=RED)
+    # ...and the circle it actually needs to pass through.
+    c.circle(cx, cy, diagonal_mm * SCALE / 2, stroke=RED, width=2, dash="4 4")
+    c.text(cx, cy + diagonal_mm * SCALE / 2 + 18,
+           f"needs a {diagonal_mm:.1f} mm bore", size=12.5, weight="700",
+           fill=RED, anchor="middle")
 
-    # ---- The arithmetic, written out ------------------------------------------------
-    tx = section_x + section_d + 46
-    ty = top + 6
-    c.text(tx, ty, "The arithmetic", size=14, weight="700")
-    lines = [
-        ("Envelope section", f"{DIAMETER_MM:.0f} mm across"),
-        ("Board", f"{BOARD_MM:.0f} × {BOARD_MM:.0f} mm"),
-        ("Board diagonal", f"{BOARD_MM * math.sqrt(2.0):.1f} mm"),
-        ("Largest inscribed square", f"{INSCRIBED_SQUARE_MM:.1f} mm"),
-        ("Board edge-on, width", f"{BOARD_MM:.0f} mm ≤ {DIAMETER_MM:.0f} mm  ✓"),
-        ("Board edge-on, height", f"{BOARD_MM:.0f} mm ≤ {BODY_HEIGHT_MM:.0f} mm  ✓"),
-        ("Board flat, diagonal", f"{BOARD_MM * math.sqrt(2.0):.1f} mm "
-                                 f"> {DIAMETER_MM:.0f} mm  ✗"),
+    # ---- The arithmetic --------------------------------------------------------------
+    tx = section_x + section_d + 70
+    ty = top + 4
+    c.text(tx, ty, "The two readings", size=14, weight="700")
+    rows = [
+        ("Design section", f"{wide_mm:.0f} × {deep_mm:.0f} mm", None),
+        ("As a WIDTH limit", f"both ≤ {ACROSS_MM:.0f} mm  ✓", True),
+        ("Section diagonal", f"{diagonal_mm:.1f} mm", None),
+        ("As a DIAMETER", f"{diagonal_mm:.1f} > {ACROSS_MM:.0f} mm  ✗", False),
+        ("Overage, if diameter",
+         f"+{100 * (diagonal_mm - ACROSS_MM) / ACROSS_MM:.0f} %  (DQ over 10 %)", False),
+        ("Height", f"{height_mm:.1f} ≤ {BODY_HEIGHT_MM:.0f} mm  ✓", True),
     ]
-    for i, (label, value) in enumerate(lines):
-        y = ty + 30 + i * 24
-        colour = GREEN if "✓" in value else (RED if "✗" in value else "#0f172a")
+    y = ty + 28
+    for label, value, good in rows:
+        colour = "#0f172a" if good is None else (GREEN if good else RED)
         c.text(tx, y, label, size=12.5, fill="#475569")
-        c.text(tx, y + 15, value, size=13, weight="600", fill=colour, mono=True)
-        ty += 14
+        c.text(tx, y + 16, value, size=13, weight="600", fill=colour, mono=True)
+        y += 42
 
-    concl_y = ty + 30 + len(lines) * 24 + 10
-    c.text(tx, concl_y, "Two ways out", size=14, weight="700")
+    y += 8
+    c.text(tx, y, "The board now fits flat", size=14, weight="700", fill=GREEN)
     for i, line in enumerate([
-        "1 · Mount the board edge-on as a spine.",
-        "    Costs nothing. Puts the RA-02 and its",
-        "    antenna along the axis, which is where",
-        "    they want to be anyway.",
+        f"A {BOARD_MM:.0f} × {BOARD_MM:.0f} mm board needs a",
+        f"{BOARD_MM * math.sqrt(2.0):.1f} mm bore, so it does not fit a",
+        f"{ACROSS_MM:.0f} mm circular section — but it fits",
+        f"this {wide_mm:.0f} × {deep_mm:.0f} mm one with room for",
+        "walls. The earlier edge-on recommendation",
+        "assumed a cylinder and no longer applies.",
         "",
-        "2 · Cut the board to 84.9 mm square and",
-        "    stack two decks. Costs a rebuild, and",
-        "    the current floorplan uses the full",
-        "    100 mm in both axes.",
+        f"(A circular section would cap a flat deck",
+        f" at {INSCRIBED_SQUARE_MM:.1f} mm square.)",
     ]):
-        c.text(tx, concl_y + 24 + i * 17, line, size=12.5, fill="#334155")
+        c.text(tx, y + 24 + i * 17, line, size=12.5, fill="#334155")
 
     c.text(40, canvas_h - 26,
-           "Generated by tools/gen_envelope_drawing.py — do not hand-edit. "
-           "Dimensions from documentation/requirements/requirements.md (GEN-004).",
+           "Generated by tools/gen_envelope_drawing.py — do not hand-edit. Envelope from "
+           "requirements.md (GEN-004); design dimensions read from the STEP file.",
            size=11.5, fill=GREY)
     return c.render()
 
 
 def main() -> int:
-    # Written to the file rather than to stdout, as the other two generators are: a
-    # Windows console encodes as cp1252 and would fail on the first non-ASCII glyph.
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     io.open(OUTPUT_PATH, "w", encoding="utf-8", newline="\n").write(build())
-    print(f"written {OUTPUT_PATH}")
+    print(f"written {OUTPUT_PATH.relative_to(REPO_ROOT).as_posix()}")
     return 0
 
 

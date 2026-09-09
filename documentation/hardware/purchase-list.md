@@ -18,7 +18,7 @@ finding, or a scoring recommendation that has been costed.
 | microSD card | HP mx310 64 GB, confirmed block-addressed at bring-up row 6.2 |
 | JST-RCY female pigtail | To mate the battery's discharge lead |
 | Header strips | Soldered to both Picos and every module on 2026-09-04 |
-| Power switch, LEDs, and their resistors | Held. An I/O switch and LEDs in two colours, confirmed 2026-09-06 |
+| Power switch, LEDs, and their resistors | Held. An I/O switch and **one red and one green 5 mm LED**, confirmed 2026-09-06, colours recorded 2026-09-09. **Measure both forward voltages on the meter's diode range before choosing the series resistors** — 5 mm green is either ~2.0 V or ~3.1 V depending on the die, and at 3.3 V the difference is between 1.3 mA and 0.2 mA |
 | Capacitors — 10 µF 50 V, 100 µF 50 V, 100 µF 25 V, 0.1 µF `104` | **Received 2026-09-06 in the ordered quantities** ([D.7](receiving-inspection.md#d7--the-capacitors)) |
 | Resistors: 100 kΩ 5 %, 33 kΩ 1 %, 1 kΩ 5 % | **Received 2026-09-06** and read from their bands ([D.6](receiving-inspection.md#d6--the-resistors)). The 33 kΩ pair is the `GP26` divider, 1 kΩ drives both LEDs, 100 kΩ is spare. **No 330 Ω arrived and none is needed** |
 | Hall effect sensor | Held, and **not being used** (decided 2026-09-06). Its supply voltage was never confirmed, and with sensor integration already at its 25-point cap it would have scored nothing. Kept as a spare part, not a planned one |

@@ -8,6 +8,127 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-09 (cycle 41)
+
+The mechanical design arrives, and it overturns a conclusion this repository reached three
+days ago about a board that could not fit.
+
+### Added — `Cansat_D1`, and a reader for it
+
+`mechanical/CAD/` now holds the Fusion archive and a STEP export of the same solid. The
+`.f3d` is committed for the team rather than for the tooling: its container uses a
+compression method standard tools do not implement, and its contents are Autodesk binary
+blobs. What is readable from it is the directory listing, which is how we know it carries
+**three simulation studies**.
+
+The STEP is readable, and [`tools/cad_dimensions.py`](tools/cad_dimensions.py) reads it:
+
+```text
+mechanical/CAD/Cansat_D1.step
+  solids            Body1
+  faces             56
+  bounding box      115.0 x 118.5 x 110.0 mm
+  cross-section     159.1 mm diagonal (the two smallest extents)
+  circular features D5.1, D12.0, D16.0, D45.0 mm
+```
+
+**No document types those numbers.** `check_doc_claims.py` extracts them and fails the build
+if `mechanical/README.md` disagrees, and the envelope drawing is generated from the same
+file. Re-export the STEP after a model change and the build names whichever figures moved.
+
+### Fixed — the board-fit conclusion was reasoned against an assumption
+
+Cycle 36 concluded that the 100 × 100 mm vehicle board **could not be mounted flat** and
+should go in edge-on as a spine, because a 100 mm square needs a 141.4 mm bore and the
+envelope is 120 mm across. That reasoning assumed a **circular** section, three days before
+there was a design to check it against.
+
+**The design is prismatic — 115 × 110 mm — and the board fits flat with 15 and 10 mm to
+spare.** The edge-on recommendation is withdrawn. It remains the right answer for a circular
+section, where a 120 mm bore caps a flat deck at 84.9 mm square, and the drawing still says
+so.
+
+This is the second time in this project that a confident conclusion turned out to rest on an
+unstated assumption about a part nobody had yet seen — the first was the microSD reader's
+supply voltage. Both were caught by the artifact arriving, not by re-reading the reasoning.
+
+### Added — open question 11, which is a disqualification-class one
+
+**"12 cm across" is not defined as a width or a diameter, and a prismatic body answers the
+two differently:**
+
+| Reading | Verdict |
+|---|---|
+| Width — no face wider than 120 mm | 115 and 110 both pass |
+| Diameter — fits a 120 mm bore | needs **159.1 mm**, **+33 %** |
+
+Exceeding a dimensional limit by more than 10 % is a **disqualification**, not a deduction.
+Under the width reading the design passes comfortably; under the diameter reading it is not
+marginal, it is out. The vehicle is drone-released and never passes through a tube, which
+argues for the width reading — but the cost of being wrong is the whole flight, and the
+fallback is a structural redesign *plus* a board rebuild.
+
+The [envelope drawing](mechanical/drawings/envelope-and-board-fit.svg) now draws both
+readings over the actual section so the question can be asked with a picture attached.
+
+### Fixed — a STEP real of the form `8.` was being silently dropped
+
+Found while writing the dimension reader, and it is exactly the failure its own docstring
+promises not to have. ISO 10303-21 writes the integer 8 as `8.` — dot, no digits after it —
+and a regex requiring a digit after the decimal point matches `8`, then fails on the `)` it
+expected. The radius is skipped.
+
+It first showed as the design's `D16` feature being absent from the report. **The same
+pattern feeds the bounding-box expansion**, so a part whose extreme lay on such a circle
+would have been measured too small — and a bounding box that is quietly too small says a
+part fits an envelope it does not fit.
+
+Sixteen tests now cover the reader, including every STEP real spelling, a circle bulging
+fifty times past every vertex, a tilted circle expanding by its projection rather than its
+full radius on all three axes, and the two files it must **refuse** rather than
+under-measure: one containing B-splines, whose extremes need not lie on any control point,
+and one in metres.
+
+### Changed — the power LED hangs off `+3V3`, and the LEDs have colours
+
+The netlist and `electrical-architecture.md` had disagreed for two days about which node the
+power LED sits on — the netlist said the switched battery node, the architecture said the
+3.3 V bus. That contradiction was introduced in cycle 36 when the netlist was written.
+**It is `+3V3`**, and the trade is now recorded rather than settled silently:
+
+- **Brightness must not depend on charge.** PWR-002 requires the indicator to be *visible*;
+  on the battery node it would dim from 4.2 V to 3.4 V over a flight.
+- **The current is deterministic**, so the resistor is sized to a value rather than a range.
+- **It tracks the question radio silence asks.** On `+3V3`, lit means powered means
+  potentially transmitting (TEL-026). On the battery node it would mean only "connected".
+
+PWR-003's "immediately" is satisfied either way, because the LED reaches a rail through a
+resistor with no firmware in the path — which is precisely why it cannot be a GPIO.
+
+**The colours are recorded: one red and one green 5 mm.** Red takes the mandatory power
+indicator and green the status LED, because **5 mm green is ambiguous** — older dice are
+≈2.0 V, modern bright ones ≈3.0–3.4 V — and at 3.3 V through 1 kΩ that is the difference
+between 1.30 mA and 0.10 mA. Red is not ambiguous, so the risk goes on the diagnostic read
+at arm's length rather than on the rulebook indicator.
+
+**And 1 kΩ is bench-bright, not daylight-bright.** It gives the power LED 1.30 mA, which is
+obvious on a desk and marginal in sunlight where a judge will see it. 220–470 Ω gives
+2.8–5.9 mA and costs 0.4 % of the pack over an hour. Neither value is held; the purchase
+list previously concluded no low-value resistor was needed, on the strength of bench
+visibility alone.
+
+### Changed
+
+`.gitattributes` marks `*.f3d`/`*.f3z` binary and `*.step`/`*.stp` text. Without the first,
+git's heuristic could apply line-ending normalisation inside a compressed archive and
+corrupt it silently.
+
+`MEC-001` moves to *designed, limit's meaning open*; `MEC-003` and `MEC-006` to
+`In Progress` — MEC-006 cannot be `Complete` until there is a built article for the model to
+represent. Python tooling tests 33 → **49**. Claims 255 → **261**.
+
+---
+
 ## [Unreleased] — 2026-09-09 (cycle 40)
 
 ### Added — the radio-silence procedure, and what writing it exposed

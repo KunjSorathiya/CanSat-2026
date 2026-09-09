@@ -40,10 +40,10 @@ PARTS: list[tuple[str, str, str]] = [
     ("BT1", "Orange 3.7 V 1500 mAh 1S LiPo", "JST-RCY pigtail"),
     ("SW1", "Manual ON/OFF switch", "not yet fitted"),
     ("D1", "Schottky diode, 1 A (1N5817 / SS14 / SS34)", "not yet fitted"),
-    ("D2", "Power indicator LED", "not yet fitted"),
-    ("D3", "Status LED", "not yet fitted"),
+    ("D2", "Power indicator LED — RED 5 mm (lowest Vf, so the brightest at a given resistor)", "not yet fitted"),
+    ("D3", "Status LED — GREEN 5 mm, on GP14", "not yet fitted"),
     ("R1", "1 kOhm 5 % — status LED series", "not yet fitted"),
-    ("R2", "1 kOhm 5 % — power LED series", "not yet fitted"),
+    ("R2", "1 kOhm 5 % — power LED series; see the note on outdoor visibility", "not yet fitted"),
     ("R3", "33 kOhm 1 % — battery divider, high side", "not yet fitted"),
     ("R4", "33 kOhm 1 % — battery divider, low side", "not yet fitted"),
     ("C1", "100 uF electrolytic — microSD bulk", "fitted"),
@@ -70,13 +70,20 @@ CONNECTIONS: list[Row] = [
     ("VSW", "power", "SW1", "2", "switch out", "", "switched battery node"),
     ("VSW", "power", "D1", "A", "anode", "", "Schottky, stops USB back-powering the pack"),
     ("VSW", "power", "R3", "1", "divider high", "", "33 kOhm 1 %"),
-    ("VSW", "power", "R2", "1", "power LED series", "", "LED on whenever the switch is on"),
+    # The power LED hangs off the REGULATED rail, not the switched battery node. Decided
+    # 2026-09-09; documentation/design/electrical-architecture.md#the-indicator-leds has the
+    # trade. Short version: on +3V3 the LED means "the system is actually powered", the
+    # current is deterministic across the whole discharge curve, and it tracks "is this
+    # thing transmitting" -- which is the question the radio-silence procedure turns on.
+    # On VSW it would mean only "the battery is connected" and would dim as the cell drains,
+    # which is a poor property for an indicator the rulebook requires to be *visible*.
     ("VSYS", "power", "D1", "K", "cathode", "", "band toward the Pico"),
     ("VSYS", "power", "U1", "39", "VSYS", "", "Pico second supply, datasheet 4.5"),
     ("VBUS", "power", "U1", "40", "VBUS", "", "LIVE 5 V — never wired, nothing here tolerates 5 V"),
 
     ("+3V3", "power", "U1", "36", "3V3(OUT)", "", "the only 3.3 V source on the vehicle"),
     ("+3V3", "power", "J1", "1", "test link", "", "opens the rail for a series-current measurement"),
+    ("+3V3", "power", "R2", "1", "power LED series", "", "lit whenever the 3.3 V rail is up"),
     ("+3V3", "power", "U2", "J2.3", "3.3V", "", "star point, C3 and C5 here"),
     ("+3V3", "power", "U3", "6", "3V3", "", "star point, C1/C2 and C4 here"),
     ("+3V3", "power", "U4", "1", "VCC", "", ""),
@@ -159,7 +166,7 @@ CONNECTIONS: list[Row] = [
     ("LED_A", "digital", "R1", "2", "series", "", ""),
     ("LED_A", "digital", "D3", "A", "anode", "", ""),
     ("PWR_LED_A", "digital", "R2", "2", "series", "", ""),
-    ("PWR_LED_A", "digital", "D2", "A", "anode", "", "PWR-002/PWR-003: lit the instant the switch closes"),
+    ("PWR_LED_A", "digital", "D2", "A", "anode", "", "PWR-002/PWR-003: lit as soon as the rail is up"),
 ]
 
 HEADER = ("net", "class", "ref", "pin", "signal", "pin_constant", "note")

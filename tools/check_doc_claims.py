@@ -948,18 +948,6 @@ def main() -> int:
                   on_disk == gen_netlist.build(),
                   "run python tools/gen_netlist.py")
 
-    # The envelope drawing is generated the same way and rots the same way. The other two
-    # generators (board layout, wiring schedule) write their file at import time rather
-    # than returning it, so they cannot be checked from here without also rewriting the
-    # file -- a check that repairs what it is checking is not a check.
-    import gen_envelope_drawing  # noqa: E402
-
-    drawing = REPO_ROOT / gen_envelope_drawing.OUTPUT_PATH
-    drawn = (drawing.read_text(encoding="utf-8").replace(chr(13) + chr(10), chr(10))
-             if drawing.exists() else None)
-    checker.check("the committed envelope drawing matches tools/gen_envelope_drawing.py",
-                  drawn == gen_envelope_drawing.build(),
-                  "run python tools/gen_envelope_drawing.py")
 
     # ---- the descent model's answers, where documents quote them --------------------
     # The canopy diameter is the one number the mechanical build takes straight out of a
@@ -1054,6 +1042,50 @@ def main() -> int:
         "runbook.md's radio-silence procedure matches whether PWR-001 is actually fitted",
         warns != switch_fitted,
         f"PWR-001={requirement_status('PWR-001')!r} runbook warns={warns}")
+
+    # ---- the mechanical documents against the CAD they describe ---------------------
+    # mechanical/README.md quotes a bounding box and a cross-section diagonal, and the
+    # envelope drawing is generated from the same model. A dimension typed by hand goes
+    # stale the first time somebody edits the model and re-exports, and this one decides
+    # whether the vehicle is inside a limit whose breach is a disqualification.
+    sys.path.insert(0, str(REPO_ROOT / "tools"))
+    import cad_dimensions  # noqa: E402
+
+    design_step = REPO_ROOT / "mechanical/CAD/Cansat_D1.step"
+    checker.check("the design's STEP export is committed", design_step.exists(),
+                  str(design_step))
+    if design_step.exists():
+        design = cad_dimensions.read_step(design_step)
+        mechanical = read("mechanical/README.md")
+        box = " × ".join(f"{v:.1f}" for v in design.sorted_extents)
+        checker.check(f"mechanical/README.md states the {box} mm bounding box",
+                      f"**{box} mm**" in mechanical, box)
+        diagonal = f"{design.footprint_diagonal:.1f} mm"
+        checker.check(f"mechanical/README.md states the {diagonal} cross-section diagonal",
+                      f"**{diagonal}**" in mechanical, diagonal)
+        # The overage under the diameter reading is what makes this a disqualification
+        # question rather than a curiosity, so it is computed rather than remembered.
+        over = 100.0 * (design.footprint_diagonal - 120.0) / 120.0
+        checker.check(f"mechanical/README.md states the +{over:.0f} % diameter overage",
+                      f"**+{over:.0f} %**" in mechanical, f"+{over:.0f} %")
+        unused = 210.0 - design.sorted_extents[0]
+        checker.check(f"mechanical/README.md states the {unused:.1f} mm of unused height",
+                      f"**{unused:.1f} mm unused**" in mechanical, f"{unused:.1f}")
+        # And the STEP itself must stay something this repository can read.
+        checker.check("the design is one solid, in millimetres",
+                      len(design.solids) == 1 and ".MILLI.,.METRE." in design.units,
+                      f"{design.solids} {design.units}")
+
+    # The envelope drawing is generated from that same model, so it is checked the same way
+    # as the netlist: against its generator, not merely for existing.
+    import gen_envelope_drawing  # noqa: E402
+
+    drawing = gen_envelope_drawing.OUTPUT_PATH
+    drawn = (drawing.read_text(encoding="utf-8").replace(chr(13) + chr(10), chr(10))
+             if drawing.exists() else None)
+    checker.check("the committed envelope drawing matches tools/gen_envelope_drawing.py",
+                  drawn == gen_envelope_drawing.build(),
+                  "run python tools/gen_envelope_drawing.py")
 
     # ---- rulebook constants that must never drift -----------------------------------
     checker.check("post-impact window is at least the rulebook's 5 s",

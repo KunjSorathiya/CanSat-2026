@@ -19,7 +19,7 @@ The architecture is based on the confirmed hardware list and the current require
 | Orange 3.7 V 1500 mAh 25C 1S LiPo | 1 | Primary power source | Confirmed hardware |
 | ~~AMS1117-3.3 regulator module~~ | 0 | Previously planned 3.3 V peripheral rail | **Not used, and none is needed.** Rejected on dropout, then made unnecessary: every load runs from the Pico's own `3V3(OUT)`, measured holding 3.28–3.29 V under the harshest load the vehicle can produce |
 | Manual power switch | 1 required | Main power control | **Held** — an I/O switch, obtained 2026-09-06. Goes in the battery positive lead, ahead of everything. Not yet fitted |
-| Power LED | 1 required | Visible power indication | **Held** — LEDs in two colours plus 1 kΩ resistors, obtained 2026-09-06. Runs from the 3.3 V bus, not a GPIO, so it lights on power-on. Not yet fitted |
+| Power LED | 1 required | Visible power indication | **Held** — one red and one green 5 mm LED plus 1 kΩ resistors, obtained 2026-09-06, colours recorded 2026-09-09. **Red is the power LED**, on the regulated `+3V3` rail rather than a GPIO — see [the indicator LEDs](#the-indicator-leds). Not yet fitted |
 | **Schottky diode, 1 A** | 1 required | Stops USB back-powering the pack | **Not held — the only outstanding purchase.** See [D-6](../hardware/assembly-procedure.md#d-6-a-schottky-goes-between-the-switch-and-vsys) |
 | Universal single-sided prototype PCB | 1 | Onboard prototype assembly | Confirmed hardware |
 
@@ -149,6 +149,78 @@ A 3.3 V peripheral rail remains a possible peripheral rail, but its final scope 
 - Its required local bypass capacitors
 
 The rail must have a defined distribution point, return path, decoupling plan, measurement point, and load test. The regulator output tolerance, current rating, and protection remain TBD.
+
+## The indicator LEDs
+
+Two, both on the vehicle. The ground bridge drives none.
+
+| Ref | Role | Colour | Node | Series R | Required by |
+|---|---|---|---|---|---|
+| `D2` | Power indicator | **Red** 5 mm | `+3V3` | `R2` | **PWR-002, PWR-003** — mandatory |
+| `D3` | Status / mission state | **Green** 5 mm | `GP14` | `R1` | Not a rulebook item; the only diagnostic on a sealed vehicle |
+
+### Which node the power LED hangs off — decided 2026-09-09
+
+The netlist and this document disagreed for two days: the netlist put the power LED on
+`VSW`, the switched battery node, and this page said the 3.3 V bus. **It is `+3V3`**, and
+the reasoning is worth keeping because the other choice is defensible:
+
+| On `VSW` (switched battery) | On `+3V3` (regulated) — **chosen** |
+|---|---|
+| Means "the battery is connected" | Means "the system is actually powered" |
+| Stays lit with a dead flight computer | Goes dark if the regulator fails — which is the honest signal |
+| 3.4–4.2 V, so it **dims visibly as the cell drains** | Regulated, so brightness and current are constant |
+| Lights microseconds earlier | Still immediate: the regulator is up before anything boots |
+
+Three reasons decided it. **Brightness must not depend on charge** — PWR-002 requires the
+indicator to be *visible*, and one that fades over a flight is a poor indicator. **The
+current is deterministic**, so the resistor can be sized exactly rather than for a range.
+And it **tracks the question the radio-silence procedure actually asks**: on `+3V3`, lit
+means powered means potentially transmitting ([TEL-026](../operations/runbook.md#radio-silence--when-your-vehicle-must-be-off)).
+
+`PWR-003` — "on immediately" — is satisfied by construction either way, because the LED is
+wired to a rail through a resistor with no firmware in the path. **A GPIO-driven LED could
+not satisfy it**; it would wait for boot. The separate GP14 status LED *is* firmware-driven
+and is deliberately **not** this indicator.
+
+### Colour, and why it decides the resistor
+
+Both nodes sit at 3.3 V, so the LED's forward voltage is most of the headroom:
+
+| | Vf ≈ 2.0 V (red) | Vf ≈ 2.2 V | Vf ≈ 3.0 V | Vf ≈ 3.2 V |
+|---|---:|---:|---:|---:|
+| Current at 1 kΩ, from 3.3 V | **1.30 mA** | 1.10 mA | 0.30 mA | 0.10 mA |
+
+**5 mm green is ambiguous** — older dice are ≈2.0 V, modern bright ones ≈3.0–3.4 V — and at
+3.2 V a 1 kΩ resistor gives 0.1 mA, which is effectively dark. **Red is not ambiguous**, so
+red takes the mandatory role and green takes the status role, where the risk is a dim
+diagnostic read at arm's length on a bench rather than a missing rulebook indicator.
+
+> **Measure both forward voltages on the meter's diode range before soldering.** It takes
+> ten seconds and it is the only thing that settles what the green one actually is. If it
+> reads ≈3.1 V, the status LED needs a resistor nearer 100 Ω than 1 kΩ — which is a
+> purchase, since only 1 kΩ, 33 kΩ and 100 kΩ are held.
+
+### 1 kΩ is bench-bright, not necessarily daylight-bright
+
+`R2` at 1 kΩ gives the red power LED 1.30 mA. That is obvious on a desk and marginal in
+sunlight, and a judge will be looking at it outdoors:
+
+| `R2` | Current, red on 3.3 V |
+|---:|---:|
+| 1 kΩ | 1.30 mA |
+| 470 Ω | 2.77 mA |
+| 330 Ω | 3.94 mA |
+| **220 Ω** | **5.91 mA** |
+
+**220–470 Ω is the better choice for the power LED**, and the cost is nothing that matters:
+5.9 mA for a one-hour session is 5.9 mAh against a 1500 mAh pack, or 0.4 %. Keep 1 kΩ on the
+status LED, which is only ever read close up. Neither value is held — this is a small
+purchase, and the [purchase list](../hardware/purchase-list.md) previously concluded no
+low-value resistor was needed on the strength of bench visibility alone.
+
+**The RP2040 sources this comfortably.** Default GPIO drive is 4 mA and it is configurable
+to 12 mA; the status LED asks for 1.3 mA.
 
 ## Grounding
 

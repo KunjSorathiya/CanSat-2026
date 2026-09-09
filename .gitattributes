@@ -18,3 +18,14 @@
 *.whl binary
 *.uf2 binary
 *.bin binary
+# Fusion 360 archive. It is a zip using a compression method standard tools do not open,
+# so git cannot sniff it reliably -- and normalising line endings inside a compressed
+# archive corrupts it silently. Say it outright rather than let the heuristic guess.
+*.f3d binary
+*.f3z binary
+
+# STEP is ASCII and diffs usefully, so it is normalised like any other text file. It is
+# also the format that outlives whichever CAD package produced it, which is why
+# mechanical/CAD/README.md asks for one beside every native file.
+*.step text
+*.stp text
