@@ -8,6 +8,62 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-09 (cycle 44)
+
+### Changed — the structure has a mass, and the risk turns out to be the other way round
+
+The PETG structure is estimated at **193 g**, from its solid volume at 1.27 g/cm³. With the
+electronics measured at 151.299 g that puts **344.299 g committed**.
+
+**The estimate cross-checks two ways**, which matters because it is the only figure in the
+budget not on a scale:
+
+- 193 g at 1.27 g/cm³ implies **152.0 cm³** of solid material — **10.1 %** of the
+  118.5 × 115 × 110 mm bounding box, the right order for an open frame with two faces cut
+  away.
+- Fusion, using the PET material the studies assigned, would report **234.2 g**; the ×0.82
+  density correction gives **192.0 g**.
+
+It is also an **upper bound**: solid volume × density is the part with no infill saving at
+all, and thin walls print mostly as perimeters, so the real print lands at or under it.
+
+### The finding: this vehicle is more likely to come in light than heavy
+
+**Two days ago this page said mass was "very unlikely to be the binding constraint" and that
+the structure had "upwards of 380 g" to spend. Both were wrong, and in opposite directions.**
+
+| | |
+|---|---:|
+| Committed | 344.299 g |
+| To reach the **450 g floor** | **+105.7 g needed** |
+| To stay under the **550 g cap** | +205.7 g available |
+
+Parachute and harness at 30–55 g, an egg chamber at 30–60 g and fasteners at 10–20 g
+project an all-up mass of **414–479 g** — and **the lower half of that is under 450 g.**
+
+**Whether that matters is genuinely unclear, and it is now open question 12.** `GEN-005`
+states *"500 g (±10%)"*, which reads as a band. But the disqualification condition in
+`GEN-006` is explicitly one-sided — *exceeding* the limit by more than 10 % — and an
+underweight vehicle appears on no disqualification list. Band, or ceiling with a nominal
+attached.
+
+**If it is a floor, the fix is cheap and worth doing regardless: thicken the walls.** It adds
+mass exactly where the [anisotropy caveat](mechanical/simulation/README.md) says a printed
+part is weakest, so it buys strength margin and mass in one change — a slicer setting and a
+re-print rather than a redesign. Ballast is the cruder alternative and earns nothing.
+
+**It has to be known before the print, not after**, which is why it goes in the same email as
+the envelope question rather than waiting.
+
+### Changed
+
+`GEN-005` and `MEC-002` record the open lower edge. `check_doc_claims.py` holds the five
+masses, the distance to **both** edges of the band, and the volume the structure estimate
+implies — a density slip would move that by an order of magnitude and nothing else would
+catch it. Claims 270 → **273**.
+
+---
+
 ## [Unreleased] — 2026-09-09 (cycle 43)
 
 Three simulation reports, two renders, a material, and the first time the electronics have

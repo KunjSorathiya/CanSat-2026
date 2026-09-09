@@ -213,61 +213,74 @@ test: known mass, known height, a stopwatch, and the measured rate fed back into
 
 ## Mass budget
 
-**Measured 2026-09-09**, on a scale, for the first time. These two numbers replace a table
-of vendor figures:
-
 | Item | Mass | How |
 |---|---:|---|
-| **Assembled vehicle PCB, no battery** | **110.573 g** | Weighed |
-| **Battery** — Orange 1500 mAh 1S LiPo | **40.726 g** | Weighed |
-| **Electronics, all-up** | **151.299 g** | Sum of the two |
-| Structure, PETG print | **TBD** | Fusion knows it — see below |
+| **Assembled vehicle PCB, no battery** | **110.573 g** | Weighed 2026-09-09 |
+| **Battery** — Orange 1500 mAh 1S LiPo | **40.726 g** | Weighed 2026-09-09 |
+| **Electronics, all-up** | **151.299 g** | Sum |
+| **Structure, PETG** | **193.000 g** | Solid volume × 1.27 g/cm³ |
+| **Committed** | **344.299 g** | Sum |
 | Egg chamber | TBD | Not designed |
 | Parachute, lines, harness | TBD | Not built |
-| **Budget** | **450–550 g** | [GEN-005](../documentation/requirements/requirements.md) |
-| **Remaining for everything mechanical** | **348.701 g** | 500 − 151.299 |
+| Fasteners, standoffs, padding | TBD | Not specified |
+| **Budget** | **450–550 g** | [GEN-005](../documentation/requirements/requirements.md) — 500 g ± 10 % |
 
-> [!WARNING]
-> **The earlier estimate on this page was wrong, and wrong in the dangerous direction.** It
-> counted ~67 g of vendor figures and said the avionics were "unlikely to exceed ~120 g".
-> **The measured figure is 151.3 g — 26 % past that ceiling**, and it makes the electronics
-> **30 % of the entire mass budget** rather than the ~14 % the estimate implied.
+**The structure estimate cross-checks cleanly**, which is worth stating because it is the
+only figure here that is not on a scale:
+
+- 193 g at PETG's 1.27 g/cm³ implies **152.0 cm³** of solid material.
+- Against the 118.5 × 115 × 110 mm bounding box — 1499 cm³ — that is **10.1 %**, which is
+  the right order for an open frame with two faces cut away.
+- Fusion, using the PET material the studies assigned, would report **234.2 g**; the ×0.82
+  density correction gives **192.0 g**. Two independent routes to the same number.
+
+**It is an upper bound.** Solid volume × density is what the part weighs with no infill
+saving at all. Thin walls print mostly as perimeters, so the saving will be small — but the
+real print will be at or under 193 g, not over.
+
+### The surprise: the risk may be being too light
+
+**344.3 g is committed. The budget is a band, not a ceiling.**
+
+| | |
+|---|---:|
+| To reach the **450 g floor** | **+105.7 g** needed |
+| To stay under the **550 g cap** | +205.7 g available |
+
+What is left to add, estimated:
+
+| Item | Plausible |
+|---|---:|
+| Parachute, lines, harness | 30–55 g |
+| Egg chamber | 30–60 g |
+| Fasteners, standoffs, padding | 10–20 g |
+| **Projected all-up** | **414–479 g** |
+
+**The lower half of that range is under 450 g.** The design is far more likely to come in
+*light* than heavy, which is the opposite of the usual worry and the opposite of what this
+page said two days ago.
+
+> [!IMPORTANT]
+> **Whether 450 g is a floor is genuinely unclear, and it is worth one line in the next
+> email to the organizers.** GEN-005 states *"500 g (±10%)"*, which reads as a band. But the
+> **disqualification condition is explicitly one-sided** — [GEN-006](../documentation/requirements/requirements.md)
+> is about *exceeding* the limit by more than 10 %, and an underweight vehicle appears on no
+> disqualification list.
 >
-> The lesson is the one this repository keeps relearning: a vendor figure is not a
-> measurement, and a sum of vendor figures with three `TBD` rows in it is not a budget. The
-> two lines that were `TBD` — wiring, headers, passives, solder, and the antenna — are most
-> of the difference.
+> So the two readings are: a **band** you must land inside, or a **ceiling** with a nominal
+> attached. Under the first, this design as projected may miss low.
 
-### The structure is now the number that decides this
-
-**348.7 g is a comfortable allowance for a printed frame, but it is not unlimited**, and
-PETG is not weightless:
-
-| Solid volume | As PETG (1.27 g/cm³) | As printed, ~40 % infill |
-|---:|---:|---:|
-| 100 cm³ | 127 g | ~50–60 g |
-| 150 cm³ | 190 g | ~75–90 g |
-| 200 cm³ | 254 g | ~100–120 g |
-| 250 cm³ | 318 g | ~125–150 g |
-
-**Get the real number in one click**: Fusion reports the model's mass directly. Two
-corrections to apply to what it says:
-
-1. **The assigned material is PET, not PETG** — density 1.541 g/cm³ against ~1.27. **Fusion's
-   figure will read about 21 % high**; multiply by 0.82.
-2. **A printed part is not solid.** Perimeters and infill mean the real print is a fraction
-   of the solid volume — the slicer's estimate is the one to trust, and it also tells you the
-   filament cost.
-
-**The slicer's own mass estimate is the best number available before anything is printed,
-and it costs one minute.** Put it in this table when you have it.
+**If it is a floor, the fix is easy and worth doing anyway: thicken the walls.** It adds
+mass exactly where the [anisotropy caveat](simulation/README.md) says the printed part is
+weakest, so it buys strength margin and mass in the same change — and it is a slicer setting
+plus a re-print, not a redesign. Ballast is the cruder alternative and earns nothing.
 
 ### What is still unweighed
 
 The antenna and its cable, the switch, the LEDs, the Schottky and the divider resistors are
-all still to fit, and none of them is on the scale yet. They are small — grams, not tens of
-grams — but the estimate above was wrong by 31 g, so **weigh the vehicle again once it is
-complete** rather than adding figures to a measured base.
+all still to fit. They are grams, not tens of grams — but the electronics estimate this page
+carried two days ago was wrong by 31 g, so **weigh the vehicle again when it is complete**
+rather than adding figures to a measured base.
 
 ---
 

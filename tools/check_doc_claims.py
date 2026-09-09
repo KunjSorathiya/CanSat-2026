@@ -1097,20 +1097,31 @@ def main() -> int:
     # Two measured masses and two sums. Sums in a table are exactly the kind of thing that
     # is right when written and wrong after the next edit, and this table is the one that
     # decides whether the vehicle is inside a limit whose breach is a disqualification.
-    pcb_g, battery_g, budget_g = 110.573, 40.726, 500.0
+    pcb_g, battery_g, structure_g = 110.573, 40.726, 193.0
+    floor_g, ceiling_g = 450.0, 550.0
     electronics_g = pcb_g + battery_g
-    remaining_g = budget_g - electronics_g
+    committed_g = electronics_g + structure_g
     for label, value in (("assembled PCB", f"**{pcb_g:.3f} g**"),
                          ("battery", f"**{battery_g:.3f} g**"),
                          ("electronics total", f"**{electronics_g:.3f} g**"),
-                         ("mechanical allowance", f"**{remaining_g:.3f} g**")):
+                         ("PETG structure", f"**{structure_g:.3f} g**"),
+                         ("committed total", f"**{committed_g:.3f} g**")):
         checker.check(f"mechanical/README.md states the {label} mass ({value.strip('*')})",
                       value in mechanical, value)
-    # The share of the budget is quoted in prose, and it is the figure that makes the point.
-    share = 100.0 * electronics_g / budget_g
-    checker.check(f"mechanical/README.md states the electronics at {share:.0f} % of budget",
-                  f"**{share:.0f} % of the entire mass budget**" in mechanical,
-                  f"{share:.0f} %")
+    # The band is two-sided in GEN-005 and the disqualification is one-sided in GEN-006, so
+    # the distance to BOTH edges is quoted. The distance to the floor is the surprising one:
+    # this design is more likely to come in light than heavy.
+    to_floor = floor_g - committed_g
+    to_ceiling = ceiling_g - committed_g
+    checker.check(f"mechanical/README.md states {to_floor:.1f} g needed to reach the floor",
+                  f"**+{to_floor:.1f} g**" in mechanical, f"{to_floor:.1f}")
+    checker.check(f"mechanical/README.md states {to_ceiling:.1f} g of headroom to the cap",
+                  f"+{to_ceiling:.1f} g available" in mechanical, f"{to_ceiling:.1f}")
+    # The structure mass is an estimate from volume, so the volume it implies is quoted as
+    # its own sanity check -- a density slip would move it by an order of magnitude.
+    volume_cm3 = structure_g / 1.27
+    checker.check(f"mechanical/README.md states the implied {volume_cm3:.1f} cm3 of PETG",
+                  f"**{volume_cm3:.1f} cm³**" in mechanical, f"{volume_cm3:.1f}")
 
     # ---- the simulation figures the mechanical page quotes ---------------------------
     # Read off the exported plots by hand, so they cannot be re-derived -- but the safety
