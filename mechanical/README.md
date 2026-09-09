@@ -139,8 +139,11 @@ material rather than PETG (21 % denser, somewhat stronger), and a **printed part
 isotropic** — inter-layer strength is typically 40–70 % of in-plane, so the print
 orientation decides which loads are the weak ones.
 
-**Decide and write down the print orientation.** It is the single free variable that changes
-the part's strength, it costs nothing at slicing time, and it cannot be changed afterwards.
+**The print orientation is decided: as modelled, sitting on its base**, 2026-09-09. It was
+the single free variable that changes the part's strength, it costs nothing at slicing time,
+and it cannot be changed afterwards. Layers stack vertically, so the weak directions are
+tension normal to the layers and interlayer shear — which turns the anisotropy caveat from a
+warning into arithmetic, and leaves an effective safety factor of **6 to 13**.
 
 ---
 

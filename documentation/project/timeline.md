@@ -2,7 +2,7 @@
 
 Where the project has been, where it stands today, and what has to happen next.
 
-**Status date: 2026-09-08.**
+**Status date: 2026-09-09.**
 
 > [!NOTE]
 > No competition deadline appears in the supplied rulebook text, so the forward plan is
@@ -55,7 +55,7 @@ All development so far is recorded in the repository history.
 
 ```mermaid
 timeline
-    title Development to date (2026-09-03 to 2026-09-08)
+    title Development to date (2026-09-03 to 2026-09-09)
     Repository setup : Project directory structure : Hardware overview drafted
     Requirements : Rulebook captured : 30 requirements extracted : 9 development gates defined : 10 organizer questions raised
     Hardware analysis : BOM identified against Robu SKUs : Pico and BMP280 datasheets stored : Electrical compatibility assessed : GPIO and resource maps drafted : AMS1117-3.3 rejected for direct regulation : microSD supply flagged as blocking
@@ -68,11 +68,12 @@ timeline
     First link : 66 packets end to end, no gaps, no duplicates : Microphone added as the additional sensor : Chip-select ordering bug found by running the flight image : Startup summary names what answered
     Rate and record : GPS moved to the log and the period to 700 ms : 1.43 Hz : Ground-to-vehicle erase, inert by construction : GPS gated on satellite count and HDOP : Flight log reader written
     Mission and mechanics : Descent model : 80 cm canopy : Board does not fit a 12 cm section laid flat : Concept of operations written : F-20 found - a landing declared under a hovering drone
+    The design lands : Cansat_D1 modelled and exported : Organizers confirm a 12 cm sided box : PETG chosen and argued : Three static-stress studies : Electronics weighed at 151.299 g : Structure estimated at 193 g : Print orientation decided : Sync-word and radio-silence procedures written
 ```
 
 ### Commit history
 
-Nearly two hundred commits over six days. Listing them here would duplicate
+Over two hundred commits in seven days. Listing them here would duplicate
 [CHANGELOG.md](../../CHANGELOG.md), which carries the reasoning as well as the subject line,
 so this is the shape of it instead:
 
@@ -84,6 +85,7 @@ so this is the shape of it instead:
 | **2026-09-06** | The board is designed rather than assembled: floorplan to scale, coupling analysis, decoupling sized against a failure that actually happened, sixteen gated build steps | [assembly-procedure.md](../hardware/assembly-procedure.md) |
 | **2026-09-07** | The board is built, and gates 3 through 7 pass on it. **The first radio link closes** — 66 packets, no gaps. Running the flight image finds a chip-select ordering bug no host test could have | [bring-up-record.md](../testing/bring-up-record.md), F-12 to F-19 |
 | **2026-09-08** | Telemetry to 1.43 Hz, an authorised erase command that is inert by construction, GPS gated on satellite count and HDOP, and the first mechanical and mission analysis this project has had | This document, [concept-of-operations.md](../mission/concept-of-operations.md) |
+| **2026-09-09** | **The mechanical design arrives and the vehicle stops being an idea with a board in it.** `Cansat_D1` modelled and exported, the organizers confirm a 12 cm *sided box* so it fits, PETG chosen and argued, three static-stress studies run, the electronics weighed for the first time at **151.299 g**, and the print orientation decided. The mass finding runs the other way: **coming in under the 450 g floor is now likelier than exceeding the cap** | [mechanical/README.md](../../mechanical/README.md), [simulation/README.md](../../mechanical/simulation/README.md) |
 
 **Two things are worth noticing about that list.** Every one of those days ends with a
 finding, and most of the findings came from *running* something rather than from reading it.
@@ -102,7 +104,7 @@ appear when a real board is powered up.
 | Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI, end-to-end trace | 140 Python tests |
 | Web console | Framing, parser, validator and link health extracted from `index.html` and run under Node | 62 Node tests |
 | SPI drivers | LoRa radio and microSD command sequences against simulated devices | 772 assertions |
-| Tooling | LoRa airtime calculator, netlist and drawing generators, SD-card preparation, flight-log reader, documentation-claim checker | 33 Python tests |
+| Tooling | LoRa airtime calculator, STEP dimension reader, netlist and drawing generators, SD-card preparation, flight-log reader, documentation-claim checker | 49 Python tests |
 | Simulations | Descent model: canopy sizing, descent time and telemetry yield | 40 Python tests |
 | Web console UI | Single-file console with demo, file replay and Web Serial | Rendering verified by hand in a browser |
 | Vehicle board | 100 × 100 mm perfboard, seven modules, built and working | [bring-up-record.md](../testing/bring-up-record.md), gates 3–7 |
@@ -170,8 +172,9 @@ gantt
 - ~~Structure sized to **21 cm (+7 cm) × 12 cm**~~ — done: `Cansat_D1`, 118.5 × 115.0 × 110.0 mm, **PETG**, out for printing
 - ~~Decide the board orientation~~ — settled by the design: the 115 × 110 mm section takes the 100 mm board flat
 - ~~Confirm how "12 cm across" is measured~~ — **organizers confirmed a 12 cm sided box, 2026-09-09**
-- **Decide and record the print orientation.** The one free variable that changes a printed part's strength, and it is not yet chosen
-- **Weigh the printed structure.** The electronics are measured at 151.299 g; the structure is the number that decides the budget
+- ~~Decide and record the print orientation~~ — **decided 2026-09-09: printed as modelled, on its base.** Layers stack vertically, so the weak directions are tension normal to the layers and interlayer shear, and the derated safety factor is still **6 to 13**
+- **Run the base-first load case.** All three studies load horizontally, and a vehicle hanging under a parachute lands along the build axis — which is exactly the print's weak direction. The one load case not run
+- **Weigh the printed structure.** The electronics are measured at 151.299 g and the structure is estimated at 193 g, which has never been on a scale. It is the number that decides the budget, and the projected all-up **414–479 g** makes coming in *under* the 450 g floor the likelier risk
 - Cushioned, secure egg chamber. **Build it even though no egg flies:** PAY-002 is a separate requirement, it carries the +7 cm allowance, and section D scores use of permitted volume
 - Parachute: **80.0 cm flat canopy**, sized at 550 g on a hot day by [`simulations/descent.py`](../../simulations/descent.py). Vented or cruciform, and **not tightly packed** — REC-003 and REC-004
 - ~~Weigh the electronics~~ — done 2026-09-09: **151.299 g**, and it overran the estimate by 26 %
@@ -221,8 +224,8 @@ flowchart LR
 | 2 · Electrical architecture approved | 🟠 Partial | **Resolved and built, except the battery end.** No regulator is fitted and none is needed — every load runs from the Pico's `3V3(OUT)`, measured at **3.28–3.29 V under 45 back-to-back transmits** and 3.28–3.30 V at 100 % write duty. Missing: the switch, the divider, and the Schottky that stops USB back-powering the pack |
 | 3 · Power system tested | 🟠 Partial | **The rail is measured** under each load individually and holds. Missing: the switch, the LEDs, the divider, the series-current figure that four sessions have skipped, and the rail under radio **and** card simultaneously |
 | 4 · Sensors individually verified | 🟠 Partial | **Both I2C sensors verified together on the soldered board 2026-09-07** — `0x68` and `0x76` on one bus, `0x0C` correctly absent, rates, biases and noise recorded. GPS delivers all six NMEA sentences with zero checksum errors. The microSD writes and sustains ~300 writes/s. Missing: a GPS fix outdoors, the sound module, and [F-13](../testing/bring-up-record.md#findings)'s gyro drift across temperature |
-| 5 · Telemetry verified | 🟠 Partial | The RA-02 answers `0x12` and transmits: measured airtime is within 1.8 % of the model, and channel occupancy 33.4 % typical. **No link has been established** — one radio transmitting is not two radios talking. Transmit itself is now proven on the soldered board: 55 transmits, zero failures, airtime within 1.8 % of the model on both packet sizes |
-| 6 · Ground station verified | 🟠 Partial | The bridge image runs on its Pico, enumerates over USB and emits status frames at a verified 1 Hz with byte-exact CRC framing. The receive pipeline has still never seen a packet that arrived over the air |
+| 5 · Telemetry verified | 🟠 Partial | **A link has been established.** 66 packets, `P-001` to `P-066`, no gaps and no duplicates, sync word `0xF3`, on 2026-09-07. Transmit is proven on the soldered board: 55 transmits, zero failures, airtime within 1.8 % of the model on both packet sizes, and channel occupancy 33.4 % typical. Missing: the `0xA5` sync word, which is a reflash of *both* Picos; a loss figure over the 500-packet window the row asks for rather than 66; and the lift, flight, landing and post-impact transmissions, which need a flight |
+| 6 · Ground station verified | 🟠 Partial | The bridge image runs on its Pico, enumerates over USB and emits status frames at a verified 1 Hz with byte-exact CRC framing, and **the receive pipeline has now seen 66 packets that arrived over the air** — parsed, validated and counted, with the bridge's `frames` counter incrementing once per packet and `dropped=0` throughout. Missing: compatibility with the official dual ground stations, which only the organizers or the venue can settle |
 | 7 · Mechanical and recovery verified | ⬜ Not passed | Nothing built |
 | 8 · Full system integration | ⬜ Not passed | Blocked by gates 2–7 |
 | 9 · Competition readiness | ⬜ Not passed | Blocked by gate 8 |

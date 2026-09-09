@@ -8,6 +8,83 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-09 (cycle 46)
+
+A repository-wide pass with nothing new built. Everything below is something the repository
+already knew and one of its documents had not been told.
+
+### Fixed — the timeline was a day behind its own project
+
+[timeline.md](documentation/project/timeline.md) carried **Status date: 2026-09-08** while
+**eight changelog cycles, 38 through 45, are dated 2026-09-09** — the cycles in which the
+mechanical design arrived, the envelope question was answered, the electronics went on a
+scale and the print orientation was chosen. The document that exists to say where the
+project stands was the last to hear about the biggest day it has had.
+
+Its history table and mermaid timeline both stopped at 2026-09-08, so a 2026-09-09 row was
+added to each, and *"nearly two hundred commits over six days"* is now **207 over seven**.
+
+### Fixed — two gates were still reporting that no link existed
+
+The same file's gate table said this, three sections below its own entry recording that the
+first radio link closed on 2026-09-07:
+
+| Gate | Said | Says |
+|---|---|---|
+| 5 · Telemetry verified | *"**No link has been established** — one radio transmitting is not two radios talking"* | **A link has been established** — 66 packets, `P-001` to `P-066`, no gaps, no duplicates, sync word `0xF3` |
+| 6 · Ground station verified | *"The receive pipeline has still never seen a packet that arrived over the air"* | **It has now seen 66**, parsed, validated and counted, with `dropped=0` throughout |
+
+**Neither is a small error, because a gate table is read to decide what to work on next.**
+Both rows stay 🟠 Partial — what is actually missing is now named instead: the `0xA5` sync
+word, a loss figure over the 500-packet window rows 8.1 and 8.2 ask for rather than 66, the
+in-flight transmissions, and compatibility with the official dual ground stations.
+
+### Fixed — two stale counts and a decision recorded as still open
+
+- The timeline's tooling row said **33 Python tests**. Cycle 41 took that suite to **49**,
+  and [test-plan.md](documentation/testing/test-plan.md) has said 49 ever since. The
+  timeline was the copy nobody updated.
+- The timeline's phase 7 still asked to *"decide and record the print orientation"* — decided
+  in cycle 45. It is struck through now, and the item that decision **exposed** replaces it:
+  **all three studies load horizontally, and a vehicle under a parachute lands base-first**,
+  along the build axis, which is the print's weak direction.
+- [mechanical/README.md](mechanical/README.md) contradicted itself on the same point,
+  asking for the orientation in its material section and recording the decision in its
+  open-items table sixteen lines later.
+
+**The pattern is worth naming.** Every one of these is a document left behind by work
+recorded correctly elsewhere, and `check_doc_claims.py` caught none of them — it holds
+numbers against the source that defines them, and *"no link has been established"* is prose.
+**278 / 278 claims passed the whole time these five statements were false.**
+
+### Changed — the CI actions were three majors behind
+
+| Action | Was | Is |
+|---|---|---|
+| `actions/checkout` | v4 | **v7** |
+| `actions/setup-python` | v5 | **v7** |
+| `actions/setup-node` | v4 | **v7** |
+| `actions/upload-artifact` | v4 | **v7** |
+| Node | 22 | **24** |
+
+The v5–v7 majors are Node 24 runtime moves and an ESM repackaging. The one real behaviour
+change — checkout v7 blocking fork-PR checkout under `pull_request_target` and
+`workflow_run` — **does not reach this workflow**, which triggers on `push`, `pull_request`
+and `workflow_dispatch`. setup-python v7 drops a `pip-install` input this repository never
+used.
+
+**Node moves to 24 because that is what the development machine runs**, and the web console
+suite is the only thing that needs it. **Python stays on 3.12 deliberately**, for the reason
+now written beside the pin: everything here has only ever been run on 3.12, and a CI
+interpreter ahead of the one the work is done on reports failures nobody can reproduce.
+
+### Verified
+
+`tools/build_host.sh` clean after every change above: **4879 C++ assertions, 229 Python
+tests, 62 Node tests, 278 / 278 documented claims** — 5170 checks, zero failures.
+
+---
+
 ## [Unreleased] — 2026-09-09 (cycle 45)
 
 Three answers, and the first one resolves the contradiction cycle 43 could not.
