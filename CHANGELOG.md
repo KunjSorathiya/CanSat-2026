@@ -8,6 +8,53 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-09 (cycle 38)
+
+### Fixed — the runbook was still describing the old telemetry rate
+
+Found while answering a question about the sync words, which is the usual way: nobody reads
+a runbook end to end, they read the one section they need.
+
+Four figures in [runbook.md](documentation/operations/runbook.md) were computed from a rate
+the vehicle no longer transmits at, and one of them had gone from stale to **actively
+wrong**. The tunables table gave `telemetry_period_ms` a default of **1000** and described
+1000 ms as *"both the rulebook ceiling and roughly what the SF7/125 kHz modem sustains"* —
+after cycle 37 made 1000 ms a value `validate_config()` **refuses**. A wrong ceiling in the
+document an operator reads before a launch is worse than a wrong figure anywhere else in
+this repository.
+
+| Was | Is |
+|---|---|
+| `telemetry_period_ms` default 1000, "the rulebook ceiling" | **700** (1.43 Hz), and 1000 ms is refused — the rulebook's 1 Hz is a floor |
+| Link health: "1.18 Hz (850 ms) by default" | **1.43 Hz (700 ms)**, with 1.18 Hz named as the `transmit_gps` case it actually is |
+| Stray transmission: "1.18 Hz … ninety seconds" | **1.43 Hz, 0.71 points/s, 35 seconds** to lose the whole 25-point telemetry section |
+| Log capacity: "36 hours at 1.18 Hz" | **30 hours** at 1.43 Hz |
+
+`ground-station/web/README.md` carried the same 1.18 Hz figure for the flight radio.
+
+**The stray-transmission arithmetic was wrong in both directions.** The old text said ninety
+seconds costs more than the 25-point section; at 1.18 Hz it actually costs fifty-three
+points, so the warning understated itself by more than double. At the current rate the true
+figure is **35 seconds for 25 points**, and the faster rate makes that window *shorter*, not
+longer — which is the opposite of the intuition, and worth saying out loud on a page about
+switch discipline.
+
+A `transmit_gps` row was added to the same table. It was the one setting that changes the
+rate, the packet size and the recovery story at once, and it was not listed.
+
+### Changed — the arithmetic is checked, not just the figure
+
+Quoting the right rate and computing the right consequences from it are different
+properties, and only the first was guarded. `check_doc_claims.py` now derives the penalty
+rate and the wipe-out time from the shipped telemetry period and holds the runbook to both,
+so a period change fails the build until the prose that reasons about it is updated. It also
+refuses the specific sentence that called 1000 ms a ceiling, and extends the quoted-rate
+sweep to the runbook, `avionics/telemetry/README.md` and the web console's README.
+
+Claims 244 -> **251**.
+
+---
+
 ## [Unreleased] — 2026-09-08 (cycle 37)
 
 Two changes to flight behaviour, and both are about a rule the vehicle was following in

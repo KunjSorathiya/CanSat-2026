@@ -1036,8 +1036,34 @@ def main() -> int:
                        ("test-plan.md", test_plan),
                        ("link-budget.md", read("documentation/design/link-budget.md")),
                        ("concept-of-operations.md",
-                        read("documentation/mission/concept-of-operations.md"))):
+                        read("documentation/mission/concept-of-operations.md")),
+                       ("runbook.md", runbook),
+                       ("avionics/telemetry/README.md",
+                        read("avionics/telemetry/README.md")),
+                       ("ground-station/web/README.md",
+                        read("ground-station/web/README.md"))):
         checker.check(f"{name} states the {quoted} telemetry rate", quoted in body, quoted)
+
+    # The rate a document quotes being right is not the same as its *arithmetic* being right.
+    # Three figures in the runbook are computed from the rate, and every one of them had been
+    # scaled from an earlier period and left behind -- including a tunables row that still
+    # called 1000 ms "the rulebook ceiling" after 1000 ms became a value validate_config()
+    # refuses. A wrong ceiling in the document an operator reads before a launch is worse
+    # than a wrong figure anywhere else in the repository.
+    checker.check("runbook.md states the shipped period as the default, not an older one",
+                  f"| `telemetry_period_ms` | **{period_ms}**" in runbook, str(period_ms))
+    checker.check("runbook.md does not present 1000 ms as an acceptable period",
+                  "1000 ms is both the rulebook ceiling" not in runbook)
+    # -1 point per 2 packets, so half a point per packet. The seconds it takes to lose the
+    # whole 25-point telemetry section is the number that makes switch discipline concrete,
+    # and it moves whenever the rate does.
+    penalty_pts_per_s = rate_hz * 0.5
+    wipeout_s = round(25.0 / penalty_pts_per_s)
+    checker.check(f"runbook.md states {penalty_pts_per_s:.2f} points per second of stray transmission",
+                  f"{penalty_pts_per_s:.2f} points per second" in runbook,
+                  f"{penalty_pts_per_s:.2f}")
+    checker.check(f"runbook.md states that {wipeout_s} s of stray transmission costs 25 points",
+                  f"in **{wipeout_s} seconds**" in runbook, str(wipeout_s))
 
     # Last, and counting itself: the number of claims this script checks is itself a figure
     # the test plan quotes, so adding a check here without updating that row fails here.

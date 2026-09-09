@@ -105,7 +105,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Python ground station | 8 modules | ✅ **140 / 140 tests** |
 | Python tooling | `tools/link_budget.py` | ✅ **33 / 33 tests** |
 | Python simulations | `simulations/descent.py` — canopy sizing, the closed-form fall against both of its own limits, ISA air density, and the mass-tolerance argument | ✅ **40 / 40 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **244 / 244 claims** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **251 / 251 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **62 / 62 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 

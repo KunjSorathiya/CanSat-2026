@@ -61,9 +61,11 @@ config.radio_mode = flight::RadioMode::test;  // ::official for the launch
 > total loss of telemetry — the receiver simply never sees a packet.
 >
 > **The 2026 revision made stray transmission five times more expensive: -1 point per 2
-> packets, where the earlier rulebook said per 10.** This vehicle transmits at 1.18 Hz, so that
-> is half a point per second. Ninety seconds of a CanSat accidentally left on during someone
-> else's launch costs more than the entire 25-point telemetry section is worth.
+> packets, where the earlier rulebook said per 10.** This vehicle transmits at **1.43 Hz**, so
+> that is **0.71 points per second**. A CanSat accidentally left on during someone else's
+> launch throws away the entire 25-point telemetry section in **35 seconds**, and twice that
+> in seventy. The faster rate this vehicle now runs at makes that window *shorter*, not
+> longer.
 >
 > The firmware cannot help here — it is *required* to transmit automatically on power-up.
 > **The manual switch is the only control, and switch discipline is a scored activity.**
@@ -87,7 +89,8 @@ Other tunables worth reviewing before a flight, all in
 
 | Setting | Default | Review when |
 |---|---:|---|
-| `telemetry_period_ms` | 1000 | Raising the rate — but read [link-budget.md](../design/link-budget.md) first: 1000 ms is both the rulebook ceiling and roughly what the SF7/125 kHz modem sustains. `validate_config()` refuses a period the radio cannot deliver |
+| `telemetry_period_ms` | **700** (1.43 Hz) | Rarely. **1000 ms is refused**, not a ceiling to sit on: the rulebook's 1 Hz is a floor, so `validate_config()` and a `static_assert` both reject any period above `kMaxTelemetryPeriodMs` (950 ms). Going *faster* than 700 needs a wider bandwidth or a shorter packet, and `validate_config()` refuses a period the radio cannot deliver — read [link-budget.md](../design/link-budget.md) first |
+| `transmit_gps` | `false` | Deciding whether the position goes on the air as well as into the log. True costs 56 bytes and drops the rate to **1.18 Hz**; false means the ground station cannot see where the vehicle is. `validate_config()` refuses it without `worst_case_packet_bytes` and the period moving with it |
 | `sensor_period_ms` | 33 | Changing the acquisition rate — `validate_config()` refuses a period the barometer cannot feed ([sensor-rates.md](../design/sensor-rates.md)) |
 | `reference_pressure_pa` | 101325 | Always — set it from a field barometer reading on the day |
 | `launch_accel_mps2` / `launch_altitude_gain_m` | 30 / 15 | After the first flight data exists |
@@ -176,8 +179,8 @@ pipeline is what writes the authoritative logs. Run both when it matters.
 ### Erasing the onboard log
 
 The log **appends across power cycles** — the dual-header resume is what makes a brownout
-mid-flight survivable — so a card accumulates every run until something empties it. At 1.18 Hz
-a 64 MB region holds about **36 hours** of records, and when it does fill the vehicle raises
+mid-flight survivable — so a card accumulates every run until something empties it. At 1.43 Hz
+a 64 MB region holds about **30 hours** of records, and when it does fill the vehicle raises
 `sd_write`, then `sd_unavailable`, and keeps transmitting: logging stops, telemetry does not.
 
 Two ways to empty it, and the first is the one to use before a launch:
@@ -356,7 +359,7 @@ Link health on the ground station:
 
 | Indicator | Healthy | Investigate |
 |---|---|---|
-| Rate | Steady at the configured rate, **1.18 Hz** (850 ms) by default | Falling rate means range or power trouble. Anything below 1.00 Hz is a rulebook failure, not just a warning |
+| Rate | Steady at the configured rate, **1.43 Hz** (700 ms) by default — 1.18 Hz with `transmit_gps` | Falling rate means range or power trouble. Anything below 1.00 Hz is a rulebook failure, not just a warning, and the station says so: the headless form prints `RATE BELOW THE RULEBOOK MINIMUM` and the dashboard carries a `>= 1 Hz rulebook` row |
 | Loss % | Near zero | Rising loss means range, antenna or orientation |
 | CRC errors | Zero | Non-zero means transport corruption, not sensor trouble |
 | Missing | Zero | Gaps in numbering mean lost packets over the air |
