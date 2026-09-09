@@ -149,25 +149,28 @@ the part's strength, it costs nothing at slicing time, and it cannot be changed 
 Three static-stress studies, run 2026-09-09. Full write-up and caveats:
 **[simulation/README.md](simulation/README.md)**.
 
-| Study | Load | Mesh | **Max von Mises** | SF vs 54.40 MPa yield |
+| Study | Load | Mesh | **Max von Mises** | **Min safety factor** |
 |---|---|---|---:|---:|
-| 1 · Horizontal force | 30 N on +Z | 5838 nodes | **2.885 MPa** | ~19 |
-| 2 · Tearing force | 30 N on −X | 5838 nodes | **1.330 MPa** | ~41 |
-| 3 · Impact force | 100 N on −X | 7148 nodes | **2.345 MPa** | ~23 |
+| 1 · Horizontal force | 30 N on +Z | 5838 nodes | **2.885 MPa** | **≥ 15** |
+| 2 · Tearing force | 30 N on −X | 5838 nodes | **1.330 MPa** | **≥ 15** |
+| 3 · Impact force | 100 N on −X | 7148 nodes | **2.345 MPa** | **≥ 15** |
 
 **The structure is nowhere near failing in any of the three**, which is the headline and it
 is a good one. Four caveats, all in the simulation write-up and none of them small:
 
-1. **The reports say the design "is expected to bend permanently or break."** That is
-   contradicted by their own stress plots by a factor of 19 to 41, and appears in all three
-   above a block containing *both* guided-result branches — it reads as template text.
-   **Fusion's Result Summary table exported empty**, so the minimum safety factor has never
-   actually been read. That is the one number to go back for.
+1. ~~The reports say the design "is expected to bend permanently or break."~~ **Settled: it
+   is template text.** The reported 15 is Fusion's display cap, not a result — three load
+   cases with peak stresses differing by 2× cannot all minimise at exactly 15. So the real
+   statement is **≥ 15 everywhere**, which matches the yield-derived 19 / 41 / 23.
 2. **The material is PET, not PETG.** 21 % denser and somewhat stronger than what is being
    printed.
-3. **A printed part is not isotropic**, and these studies assume it is.
+3. **A printed part is not isotropic**, and these studies assume it is. **The orientation is
+   now decided** — printed on its base, as modelled — so the weak direction is vertical.
+   Derating the margin by the usual 40–70 % still leaves an effective safety factor of
+   **6 to 13**.
 4. **The 100 N impact load assumes a 25 ms arrest** for a 0.5 kg vehicle at 5 m/s. A rigid
-   landing on concrete is several times worse — 10 ms is 250 N, 5 ms is 500 N.
+   landing on concrete is several times worse — 10 ms is 250 N, 5 ms is 500 N. **And all
+   three studies load horizontally**, while a vehicle under a parachute lands base-first.
 
 **A simulation is not a drop test**, and section C scores the real descent. The model says
 where to look; the drop test says whether it was right.
@@ -295,7 +298,8 @@ started.
 | ~~How "12 cm across" is measured~~ | — | **Answered 2026-09-09: a 12 cm sided box is acceptable.** The design fits with 2.5 and 5.0 mm per side |
 | **Where the protruding features go** | Structure | Switch, LED, connector, chute attachment, antenna. **2.5 mm per side is all the clearance there is** |
 | ~~Structure material~~ | — | **PETG, decided 2026-09-09**, and out for printing. The reasoning is [above](#material-and-manufacture) and section D rewards having it |
-| **Print orientation** | Nothing | The one free variable that changes a printed part's strength, free at slicing time, unchangeable afterwards. **Not yet decided or recorded** |
+| ~~Print orientation~~ | — | **Decided 2026-09-09: as modelled**, printed on its base. Layers stack vertically, so the weak direction is vertical tension and interlayer shear |
+| **A vertical impact case** | Nothing | All three studies load horizontally, and a vehicle under a parachute lands base-first — along the build axis, which is the print's weak direction |
 | Whether to use the 91.5 mm of unused height | Nothing | The body allowance is 210 mm and the design is 118.5 mm. Section D scores *effective use of the volume the rules permit*, and half of it is currently empty |
 | Egg chamber, built even though no egg flies | Nothing | PAY-002 is a separate requirement from PAY-001, carries the +7 cm allowance, and section D scores use of permitted volume. **Build it** — see [scoring-assessment.md](../documentation/project/scoring-assessment.md) |
 | Canopy type and material | Sewing capability | Vented flat circular is the floor; cruciform scores better on stability |

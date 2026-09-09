@@ -1128,12 +1128,26 @@ def main() -> int:
     # factors are arithmetic on them and must stay consistent with the material's yield.
     simulation = read("mechanical/simulation/README.md")
     yield_mpa = 54.40
+    # Fusion caps its safety factor legend at 15, and all three studies sit on that cap --
+    # so the reported figure is a floor, not a result. The yield-derived numbers are the
+    # real margins, and they are quoted alongside it precisely so nobody reads the cap as
+    # the answer. Both are held here.
     for study, von_mises in ((1, 2.885), (2, 1.330), (3, 2.345)):
         sf = yield_mpa / von_mises
-        checker.check(f"simulation study {study} quotes {von_mises} MPa and ~{sf:.0f} safety factor",
-                      f"**{von_mises:.3f} MPa**" in simulation and
-                      f"| ~{sf:.0f} |" in mechanical,
-                      f"{von_mises} -> {sf:.1f}")
+        checker.check(f"simulation study {study} quotes its {von_mises} MPa peak stress",
+                      f"**{von_mises:.3f} MPa**" in simulation, str(von_mises))
+        checker.check(f"simulation study {study} quotes the {sf:.1f} yield-derived margin",
+                      f"**{sf:.1f}**" in simulation or f"| {sf:.1f} |" in simulation,
+                      f"{sf:.1f}")
+    checker.check("mechanical/README.md reports the capped safety factor as a floor",
+                  mechanical.count("**≥ 15**") >= 3,
+                  str(mechanical.count("**≥ 15**")))
+    # The derated figure is the one that actually answers "will a printed part survive",
+    # and it is arithmetic on the cap rather than a number anybody looked up.
+    derated = 15 * 0.40
+    checker.check(f"simulation/README.md states the {derated:.0f}x derated worst case",
+                  f"effective safety factor is {derated:.0f}" in simulation,
+                  f"{derated:.0f}")
 
     # ---- rulebook constants that must never drift -----------------------------------
     checker.check("post-impact window is at least the rulebook's 5 s",

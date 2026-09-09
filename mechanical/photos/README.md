@@ -22,14 +22,14 @@ An open box frame, 118.5 × 115.0 × 110.0 mm, to be printed in **PETG**:
 - **A central vertical spine** with a through-hole, dividing the volume.
 - **Rectangular slots** top and bottom, in pairs — harness or strap routing.
 - **Round holes** in the side panels and the spine.
-- **A square cutout with two small round holes beside it** on one upper face — the shape a
-  USB port and two indicators would need.
+- **A rectangular cutout with two small round holes beside it** on one upper face — the
+  switch and the two indicator LEDs.
 
-> That last one is worth confirming against the electrical design. The vehicle needs a
-> **USB cutout** for the Pico, a **manual switch**, a **power LED** and a **status LED** —
-> four penetrations, and [only 2.5 mm of clearance per side](../README.md#the-envelope-question--asked-and-answered)
-> before the envelope is exceeded. If those two small holes are the LEDs, the switch still
-> needs a home.
+> **The rectangular cutout is the switch** — confirmed 2026-09-09 — and the two small round
+> holes beside it are the LED positions. That accounts for three of the four penetrations the
+> vehicle needs; **USB access for the Pico is the one left to confirm**, and there is
+> [only 2.5 mm of clearance per side](../README.md#the-envelope-question--asked-and-answered)
+> for anything that protrudes.
 
 ---
 

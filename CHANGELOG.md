@@ -8,6 +8,72 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-09 (cycle 45)
+
+Three answers, and the first one resolves the contradiction cycle 43 could not.
+
+### Fixed — the "expected to break" line is template text, and the 15 proves it
+
+**Minimum safety factor is 15 in all three studies**, read out of Fusion directly.
+
+**That is a display cap, not a result**, and noticing so is what settles the question. The
+three studies' peak stresses differ by more than a factor of two — 2.885, 1.330 and
+2.345 MPa — so their true minimum safety factors cannot all be exactly 15:
+
+| Study | Max von Mises | Yield ÷ stress |
+|---|---:|---:|
+| Horizontal | 2.885 MPa | **18.9** |
+| Tearing | 1.330 MPa | **40.9** |
+| Impact | 2.345 MPa | **23.2** |
+
+Fusion's safety factor legend caps at 15 by default. All three sitting on it means **≥ 15
+everywhere on the part, in every load case** — which is a stronger statement than a single
+minimum, and it agrees with the yield-derived figures above.
+
+**So the sentence *"the design is expected to bend permanently or break"*, which appears in
+all three reports, is template text and can be disregarded.** It was printed above a block
+containing *both* guided-result branches, and Fusion's Result Summary table exported empty,
+which is why it took a number from outside the report to settle it.
+
+### Added — print orientation, and the derating it makes possible to compute
+
+**Decided 2026-09-09: printed as modelled, sitting on its base.** Layers stack vertically, so
+the weak directions are tension normal to the layers and interlayer shear.
+
+That turns the anisotropy caveat from a warning into arithmetic:
+
+| Study | Yield ÷ stress | ×0.40 | ×0.55 | ×0.70 |
+|---|---:|---:|---:|---:|
+| Horizontal | 18.9 | **7.5** | 10.4 | 13.2 |
+| Tearing | 40.9 | 16.4 | 22.5 | 28.6 |
+| Impact | 23.2 | **9.3** | 12.8 | 16.2 |
+
+**Even at the pessimistic 40 %, and even taking the capped 15 rather than the yield-derived
+figure, the effective safety factor is 6.** The margin was worth having.
+
+**One load case is still missing, and it is the one that matters most.** All three studies
+load horizontally. **A vehicle hanging under a parachute lands base-first** — along the
+build axis, which is exactly the print's weak direction. That case has not been run.
+
+### Changed — the switch has a home
+
+**The rectangular cutout in the structure is the switch**, confirmed 2026-09-09, with the two
+indicator LEDs in the round holes beside it. Three of the four penetrations the vehicle needs
+are accounted for; **USB access for the Pico is the one left to confirm**, against 2.5 mm of
+clearance per side.
+
+`PWR-001` records it. The part has been held since 2026-09-06 and is still not fitted, but it
+is no longer a part without a place to go.
+
+### Changed
+
+Claims 273 → **278**. The new ones hold the capped safety factor as a **floor** rather than
+a result, keep the yield-derived margins beside it so nobody reads the cap as the answer, and
+check the derated worst case — which is the figure that actually answers whether a *printed*
+part survives.
+
+---
+
 ## [Unreleased] — 2026-09-09 (cycle 44)
 
 ### Changed — the structure has a mass, and the risk turns out to be the other way round
