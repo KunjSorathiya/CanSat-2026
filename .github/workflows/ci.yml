@@ -32,15 +32,20 @@ jobs:
     # verifies, and it should change when we decide to, not when the runner image rolls.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      # Python tracks the development machine rather than the newest release. Everything
+      # here has only ever been run on 3.12, and a CI interpreter ahead of the one the
+      # work is done on reports failures nobody can reproduce locally.
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
-      - uses: actions/setup-node@v4
+      # Node tracks active LTS, which is also what the development machine runs. The web
+      # console suite is the only thing that needs it.
+      - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Toolchain versions
         run: |
@@ -65,7 +70,7 @@ jobs:
       # Whatever happened, the evidence survives the job.
       - name: Upload the build log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: host-build-log
           path: host.log
@@ -75,15 +80,15 @@ jobs:
     name: Strict warning set
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
 
       # A warning is a finding, not decoration. -Wshadow catches a local hiding a member,
       # -Wcast-align a pointer cast that faults on ARM but not on x86, -Wdouble-promotion
@@ -97,7 +102,7 @@ jobs:
 
       - name: Upload the strict build log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: strict-warning-log
           path: strict.log
@@ -107,7 +112,7 @@ jobs:
     name: Pico firmware syntax check
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Syntax-check every PICO_BUILD translation unit
         run: bash tools/check_pico_syntax.sh
@@ -116,7 +121,7 @@ jobs:
     name: CMake configure (host targets)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Tool versions
         run: |
@@ -136,7 +141,7 @@ jobs:
       # useful than the console tail when a single assertion goes wrong.
       - name: Upload CTest output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-log
           path: build/ci/Testing/**
