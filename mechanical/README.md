@@ -3,9 +3,10 @@
 The structure, the egg chamber, the parachute and the recovery system.
 
 > [!IMPORTANT]
-> **A design exists. Nothing has been fabricated.** `Cansat_D1` is modelled in Fusion 360
-> and exported to STEP, with three simulation studies in the archive. No part has been cut,
-> printed or assembled, nothing has been weighed, and no drop test has been done.
+> **A design exists and is out for 3D printing in PETG. Nothing has come back yet.**
+> `Cansat_D1` is modelled in Fusion 360, exported to STEP, and carries three static-stress
+> studies. The electronics have been weighed for the first time. No part has been printed,
+> the structure has never been on a scale, and no drop test has been done.
 
 **Status: 2026-09-09.** Gate 7 (mechanical and recovery verified) has not been attempted.
 It is still the largest single block of unclaimed points in the project — see
@@ -23,6 +24,7 @@ and run `bash tools/build_host.sh` — it will tell you which numbers moved.
 
 - [What the rulebook fixes](#what-the-rulebook-fixes)
 - [The design](#the-design)
+- [Material and manufacture](#material-and-manufacture)
 - [Structural simulation](#structural-simulation)
 - [The parachute](#the-parachute)
 - [Mass budget](#mass-budget)
@@ -64,6 +66,10 @@ most consequential table in this directory.
 
 It is **prismatic, not a cylinder** — the largest radius anywhere in the model is 22.5 mm,
 nothing like the 60 mm a 120 mm circular section would need.
+
+An open box frame: two solid side panels, two faces opened out with large arched cutouts, a
+central vertical spine, harness slots top and bottom, and a square cutout with two small
+holes beside it on one upper face. Renders in [photos/](photos/README.md).
 
 ![Envelope and the Cansat_D1 design](drawings/envelope-and-board-fit.svg)
 
@@ -113,43 +119,58 @@ those features before cutting anything.
 
 ---
 
+## Material and manufacture
+
+**PETG, 3D printed.** The body is out for printing as of 2026-09-09.
+
+It is a sensible choice and worth being able to defend, because section D awards a **bonus
+for material selection** and expects the reasoning:
+
+- **Tougher than PLA and far easier than ABS.** PETG does not go brittle the way PLA does,
+  which matters for a part whose job is to survive one impact.
+- **Prints without an enclosure**, with little warping — ABS's toughness comes with
+  warping and fumes that a school workshop usually cannot manage.
+- **Impact energy goes into deformation rather than fracture**, which is the failure mode
+  you want: a bent frame is a recovered vehicle, a shattered one is not.
+
+**Two things about it that the simulation does not know**, both in
+[simulation/README.md](simulation/README.md): the studies were run with Fusion's **PET**
+material rather than PETG (21 % denser, somewhat stronger), and a **printed part is not
+isotropic** — inter-layer strength is typically 40–70 % of in-plane, so the print
+orientation decides which loads are the weak ones.
+
+**Decide and write down the print orientation.** It is the single free variable that changes
+the part's strength, it costs nothing at slicing time, and it cannot be changed afterwards.
+
+---
+
 ## Structural simulation
 
-Three studies exist in [`CAD/Cansat_D1.f3d`](CAD/Cansat_D1.f3d) — the archive lists
-`Simulation Case`, `Simulation Case_2` and `Simulation Case_3`, each with its own mesh
-database.
+Three static-stress studies, run 2026-09-09. Full write-up and caveats:
+**[simulation/README.md](simulation/README.md)**.
 
-> [!NOTE]
-> **Their results are not in this repository yet.** The `.f3d` is a Fusion archive: its
-> simulation results are proprietary binary blobs, and even its zip container uses a
-> compression method standard tools will not open. Nothing outside Fusion can read them.
->
-> **To bring them in**, export from Fusion's Simulation workspace — *Results → Report*
-> produces HTML or PDF carrying the setup, material, constraints, loads, mesh statistics
-> and result extrema together — and commit it beside the model. Screenshots of each result
-> plot work too, and are what section D's presentation marks want anyway.
+| Study | Load | Mesh | **Max von Mises** | SF vs 54.40 MPa yield |
+|---|---|---|---:|---:|
+| 1 · Horizontal force | 30 N on +Z | 5838 nodes | **2.885 MPa** | ~19 |
+| 2 · Tearing force | 30 N on −X | 5838 nodes | **1.330 MPa** | ~41 |
+| 3 · Impact force | 100 N on −X | 7148 nodes | **2.345 MPa** | ~23 |
 
-Until they are here, this table stays empty rather than guessed:
+**The structure is nowhere near failing in any of the three**, which is the headline and it
+is a good one. Four caveats, all in the simulation write-up and none of them small:
 
-| Case | Study type | Material | Load | Max von Mises | Min safety factor | Max displacement |
-|---|---|---|---|---:|---:|---:|
-| 1 | | | | | | |
-| 2 | | | | | | |
-| 3 | | | | | | |
+1. **The reports say the design "is expected to bend permanently or break."** That is
+   contradicted by their own stress plots by a factor of 19 to 41, and appears in all three
+   above a block containing *both* guided-result branches — it reads as template text.
+   **Fusion's Result Summary table exported empty**, so the minimum safety factor has never
+   actually been read. That is the one number to go back for.
+2. **The material is PET, not PETG.** 21 % denser and somewhat stronger than what is being
+   printed.
+3. **A printed part is not isotropic**, and these studies assume it is.
+4. **The 100 N impact load assumes a 25 ms arrest** for a 0.5 kg vehicle at 5 m/s. A rigid
+   landing on concrete is several times worse — 10 ms is 250 N, 5 ms is 500 N.
 
-**What the numbers have to answer**, once they arrive:
-
-- **The landing.** Terminal descent is 5 m/s, and the deceleration depends entirely on what
-  it lands on and how much the structure gives — which is a modelling assumption, not a
-  measured one. State the assumption beside the result.
-- **Whether the board mounts survive it.** The electronics are the payload that matters;
-  the vehicle can be scuffed and still score, but a cracked board mount ends telemetry, and
-  REC-008 requires 5 s of it after impact.
-- **The antenna and battery joints.** The u.FL connector is the most fragile joint on the
-  vehicle and the battery lead is the one that must not come out on arrival.
-
-**A simulation is not a drop test**, and section C scores the real descent. The model tells
-you where to look; the drop test tells you whether you were right.
+**A simulation is not a drop test**, and section C scores the real descent. The model says
+where to look; the drop test says whether it was right.
 
 ---
 
@@ -192,43 +213,61 @@ test: known mass, known height, a stopwatch, and the measured rate fed back into
 
 ## Mass budget
 
-**Nothing here has been weighed.** The project does not own a scale accurate enough to be
-worth quoting, which is itself the first action item. Until then this table is a plan with
-its sources named, not a measurement — the same rule the rest of the repository runs under.
+**Measured 2026-09-09**, on a scale, for the first time. These two numbers replace a table
+of vendor figures:
 
-| Item | Qty | Mass each | Source | Total |
-|---|---:|---:|---|---:|
-| Raspberry Pi Pico | 1 | ~3 g | Vendor figure, unverified | ~3 g |
-| SX1278 RA-02 module | 1 | ~6 g | Vendor figure, unverified | ~6 g |
-| 433 MHz SMA antenna + IPEX cable | 1 | TBD | Not stated on the listing | TBD |
-| MPU-6500 breakout | 1 | ~2 g | Vendor figure, unverified | ~2 g |
-| BMP280 breakout | 1 | ~1 g | Vendor figure, unverified | ~1 g |
-| NEO-6M GPS + patch antenna | 1 | ~20 g | Vendor figure, unverified; the antenna dominates | ~20 g |
-| microSD reader + card | 1 | ~2 g | Vendor figure, unverified | ~2 g |
-| LM393 sound module | 1 | ~3 g | Vendor figure, unverified | ~3 g |
-| Perfboard, 100 × 100 × 1.6 mm FR-4 | 1 | TBD | Weigh it — this one is on the bench | TBD |
-| Orange 1500 mAh 1S LiPo | 1 | ~30 g | Vendor figure, unverified | ~30 g |
-| Wiring, headers, passives, switch, LEDs | — | TBD | Weigh the assembled board | TBD |
-| **Avionics subtotal** | | | | **~67 g + TBD** |
-| Structure | 1 | **TBD** | Not designed | TBD |
-| Egg chamber | 1 | **TBD** | Not designed | TBD |
-| Parachute, shroud lines, harness | 1 | **TBD** | Not built | TBD |
-| **Budget** | | | GEN-005 | **450–550 g** |
+| Item | Mass | How |
+|---|---:|---|
+| **Assembled vehicle PCB, no battery** | **110.573 g** | Weighed |
+| **Battery** — Orange 1500 mAh 1S LiPo | **40.726 g** | Weighed |
+| **Electronics, all-up** | **151.299 g** | Sum of the two |
+| Structure, PETG print | **TBD** | Fusion knows it — see below |
+| Egg chamber | TBD | Not designed |
+| Parachute, lines, harness | TBD | Not built |
+| **Budget** | **450–550 g** | [GEN-005](../documentation/requirements/requirements.md) |
+| **Remaining for everything mechanical** | **348.701 g** | 500 − 151.299 |
 
-**Read this table for its shape, not its total.** The counted lines come to **~67 g**, and
-three are still `TBD` — the antenna and cable, the perfboard, and the wiring and passives.
-Even allowing generously for those, the avionics are unlikely to exceed **~120 g** against a
-**500 g** budget, which leaves **upwards of 380 g** for the structure, the egg chamber and
-the parachute together.
+> [!WARNING]
+> **The earlier estimate on this page was wrong, and wrong in the dangerous direction.** It
+> counted ~67 g of vendor figures and said the avionics were "unlikely to exceed ~120 g".
+> **The measured figure is 151.3 g — 26 % past that ceiling**, and it makes the electronics
+> **30 % of the entire mass budget** rather than the ~14 % the estimate implied.
+>
+> The lesson is the one this repository keeps relearning: a vendor figure is not a
+> measurement, and a sum of vendor figures with three `TBD` rows in it is not a budget. The
+> two lines that were `TBD` — wiring, headers, passives, solder, and the antenna — are most
+> of the difference.
 
-That is a great deal, and the useful conclusion is a negative one: **mass is very unlikely to
-be the binding constraint.** The binding constraint is the 120 mm section, which the drawing
-above already shows. Design to the envelope; check the mass once and stop worrying about it.
+### The structure is now the number that decides this
 
-**The first three actions, in order:** weigh the assembled board; weigh the battery; weigh
-the perfboard offcut to get a mass per unit area for the structure estimate. All three are
-one afternoon with a kitchen scale, and all three replace a "vendor figure, unverified"
-with a number.
+**348.7 g is a comfortable allowance for a printed frame, but it is not unlimited**, and
+PETG is not weightless:
+
+| Solid volume | As PETG (1.27 g/cm³) | As printed, ~40 % infill |
+|---:|---:|---:|
+| 100 cm³ | 127 g | ~50–60 g |
+| 150 cm³ | 190 g | ~75–90 g |
+| 200 cm³ | 254 g | ~100–120 g |
+| 250 cm³ | 318 g | ~125–150 g |
+
+**Get the real number in one click**: Fusion reports the model's mass directly. Two
+corrections to apply to what it says:
+
+1. **The assigned material is PET, not PETG** — density 1.541 g/cm³ against ~1.27. **Fusion's
+   figure will read about 21 % high**; multiply by 0.82.
+2. **A printed part is not solid.** Perimeters and infill mean the real print is a fraction
+   of the solid volume — the slicer's estimate is the one to trust, and it also tells you the
+   filament cost.
+
+**The slicer's own mass estimate is the best number available before anything is printed,
+and it costs one minute.** Put it in this table when you have it.
+
+### What is still unweighed
+
+The antenna and its cable, the switch, the LEDs, the Schottky and the divider resistors are
+all still to fit, and none of them is on the scale yet. They are small — grams, not tens of
+grams — but the estimate above was wrong by 31 g, so **weigh the vehicle again once it is
+complete** rather than adding figures to a measured base.
 
 ---
 
@@ -242,7 +281,8 @@ started.
 | ~~Board orientation~~ | — | **Settled by the design.** A 100 mm board fits the 115 × 110 mm section flat |
 | ~~How "12 cm across" is measured~~ | — | **Answered 2026-09-09: a 12 cm sided box is acceptable.** The design fits with 2.5 and 5.0 mm per side |
 | **Where the protruding features go** | Structure | Switch, LED, connector, chute attachment, antenna. **2.5 mm per side is all the clearance there is** |
-| Structure material | Mass budget, drop testing | Points are scored on material choice and craftsmanship (section D). **The simulations assume one — say which** |
+| ~~Structure material~~ | — | **PETG, decided 2026-09-09**, and out for printing. The reasoning is [above](#material-and-manufacture) and section D rewards having it |
+| **Print orientation** | Nothing | The one free variable that changes a printed part's strength, free at slicing time, unchangeable afterwards. **Not yet decided or recorded** |
 | Whether to use the 91.5 mm of unused height | Nothing | The body allowance is 210 mm and the design is 118.5 mm. Section D scores *effective use of the volume the rules permit*, and half of it is currently empty |
 | Egg chamber, built even though no egg flies | Nothing | PAY-002 is a separate requirement from PAY-001, carries the +7 cm allowance, and section D scores use of permitted volume. **Build it** — see [scoring-assessment.md](../documentation/project/scoring-assessment.md) |
 | Canopy type and material | Sewing capability | Vented flat circular is the floor; cruciform scores better on stability |
@@ -256,8 +296,10 @@ started.
 
 | Path | Contents |
 |---|---|
-| [`drawings/`](drawings/) | Dimensioned drawings. Generated from the requirement **and from the CAD**, so they cannot drift from either |
-| [`CAD/`](CAD/) | `Cansat_D1.f3d` (Fusion, native, with three simulation studies) and `Cansat_D1.step` (neutral export, and the one this repository can actually read) |
+| [`CAD/`](CAD/README.md) | `Cansat_D1.f3d` (Fusion, native) and `Cansat_D1.step` (neutral export, and the one this repository can read) |
+| [`simulation/`](simulation/README.md) | The three static-stress reports, and what they do and do not establish |
+| [`photos/`](photos/README.md) | CAD renders now; photographs of the printed article when there is one |
+| [`drawings/`](drawings/README.md) | Dimensioned drawings. Generated from the requirement **and from the CAD**, so they cannot drift from either |
 
 Related: [simulations/descent.py](../simulations/descent.py) ·
 [requirements.md](../documentation/requirements/requirements.md) ·

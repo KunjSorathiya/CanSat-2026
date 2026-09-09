@@ -1093,6 +1093,37 @@ def main() -> int:
                   drawn == gen_envelope_drawing.build(),
                   "run python tools/gen_envelope_drawing.py")
 
+    # ---- the mass budget adds up ----------------------------------------------------
+    # Two measured masses and two sums. Sums in a table are exactly the kind of thing that
+    # is right when written and wrong after the next edit, and this table is the one that
+    # decides whether the vehicle is inside a limit whose breach is a disqualification.
+    pcb_g, battery_g, budget_g = 110.573, 40.726, 500.0
+    electronics_g = pcb_g + battery_g
+    remaining_g = budget_g - electronics_g
+    for label, value in (("assembled PCB", f"**{pcb_g:.3f} g**"),
+                         ("battery", f"**{battery_g:.3f} g**"),
+                         ("electronics total", f"**{electronics_g:.3f} g**"),
+                         ("mechanical allowance", f"**{remaining_g:.3f} g**")):
+        checker.check(f"mechanical/README.md states the {label} mass ({value.strip('*')})",
+                      value in mechanical, value)
+    # The share of the budget is quoted in prose, and it is the figure that makes the point.
+    share = 100.0 * electronics_g / budget_g
+    checker.check(f"mechanical/README.md states the electronics at {share:.0f} % of budget",
+                  f"**{share:.0f} % of the entire mass budget**" in mechanical,
+                  f"{share:.0f} %")
+
+    # ---- the simulation figures the mechanical page quotes ---------------------------
+    # Read off the exported plots by hand, so they cannot be re-derived -- but the safety
+    # factors are arithmetic on them and must stay consistent with the material's yield.
+    simulation = read("mechanical/simulation/README.md")
+    yield_mpa = 54.40
+    for study, von_mises in ((1, 2.885), (2, 1.330), (3, 2.345)):
+        sf = yield_mpa / von_mises
+        checker.check(f"simulation study {study} quotes {von_mises} MPa and ~{sf:.0f} safety factor",
+                      f"**{von_mises:.3f} MPa**" in simulation and
+                      f"| ~{sf:.0f} |" in mechanical,
+                      f"{von_mises} -> {sf:.1f}")
+
     # ---- rulebook constants that must never drift -----------------------------------
     checker.check("post-impact window is at least the rulebook's 5 s",
                   (constant(config, "post_impact_transmission_ms") or 0) >= 5000)

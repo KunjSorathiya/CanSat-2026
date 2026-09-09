@@ -40,7 +40,7 @@ Where the project has been, where it stands today, and what has to happen next.
 | 4 · Documentation | Architecture, wiring, timeline, test plan, runbook, audit | ✅ Complete |
 | 5 · Procurement + bring-up | Verify boards, resolve power, bench each subsystem | 🟢 **Substantially complete.** Every board inspected, the power question closed by measurement, gates 3–7 passed on the soldered board |
 | 6 · Electrical build | Regulator, switch, LED, divider, PCB, harness | 🟠 **Board built and working.** No regulator is needed. Switch, LEDs, Schottky and divider not fitted |
-| 7 · Mechanical build | Structure, egg chamber, parachute, recovery | 🟠 **Nothing built, no longer blocked.** Envelope locked, canopy sized, board-fit constraint found |
+| 7 · Mechanical build | Structure, egg chamber, parachute, recovery | 🟠 **Designed and simulated; out for printing.** `Cansat_D1` in PETG, three static-stress studies, envelope confirmed with the organizers, canopy sized at 80.0 cm. Nothing printed, no egg chamber, no parachute, no drop test |
 | 8 · Integration + flight test | Full-system, drop and range testing | 🟠 **Bench link closed.** No range test, no drop test, never run on battery |
 | 9 · Competition | Launch, analysis, reports, media | ⬜ Not started |
 
@@ -165,13 +165,16 @@ gantt
 - Build and measure the battery divider, then set `battery_divider_ratio`
 - Optional but scored: lay out and order a PCB. **Not 100 × 100 mm** — see [electrical/PCB](../../electrical/PCB/README.md)
 
-### Phase 7 — Mechanical build 🟠 *nothing built, nothing blocked*
+### Phase 7 — Mechanical build 🟠 *designed and simulated, out for printing*
 
-- Structure sized to **21 cm (+7 cm) × 12 cm**, locked by the 2026 revision
-- **Decide the board orientation first.** A 100 mm square board does not fit flat in a 120 mm section; edge-on it does — [mechanical/README.md](../../mechanical/README.md)
+- ~~Structure sized to **21 cm (+7 cm) × 12 cm**~~ — done: `Cansat_D1`, 118.5 × 115.0 × 110.0 mm, **PETG**, out for printing
+- ~~Decide the board orientation~~ — settled by the design: the 115 × 110 mm section takes the 100 mm board flat
+- ~~Confirm how "12 cm across" is measured~~ — **organizers confirmed a 12 cm sided box, 2026-09-09**
+- **Decide and record the print orientation.** The one free variable that changes a printed part's strength, and it is not yet chosen
+- **Weigh the printed structure.** The electronics are measured at 151.299 g; the structure is the number that decides the budget
 - Cushioned, secure egg chamber. **Build it even though no egg flies:** PAY-002 is a separate requirement, it carries the +7 cm allowance, and section D scores use of permitted volume
 - Parachute: **80.0 cm flat canopy**, sized at 550 g on a hot day by [`simulations/descent.py`](../../simulations/descent.py). Vented or cruciform, and **not tightly packed** — REC-003 and REC-004
-- Weigh everything. The mass budget is currently vendor figures, and nothing has been on a scale
+- ~~Weigh the electronics~~ — done 2026-09-09: **151.299 g**, and it overran the estimate by 26 %
 - Drop testing for structural integrity, and to measure the drag coefficient the model assumes
 
 ### Phase 8 — Integration and flight test
@@ -289,7 +292,7 @@ to be bought.
 | ~~No regulator selected~~ | ~~Blocks the whole power build~~ | **Closed 2026-09-07.** None is needed: the Pico's own rail held 3.28–3.29 V through 45 back-to-back transmits and 3.28–3.30 V at 100 % write duty |
 | ~~microSD write transient browns out the shared rail~~ | ~~Loses onboard logging~~ | **Closed 2026-09-07** by measurement, and by the decoupling that [F-10](../testing/bring-up-record.md#findings) forced. The radio-and-card-together case is still untested |
 | **The drag coefficient the canopy is sized against is unmeasured** | A descent above 5 m/s, which is a scored requirement | The model sweeps every canopy type and the spread is ~10 % on diameter; sizing is at the pessimistic end and at the top of the mass tolerance. Only a drop test closes it |
-| **Nothing has been weighed** | The mass budget is vendor figures, against a limit whose breach is a disqualification | The avionics are ~70 g of a 500 g budget, so the margin is large — but that is an estimate, and a kitchen scale replaces it in an afternoon |
+| ~~Nothing has been weighed~~ | ~~The mass budget is vendor figures~~ | **Partly closed 2026-09-09.** The electronics are measured: **151.299 g**, 30 % of the 500 g budget. **The estimate they replaced was wrong in the dangerous direction** — it predicted the avionics would not exceed 120 g. The PETG structure is out for printing and has never been on a scale, so the binding number is still unmeasured |
 | Yaw may be judged non-compliant if a relative angle is not accepted | Mandatory field may be judged non-compliant | **Raised by F-1:** the delivered IMU is a six-axis MPU-6500, so this vehicle transmits a relative yaw and declares it `YR-G`. The nine-axis path is implemented and tested and would produce `YR-M` on a real MPU-9250. Mitigation is procurement — a genuine nine-axis part — or an organizer ruling that a declared relative yaw is acceptable |
 | Antenna connector gender mismatch | Cannot connect the RF chain | Flagged for physical verification before assembly |
 | Dimension contradiction unresolved | Mechanical rework, or disqualification on size | No value invented locally; escalated to the organizers |

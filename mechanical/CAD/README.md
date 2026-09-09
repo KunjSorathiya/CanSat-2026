@@ -64,13 +64,15 @@ reopen and edit the design, and losing it would mean re-modelling from the STEP.
 
 Nothing outside Fusion can read them, so they have to be exported. In order of usefulness:
 
-1. **Fusion's own report** — Simulation workspace → *Results* → *Report*. HTML or PDF,
-   carrying study type, material, constraints, loads, mesh statistics and result extrema in
-   one document. Commit it here; both formats are readable.
-2. **Screenshots** of each result plot — von Mises, displacement, safety factor — one per
-   study. These are also what section D's presentation marks want.
-3. **The numbers, typed** into the table in [mechanical/README.md](../README.md#structural-simulation).
-   Often the fastest, and it is where they end up regardless.
+**Three have been brought in already**, as Fusion HTML reports, and they live in
+[`../simulation/`](../simulation/README.md) rather than here — a report is not a model.
+That page carries the results and, more importantly, the four caveats that keep them
+honest.
+
+**What the export does not carry, and you will have to fetch by hand:** Fusion's *Result
+Summary* table came out **completely empty** in all three reports, so the minimum safety
+factor — the number the studies exist to produce — is not in them. Every figure on that
+page was read off a colour-bar legend in a result plot.
 
 **Say what was assumed, not just what came out.** A max von Mises figure without the
 material, the constraint set and the load case is not a result anybody can check — and the
@@ -100,7 +102,7 @@ landing deceleration in particular is a modelling assumption, not a measured qua
 | Body envelope, height | ≤ 210 mm | **118.5 mm** ✅ | [GEN-004](../../documentation/requirements/requirements.md) |
 | Body envelope, across | ≤ 120 mm, **as a sided box** | **115 / 110 mm** ✅, with 2.5 and 5.0 mm per side | GEN-004 |
 | Egg chamber allowance | +70 mm | Not designed | GEN-004 |
-| Mass | 450–550 g all-up | Not weighed | [GEN-005](../../documentation/requirements/requirements.md) |
+| Mass | 450–550 g all-up | **Electronics 151.299 g, weighed.** Structure not printed | [GEN-005](../../documentation/requirements/requirements.md) |
 | Vehicle board | 100 × 100 × 1.6 mm, flat | Fits the 115 × 110 section | [assembly-procedure.md](../../documentation/hardware/assembly-procedure.md) |
 
 **The second row was the open one, and the organizers closed it on 2026-09-09**: a 12 cm

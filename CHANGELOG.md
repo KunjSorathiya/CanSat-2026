@@ -8,6 +8,106 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-09 (cycle 43)
+
+Three simulation reports, two renders, a material, and the first time the electronics have
+been on a scale. One of those overturns an estimate this page made two days ago.
+
+### Added — the structural studies, and what they do and do not establish
+
+Three static-stress studies, run in Fusion on 2026-09-09, now in
+[`mechanical/simulation/`](mechanical/simulation/README.md):
+
+| Study | Load | Mesh | Max von Mises | SF vs 54.40 MPa yield |
+|---|---|---|---:|---:|
+| Horizontal force | 30 N on +Z | 5838 nodes | **2.885 MPa** | ~19 |
+| Tearing force | 30 N on −X | 5838 nodes | **1.330 MPa** | ~41 |
+| Impact force | 100 N on −X | 7148 nodes | **2.345 MPa** | ~23 |
+
+**The structure is nowhere near failing in any of the three.** That is the headline and it
+is a good one. Four caveats keep it honest, and none is small:
+
+**1 · The reports say the design breaks, and it does not.** All three contain *"the design
+is expected to bend permanently or break"* — contradicted by their own stress plots by a
+factor of 19 to 41, and printed above a block containing *both* the "Below Safety Factor
+Target" and "Above Safety Factor Limit" advice lists, which is what a template emits when it
+renders every branch. **It has not been confirmed either way**, because Fusion's *Result
+Summary* table **exported completely empty** in all three reports. Every number above was
+read off a colour-bar legend in a result plot. The minimum safety factor — the one number
+these studies exist to produce — has never actually been read, and going back for it is now
+an open item.
+
+**2 · The simulation material is PET; the part is being printed in PETG.** Density 1.541
+against ~1.27 g/cm³ — **21 % high**, which lands directly on the mass budget — plus a
+stiffer modulus and a slightly higher yield.
+
+**3 · A printed part is not isotropic, and these studies assume it is.** FDM inter-layer
+strength is typically 40–70 % of in-plane. Which loads are the weak ones depends on print
+orientation, which is not in the model and has not been decided. At safety factors of 19–41
+there is room to absorb that; at 2 there would not have been.
+
+**4 · The 100 N impact load assumes a 25 ms arrest.** A 0.5 kg vehicle at 5 m/s carries
+2.5 N·s, so the force is entirely a function of how long stopping takes: 25 ms is 100 N,
+10 ms is 250 N, 5 ms is 500 N. 100 N models a compliant arrival on grass. Concrete is
+several times worse. The assumption is not wrong — it just has to be written beside the
+result.
+
+### Added — PETG, and the reasoning section D asks for
+
+The body is out for 3D printing in **PETG**, decided 2026-09-09. Tougher than PLA and not
+brittle, printable without an enclosure unlike ABS, and it deforms rather than shatters —
+which is the failure mode that leaves a recoverable vehicle. Section D awards a bonus for
+material selection and expects the argument, so it is written down.
+
+**Print orientation is now the open mechanical decision.** It is the single free variable
+that changes a printed part's strength, it costs nothing at slicing time, and it cannot be
+changed afterwards.
+
+### Fixed — the mass estimate was wrong in the dangerous direction
+
+**Measured 2026-09-09:** assembled vehicle PCB **110.573 g**, battery **40.726 g**,
+electronics all-up **151.299 g**.
+
+The estimate they replace counted ~67 g of vendor figures with three `TBD` rows in it and
+concluded the avionics were *"unlikely to exceed ~120 g"*. **The measured figure is 26 %
+past that ceiling**, and it makes the electronics **30 % of the entire mass budget** rather
+than the ~14 % the estimate implied. The two lines that were `TBD` — wiring, headers,
+passives and solder, and the antenna — are most of the difference.
+
+**348.701 g remains** for structure, egg chamber and parachute. That is comfortable for a
+printed frame but it is not unlimited, and PETG is not weightless: 200 cm³ of solid PETG is
+254 g. The slicer's own mass estimate is the best number available before anything is
+printed and costs one minute; Fusion's figure needs multiplying by 0.82 first, because the
+assigned material is the denser PET.
+
+**The lesson is one this repository keeps relearning.** A vendor figure is not a
+measurement, and a sum of vendor figures with `TBD` rows in it is not a budget — it is an
+estimate wearing a table's clothes. `check_doc_claims.py` now holds the four masses and the
+percentage to each other, so the arithmetic cannot drift even if the measurements do.
+
+### Added — renders, and a home for them
+
+[`mechanical/photos/`](mechanical/photos/README.md) holds two CAD renders of `Cansat_D1`:
+an open box frame with two solid side panels, two faces opened out with arched cutouts, a
+central spine, harness slots top and bottom, and a square cutout with two small round holes
+beside it on one upper face.
+
+**That last feature is worth confirming against the electrical design.** The vehicle needs a
+USB cutout, a manual switch, a power LED and a status LED — four penetrations — and there
+is [2.5 mm of clearance per side](mechanical/README.md#the-envelope-question--asked-and-answered)
+before the envelope is exceeded. If those two small holes are the LEDs, the switch has
+nowhere yet.
+
+Photographs of the printed article belong in the same directory. Section D awards **15 of
+its 30 points for aesthetics and build quality**, which is judged from what the vehicle
+looks like.
+
+### Changed
+
+`MEC-002`, `MEC-003` and `MEC-005` move to `In Progress`. Claims 262 → **270**.
+
+---
+
 ## [Unreleased] — 2026-09-09 (cycle 42)
 
 ### Changed — the organizers answered, and the design fits
