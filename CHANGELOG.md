@@ -8,6 +8,75 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-09 (cycle 39)
+
+### Added — the two ends of the link can no longer disagree about the sync word
+
+**TEL-025 closed.** It was the last requirement whose implementation column read *"Launch
+configuration procedure - TBD"* for something purely procedural, and it stayed there because
+a procedure on its own is a promise.
+
+The sync word is a **compile-time constant in two separate images**. Reflashing one Pico and
+not the other has always been possible, and the failure it produces is the worst kind this
+system can generate: **silence, not an error.** A LoRa sync word is not a field in the
+packet — it is encoded into the two sync symbols at the end of the preamble, each nibble
+multiplied by 8, so `0xF3` is symbols 120 and 24 and `0xA5` is 80 and 40. A receiver
+correlates against the symbols it is configured for, and on a mismatch the correlator never
+locks: preamble detect never fires, the header is never decoded, the CRC is never evaluated.
+No packet, no CRC failure, no counter moving. It is indistinguishable from a dead antenna, a
+dead module, or a vehicle that was never switched on — discovered at a launch, from a
+receiver that is working perfectly.
+
+`check_doc_claims.py` now parses `config.radio_mode` out of the vehicle image and
+`SYNC_WORD` out of the bridge image and holds them to each other:
+
+```text
+FAIL  vehicle and bridge agree: OFFICIAL sync word (0xA5)   [vehicle=official bridge=test]
+```
+
+and on a consistent tree it **names the configuration the working tree would fly**, so a
+build log answers "which word am I on" without opening either file:
+
+```text
+  ok  vehicle and bridge agree: TEST sync word (0xF3)
+```
+
+The most expensive mistake available here is now a red build.
+
+### Added — the launch-configuration procedure
+
+[runbook.md](documentation/operations/runbook.md#launch-configuration--switching-the-sync-word):
+why the sync word needs a procedure rather than a note, the nine-step switch to `0xA5` at
+T-60, and the revert afterwards.
+
+Three things it insists on that a checklist item would not have:
+
+- **Prove the tree agrees before building anything.** The guard above runs without the SDK
+  and costs nothing; every other confirmation needs images and hardware.
+- **Both images from one tree, in one command**, so they cannot come from different
+  revisions.
+- **Step 8 is end to end.** Reading `OFFICIAL 0xA5` on the vehicle and `sync=0xA5` on the
+  bridge proves only that each end believes what it was told. Nothing before packets
+  actually arriving proves they can hear each other.
+
+And the revert, because `0xA5` is the launch word and a vehicle left on it transmits into
+every other team's launch — at 0.71 points per second.
+
+**One thing worth stating plainly, because it is easy to get backwards:** `0xA5` does not
+separate you from other teams. Every team uses it for their own launch. It separates launch
+traffic from test traffic, and during your launch the sky is meant to hold exactly one
+`0xA5` transmitter. What protects you from another team is the team identifier in every
+packet and everyone else being powered off (TEL-026, still open).
+
+### Changed
+
+Requirements `Complete` 35 -> **36**. Claims 251 -> **254**.
+
+`TEL-025` is **not** `Verified` and cannot be until `0xA5` has carried a real link. Only
+`0xF3` ever has — bring-up row 5.13 is still half taken.
+
+---
+
 ## [Unreleased] — 2026-09-09 (cycle 38)
 
 ### Fixed — the runbook was still describing the old telemetry rate

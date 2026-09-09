@@ -1005,6 +1005,35 @@ def main() -> int:
     duplicates = sorted({rid for rid in ids if ids.count(rid) > 1})
     checker.check("every requirement id is unique", not duplicates, ", ".join(duplicates))
 
+    # ---- both ends of the link agree which rulebook sync word they are on -----------
+    # This is the most expensive mistake available in this system, and until now nothing
+    # caught it. The sync word is a compile-time constant in TWO separate images, and a
+    # LoRa sync mismatch is not an error -- it is silence. The receiver's correlator never
+    # locks, so preamble detect never fires, the header is never decoded and no counter
+    # moves. It is indistinguishable from a dead antenna, a dead module, or a vehicle that
+    # was never switched on.
+    #
+    # Reflashing one Pico and not the other is therefore a total, silent loss of telemetry
+    # discovered at a launch. Holding the two declarations to each other turns that into a
+    # failed build, which is where it belongs. TEL-025.
+    flight_main = read("firmware/flight-computer/src/pico/main.cpp")
+    bridge_main = read("firmware/ground-station/src/pico/main.cpp")
+    modes = re.findall(r"config\.radio_mode\s*=\s*flight::RadioMode::(test|official)\s*;",
+                       flight_main)
+    words = re.findall(
+        r"constexpr std::uint8_t SYNC_WORD\s*=\s*cansat::link::k(Test|Official)SyncWord\s*;",
+        bridge_main)
+    checker.check("the vehicle declares exactly one radio mode", len(modes) == 1, str(modes))
+    checker.check("the bridge declares exactly one sync word", len(words) == 1, str(words))
+    if len(modes) == 1 and len(words) == 1:
+        mode, word = modes[0], words[0].lower()
+        # Named rather than silent, so a full build log states which configuration this
+        # working tree would fly -- the launch procedure asks an operator to read it.
+        checker.check(
+            f"vehicle and bridge agree: {mode.upper()} sync word "
+            f"({'0xF3' if mode == 'test' else '0xA5'})",
+            mode == word, f"vehicle={mode} bridge={word}")
+
     # ---- rulebook constants that must never drift -----------------------------------
     checker.check("post-impact window is at least the rulebook's 5 s",
                   (constant(config, "post_impact_transmission_ms") or 0) >= 5000)

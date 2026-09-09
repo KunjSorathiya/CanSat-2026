@@ -15,6 +15,7 @@ ground station, operating on launch day, and analysing the flight afterwards.
 
 - [Before every session](#before-every-session)
 - [Configuring the vehicle](#configuring-the-vehicle)
+- [Launch configuration — switching the sync word](#launch-configuration--switching-the-sync-word)
 - [Building the firmware](#building-the-firmware)
 - [Running the ground station](#running-the-ground-station)
 - [Launch-day procedure](#launch-day-procedure)
@@ -96,6 +97,101 @@ Other tunables worth reviewing before a flight, all in
 | `launch_accel_mps2` / `launch_altitude_gain_m` | 30 / 15 | After the first flight data exists |
 | `arming_delay_ms` | 3000 | If the pad procedure takes longer to settle |
 | `battery_divider_ratio` | 0 (disabled) | Only after the divider is built and measured. **While it is 0 the reported battery voltage is the raw ADC pin voltage, not the cell voltage** — `battery_voltage_is_scaled` in the health snapshot says which you are looking at, and the low-battery fault stays disabled because a pin reading cannot judge a cell |
+
+---
+
+## Launch configuration — switching the sync word
+
+**This is the procedure [TEL-025](../requirements/requirements.md) asks for.** The rulebook
+fixes two sync words: `0xF3` for pre-launch testing, `0xA5` for the official launch. The
+vehicle must be on `0xA5` for its own launch and must not be sitting on it at any other time.
+
+### Why this needs a procedure rather than a note
+
+The sync word is **not a field in the packet**. It is encoded into the two sync symbols at
+the end of the LoRa preamble — the byte splits into two nibbles, each multiplied by 8, so
+`0xF3` becomes symbols 120 and 24 and `0xA5` becomes 80 and 40. A receiver correlates
+against the symbols *it* is configured for, and on a mismatch the correlator never locks.
+Preamble detect never fires, the header is never decoded, the CRC is never evaluated.
+
+**So a mismatch is silence, not an error.** No packet, no CRC failure, no counter moving. It
+is indistinguishable from a dead antenna, a dead module, or a vehicle that was never
+switched on — and it is discovered at a launch, from a receiver that is working perfectly.
+
+It is a compile-time constant in **two separate images**, which is why one is easy to change
+and the other easy to forget.
+
+### The guard that catches you
+
+`bash tools/build_host.sh` now refuses a working tree whose two ends disagree:
+
+```text
+FAIL  vehicle and bridge agree: OFFICIAL sync word (0xA5)   [vehicle=official bridge=test]
+```
+
+and on a consistent tree it **names the configuration you would fly**:
+
+```text
+  ok  vehicle and bridge agree: TEST sync word (0xF3)
+```
+
+Read that line. It is the cheapest confirmation available, it costs nothing, and it is the
+only check that runs before the images exist.
+
+### Switching to the launch configuration
+
+Do this at **T-60**, not at the pad.
+
+- [ ] **1 · Vehicle** — [`flight-computer/src/pico/main.cpp`](../../firmware/flight-computer/src/pico/main.cpp):
+
+      config.radio_mode = flight::RadioMode::official;   // was ::test
+
+- [ ] **2 · Bridge** — [`firmware/ground-station/src/pico/main.cpp`](../../firmware/ground-station/src/pico/main.cpp):
+
+      constexpr std::uint8_t SYNC_WORD = cansat::link::kOfficialSyncWord;   // was kTestSyncWord
+
+- [ ] **3 · Prove the tree agrees**, before building anything:
+
+      bash tools/build_host.sh
+
+      The line must read `vehicle and bridge agree: OFFICIAL sync word (0xA5)`. If it does
+      not, stop — you changed one file.
+
+- [ ] **4 · Build both images from that one tree**, in one command, so they cannot come from
+      different revisions:
+
+      cmake -S . -B build/pico && cmake --build build/pico --parallel
+
+- [ ] **5 · Flash both Picos.** Both. This is the step that is actually skipped.
+- [ ] **6 · Confirm on the vehicle.** Serial monitor, startup summary:
+
+      team CAN-Team-25 | radio OFFICIAL 0xA5 | telemetry every 700 ms (1.43 Hz)
+
+- [ ] **7 · Confirm on the bridge.** Its status line reports the word rather than assuming it:
+
+      #state=RX radio=1 frames=0 dropped=0 rssi=-44 snr=9.5 sync=0xA5 tx=0
+
+- [ ] **8 · Confirm end to end.** Power the vehicle and watch packets arrive. Nothing before
+      this point proves the two ends can actually hear each other; steps 6 and 7 only prove
+      each end believes what it was told.
+- [ ] **9 · Record the revision flown** — `git rev-parse --short HEAD` — in the flight log.
+
+### After the launch
+
+- [ ] **Revert both files to the test configuration and reflash both Picos.** `0xA5` is the
+      launch word, and a vehicle left on it is transmitting into every other team's launch.
+- [ ] Confirm `vehicle and bridge agree: TEST sync word (0xF3)` before any further bench work.
+
+> [!CAUTION]
+> **`0xA5` does not separate you from other teams — every team uses it for their launch.**
+> It separates launch traffic from test traffic. During your launch the sky is meant to hold
+> exactly one `0xA5` transmitter, and it is yours. What protects you from another team is the
+> team identifier in every packet and everyone else being powered off ([TEL-026](../requirements/requirements.md)).
+>
+> Sync words are **weak isolation in any case.** A transmitter on the wrong word still
+> occupies the channel and can still occasionally trip a correlator. Being on `0xF3` during
+> someone else's launch is not harmless — it is the penalty above, at **0.71 points per
+> second**.
 
 ---
 

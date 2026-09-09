@@ -15,7 +15,7 @@ Confirmed hardware is recorded in the implementation column, but possession does
 
 ## Requirements Checklist
 
-**Status as of 2026-09-08:** 35 of the 127 requirement rows are marked
+**Status as of 2026-09-09:** 36 of the 127 requirement rows are marked
 `Complete`, each with a named test in the Evidence column. None is
 marked `Verified`: that word is reserved for evidence from hardware, and while the IMU, the
 barometer, the GPS and the radio have now each read on the bench, no requirement has been
@@ -53,6 +53,17 @@ rather than because they predated it:
 **And one row was not stale but wrong:** two different requirements were both numbered
 `GS-002`. The one added when the 2026 revision named the official radios is now `GS-006`;
 the original keeps its number, because that is the one the changelog records as new.
+
+**Updated 2026-09-09.** `TEL-025` — the launch configuration must not use another team's
+sync word — moves from `Not Started` to `Complete`. It was the last row whose
+implementation column read *"Launch configuration procedure - TBD"* for something that is
+purely procedural, and the reason it stayed there is that a procedure alone is a promise. It
+now has a **guard**: the sync word is a compile-time constant in two separate images, and
+`check_doc_claims.py` parses both and fails the build if they disagree, so reflashing one
+Pico and not the other is a red build rather than silence at a launch. The nine-step switch
+and the post-launch revert are in the [runbook](../operations/runbook.md#launch-configuration--switching-the-sync-word).
+It is **not** `Verified`, and cannot be until `0xA5` has carried a real link — only `0xF3`
+ever has.
 
 
 | ID | Requirement | Source | Priority | Implementation | Verification Method | Status | Evidence |
@@ -97,7 +108,7 @@ the original keeps its number, because that is the one the changelog records as 
 | TEL-022 | Optional sensor data may be appended only after mandatory data and must not displace it. | Rulebook - Telemetry | Recommended | Optional fields are appended after the mandatory block and shed first when the packet would exceed its budget | Test packets with and without optional fields. | Complete | `test_controller_drops_optional_fields_before_overrunning_the_budget` |
 | TEL-023 | Official launch LoRa sync word must be `0xA5`. | Rulebook - LoRa Configuration | Mandatory | `0xA5` selected by `RadioMode::official`, defined once in the shared link profile | Inspect configuration and test against the official receiver. | Complete | `test_link_profile_is_shared_by_both_ends`, `test_sync_word_can_be_switched_for_the_official_launch` |
 | TEL-024 | Pre-launch testing LoRa sync word must be `0xF3`. | Rulebook - LoRa Configuration | Mandatory | `0xF3` selected by `RadioMode::test`, the default | Test using `0xF3` and confirm isolation from launch mode. | Complete | `test_link_profile_is_shared_by_both_ends`; `flight_smoke_test` asserts the sync word |
-| TEL-025 | The launch configuration must not use another team's sync word during its launch. | Rulebook - LoRa Configuration | Mandatory | Launch configuration procedure - TBD | Review procedure and inspect configured sync word. | Not Started | |
+| TEL-025 | The launch configuration must not use another team's sync word during its launch. | Rulebook - LoRa Configuration | Mandatory | **Procedure written 2026-09-09**, and the half of it that can be mechanised is: `check_doc_claims.py` parses the radio mode out of the vehicle image and the sync word out of the bridge image and **fails the build if they disagree**, naming both sides. A consistent tree reports which configuration it would fly. The nine-step switch, the two confirmations on the images themselves, the end-to-end check and the post-launch revert are in the runbook | Read the build's `vehicle and bridge agree:` line, then the vehicle's startup summary and the bridge's `sync=` status field, then confirm packets actually arrive. | Complete | [runbook.md](../operations/runbook.md#launch-configuration--switching-the-sync-word); `vehicle and bridge agree` in `tools/check_doc_claims.py`. **`0xA5` has never been on the air** — only `0xF3` has ever linked (bring-up row 5.13), so this cannot be `Verified` until the launch configuration has carried a real link |
 | TEL-026 | Other CanSats must remain powered off during another team's launch. | Rulebook - LoRa Configuration | Mandatory | Team operating procedure - TBD | Review and rehearse launch-day procedure. | Not Started | |
 | SEN-001 | The CanSat must measure altitude. | Rulebook - Sensor Requirements | Mandatory | BMP280 pressure through the Bosch compensation, then the barometric formula against a pad reference taken at calibration | Sensor test, calibration, and altitude validation. | Complete | `test_bmp280_compensation_datasheet_vector`, `test_pressure_altitude` |
 | SEN-002 | The CanSat must measure pressure. | Rulebook - Sensor Requirements | Mandatory | BMP280 over I2C0 at `0x76`, compensated by the datasheet's 64-bit integer path | Sensor test and reading validation. | Complete | `test_bmp280_compensation_datasheet_vector` reproduces the datasheet reference vector |
