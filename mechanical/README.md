@@ -83,28 +83,33 @@ A 100 mm square fits a 115 × 110 mm opening flat, with 15 and 10 mm to spare fo
 standoffs. The edge-on recommendation is withdrawn. *(It would still be the answer for a
 circular section: a 120 mm bore caps a flat deck at 84.9 mm square.)*
 
-### The envelope question — and it is a disqualification-class one
+### The envelope question — asked, and answered
 
-**"12 cm across" is not defined as a width or a diameter, and for a prismatic body those
-give different answers:**
+**"12 cm across" did not say whether it meant a width or a diameter**, and for a prismatic
+body those give different answers: 115 and 110 both pass as widths, while the 159.1 mm
+corner-to-corner diagonal is 33 % over as a diameter — against a **10 % disqualification
+threshold**. It was not a scored margin; it was the whole flight.
 
-| Reading | Verdict |
-|---|---|
-| **Width** — no face wider than 120 mm | 115 and 110 both pass ✅ |
-| **Diameter** — fits through a 120 mm bore | needs **159.1 mm**, which is **+33 %** ❌ |
+> [!NOTE]
+> **Closed 2026-09-09. The organizers confirmed that a 12 cm sided box is acceptable.**
+> The section limit is therefore a **120 mm square**, not a 120 mm bore, and this design
+> fits it.
+>
+> **Keep the written confirmation with the submission.** This is a disqualification-class
+> dimension rather than a scored one, and the answer is currently recorded only here.
 
-The rulebook disqualifies at **more than 10 % over**, so under the second reading this
-design is not marginal — it is out. Under the first it passes comfortably.
+| | |
+|---|---:|
+| Envelope section, confirmed | 120 × 120 mm |
+| Design section | **115 × 110 mm** ✅ |
+| **Clearance per side** | **2.5 and 5.0 mm** |
+| Height | 118.5 mm against 210 mm ✅ |
 
-**Nothing in the repository can settle this; the organizers can, in one email.** It is
-[open question 11](../documentation/requirements/requirements.md#open-questions-for-organizers). The argument for the
-width reading is that the vehicle is drone-released and never passes through a tube. The
-argument for asking anyway is that a judge with a caliper measuring "across" may well
-measure the widest thing they can find.
-
-**Until it is answered, know what the fallback costs.** Fitting a 120 mm bore means a
-section of about 84.9 mm square, which the 100 mm board does not fit — so it is a
-structural redesign *and* a board rebuild, not a trim. That is the risk being carried.
+**The clearance is the number to carry forward, and 2.5 mm per side is not much.** Anything
+that protrudes past the modelled body — a switch boss, an LED bezel, a connector, a
+parachute attachment, the antenna — has to live inside it, or the envelope grows past
+120 mm and the question reopens as a real failure rather than an interpretive one. Model
+those features before cutting anything.
 
 ---
 
@@ -235,7 +240,8 @@ started.
 | Decision | Depends on | Note |
 |---|---|---|
 | ~~Board orientation~~ | — | **Settled by the design.** A 100 mm board fits the 115 × 110 mm section flat |
-| **How "12 cm across" is measured** | **Organizers** | The one open item that could invalidate the design. See [above](#the-envelope-question--and-it-is-a-disqualification-class-one) |
+| ~~How "12 cm across" is measured~~ | — | **Answered 2026-09-09: a 12 cm sided box is acceptable.** The design fits with 2.5 and 5.0 mm per side |
+| **Where the protruding features go** | Structure | Switch, LED, connector, chute attachment, antenna. **2.5 mm per side is all the clearance there is** |
 | Structure material | Mass budget, drop testing | Points are scored on material choice and craftsmanship (section D). **The simulations assume one — say which** |
 | Whether to use the 91.5 mm of unused height | Nothing | The body allowance is 210 mm and the design is 118.5 mm. Section D scores *effective use of the volume the rules permit*, and half of it is currently empty |
 | Egg chamber, built even though no egg flies | Nothing | PAY-002 is a separate requirement from PAY-001, carries the +7 cm allowance, and section D scores use of permitted volume. **Build it** — see [scoring-assessment.md](../documentation/project/scoring-assessment.md) |

@@ -8,6 +8,56 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-09 (cycle 42)
+
+### Changed — the organizers answered, and the design fits
+
+**Open question 11 is closed: a 12 cm sided box is acceptable.** Confirmed with the
+organizers on 2026-09-09, hours after the question was raised.
+
+So the section limit is a **120 mm square**, not a 120 mm bore, and `Cansat_D1` fits:
+
+| | |
+|---|---:|
+| Envelope section, confirmed | 120 × 120 mm |
+| Design section | 115 × 110 mm |
+| **Clearance per side** | **2.5 and 5.0 mm** |
+| Height | 118.5 mm against 210 mm |
+
+**The question was worth asking.** Read as a diameter, the 159.1 mm corner-to-corner
+diagonal would have been **33 % over**, and exceeding a dimensional limit by more than 10 %
+is a disqualification rather than a deduction — the fallback would have been a structural
+redesign plus a board rebuild. It was not a scored margin; it was the whole flight.
+
+**What is left of it is the clearance, and that is now the live constraint.** 2.5 mm per
+side on the wide axis is not much. Any feature protruding past the modelled body — a
+switch boss, an LED bezel, a connector, a parachute attachment, the antenna — has to live
+inside it, or the envelope grows past 120 mm and the question reopens as a real failure
+rather than an interpretive one. The claim checker now holds the documented clearance to
+what the STEP says, where it previously held the diameter overage.
+
+> **Keep the written confirmation with the submission.** The answer is currently recorded
+> only in this repository, and it is a disqualification-class dimension rather than a
+> scored one.
+
+The [envelope drawing](mechanical/drawings/envelope-and-board-fit.svg) is redrawn against
+the confirmed limit: a 120 mm square section with the design inside it and the per-side
+clearance dimensioned. The bore that was ruled out stays on the drawing, faint, so somebody
+reading it next year can see the question was answered rather than never considered.
+
+`MEC-001` moves to *designed and compliant; nothing built*. The mechanical badge moves from
+`not started` to `designed · not built`.
+
+### Fixed — a commit message mangled by its own backticks
+
+Cycle 41's message was passed to `git commit -m` inside a double-quoted shell string
+containing a backticked literal. Bash substituted it as a command, so the sentence about the
+STEP real `8.` lost the very literal it was about. Amended and force-pushed with
+`--force-with-lease`; the tree was verified byte-identical first, so only the message
+changed. Commit messages go through a file from here on, as the changelog entries already do.
+
+---
+
 ## [Unreleased] — 2026-09-09 (cycle 41)
 
 The mechanical design arrives, and it overturns a conclusion this repository reached three

@@ -2,7 +2,7 @@
 <rect width="1280" height="848" fill="#ffffff"/>
 <text x="40.0" y="48.0" font-size="25" fill="#0f172a" font-weight="700" text-anchor="start" >CanSat 2026 — rulebook envelope and the Cansat_D1 design</text>
 <text x="40.0" y="74.0" font-size="13" fill="#64748b" font-weight="400" text-anchor="start" >2026 guidelines: 21 cm body (+7 cm egg chamber) × 12 cm across. Design read from mechanical/CAD/Cansat_D1.step. Drawn to scale at 2.0 px/mm.</text>
-<text x="40.0" y="96.0" font-size="12.5" fill="#b45309" font-weight="400" text-anchor="start" >"12 cm across" is not defined as a width or a diameter, and for a prismatic body those give different answers. Both are drawn.</text>
+<text x="40.0" y="96.0" font-size="12.5" fill="#1b5e20" font-weight="400" text-anchor="start" >Organizers confirmed 2026-09-09: a 12 cm SIDED BOX is acceptable, so the section limit is a 120 mm square rather than a 120 mm bore.</text>
 <text x="120.0" y="152.0" font-size="13" fill="#0d47a1" font-weight="700" text-anchor="start" >ELEVATION</text>
 <rect x="120.0" y="168.0" width="240.0" height="140.0" fill="#fff7ed" stroke="#b45309" stroke-width="2" stroke-dasharray="7 5"/>
 <text x="240.0" y="234.0" font-size="12" fill="#b45309" font-weight="400" text-anchor="middle" >egg chamber allowance</text>
@@ -26,36 +26,41 @@
 <text x="240.0" y="778.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle" >120 mm across</text>
 <text x="560.0" y="152.0" font-size="13" fill="#0d47a1" font-weight="700" text-anchor="start" >SECTION — looking down</text>
 <rect x="560.0" y="398.0" width="240.0" height="240.0" fill="#eef4ff" stroke="#0d47a1" stroke-width="2.5"/>
-<text x="680.0" y="388.0" font-size="12" fill="#0d47a1" font-weight="600" text-anchor="middle" >if "across" is a WIDTH</text>
-<circle cx="680.0" cy="518.0" r="120.0" fill="none" stroke="#6d28d9" stroke-width="2.2" stroke-dasharray="9 5"/>
-<text x="680.0" y="658.0" font-size="12" fill="#6d28d9" font-weight="600" text-anchor="middle" >if "across" is a DIAMETER</text>
+<text x="680.0" y="388.0" font-size="12" fill="#0d47a1" font-weight="700" text-anchor="middle" >120 mm SIDED BOX — confirmed</text>
+<circle cx="680.0" cy="518.0" r="120.0" fill="none" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="4 6"/>
+<text x="680.0" y="658.0" font-size="11" fill="#94a3b8" font-weight="400" text-anchor="middle" >a 120 mm bore would NOT have fit — ruled out</text>
 <rect x="565.0" y="408.0" width="230.0" height="220.0" fill="#e8f2ea" stroke="#1b5e20" stroke-width="2.5"/>
 <text x="680.0" y="514.0" font-size="13" fill="#1b5e20" font-weight="700" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" >115 × 110</text>
 <text x="680.0" y="532.0" font-size="11.5" fill="#1b5e20" font-weight="400" text-anchor="middle" >Cansat_D1</text>
-<circle cx="680.0" cy="518.0" r="159.1" fill="none" stroke="#b71c1c" stroke-width="2" stroke-dasharray="4 4"/>
-<text x="680.0" y="695.1" font-size="12.5" fill="#b71c1c" font-weight="700" text-anchor="middle" >needs a 159.1 mm bore</text>
-<text x="870.0" y="172.0" font-size="14" fill="#0f172a" font-weight="700" text-anchor="start" >The two readings</text>
+<text x="562.5" y="396.0" font-size="11" fill="#b45309" font-weight="600" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" >2.5</text>
+<text x="797.5" y="396.0" font-size="11" fill="#b45309" font-weight="600" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" >2.5</text>
+<text x="680.0" y="407.0" font-size="11" fill="#b45309" font-weight="600" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" >5.0</text>
+<text x="680.0" y="637.0" font-size="11" fill="#b45309" font-weight="600" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" >5.0</text>
+<text x="680.0" y="676.0" font-size="12" fill="#b45309" font-weight="600" text-anchor="middle" >clearance per side: 2.5 mm and 5.0 mm</text>
+<text x="870.0" y="172.0" font-size="14" fill="#0f172a" font-weight="700" text-anchor="start" >Against the confirmed limit</text>
 <text x="870.0" y="200.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >Design section</text>
 <text x="870.0" y="216.0" font-size="13" fill="#0f172a" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >115 × 110 mm</text>
-<text x="870.0" y="242.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >As a WIDTH limit</text>
-<text x="870.0" y="258.0" font-size="13" fill="#1b5e20" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >both ≤ 120 mm  ✓</text>
-<text x="870.0" y="284.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >Section diagonal</text>
-<text x="870.0" y="300.0" font-size="13" fill="#0f172a" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >159.1 mm</text>
-<text x="870.0" y="326.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >As a DIAMETER</text>
-<text x="870.0" y="342.0" font-size="13" fill="#b71c1c" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >159.1 &gt; 120 mm  ✗</text>
-<text x="870.0" y="368.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >Overage, if diameter</text>
-<text x="870.0" y="384.0" font-size="13" fill="#b71c1c" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >+33 %  (DQ over 10 %)</text>
-<text x="870.0" y="410.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >Height</text>
-<text x="870.0" y="426.0" font-size="13" fill="#1b5e20" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >118.5 ≤ 210 mm  ✓</text>
-<text x="870.0" y="460.0" font-size="14" fill="#1b5e20" font-weight="700" text-anchor="start" >The board now fits flat</text>
-<text x="870.0" y="484.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >A 100 × 100 mm board needs a</text>
-<text x="870.0" y="501.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >141.4 mm bore, so it does not fit a</text>
-<text x="870.0" y="518.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >120 mm circular section — but it fits</text>
-<text x="870.0" y="535.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >this 115 × 110 mm one with room for</text>
-<text x="870.0" y="552.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >walls. The earlier edge-on recommendation</text>
-<text x="870.0" y="569.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >assumed a cylinder and no longer applies.</text>
-<text x="870.0" y="586.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" ></text>
-<text x="870.0" y="603.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >(A circular section would cap a flat deck</text>
-<text x="870.0" y="620.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" > at 84.9 mm square.)</text>
+<text x="870.0" y="242.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >Envelope, confirmed</text>
+<text x="870.0" y="258.0" font-size="13" fill="#0f172a" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >120 × 120 mm box</text>
+<text x="870.0" y="284.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >Widest face</text>
+<text x="870.0" y="300.0" font-size="13" fill="#1b5e20" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >115 ≤ 120 mm  ✓</text>
+<text x="870.0" y="326.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >Clearance per side</text>
+<text x="870.0" y="342.0" font-size="13" fill="#0f172a" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >2.5 and 5.0 mm</text>
+<text x="870.0" y="368.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >Height</text>
+<text x="870.0" y="384.0" font-size="13" fill="#1b5e20" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >118.5 ≤ 210 mm  ✓</text>
+<text x="870.0" y="410.0" font-size="12.5" fill="#475569" font-weight="400" text-anchor="start" >Height unused</text>
+<text x="870.0" y="426.0" font-size="13" fill="#0f172a" font-weight="600" text-anchor="start" font-family="ui-monospace, Consolas, monospace" >91.5 mm</text>
+<text x="870.0" y="460.0" font-size="14" fill="#1b5e20" font-weight="700" text-anchor="start" >The board fits flat</text>
+<text x="870.0" y="484.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >A 100 × 100 mm board sits inside this</text>
+<text x="870.0" y="501.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >115 × 110 mm section with room for walls.</text>
+<text x="870.0" y="518.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >The earlier edge-on recommendation assumed</text>
+<text x="870.0" y="535.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" >a cylinder and no longer applies.</text>
+<text x="870.0" y="552.0" font-size="12.5" fill="#334155" font-weight="400" text-anchor="start" ></text>
+<text x="870.0" y="569.0" font-size="12.5" fill="#b45309" font-weight="600" text-anchor="start" >WATCH THE CLEARANCE, THOUGH:</text>
+<text x="870.0" y="586.0" font-size="12.5" fill="#b45309" font-weight="400" text-anchor="start" >2.5 mm per side on the wide axis is not</text>
+<text x="870.0" y="603.0" font-size="12.5" fill="#b45309" font-weight="400" text-anchor="start" >much. Anything that protrudes — switch</text>
+<text x="870.0" y="620.0" font-size="12.5" fill="#b45309" font-weight="400" text-anchor="start" >boss, LED bezel, chute attachment, an</text>
+<text x="870.0" y="637.0" font-size="12.5" fill="#b45309" font-weight="400" text-anchor="start" >antenna — has to live inside it, or the</text>
+<text x="870.0" y="654.0" font-size="12.5" fill="#b45309" font-weight="400" text-anchor="start" >envelope grows past 120 mm.</text>
 <text x="40.0" y="822.0" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="start" >Generated by tools/gen_envelope_drawing.py — do not hand-edit. Envelope from requirements.md (GEN-004); design dimensions read from the STEP file.</text>
 </svg>

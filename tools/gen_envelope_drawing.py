@@ -4,14 +4,13 @@
     python tools/gen_envelope_drawing.py
 
 The 2026 guidelines fix the envelope at 21 cm tall (+7 cm for the egg chamber) by 12 cm
-across. What "12 cm across" means is not fixed, and the design is prismatic rather than
-cylindrical, so the two readings give different answers:
+across. "12 cm across" did not say whether it meant a width or a diameter, and for a
+prismatic body those give different answers -- a 115 x 110 mm section passes as a width and
+is 33 % over as a diameter, against a 10 % disqualification threshold.
 
-  * as a **width** limit, a 115 x 110 mm section passes on both faces;
-  * as a **diameter**, its 159.1 mm corner-to-corner diagonal is 33 % over, and the
-    rulebook's disqualification threshold is 10 %.
-
-That is an open question for the organizers, and it is much easier to ask once drawn.
+**The organizers settled it on 2026-09-09: a 12 cm sided box is acceptable.** So the
+envelope is a 120 mm square section, the design fits, and what the drawing now shows is the
+margin rather than the question.
 
 **The design's dimensions are read from the STEP file**, not typed here, so the drawing
 cannot disagree with the model. Change the model, re-export, re-run this: the drawing
@@ -150,8 +149,9 @@ def build() -> str:
            f"Design read from {DESIGN_STEP.relative_to(REPO_ROOT).as_posix()}. "
            f"Drawn to scale at {SCALE} px/mm.", size=13, fill="#64748b")
     c.text(40, 96,
-           '"12 cm across" is not defined as a width or a diameter, and for a prismatic '
-           "body those give different answers. Both are drawn.", size=12.5, fill=AMBER)
+           "Organizers confirmed 2026-09-09: a 12 cm SIDED BOX is acceptable, so the "
+           "section limit is a 120 mm square rather than a 120 mm bore.",
+           size=12.5, fill=GREEN)
 
     # ---- Elevation -----------------------------------------------------------------
     c.text(left, top - 16, "ELEVATION", size=13, weight="700", fill=BLUE)
@@ -190,16 +190,18 @@ def build() -> str:
     cy = body_top + body_h / 2.0
     c.text(section_x, top - 16, "SECTION — looking down", size=13, weight="700", fill=BLUE)
 
-    # Reading A: 120 mm as a width limit -> a square.
+    # The confirmed envelope: a 120 mm square section.
     c.rect(cx - section_d / 2, cy - section_d / 2, section_d, section_d,
            fill="#eef4ff", stroke=BLUE, width=2.5)
-    c.text(cx, cy - section_d / 2 - 10, 'if "across" is a WIDTH', size=12,
-           weight="600", fill=BLUE, anchor="middle")
+    c.text(cx, cy - section_d / 2 - 10, "120 mm SIDED BOX — confirmed", size=12,
+           weight="700", fill=BLUE, anchor="middle")
 
-    # Reading B: 120 mm as a diameter -> a circle inscribed in that square.
-    c.circle(cx, cy, section_d / 2, stroke=PURPLE, width=2.2, dash="9 5")
-    c.text(cx, cy + section_d / 2 + 20, 'if "across" is a DIAMETER', size=12,
-           weight="600", fill=PURPLE, anchor="middle")
+    # The reading that was ruled out, kept faint. It is why the question was asked, and
+    # somebody reading this drawing next year should be able to see that it was answered
+    # rather than never considered.
+    c.circle(cx, cy, section_d / 2, stroke=GREY, width=1.4, dash="4 6")
+    c.text(cx, cy + section_d / 2 + 20, "a 120 mm bore would NOT have fit — ruled out",
+           size=11, fill=GREY, anchor="middle")
 
     # The design's actual cross-section.
     sw, sd = wide_mm * SCALE, deep_mm * SCALE
@@ -208,24 +210,35 @@ def build() -> str:
            fill=GREEN, anchor="middle", mono=True)
     c.text(cx, cy + 14, "Cansat_D1", size=11.5, fill=GREEN, anchor="middle")
 
-    # ...and the circle it actually needs to pass through.
-    c.circle(cx, cy, diagonal_mm * SCALE / 2, stroke=RED, width=2, dash="4 4")
-    c.text(cx, cy + diagonal_mm * SCALE / 2 + 18,
-           f"needs a {diagonal_mm:.1f} mm bore", size=12.5, weight="700",
-           fill=RED, anchor="middle")
+    # The clearance to the envelope, per side. This is the number a builder needs: it is
+    # what any protruding feature -- a switch boss, an LED bezel, a chute attachment -- has
+    # to live inside.
+    side_w = (ACROSS_MM - wide_mm) / 2.0
+    side_d = (ACROSS_MM - deep_mm) / 2.0
+    for x, y, label in (
+            (cx - (wide_mm * SCALE / 2 + side_w * SCALE / 2), cy - sd / 2 - 12,
+             f"{side_w:.1f}"),
+            (cx + (wide_mm * SCALE / 2 + side_w * SCALE / 2), cy - sd / 2 - 12,
+             f"{side_w:.1f}"),
+            (cx, cy - (deep_mm * SCALE / 2 + side_d * SCALE / 2) + 4, f"{side_d:.1f}"),
+            (cx, cy + (deep_mm * SCALE / 2 + side_d * SCALE / 2) + 4, f"{side_d:.1f}")):
+        c.text(x, y, label, size=11, weight="600", fill=AMBER, anchor="middle", mono=True)
+    c.text(cx, cy + section_d / 2 + 38,
+           f"clearance per side: {side_w:.1f} mm and {side_d:.1f} mm",
+           size=12, weight="600", fill=AMBER, anchor="middle")
 
     # ---- The arithmetic --------------------------------------------------------------
     tx = section_x + section_d + 70
     ty = top + 4
-    c.text(tx, ty, "The two readings", size=14, weight="700")
+    c.text(tx, ty, "Against the confirmed limit", size=14, weight="700")
     rows = [
         ("Design section", f"{wide_mm:.0f} × {deep_mm:.0f} mm", None),
-        ("As a WIDTH limit", f"both ≤ {ACROSS_MM:.0f} mm  ✓", True),
-        ("Section diagonal", f"{diagonal_mm:.1f} mm", None),
-        ("As a DIAMETER", f"{diagonal_mm:.1f} > {ACROSS_MM:.0f} mm  ✗", False),
-        ("Overage, if diameter",
-         f"+{100 * (diagonal_mm - ACROSS_MM) / ACROSS_MM:.0f} %  (DQ over 10 %)", False),
+        ("Envelope, confirmed", f"{ACROSS_MM:.0f} × {ACROSS_MM:.0f} mm box", None),
+        ("Widest face", f"{wide_mm:.0f} ≤ {ACROSS_MM:.0f} mm  ✓", True),
+        ("Clearance per side",
+         f"{(ACROSS_MM - wide_mm) / 2:.1f} and {(ACROSS_MM - deep_mm) / 2:.1f} mm", None),
         ("Height", f"{height_mm:.1f} ≤ {BODY_HEIGHT_MM:.0f} mm  ✓", True),
+        ("Height unused", f"{BODY_HEIGHT_MM - height_mm:.1f} mm", None),
     ]
     y = ty + 28
     for label, value, good in rows:
@@ -235,19 +248,23 @@ def build() -> str:
         y += 42
 
     y += 8
-    c.text(tx, y, "The board now fits flat", size=14, weight="700", fill=GREEN)
+    c.text(tx, y, "The board fits flat", size=14, weight="700", fill=GREEN)
     for i, line in enumerate([
-        f"A {BOARD_MM:.0f} × {BOARD_MM:.0f} mm board needs a",
-        f"{BOARD_MM * math.sqrt(2.0):.1f} mm bore, so it does not fit a",
-        f"{ACROSS_MM:.0f} mm circular section — but it fits",
-        f"this {wide_mm:.0f} × {deep_mm:.0f} mm one with room for",
-        "walls. The earlier edge-on recommendation",
-        "assumed a cylinder and no longer applies.",
+        f"A {BOARD_MM:.0f} × {BOARD_MM:.0f} mm board sits inside this",
+        f"{wide_mm:.0f} × {deep_mm:.0f} mm section with room for walls.",
+        "The earlier edge-on recommendation assumed",
+        "a cylinder and no longer applies.",
         "",
-        f"(A circular section would cap a flat deck",
-        f" at {INSCRIBED_SQUARE_MM:.1f} mm square.)",
+        "WATCH THE CLEARANCE, THOUGH:",
+        f"{(ACROSS_MM - wide_mm) / 2:.1f} mm per side on the wide axis is not",
+        "much. Anything that protrudes — switch",
+        "boss, LED bezel, chute attachment, an",
+        "antenna — has to live inside it, or the",
+        "envelope grows past 120 mm.",
     ]):
-        c.text(tx, y + 24 + i * 17, line, size=12.5, fill="#334155")
+        colour = AMBER if i >= 5 else "#334155"
+        weight = "600" if i == 5 else "400"
+        c.text(tx, y + 24 + i * 17, line, size=12.5, fill=colour, weight=weight)
 
     c.text(40, canvas_h - 26,
            "Generated by tools/gen_envelope_drawing.py — do not hand-edit. Envelope from "

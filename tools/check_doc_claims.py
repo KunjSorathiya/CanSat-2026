@@ -1063,11 +1063,17 @@ def main() -> int:
         diagonal = f"{design.footprint_diagonal:.1f} mm"
         checker.check(f"mechanical/README.md states the {diagonal} cross-section diagonal",
                       f"**{diagonal}**" in mechanical, diagonal)
-        # The overage under the diameter reading is what makes this a disqualification
-        # question rather than a curiosity, so it is computed rather than remembered.
-        over = 100.0 * (design.footprint_diagonal - 120.0) / 120.0
-        checker.check(f"mechanical/README.md states the +{over:.0f} % diameter overage",
-                      f"**+{over:.0f} %**" in mechanical, f"+{over:.0f} %")
+        # The organizers confirmed on 2026-09-09 that a 12 cm sided box is acceptable, so
+        # the section limit is a 120 mm square and the diagonal no longer decides anything.
+        # What matters now is the clearance to that square, per side: it is what any
+        # protruding feature has to live inside, and 2.5 mm is not much.
+        clearances = sorted((120.0 - e) / 2.0 for e in design.sorted_extents[1:])
+        quoted = " and ".join(f"{c:.1f}" for c in clearances) + " mm"
+        checker.check(f"mechanical/README.md states the {quoted} per-side clearance",
+                      f"**{quoted}**" in mechanical, quoted)
+        checker.check("the design fits the confirmed 120 mm sided box",
+                      all(e <= 120.0 for e in design.sorted_extents[1:]),
+                      str(design.sorted_extents))
         unused = 210.0 - design.sorted_extents[0]
         checker.check(f"mechanical/README.md states the {unused:.1f} mm of unused height",
                       f"**{unused:.1f} mm unused**" in mechanical, f"{unused:.1f}")

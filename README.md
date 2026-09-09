@@ -12,7 +12,7 @@ and streams telemetry from power-on through recovery.**
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
 [![Link](https://img.shields.io/badge/telemetry-433%20MHz%20LoRa-4527a0)](documentation/design/telemetry-protocol.md)
 [![Hardware](https://img.shields.io/badge/hardware-board%20built%20%C2%B7%20link%20closed-1b5e20)](documentation/testing/bring-up-record.md)
-[![Mechanical](https://img.shields.io/badge/mechanical-not%20started-b71c1c)](mechanical/README.md)
+[![Mechanical](https://img.shields.io/badge/mechanical-designed%20%C2%B7%20not%20built-e65100)](mechanical/README.md)
 
 [Mission profile](documentation/mission/concept-of-operations.md) ·
 [Architecture](documentation/design/software-architecture.md) ·
@@ -449,7 +449,7 @@ bash tools/build_host.sh
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **49 / 49** |
 | Python (simulations) | Descent model: canopy sizing, the closed-form fall against both its own limits, ISA air density, the mass-tolerance argument | ✅ **40 / 40** |
 | Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **62 / 62** |
-| Documented claims | Numbers in the documentation checked against the source that defines them — test counts, the generated netlist, and the descent model's canopy diameter included | ✅ **261 / 261** |
+| Documented claims | Numbers in the documentation checked against the source that defines them — test counts, the generated netlist, and the descent model's canopy diameter included | ✅ **262 / 262** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
@@ -536,13 +536,7 @@ The mechanical design is no longer blocked on the organizers.
 4. What scoring thresholds apply where the rulebook rewards higher performance? The 2026 revision rewards packet rates above 1 Hz and longer stable descents, but names no thresholds
 5. What are the actual report, media, video and arrival deadlines?
 6. What interface and data format do the official dual ground stations use? The 2026 revision names the radios — SX1278 RA-02 or nRF24L01 — but not the framing or the host-side format
-7. **How is the 12 cm "across" limit measured on a non-cylindrical CanSat?** `Cansat_D1` is
-   prismatic — 115 × 110 mm in section — so **both faces are inside 120 mm while the
-   corner-to-corner diagonal is 159.1 mm.** As a width limit it passes; as a diameter it is
-   **33 % over**, and exceeding a dimensional limit by more than 10 % is a disqualification
-   rather than a scored deduction. The vehicle is drone-released and never passes through a
-   tube, which argues for the width reading — but being wrong costs the flight, and the
-   fallback is a structural redesign plus a board rebuild
+
 
 ---
 

@@ -98,13 +98,16 @@ landing deceleration in particular is a modelling assumption, not a measured qua
 | Constraint | Value | Design | Source |
 |---|---|---|---|
 | Body envelope, height | ≤ 210 mm | **118.5 mm** ✅ | [GEN-004](../../documentation/requirements/requirements.md) |
-| Body envelope, across | ≤ 120 mm | **115 / 110 mm** as a width ✅; **159.1 mm** as a diameter ❌ | GEN-004 |
+| Body envelope, across | ≤ 120 mm, **as a sided box** | **115 / 110 mm** ✅, with 2.5 and 5.0 mm per side | GEN-004 |
 | Egg chamber allowance | +70 mm | Not designed | GEN-004 |
 | Mass | 450–550 g all-up | Not weighed | [GEN-005](../../documentation/requirements/requirements.md) |
 | Vehicle board | 100 × 100 × 1.6 mm, flat | Fits the 115 × 110 section | [assembly-procedure.md](../../documentation/hardware/assembly-procedure.md) |
 
-**The second row is the open one**, and it is a disqualification-class question rather than
-a scored one — see [the envelope question](../README.md#the-envelope-question--and-it-is-a-disqualification-class-one).
+**The second row was the open one, and the organizers closed it on 2026-09-09**: a 12 cm
+sided box is acceptable, so the section limit is a 120 mm square rather than a bore — see
+[the envelope question](../README.md#the-envelope-question--asked-and-answered). What is
+left of it is the **clearance**: 2.5 mm per side on the wide axis is all there is for any
+feature that protrudes past the modelled body.
 
 Related: [mechanical/README.md](../README.md) · [drawings/](../drawings/) ·
 [`tools/cad_dimensions.py`](../../tools/cad_dimensions.py)
