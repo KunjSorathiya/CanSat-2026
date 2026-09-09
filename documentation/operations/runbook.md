@@ -16,6 +16,7 @@ ground station, operating on launch day, and analysing the flight afterwards.
 - [Before every session](#before-every-session)
 - [Configuring the vehicle](#configuring-the-vehicle)
 - [Launch configuration — switching the sync word](#launch-configuration--switching-the-sync-word)
+- [Radio silence — when your vehicle must be off](#radio-silence--when-your-vehicle-must-be-off)
 - [Building the firmware](#building-the-firmware)
 - [Running the ground station](#running-the-ground-station)
 - [Launch-day procedure](#launch-day-procedure)
@@ -192,6 +193,85 @@ Do this at **T-60**, not at the pad.
 > occupies the channel and can still occasionally trip a correlator. Being on `0xF3` during
 > someone else's launch is not harmless — it is the penalty above, at **0.71 points per
 > second**.
+
+---
+
+## Radio silence — when your vehicle must be off
+
+**This is the procedure [TEL-026](../requirements/requirements.md) asks for.** Every other
+team's CanSat must be off during your launch, and yours must be off during theirs.
+
+### The firmware cannot help, and that is by design
+
+There is no silent mode and there will not be one. [PWR-004](../requirements/requirements.md)
+requires telemetry to begin **automatically at power-on**, with no manual trigger — and the
+firmware satisfies it: the controller transmits from `READY` onward with no arming step. A
+powered vehicle is a transmitting vehicle.
+
+So the only control is physical, and **switch discipline is a scored activity rather than a
+courtesy.** At 1.43 Hz the 2026 penalty of −1 point per 2 packets is **0.71 points per
+second**: 35 seconds throws away the entire 25-point telemetry section, 70 seconds costs
+fifty points. There is no recovering that with a good flight.
+
+### What "off" means today
+
+> [!WARNING]
+> **The manual ON/OFF switch is not fitted, and neither is the power LED.** Both parts are
+> held ([purchase list](../hardware/purchase-list.md)), neither is soldered, and both are
+> mandatory requirements in their own right ([PWR-001](../requirements/requirements.md),
+> PWR-002, PWR-003).
+>
+> Until they are fitted, **"off" means the battery lead is physically disconnected**, and
+> there is **no indicator that says so from the outside.** You have to open the vehicle and
+> look. That is slow, it is easy to get wrong under time pressure, and it is the single
+> strongest practical argument for fitting the switch and the LED before the competition —
+> ahead of their five points.
+
+### Before another team's launch
+
+- [ ] **One named person owns the power state**, for the whole event. Not "the team" — a
+      person. Shared ownership of a switch is how a vehicle gets left on.
+- [ ] **Disconnect the battery** (or open the switch, once fitted).
+- [ ] **Confirm the vehicle is dark.** With the LED fitted this is a glance; without it,
+      confirm the lead is out of the connector by eye, not by memory.
+- [ ] **Also power down the ground bridge** if you are not using it. It only transmits on an
+      uplink command, but a Pico you are not watching is a Pico you are not sure about.
+
+### Confirm it, rather than assume it
+
+**Your own ground station is the detector, and this costs nothing.** With your vehicle
+supposedly off, leave the bridge running and watch its status line:
+
+```text
+#state=RX radio=1 frames=12 dropped=0 rssi=-44 snr=9.5 sync=0xF3 tx=0
+```
+
+- [ ] **Watch `frames=` for 30 seconds.** If it does not move, nothing is transmitting on
+      your bridge's sync word.
+- [ ] **If it moves, read the team identifier in the packet.** If it is yours, your vehicle
+      is on — go and find it. If it is not, another team is testing, which is theirs to
+      manage and is exactly what `0xF3` is for.
+
+This is the same trick the launch-configuration procedure uses: an existing counter turning
+an assumption into an observation. It will not catch a vehicle transmitting on `0xA5` while
+your bridge listens on `0xF3` — for that, reflash the bridge or ask the organizers' station.
+
+### During your own launch
+
+- [ ] Your vehicle on, everyone else's off — the mirror of the above, and the organizers'
+      to enforce.
+- [ ] If you see packets from another team arriving on your station during your launch,
+      **record it and say so afterwards.** Your logs are timestamped and carry the foreign
+      team id; the validator counts them separately as `wrong_team`. That is evidence, and
+      it costs nothing to keep.
+
+### After your launch
+
+- [ ] **Power the vehicle off as soon as it is recovered** and its card is out. Recovery is
+      the phase where a vehicle is most likely to be left transmitting: it is in someone's
+      hands, the flight is over, and attention has moved on.
+- [ ] Revert the sync word to the test configuration — see
+      [Launch configuration](#launch-configuration--switching-the-sync-word).
 
 ---
 

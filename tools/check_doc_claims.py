@@ -1034,6 +1034,27 @@ def main() -> int:
             f"({'0xF3' if mode == 'test' else '0xA5'})",
             mode == word, f"vehicle={mode} bridge={word}")
 
+    # ---- the radio-silence procedure and the hardware it depends on -----------------
+    # TEL-026 is executed with a switch and confirmed with a power LED, and neither is
+    # fitted. So the runbook has to say so, and keep saying so until they are -- a
+    # procedure that tells an operator to open a switch that does not exist reads as
+    # authoritative and is unfollowable, which is worse than an obvious gap. When PWR-001
+    # is finally marked Complete this check flips: the warning becomes the stale thing, and
+    # the build says so.
+    def requirement_status(rid: str) -> str:
+        match = re.search(rf"^\| {rid} \| (.*)$", requirements, re.MULTILINE)
+        if not match:
+            return ""
+        cells = match.group(1).split(" | ")
+        return cells[5].strip() if len(cells) >= 7 else ""
+
+    switch_fitted = requirement_status("PWR-001") in ("Complete", "Verified")
+    warns = "The manual ON/OFF switch is not fitted" in runbook
+    checker.check(
+        "runbook.md's radio-silence procedure matches whether PWR-001 is actually fitted",
+        warns != switch_fitted,
+        f"PWR-001={requirement_status('PWR-001')!r} runbook warns={warns}")
+
     # ---- rulebook constants that must never drift -----------------------------------
     checker.check("post-impact window is at least the rulebook's 5 s",
                   (constant(config, "post_impact_transmission_ms") or 0) >= 5000)

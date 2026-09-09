@@ -8,6 +8,70 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-09 (cycle 40)
+
+### Added — the radio-silence procedure, and what writing it exposed
+
+**TEL-026 closed** — other CanSats powered off during another team's launch. It is the
+companion to cycle 39's sync-word procedure and the other half of switch discipline, which
+the 2026 revision made a scored activity rather than a courtesy: at 1.43 Hz, −1 point per
+2 packets is **0.71 points per second**, so 35 seconds of a vehicle left on throws away the
+entire 25-point telemetry section.
+
+**The firmware cannot help here, and is not meant to.** `PWR-004` requires telemetry to
+begin automatically at power-on, and the controller satisfies it — it transmits from
+`READY` with no arming step. There is no silent mode and there will not be one. **A powered
+vehicle is a transmitting vehicle**, so the only control is physical.
+
+What makes the procedure verifiable rather than assumed is that **the team's own bridge is
+the detector**, at no cost and with no new code. With the vehicle supposedly off, `frames=`
+in the bridge status line must not move over 30 seconds; if it does, the team identifier in
+the packet says whose it is — yours, or another team testing on `0xF3`, which is what
+`0xF3` is for. Same trick as the sync-word procedure: an existing counter turning an
+assumption into an observation.
+
+The procedure also covers the phase where a vehicle is most likely to be left transmitting
+— **recovery**, when it is in someone's hands, the flight is over and attention has moved
+on — and it asks for one *named person* to own the power state for the whole event.
+Shared ownership of a switch is how a vehicle gets left on.
+
+### Fixed — three requirement rows that were wrong, not stale
+
+Writing TEL-026 meant looking at what executes it, and **`PWR-001`, `PWR-002` and `PWR-003`
+— the manual switch and the power LED — all read `Blocked`.** That status is defined
+in this document as *"requires missing hardware, an external decision, or another
+prerequisite"*.
+
+**Nothing is missing.** Both parts have been held since 2026-09-06 and are listed as held in
+the purchase list. They are simply not fitted, which is `Not Started`.
+
+The distinction is not pedantry. Calling unfitted parts *blocked* hides work that could be
+done in an evening behind a word that means somebody else's problem — and these two are
+the only control behind TEL-026, so their absence costs considerably more than the five
+points they carry on their own. All three rows now say what is actually true: the part is
+held, its place in the power path is drawn in the netlist, and nothing stands in the way.
+
+`PWR-003` gained the reasoning that makes it satisfiable by construction: the LED hangs off
+the **switched rail** through a series resistor, so it lights the instant the switch closes.
+A GPIO-driven LED could not meet "immediately" — it would wait for boot — and the
+separate GP14 status LED is firmware-driven and is not this indicator.
+
+### Changed — a procedure cannot outlive the hardware it assumes
+
+`check_doc_claims.py` now cross-checks the runbook against the requirements table: while
+`PWR-001` is not `Complete`, the radio-silence procedure **must** carry its warning that the
+switch is not fitted and that "off" therefore means the battery lead is physically out with
+nothing indicating it from outside the structure.
+
+**The check flips when the switch is fitted.** Marking `PWR-001` complete without deleting
+the warning fails the build, because at that point the warning is the stale thing. A
+procedure that tells an operator to open a switch that does not exist reads as authoritative
+and is unfollowable, which is worse than an obvious gap.
+
+Requirements `Complete` 36 -> **37**. Claims 254 -> **255**.
+
+---
+
 ## [Unreleased] — 2026-09-09 (cycle 39)
 
 ### Added — the two ends of the link can no longer disagree about the sync word
