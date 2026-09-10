@@ -68,6 +68,7 @@ are none yet, because nothing has flown.
 | [wiring.md](design/wiring.md) | Signal wiring for both Picos, pin table, bus-sharing rules, power tree, bring-up order |
 | [electrical-architecture.md](design/electrical-architecture.md) | Power topology, regulation analysis, grounding, decoupling, power budget, electrical risks |
 | [link-budget.md](design/link-budget.md) | LoRa airtime arithmetic, the spreading-factor and packet-rate decision, range margin, and the guards that enforce them |
+| [max-rate-command.md](design/max-rate-command.md) | **Proposed, not implemented.** The ground-commanded switch to 3.57 Hz that closes the uplink behind itself: protocol, the airtime and SD-write arithmetic behind the period, what latches, and what it refuses |
 | [sensor-rates.md](design/sensor-rates.md) | The 30 Hz acquisition loop: barometer conversion time, IMU anti-aliasing, bus budget, and why over-sampling corrupts vertical speed |
 
 ## Hardware
