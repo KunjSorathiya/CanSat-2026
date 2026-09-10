@@ -1477,6 +1477,41 @@ void test_a_truncated_command_is_ignored() {
 
 // The digest both ends compute. A divergence here is a console that cannot command the
 // vehicle it was built for, and it would show up on the bench as "the button does nothing".
+void test_a_token_authorises_one_command_and_not_another() {
+    // The reason the digest covers the command. Without it, the operator who was allowed to
+    // erase the log was also allowed -- by anyone holding that one frame -- to put the
+    // vehicle into a mode it cannot be talked out of. Both substitutions are checked,
+    // because either direction is a way to make the vehicle do something nobody pressed a
+    // button for.
+    const std::string password = "bench-password";
+    const std::string team = "CAN-Team-25";
+    std::uint32_t pn = 0;
+
+    const std::string erase =
+        cansat::format_command(team, cansat::CommandKind::erase_log, password, 40);
+    CHECK(cansat::parse_command(erase, team, password, pn) == cansat::CommandKind::erase_log);
+
+    std::string swapped = erase;
+    const std::size_t at = swapped.find("ERASE_LOG");
+    CHECK(at != std::string::npos);
+    swapped.replace(at, std::string("ERASE_LOG").size(), "MAX_RATE_LEAN");
+    CHECK(cansat::parse_command(swapped, team, password, pn) == cansat::CommandKind::none);
+
+    const std::string lean =
+        cansat::format_command(team, cansat::CommandKind::max_rate_lean, password, 40);
+    CHECK(cansat::parse_command(lean, team, password, pn) == cansat::CommandKind::max_rate_lean);
+    std::string back = lean;
+    const std::size_t at2 = back.find("MAX_RATE_LEAN");
+    CHECK(at2 != std::string::npos);
+    back.replace(at2, std::string("MAX_RATE_LEAN").size(), "ERASE_LOG");
+    CHECK(cansat::parse_command(back, team, password, pn) == cansat::CommandKind::none);
+
+    // And a name this build does not know is none, rather than the nearest thing it knows.
+    std::string unknown = lean;
+    unknown.replace(at2, std::string("MAX_RATE_LEAN").size(), "MAX_RATE_LEANER");
+    CHECK(cansat::parse_command(unknown, team, password, pn) == cansat::CommandKind::none);
+}
+
 void test_command_tokens_match_the_shared_fixture(const std::string& repo_root) {
     const std::string path = repo_root + "/test-data/command-tokens.tsv";
     std::ifstream file(path);
@@ -1487,16 +1522,26 @@ void test_command_tokens_match_the_shared_fixture(const std::string& repo_root) 
         if (line.empty() || line[0] == '#') continue;
         const std::size_t a = line.find('\t');
         const std::size_t b = line.find('\t', a + 1);
-        CHECK(a != std::string::npos && b != std::string::npos);
+        const std::size_t c = line.find('\t', b + 1);
+        CHECK(a != std::string::npos && b != std::string::npos && c != std::string::npos);
         const std::string password = line.substr(0, a);
+        const std::string command = line.substr(a + 1, b - a - 1);
         const std::uint32_t pn =
-            static_cast<std::uint32_t>(std::stoul(line.substr(a + 1, b - a - 1)));
-        std::string expected = line.substr(b + 1);
+            static_cast<std::uint32_t>(std::stoul(line.substr(b + 1, c - b - 1)));
+        std::string expected = line.substr(c + 1);
         while (!expected.empty() &&
                (expected.back() == '\r' || expected.back() == '\n')) {
             expected.pop_back();
         }
-        CHECK(cansat::command_token(password, pn) == expected);
+        // The fixture names the command in text; the digest takes the enum. A row naming a
+        // command this build does not know is a fixture ahead of the firmware, and saying so
+        // beats quietly computing a token for CommandKind::none and reporting a mismatch.
+        cansat::CommandKind kind = cansat::CommandKind::none;
+        if (command == "ERASE_LOG") kind = cansat::CommandKind::erase_log;
+        else if (command == "MAX_RATE_GPS") kind = cansat::CommandKind::max_rate_gps;
+        else if (command == "MAX_RATE_LEAN") kind = cansat::CommandKind::max_rate_lean;
+        CHECK(kind != cansat::CommandKind::none);
+        CHECK(cansat::command_token(password, kind, pn) == expected);
         ++rows;
     }
     CHECK(rows >= 8);
@@ -3976,6 +4021,7 @@ int main(int argc, char** argv) {
     test_a_telemetry_packet_is_never_a_command();
     test_an_unconfigured_vehicle_matches_nothing();
     test_a_truncated_command_is_ignored();
+    test_a_token_authorises_one_command_and_not_another();
     test_command_tokens_match_the_shared_fixture(repo_root);
     test_a_fix_with_too_few_satellites_is_refused();
     test_a_fix_with_poor_geometry_is_refused();

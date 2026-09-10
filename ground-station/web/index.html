@@ -1054,7 +1054,9 @@ function missionStateView(mode) {
   const spaced = mode.replace("_", " ");
   return { name: spaced, live: "Mission state " + spaced.toLowerCase(), phase: mode };
 }
-// FNV-1a, 64-bit, over `password + "|" + packetNumber`, as 16 lowercase hex characters.
+// FNV-1a, 64-bit, over `password + "|" + command + "|" + packetNumber`, as 16 lowercase hex
+// characters. The command is in the material so a token authorises exactly one action: a
+// captured erase frame must not become a valid max-rate frame by editing four words.
 // The C++ side computes the identical digest; test-data/command-tokens.tsv holds the agreed
 // answers and both suites read it, so the two implementations cannot drift apart.
 //
@@ -1062,9 +1064,9 @@ function missionStateView(mode) {
 // and the two languages would then agree on nothing. TextEncoder rather than charCodeAt:
 // the digest is over UTF-8 bytes, and a password with an accent in it would otherwise hash
 // differently on each end -- which the fixture's last row exists to catch.
-function commandToken(password, packetNumber) {
-  if (!password) return "";
-  const bytes = new TextEncoder().encode(password + "|" + String(packetNumber));
+function commandToken(password, command, packetNumber) {
+  if (!password || !command) return "";
+  const bytes = new TextEncoder().encode(password + "|" + command + "|" + String(packetNumber));
   const MASK = (1n << 64n) - 1n;
   let hash = 14695981039346656037n;
   for (const b of bytes) {
@@ -1074,10 +1076,10 @@ function commandToken(password, packetNumber) {
   return hash.toString(16).padStart(16, "0");
 }
 
-function formatCommand(teamId, password, packetNumber) {
-  if (!password) return "";
-  return teamId + "; CMD-ERASE_LOG; PN-" + packetNumber + "; KEY-" +
-         commandToken(password, packetNumber) + ";";
+function formatCommand(teamId, command, password, packetNumber) {
+  if (!password || !command) return "";
+  return teamId + "; CMD-" + command + "; PN-" + packetNumber + "; KEY-" +
+         commandToken(password, command, packetNumber) + ";";
 }
 
 // PORTABLE-CORE:END
@@ -2724,7 +2726,7 @@ async function eraseVehicleLog() {
   if (password === null) { toast("Erase cancelled"); return; }
   if (!password) { toast("No password entered — nothing sent"); return; }
 
-  const command = formatCommand(team, password, pn);
+  const command = formatCommand(team, "ERASE_LOG", password, pn);
   try {
     const writer = serialPort.writable.getWriter();
     // frameEncode returns an array of byte values, not a string — wrapping it in a

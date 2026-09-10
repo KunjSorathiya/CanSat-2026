@@ -1,17 +1,27 @@
-# Ground-command tokens: the digest both ends must compute from a password and a packet
-# number. Read by the C++ suite and by the web console's Node tests, so the two
+# Ground-command tokens: the digest both ends must compute from a password, a command and
+# a packet number. Read by the C++ suite and by the web console's Node tests, so the two
 # implementations of FNV-1a cannot drift apart without a build failing.
+#
+# The command is in the material, and that is the point of this file having a command
+# column at all: without it a token authorises any command at that packet number, and a
+# captured ERASE_LOG frame becomes a valid MAX_RATE_LEAN frame with the key untouched.
 #
 # The last row is deliberately non-ASCII: the token is computed over UTF-8 bytes, and a
 # JavaScript implementation that hashed UTF-16 code units would agree on every other row
 # and disagree on that one.
 #
-# password	packet_number	token
-change-me	1	58543cc5429ea08d
-change-me	2	585439c5429e9b74
-change-me	4294967295	f05d614349d5e7fd
-hunter2	0	7b3f654d6b334ed7
-hunter2	1	7b3f644d6b334d24
-a longer pass phrase with spaces	1234	437ff9fa145d8cf8
-p@ssw0rd!#$%	42	4efdb70c6610db29
-éàü	7	6539510faec1815c
+# password	command	packet_number	token
+change-me	ERASE_LOG	1	1d974615f01a9eee
+change-me	ERASE_LOG	2	1d974515f01a9d3b
+change-me	MAX_RATE_GPS	1	b34674efa599958b
+change-me	MAX_RATE_LEAN	1	3cff1b98addaef37
+change-me	ERASE_LOG	4294967295	f6f2c2bfac3b0430
+change-me	MAX_RATE_LEAN	4294967295	330c371852cf276b
+hunter2	ERASE_LOG	0	3d3873c195372e80
+hunter2	ERASE_LOG	1	3d3874c195373033
+hunter2	MAX_RATE_GPS	0	20793aaa1b470dd7
+a longer pass phrase with spaces	ERASE_LOG	1234	b3177fe8d85b9325
+a longer pass phrase with spaces	MAX_RATE_LEAN	1234	70a0f224cc49d8a6
+p@ssw0rd!#$%	ERASE_LOG	42	d32bd736939bbbc4
+éàü	ERASE_LOG	7	55e7070c2da249f7
+éàü	MAX_RATE_GPS	7	6b4d99ac711eaf24

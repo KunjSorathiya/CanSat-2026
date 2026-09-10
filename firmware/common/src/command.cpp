@@ -10,9 +10,21 @@ namespace {
 const char* name_of(CommandKind kind) {
     switch (kind) {
         case CommandKind::erase_log: return "ERASE_LOG";
+        case CommandKind::max_rate_gps: return "MAX_RATE_GPS";
+        case CommandKind::max_rate_lean: return "MAX_RATE_LEAN";
         case CommandKind::none: break;
     }
     return "";
+}
+
+// The inverse, and deliberately exhaustive rather than a prefix match: MAX_RATE_LEANER is
+// not MAX_RATE_LEAN, and a command this build does not know must read as none rather than
+// as the nearest thing it recognises.
+CommandKind kind_of(const std::string& name) {
+    if (name == "ERASE_LOG") return CommandKind::erase_log;
+    if (name == "MAX_RATE_GPS") return CommandKind::max_rate_gps;
+    if (name == "MAX_RATE_LEAN") return CommandKind::max_rate_lean;
+    return CommandKind::none;
 }
 
 // Splits on ';' and trims spaces, the same shape the telemetry parser reads.
@@ -50,9 +62,12 @@ bool tokens_match(const std::string& a, const std::string& b) {
 
 }  // namespace
 
-std::string command_token(const std::string& password, std::uint32_t packet_number) {
-    if (password.empty()) return {};
+std::string command_token(const std::string& password, CommandKind kind,
+                          std::uint32_t packet_number) {
+    if (password.empty() || kind == CommandKind::none) return {};
     std::string material = password;
+    material += '|';
+    material += name_of(kind);
     material += '|';
     material += std::to_string(packet_number);
 
@@ -72,7 +87,7 @@ std::string format_command(const std::string& team_id, CommandKind kind,
                            const std::string& password, std::uint32_t packet_number) {
     if (kind == CommandKind::none || password.empty()) return {};
     return team_id + "; CMD-" + name_of(kind) + "; PN-" + std::to_string(packet_number) +
-           "; KEY-" + command_token(password, packet_number) + ";";
+           "; KEY-" + command_token(password, kind, packet_number) + ";";
 }
 
 CommandKind parse_command(const std::string& text, const std::string& expected_team,
@@ -110,13 +125,16 @@ CommandKind parse_command(const std::string& text, const std::string& expected_t
         if (pn > 4294967295ULL) return CommandKind::none;
     }
 
-    if (!tokens_match(key, command_token(password, static_cast<std::uint32_t>(pn)))) {
+    // The name is resolved first, because the token is only meaningful against a specific
+    // command: an unknown name has no token to check it with.
+    const CommandKind kind = kind_of(command);
+    if (kind == CommandKind::none) return CommandKind::none;
+    if (!tokens_match(key, command_token(password, kind, static_cast<std::uint32_t>(pn)))) {
         return CommandKind::none;
     }
-    if (command != name_of(CommandKind::erase_log)) return CommandKind::none;
 
     packet_number = static_cast<std::uint32_t>(pn);
-    return CommandKind::erase_log;
+    return kind;
 }
 
 }  // namespace cansat

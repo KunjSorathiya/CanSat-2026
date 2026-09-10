@@ -830,23 +830,28 @@ test("command tokens match the fixture the firmware reads", () => {
   let rows = 0;
   for (const line of text.split("\n")) {
     if (!line.trim() || line.startsWith("#")) continue;
-    const [password, packetNumber, expected] = line.split("\t");
-    assert.strictEqual(M.commandToken(password, Number(packetNumber)), expected.trim(),
-                       `token mismatch for "${password}" at packet ${packetNumber}`);
+    const [password, command, packetNumber, expected] = line.split("\t");
+    assert.strictEqual(M.commandToken(password, command, Number(packetNumber)), expected.trim(),
+                       `token mismatch for "${password}" / ${command} at packet ${packetNumber}`);
     rows++;
   }
   assert.ok(rows >= 8, `expected the full token fixture, got ${rows}`);
 });
 
 test("the password never appears in the frame the console transmits", () => {
-  const command = M.formatCommand("CAN-Team-25", "hunter2", 42);
+  const command = M.formatCommand("CAN-Team-25", "ERASE_LOG", "hunter2", 42);
   assert.ok(!command.includes("hunter2"), "the password reached the wire");
   assert.ok(command.includes("PN-42"), "the nonce is missing");
   assert.ok(command.endsWith(";"), "a command without its terminator is inert by design");
 });
 
 test("a token is bound to one packet number", () => {
-  assert.notStrictEqual(M.commandToken("hunter2", 41), M.commandToken("hunter2", 42));
-  assert.notStrictEqual(M.commandToken("hunter3", 42), M.commandToken("hunter2", 42));
-  assert.strictEqual(M.commandToken("", 42), "", "no password must mint no token");
+  assert.notStrictEqual(M.commandToken("hunter2", "ERASE_LOG", 41),
+                        M.commandToken("hunter2", "ERASE_LOG", 42));
+  assert.notStrictEqual(M.commandToken("hunter3", "ERASE_LOG", 42),
+                        M.commandToken("hunter2", "ERASE_LOG", 42));
+  assert.strictEqual(M.commandToken("", "ERASE_LOG", 42), "", "no password must mint no token");
+  // The command is in the material, so one token can never stand in for another.
+  assert.notStrictEqual(M.commandToken("hunter2", "ERASE_LOG", 42),
+                        M.commandToken("hunter2", "MAX_RATE_LEAN", 42));
 });
