@@ -1,18 +1,29 @@
-# Max-rate command — design
+# Max-rate commands — design
 
 **Status: proposed, 2026-09-10. Nothing in this document is implemented.**
 
-A ground-commanded, one-way switch that takes the vehicle from 1.43 Hz to 3.57 Hz and
-closes the uplink behind itself. It exists because the 2026 revision scores packet rates
-above 1 Hz, and because a vehicle that can be commanded is a vehicle that can be commanded
-by accident — so the same button that buys the rate also removes the ability to send
-another one.
+Two ground commands, each a one-way switch that takes the vehicle to a faster packet rate
+and closes the uplink behind itself. They exist because the rulebook scores packet rate
+with no ceiling, and because a vehicle that can be commanded is a vehicle that can be
+commanded by accident — so the same button that buys the rate also removes the ability to
+send another one.
+
+**What the rulebook actually says**, since every number here is chosen against it:
+
+> **Transmission Capability & Reliability (5 Points):** "Higher packet rates will be
+> rewarded with more points, provided transmissions remain consistent. Packet loss will
+> reduce the score — teams must balance high transmission frequency with minimal loss. All
+> performance will be measured using the Physics Club's official dual ground stations."
+
+Rate and loss are one scored line, measured on receivers that are not ours. That is the
+whole reason the period below is derived from a guard rather than from a duty target.
 
 ---
 
 ## Contents
 
-- [What the command is](#what-the-command-is)
+- [The two commands](#the-two-commands)
+- [The token must cover the command](#the-token-must-cover-the-command)
 - [What maximum is](#what-maximum-is)
 - [What latches](#what-latches)
 - [What it refuses](#what-it-refuses)
@@ -24,103 +35,129 @@ another one.
 
 ---
 
-## What the command is
+## The two commands
 
-A second `CommandKind` alongside `erase_log`, in the same envelope, with the same token
-scheme and the same replay rules
-([command.hpp](../../firmware/common/include/cansat/command.hpp)):
+Two new `CommandKind` values alongside `erase_log`, in the same envelope, with the same
+replay rules ([command.hpp](../../firmware/common/include/cansat/command.hpp)):
 
 ```text
-CAN-Team-25; CMD-MAX_RATE; PN-1234; KEY-3f9a1c04b7e25d68;
+CAN-Team-25; CMD-MAX_RATE_GPS;  PN-1234; KEY-3f9a1c04b7e25d68;
+CAN-Team-25; CMD-MAX_RATE_LEAN; PN-1234; KEY-9c1d77a20e4b8fa3;
 ```
 
-**It carries no rate value, and that is the point.** The vehicle computes its own maximum
-from constants it was built with. A corrupted frame, another team's traffic or a forged
-token cannot name a period; the worst a valid-looking frame can do is trigger the one
-transition the operator already intended. A command that carried a number would need range
-checking, a refusal path, and a way to report which number was applied — all of it new
-surface on an unauthenticated link, to express something the vehicle already knows.
+Both appear on the web console as separate buttons, each labelled with the rate it produces
+and each stating that it is irreversible. The operator chooses at the moment of sending,
+not at build time, because which one is right depends on what the flight is for: position
+on the air for a recovery-critical flight, raw rate for a scoring run.
 
-`test-data/command-tokens.tsv` gains rows for the new kind so the C++ and JavaScript
-implementations still cannot drift apart unnoticed.
+**Neither carries a rate value.** The vehicle computes both periods from constants it was
+built with. A corrupted frame cannot name a period; the worst a valid-looking frame can do
+is trigger one of the two transitions the operator already had buttons for. A command that
+carried a number would need range checking, a refusal path, and a way to report which
+number was applied — new surface on an unauthenticated link, to express something the
+vehicle already knows.
 
 The acceptance window is unchanged: **READY, `ARM-0`, on the ground, and only on a build
-with `allow_ground_commands` set.** The replay rules are unchanged: a packet number already
-accepted, not yet reached, or older than `command_replay_window` is refused.
+with `allow_ground_commands` set.**
+
+## The token must cover the command
+
+`command_token()` is currently FNV-1a over `password + "|" + packet_number`, and
+`parse_command()` reads the `CMD-` text separately. **So any valid token authorises any
+known command at that packet number** — a captured `CMD-ERASE_LOG` frame becomes a valid
+`CMD-MAX_RATE_LEAN` frame by editing four words, with the key untouched.
+
+With one command that was invisible. With three, one of which erases the log and two of
+which are irreversible, it is not acceptable. The digest becomes:
+
+```text
+FNV-1a( password + "|" + command + "|" + packet_number )
+```
+
+so each token authorises exactly one action at exactly one packet number. This changes the
+existing erase token too, and `test-data/command-tokens.tsv` is regenerated — the fixture
+both language implementations read, so neither can drift. **The fixture keeps at least one
+row per command kind and the existing non-ASCII password row**, which is what catches a
+JavaScript implementation hashing UTF-16 code units instead of UTF-8 bytes.
+
+This is still not cryptography, and the header must keep saying so.
 
 ## What maximum is
 
-|  | Normal | Max mode |
-|---|---:|---:|
-| Worst-case packet | 199 B | **145 B** |
-| Airtime, model | 317.70 ms | **235.78 ms** |
-| Airtime, +1.8 % hardware correction | 323.41 ms | **240.02 ms** |
-| Period | 700 ms | **280 ms** |
-| Rate | 1.43 Hz | **3.57 Hz** |
-| Duty | 46 % | **86 %** |
+| | Normal | `MAX_RATE_GPS` | `MAX_RATE_LEAN` |
+|---|---:|---:|---:|
+| `MODE`/`FAULTS`/`CAL`/`ARM`/`YR` | on the air | **shed** | **shed** |
+| `GP-Lat`/`GP-Lon`/`GP-Alt` | logged only | **on the air** | logged only |
+| Worst-case packet | 199 B | **201 B** | **145 B** |
+| Airtime, model | 317.70 ms | **317.70 ms** | **235.78 ms** |
+| Airtime, +1.8 % hardware correction | 323.41 ms | **323.41 ms** | **240.02 ms** |
+| Period | 700 ms | **363 ms** | **280 ms** |
+| Rate | 1.43 Hz | **2.75 Hz** | **3.57 Hz** |
+| Duty | 46 % | **89 %** | **86 %** |
 
-Two things produce the gain, and only one of them is the duty policy.
+**201 bytes costs exactly what 199 does.** LoRa quantises the payload into symbol blocks,
+and both land on 298 symbols at SF7/125 kHz — so putting the three `GP-` fields on the air
+in place of the five diagnostic tags is airtime-free against today's budget. That is why
+the GPS variant exists at all: it nearly doubles the rate *and* transmits position, for
+nothing.
 
-**The packet gets smaller.** Max mode stops appending the `MODE`, `FAULTS`, `CAL`, `ARM`
-and `YR` tags — the same fields the oversize path already sheds first, on the grounds that
-they are project-local diagnostics rather than rulebook data. They continue to reach the SD
-log. The runtime cap (`Configuration::worst_case_packet_bytes`) drops to match, so the
-shedding logic and the budget stay describing the same packet.
+**The period is `airtime + 40 ms`, not `airtime / duty`.** The 40 ms is the vehicle's own
+work between transmits. [F-11](../testing/bring-up-record.md#findings) measured the SD block
+write at 2.7 ms mean and **30 ms worst case, on two different boards, in two of five
+sessions** — that is a healthy card's internal housekeeping, not a fault, and it does not go
+away because recent runs were clean. The sensor loop and the watchdog feed share what is
+left. A period shorter than this guard does not fail loudly; it makes that packet late,
+which reaches the official ground stations as jitter on a line scored for consistency.
 
-**The gap gets smaller.** 280 ms is `airtime + 40 ms`, not `airtime / duty`. The 40 ms is
-the vehicle's own work between transmits: [F-11](../testing/bring-up-record.md#findings)
-measured the SD block write at 2.7 ms mean and **30 ms worst case, in two of five
-sessions**, and the sensor loop and the watchdog feed have to fit alongside it. At 86 % duty
-the duty-derived period would be 279.1 ms and the guard-derived one 280.0 ms, so **the guard
-is what binds** — which is the right way round. A period shorter than the guard does not
-fail loudly; it makes packets late by however long the card stalls, and that arrives at the
-ground station as jitter rather than as an error.
+**The byte figures must be defended, not asserted.** 145 B is the repository's existing
+arithmetic (199 B worst case less 54 B of worst-case tags) and 201 B is that plus the three
+`GP-` fields. The implementation adds tests that construct the widest packet in each
+configuration and check it against its constant. If a measurement disagrees, the constant
+moves and the period moves with it. **This document fixes the derivation, not the number.**
 
-**The 145-byte figure must be defended, not asserted.** It is the repository's existing
-arithmetic — the 199 B worst case minus 54 B of worst-case tags — and the implementation
-adds a test that constructs the widest mandatory-only packet and checks it against the
-constant, the way the 199 is defended today. If that measurement disagrees, the constant
-moves and the period constant moves with it. **This document fixes the derivation, not the
-number.**
-
-Every figure above sits in `link_profile.hpp` behind `static_assert`s: that the max-mode
-period exceeds the max-mode airtime plus the guard, and that the max-mode packet fits the
-FIFO. A future change to the packet format that invalidates them fails the build rather
-than the flight.
+Both periods sit in `link_profile.hpp` behind `static_assert`s: each exceeds its own
+budget's airtime plus the guard, and each budget fits the 255-byte FIFO.
 
 ## What latches
 
-One accepted command sets three things at once, and none of them can be undone:
+One accepted command sets four things at once, and none can be undone:
 
-1. **The period** — `PeriodicTask::set_period(kMaxRatePeriodMs)` on the telemetry task.
-2. **The packet** — diagnostic tags suppressed, runtime cap lowered to the max-mode budget.
-3. **The uplink** — `service_ground_commands()` returns immediately from then on. The
-   vehicle never enters RX again, so no further command can be received, including another
-   `MAX_RATE`.
+1. **The period** — `PeriodicTask::set_period()` on the telemetry task.
+2. **The packet** — diagnostic tags off; `GP-` fields on or off per variant. Both are set
+   explicitly by the command rather than inherited from the build, so there is no
+   combination of build flag and command that produces a packet the period was not sized
+   for.
+3. **The runtime cap** — `worst_case_packet_bytes` moves to the variant's budget, so the
+   existing oversize-shedding logic keeps describing the packet actually being sent.
+4. **The uplink** — `service_ground_commands()` returns immediately from then on. The
+   vehicle never enters RX again.
 
-**The latch lives in RAM.** A power cycle or a watchdog reset returns the vehicle to
-1.43 Hz with the uplink open, on a build that had it enabled. That is a deliberate choice
-and not a limitation to be worked around later: persisting it would mean writing flight
-configuration to the card, and a card that arrives at the pad already carrying "no uplink,
-max rate" from a bench session is a worse failure than re-sending a command.
+**Whichever command arrives first wins, and the other becomes unreachable.** That is a
+consequence of the latch rather than a separate rule: there is no way to switch from one
+max mode to the other, because after either one the vehicle is no longer listening.
+
+**The latch lives in RAM.** A power cycle or a watchdog reset returns the vehicle to its
+flashed configuration — 1.43 Hz, uplink open. Persisting it would mean writing flight
+configuration to the card, and a card that arrives at the pad already carrying "max rate,
+no uplink" from a bench session applies it silently to the next flight. The RAM latch's
+failure mode is visible instead: the rate is back at 1.43 Hz and you press the button
+again. The cost is that a watchdog reboot in flight drops the rate for the rest of the
+flight — which is also the only signal that a reboot happened.
 
 ## What it refuses
 
-- **`transmit_gps` true.** That packet is 255 B and 406.81 ms of measured airtime, which is
-  *longer than the 280 ms period*. Compile-time `static_assert` on the pair, plus a runtime
-  refusal, because the two settings are configured in different places and a build that
-  combines them must not fly.
 - **Armed, or not in READY.** The same gate as `erase_log`, unchanged.
 - **A replayed, future or stale packet number.** The same rules, unchanged.
+- **A token minted for a different command.** New, and the reason for the digest change.
 - **A second command after the latch.** Not refused — *not heard*. The radio is no longer
   in RX.
 
 ## How the operator knows it worked
 
 There is no acknowledgement packet, because the vehicle stops listening in the same breath
-as it answers. The evidence is the telemetry itself, and it is unambiguous within one
-period: the rate at the ground station goes from 1.43 to 3.57 Hz, and the `MODE`, `FAULTS`,
-`CAL`, `ARM` and `YR` tags stop appearing in the packets.
+as it answers. The evidence is the telemetry, and it is unambiguous within one period: the
+rate moves to 2.75 or 3.57 Hz, the `MODE`, `FAULTS`, `CAL`, `ARM` and `YR` tags stop
+appearing, and — for the GPS variant — the three `GP-` fields start.
 
 `health_.ground_commands_accepted` still increments, and the SD log still records it.
 
@@ -128,48 +165,59 @@ period: the rate at the ground station goes from 1.43 to 3.57 Hz, and the `MODE`
 
 | | Effect |
 |---|---|
-| **Log capacity** | ~30 hours falls to **~12 hours**. Irrelevant to a flight, relevant to a long bench session. |
-| **Average current** | The radio averages 41 mA today and **75 mA** at 86 % duty; the steady-state total moves ~130 → ~165 mA. **Peaks do not change** — they are set by coincident TX, SD write and GPS acquisition, not by rate, and the 300 mA analysis in [electrical-architecture.md](electrical-architecture.md) stands unaltered. |
-| **Channel occupancy** | The vehicle transmits ~86 % of the time. Acceptable inside a reserved launch slot, antisocial during shared bench testing on `0xF3`, and a regulatory question this repository does not answer. |
-| **Scoring** | If the rulebook's rate points cap below 3.57 Hz, the extra rate is spent for nothing. **Check the scoring table before flying this.** |
-| **Diagnosis** | `MODE`/`FAULTS`/`CAL`/`ARM` leave the air. A fault during a max-rate flight is visible in the log after recovery, not live. |
+| **Log capacity** | ~30 hours falls to ~15.5 (GPS) or ~12 (lean). Irrelevant to a flight, relevant to a long bench session. |
+| **Average current** | The radio averages 41 mA today and ~75-78 mA at these duties; the steady-state total moves ~130 → ~165 mA. **Peaks do not change** — they are set by coincident TX, SD write and GPS acquisition, not by rate, so the 300 mA analysis in [electrical-architecture.md](electrical-architecture.md) stands unaltered. |
+| **Channel occupancy** | The vehicle transmits ~86-89 % of the time. Acceptable inside a reserved launch slot; antisocial during shared bench testing on `0xF3`, where other teams are listening on the same word. |
+| **Diagnosis** | `MODE`/`FAULTS`/`CAL`/`ARM` leave the air in both variants. A fault during a max-rate flight is visible in the log after recovery, not live. |
+| **Format compliance** | Unaffected, and checked: the rulebook's mandated packet is the twelve fields `CAN-Team-XX; P-; Ti-; A-; Pr-; T-; Ro-; Pi-; Ya-; AX-; AY-; AZ-`. The shed tags appear nowhere in it, and `GP-` fields are listed under *Optional Sensor Fields*. |
 
 ## Testing
 
-**Host, C++:** the accepted transition sets all three latches; the tags stop; the period
-changes; the uplink is closed afterwards and a second command has no effect; the command is
-refused when armed, when not in READY, and on replayed, future and stale packet numbers;
-the `transmit_gps` combination is refused; the widest mandatory-only packet matches the
-budget constant.
+**Host, C++:** each variant sets all four latches, with the right period and the right
+packet; the tags stop; the GPS variant adds the `GP-` fields and the lean variant does not;
+the uplink is closed afterwards and neither a repeat nor the other variant has any effect;
+both are refused when armed, when not in READY, and on replayed, future and stale packet
+numbers; **a token minted for one command is refused for another**; the widest packet in
+each configuration matches its budget constant.
 
-**Host, Node:** the console mints a `MAX_RATE` token the firmware's fixture agrees with, and
-never transmits the password.
+**Host, Node:** the console mints both tokens, the firmware's fixture agrees with each, and
+the password never appears in a transmitted frame.
 
-**Fixtures:** `test-data/command-tokens.tsv` rows for the new kind, read by both suites.
+**Fixtures:** `test-data/command-tokens.tsv` regenerated for the command-bound digest, with
+a row per kind and the non-ASCII password row kept.
 
-**Documented claims:** the rate, period and duty figures enter `check_doc_claims.py` the
-same way the 1.43 Hz figures did — derived from the shipped constants rather than quoted.
+**Documented claims:** both rates, both periods and both duties enter `check_doc_claims.py`
+derived from the shipped constants rather than quoted, the way the 1.43 Hz figures are.
 
-**Bench, on hardware:** the only test that matters. Send it in READY with `ARM-0`, watch the
-station's rate move to 3.57 Hz, confirm the tags stop, confirm a second press does nothing,
-power-cycle and confirm the vehicle comes back at 1.43 Hz with the uplink open. Record it in
-the bring-up record as a new row under Gate 8.
+**Bench, on hardware:** the only test that matters. For each variant on a separate power
+cycle — send it in READY with `ARM-0`, watch the station's rate move, confirm the tag and
+`GP-` changes in the raw packets, confirm the other button then does nothing, and confirm
+that over several minutes the packet numbering has no gaps at the new rate. Power-cycle and
+confirm the vehicle returns to 1.43 Hz with the uplink open. Record both as rows under
+Gate 8, with the observed rate and loss.
 
 ## Decisions recorded
 
+- **Two commands on the console, not a build-time flag.** Which packet is right depends on
+  the flight, and the decision costs nothing at the moment of sending.
 - **Ground-only window, not in flight.** Keeps the property that the vehicle never listens
-  once armed, which the README and the audit both rest on. A rate command is useful before
-  launch; a vehicle that listens in flight is a different project.
-- **86 % duty, not 50 %.** The launch slot is reserved, so channel courtesy is not the
-  binding constraint there. The bench is a different matter — see the table above.
+  once armed, which the README and the audit both rest on.
+- **The digest covers the command.** See [the token section](#the-token-must-cover-the-command).
+- **Period from a guard, not a duty target.** The rulebook scores consistency alongside
+  rate; a late packet costs on the same line the rate earns on.
 - **RAM latch, not persisted.** See [What latches](#what-latches).
 - **Tag shedding rather than a bandwidth change.** 250 kHz would halve airtime, but the
   bridge's modem parameters are compiled in: the vehicle would switch, the ground station
   would go deaf, and the uplink that could have undone it is closed by the same command.
-- **No rate value on the wire.** See [What the command is](#what-the-command-is).
 
 ## Out of scope
 
 Persisting the latch across a reset. Commanding in flight. Changing bandwidth or spreading
-factor. Any command that lowers the rate again. Raising the duty cap for normal flight —
-normal flight stays at 700 ms and 46 %.
+factor. Any command that lowers the rate again, or switches between the two max modes.
+Raising the rate of normal flight — it stays at 700 ms and 46 %.
+
+**Not settled by this document, and worth an answer before flying any of it:** the updated
+guidelines add *"All participating CanSats must be compatible with at least one of the
+Ground Stations provided by the Physics Club"*. Compatibility means matching frequency,
+spreading factor, bandwidth, coding rate and sync word. This repository has never seen
+those numbers.
