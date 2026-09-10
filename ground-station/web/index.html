@@ -499,6 +499,12 @@ input[type=file] { display: none; }
     <button class="hbtn" id="erase-btn" disabled
             title="Erase the vehicle's onboard log, equivalent to prepare_sd_card.py. Serial link only, and the vehicle obeys only in READY with ARM-0">Erase SD log</button>
 
+    <button class="hbtn" id="maxrate-gps-btn" disabled
+            title="Raise the packet rate to 2.75 Hz and put the GPS position on the air. IRREVERSIBLE until power-off: the vehicle stops accepting commands the moment it takes effect">Max rate + GPS</button>
+
+    <button class="hbtn" id="maxrate-lean-btn" disabled
+            title="Raise the packet rate to 3.56 Hz, the fastest this vehicle has, with position left in the log. IRREVERSIBLE until power-off: the vehicle stops accepting commands the moment it takes effect">Max rate 3.56 Hz</button>
+
     <button class="hbtn" id="pause-btn" aria-pressed="false" title="Freeze the display; packets keep arriving and are buffered">
       <svg width="14" height="14" aria-hidden="true"><use href="#i-pause" id="pause-icon"/></svg><span id="pause-label">Pause</span>
     </button>
@@ -1413,6 +1419,8 @@ async function connectSerial() {
   $("#src-mode").textContent = "SERIAL";
   setSource("serial");
   $("#erase-btn").disabled = false;
+  $("#maxrate-gps-btn").disabled = false;
+  $("#maxrate-lean-btn").disabled = false;
   const dec = new FrameDecoder();
   serialReader = serialPort.readable.getReader();
   (async () => {
@@ -2699,13 +2707,57 @@ $("#src-serial").addEventListener("click", () => { connectSerial(); });
 
 // Erase the vehicle's onboard log, over the uplink.
 //
-// Three things guard this, and only the third is real. The button is disabled unless a
-// serial link is up. The operator has to type the word, because a mis-click must not be
-// able to destroy a flight log and a confirm dialog is one keystroke from "yes". And the
-// vehicle itself obeys only in READY with ARM-0, with allow_ground_commands compiled off
-// by default -- which is the guard that still holds when this page is not the thing
-// transmitting.
-async function eraseVehicleLog() {
+// Three things guard these, and only the third is real. The buttons are disabled unless a
+// serial link is up. The operator has to type the password, because a mis-click must not be
+// able to destroy a flight log or put the vehicle somewhere it cannot be recalled from, and
+// a confirm dialog is one keystroke from "yes". And the vehicle itself obeys only in READY
+// with ARM-0, with allow_ground_commands compiled off by default -- which is the guard that
+// still holds when this page is not the thing transmitting.
+//
+// The token is bound to the command as well as to the packet number, so the frame this
+// mints for one button is refused for the other.
+// What each button says before it sends. The prompts are not decoration: two of these three
+// commands cannot be undone by any later command, only by a power cycle, and the operator
+// has to read that before typing a password rather than discover it from a rate that will
+// not go back down.
+const COMMANDS = {
+  ERASE_LOG: {
+    note: "erase command sent",
+    prompt:
+      "Erase the vehicle's onboard flight log. This cannot be undone." +
+      "\n\nThe log reads empty at once; the old blocks are then overwritten in the " +
+      "background, which takes several minutes and does not interrupt telemetry. The end " +
+      "state matches tools/prepare_sd_card.py." +
+      "\n\nThe vehicle refuses unless it is in READY with ARM-0 and was built with " +
+      "ground commands enabled.",
+  },
+  MAX_RATE_GPS: {
+    note: "max-rate (GPS) command sent",
+    prompt:
+      "Raise the packet rate to 2.75 Hz and put the GPS position on the air." +
+      "\n\nTHIS CANNOT BE UNDONE. The vehicle stops accepting commands the moment it " +
+      "takes effect \u2014 including the other rate button \u2014 and only a power cycle " +
+      "restores it." +
+      "\n\nThe MODE, FAULTS, CAL, ARM and YR tags leave the air; they are what pays for " +
+      "the rate. The mandatory fields are unchanged." +
+      "\n\nThe vehicle refuses unless it is in READY with ARM-0.",
+  },
+  MAX_RATE_LEAN: {
+    note: "max-rate (lean) command sent",
+    prompt:
+      "Raise the packet rate to 3.56 Hz, the fastest this vehicle has." +
+      "\n\nTHIS CANNOT BE UNDONE. The vehicle stops accepting commands the moment it " +
+      "takes effect \u2014 including the other rate button \u2014 and only a power cycle " +
+      "restores it." +
+      "\n\nThe MODE, FAULTS, CAL, ARM and YR tags leave the air, and GPS stays in the SD " +
+      "log rather than going on it. The mandatory fields are unchanged." +
+      "\n\nThe vehicle refuses unless it is in READY with ARM-0.",
+  },
+};
+
+async function sendVehicleCommand(kind) {
+  const spec = COMMANDS[kind];
+  if (!spec) { toast("Unknown command"); return; }
   if (!serialPort || !serialPort.writable) { toast("Connect the bridge over Web Serial first"); return; }
   const team = (latest && latest.team_id) ? latest.team_id : null;
   if (!team) { toast("No packet received yet — the command needs the vehicle's team id"); return; }
@@ -2716,17 +2768,12 @@ async function eraseVehicleLog() {
   if (!Number.isFinite(pn)) { toast("No packet number yet — wait for telemetry"); return; }
 
   const password = prompt(
-    "Erase the vehicle's onboard flight log. This cannot be undone." +
-    "\n\nThe log reads empty at once; the old blocks are then overwritten in the " +
-    "background, which takes several minutes and does not interrupt telemetry. The end " +
-    "state matches tools/prepare_sd_card.py." +
-    "\n\nThe vehicle refuses unless it is in READY with ARM-0 and was built with " +
-    "ground commands enabled." +
+    spec.prompt +
     "\n\nEnter the vehicle password to authorise (packet P-" + pn + "):");
-  if (password === null) { toast("Erase cancelled"); return; }
+  if (password === null) { toast("Cancelled"); return; }
   if (!password) { toast("No password entered — nothing sent"); return; }
 
-  const command = formatCommand(team, "ERASE_LOG", password, pn);
+  const command = formatCommand(team, kind, password, pn);
   try {
     const writer = serialPort.writable.getWriter();
     // frameEncode returns an array of byte values, not a string — wrapping it in a
@@ -2739,10 +2786,12 @@ async function eraseVehicleLog() {
   }
   // The password is never shown and never stored. What goes in the monitor is the frame
   // that went on the air, which carries only the digest.
-  pushRow({ n: null, cls: "warn", tag: "tx", text: command, note: "erase command sent" });
+  pushRow({ n: null, cls: "warn", tag: "tx", text: command, note: spec.note });
   toast("Command sent against P-" + pn + " — a wrong password is refused silently by the vehicle");
 }
-$("#erase-btn").addEventListener("click", () => { eraseVehicleLog(); });
+$("#erase-btn").addEventListener("click", () => { sendVehicleCommand("ERASE_LOG"); });
+$("#maxrate-gps-btn").addEventListener("click", () => { sendVehicleCommand("MAX_RATE_GPS"); });
+$("#maxrate-lean-btn").addEventListener("click", () => { sendVehicleCommand("MAX_RATE_LEAN"); });
 $("#file-input").addEventListener("change", e => {
   if (e.target.files[0]) { setSource("file"); replayFile(e.target.files[0]); }
 });

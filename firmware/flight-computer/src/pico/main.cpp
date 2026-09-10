@@ -81,14 +81,17 @@ void print_startup_summary(const flight::Configuration& config,
     // failure this summary is most likely to be consulted about is "the link is running at
     // 1 Hz and I do not know why", whose usual cause is an image flashed before the period
     // changed. A line that says 1.43 Hz settles that in one glance.
+    // The LIVE period, not the configured one. After an accepted MAX_RATE command the
+    // configured value is no longer what the vehicle is doing, and a summary that kept
+    // quoting it would answer the question this line exists for with the one number that
+    // has since become wrong.
+    const std::uint32_t period_ms = controller.telemetry_period_ms();
     std::printf(" team %s | radio %s | telemetry every %lu ms (%.2f Hz)\n",
                 config.team_id.c_str(),
                 config.radio_mode == flight::RadioMode::official ? "OFFICIAL 0xA5"
                                                                  : "TEST 0xF3",
-                static_cast<unsigned long>(config.telemetry_period_ms),
-                config.telemetry_period_ms == 0
-                    ? 0.0
-                    : 1000.0 / static_cast<double>(config.telemetry_period_ms));
+                static_cast<unsigned long>(period_ms),
+                period_ms == 0 ? 0.0 : 1000.0 / static_cast<double>(period_ms));
     std::printf(" boot: %s\n\n", h.watchdog_reboot ? "WATCHDOG RESET" : "power-on");
 
     print_row("IMU", "MPU-6500", h.imu_ok ? "OK" : "FAILED",
@@ -113,8 +116,12 @@ void print_startup_summary(const flight::Configuration& config,
               h.sound_ok ? "OK" : (sound_silent ? "SILENT" : "NOT FITTED"),
               h.sound_ok ? "" : (sound_silent ? "wired but no signal" : "optional sensor"));
 
-    std::printf("\n state %s | armed %s | calibrated %s\n", flight::to_string(h.state),
-                h.armed ? "yes" : "no", h.calibrated ? "yes" : "no");
+    // The latch belongs on this line rather than in a fault: it is not a failure, it is a
+    // state the vehicle cannot leave, and the operator who is about to wonder why the other
+    // button does nothing should be able to read the answer here.
+    std::printf("\n state %s | armed %s | calibrated %s | rate %s\n", flight::to_string(h.state),
+                h.armed ? "yes" : "no", h.calibrated ? "yes" : "no",
+                h.rate_maxed ? "COMMANDED MAX - uplink closed" : "normal");
 
     // A count is not actionable. Three active faults on a vehicle where every subsystem
     // reports OK is a puzzle; "mag_unavailable watchdog_reboot calibration" is an answer.

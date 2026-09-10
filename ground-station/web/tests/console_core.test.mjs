@@ -838,6 +838,30 @@ test("command tokens match the fixture the firmware reads", () => {
   assert.ok(rows >= 8, `expected the full token fixture, got ${rows}`);
 });
 
+test("each command renders its own name, and the password never travels", () => {
+  for (const kind of ["ERASE_LOG", "MAX_RATE_GPS", "MAX_RATE_LEAN"]) {
+    const frame = M.formatCommand("CAN-Team-25", kind, "hunter2", 12);
+    assert.ok(frame.includes("CMD-" + kind + ";"), `${kind} is not named in its own frame`);
+    assert.ok(!frame.includes("hunter2"), "the password reached the wire");
+    assert.ok(frame.endsWith(";"), "a command without its terminator is inert by design");
+  }
+});
+
+test("a frame minted for one command is not a frame for another", () => {
+  // The console cannot check what the vehicle will accept, but it can prove it never mints
+  // two commands that share a key: that is the property the firmware relies on when it
+  // refuses a token belonging to a different command.
+  const a = M.formatCommand("CAN-Team-25", "ERASE_LOG", "hunter2", 12);
+  const b = M.formatCommand("CAN-Team-25", "MAX_RATE_LEAN", "hunter2", 12);
+  const keyOf = f => f.slice(f.indexOf("KEY-"));
+  assert.notStrictEqual(keyOf(a), keyOf(b));
+});
+
+test("a command with no name mints nothing", () => {
+  assert.strictEqual(M.formatCommand("CAN-Team-25", "", "hunter2", 12), "");
+  assert.strictEqual(M.commandToken("hunter2", "", 12), "");
+});
+
 test("the password never appears in the frame the console transmits", () => {
   const command = M.formatCommand("CAN-Team-25", "ERASE_LOG", "hunter2", 42);
   assert.ok(!command.includes("hunter2"), "the password reached the wire");
