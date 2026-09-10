@@ -642,6 +642,10 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
 // a command is actually accepted, the erase itself. Both are small against a 700 ms period,
 // and the accepted-command case happens on the ground, in READY, with ARM-0.
 void Controller::service_ground_commands(std::uint64_t mission_ms) {
+    // The latch, checked before anything else. After a MAX_RATE command this function is
+    // dead for the rest of the power cycle: no poll, no parse, no RX. That is the property
+    // the operator was promised when they pressed a button labelled irreversible.
+    if (uplink_closed_) return;
     if (!config_.allow_ground_commands) return;
     if (state_machine_.state() != MissionState::ready) return;
     if (is_armed(mission_ms)) return;
@@ -650,8 +654,9 @@ void Controller::service_ground_commands(std::uint64_t mission_ms) {
     if (!radio_.poll_receive(received)) return;
 
     std::uint32_t command_pn = 0;
-    switch (cansat::parse_command(received, config_.team_id, config_.command_password,
-                                  command_pn)) {
+    const cansat::CommandKind kind = cansat::parse_command(
+        received, config_.team_id, config_.command_password, command_pn);
+    switch (kind) {
         case cansat::CommandKind::erase_log: {
             // The replay check, and it is the reason the packet number is in the command at
             // all. A token is only ever valid for the one packet number it was computed
@@ -676,12 +681,56 @@ void Controller::service_ground_commands(std::uint64_t mission_ms) {
             }
             break;
         }
+        case cansat::CommandKind::max_rate_gps:
+        case cansat::CommandKind::max_rate_lean: {
+            // The same replay rules as the erase, and for the same reason: a token is worth
+            // one use at one packet number. It matters more here -- an erase costs a log
+            // that can be re-recorded, and this cannot be undone at all without a power
+            // cycle the vehicle may not get.
+            const bool already_used = command_pn <= last_command_pn_;
+            const bool from_the_future = command_pn > packet_number_;
+            const bool stale = packet_number_ - command_pn > config_.command_replay_window;
+            if (already_used || from_the_future || stale) {
+                ++health_.ground_commands_ignored;
+                break;
+            }
+            last_command_pn_ = command_pn;
+            ++health_.ground_commands_accepted;
+            engage_max_rate(kind == cansat::CommandKind::max_rate_gps);
+            break;
+        }
         case cansat::CommandKind::none:
             // Anything else on the air: another team's command, a corrupted frame, our own
             // telemetry looped back. Counted so a link that is delivering junk is visible.
             ++health_.ground_commands_ignored;
             break;
     }
+}
+
+// Four changes, none of them undoable, and the fourth is what makes the first three so.
+//
+// The packet is set here explicitly rather than left to whatever the build was configured
+// with. That is deliberate: the period below is sized for one specific worst case, and
+// inheriting half of the packet shape from a compiled-in flag is how a vehicle ends up
+// transmitting 255 bytes on a 281 ms period -- an airtime it cannot fit, discovered on the
+// air, with no way left to tell it to stop.
+void Controller::engage_max_rate(bool with_gps) {
+    const std::size_t budget = with_gps ? cansat::link::kMaxRatePacketBytesGps
+                                        : cansat::link::kMaxRatePacketBytesLean;
+    const std::uint32_t period = with_gps ? cansat::link::kMaxRatePeriodGpsMs
+                                          : cansat::link::kMaxRatePeriodLeanMs;
+
+    // The five project-local tags come off the air in both variants. The rulebook's
+    // mandated packet does not contain them, and they are what the airtime is bought with.
+    config_.append_diagnostic_fields = false;
+    config_.transmit_gps = with_gps;
+    config_.worst_case_packet_bytes = budget;
+    // The builder holds its own copy of the configuration, so it has to be told separately.
+    builder_.set_transmit_gps(with_gps);
+
+    telemetry_task_.set_period(period);
+    health_.rate_maxed = true;
+    uplink_closed_ = true;
 }
 
 bool Controller::transmit_with_recovery(const std::string& packet, std::uint64_t mission_ms) {

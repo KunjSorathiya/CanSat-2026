@@ -17,6 +17,10 @@ struct HealthSnapshot {
     // in itself rather than a statistic.
     std::uint32_t ground_commands_accepted = 0;
     std::uint32_t ground_commands_ignored = 0;
+    // Set by an accepted MAX_RATE command and never cleared: the vehicle is running at a
+    // commanded rate with the uplink closed, and only a power cycle undoes it. On a flight
+    // log this is the difference between "the rate changed" and "the vehicle rebooted".
+    bool rate_maxed = false;
     std::uint32_t packets_suppressed = 0;
     std::uint32_t packets_tx_failed = 0;
     std::uint32_t fault_total = 0;

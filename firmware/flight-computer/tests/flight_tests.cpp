@@ -25,6 +25,7 @@
 #include <cstring>
 #include <cstdint>
 #include <fstream>
+#include <memory>
 #include <initializer_list>
 #include <iostream>
 #include <string>
@@ -3621,32 +3622,196 @@ struct GroundLink {
     flight::test::MockLogger logger;
     flight::test::MockBoard board;
 
-    explicit GroundLink(bool allow) {
+    // Which command sits on the air. Defaulted so every erase test reads as it did before
+    // there was more than one command to send.
+    cansat::CommandKind kind = cansat::CommandKind::erase_log;
+
+    explicit GroundLink(bool allow, cansat::CommandKind k = cansat::CommandKind::erase_log) {
         c.team_id = "CAN-Team-25";
         c.allow_ground_commands = allow;
+        kind = k;
     }
-    // Runs to `until_ms`, with the erase command waiting on the air the whole time.
+    // Runs to `until_ms`, with the command waiting on the air the whole time.
     void run(std::uint64_t until_ms) {
-        flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
-        CHECK(ctrl.initialize());
-        for (std::uint64_t t = 0; t <= until_ms; t += 10) {
+        ctrl_.reset(new flight::Controller(c, imu, baro, gps, radio, logger, board));
+        CHECK(ctrl_->initialize());
+        step(0, until_ms);
+    }
+    // Carries on with the SAME controller, which is the only way to observe a latch: a
+    // fresh controller would come up unlatched and every such test would pass vacuously.
+    void run_more(std::uint64_t extra_ms) {
+        CHECK(ctrl_ != nullptr);
+        step(now_ + 10, now_ + extra_ms);
+    }
+    void step(std::uint64_t from_ms, std::uint64_t until_ms) {
+        for (std::uint64_t t = from_ms; t <= until_ms; t += 10) {
             if (radio.inbox.empty()) {
                 // Minted against the number the vehicle has reached, the way the console
                 // mints it from the last packet it received. A token made for any other
                 // number is refused, so the harness has to play by the same rule.
                 radio.inbox.push_back(cansat::format_command(
-                    "CAN-Team-25", cansat::CommandKind::erase_log, c.command_password,
+                    "CAN-Team-25", kind, c.command_password,
                     static_cast<std::uint32_t>(radio.packets.size())));
             }
-            ctrl.poll(t);
+            ctrl_->poll(t);
+            now_ = t;
         }
-        accepted = ctrl.health().ground_commands_accepted;
-        state = ctrl.state();
+        accepted = ctrl_->health().ground_commands_accepted;
+        state = ctrl_->state();
+        period_after = ctrl_->telemetry_period_ms();
+        rate_maxed = ctrl_->health().rate_maxed;
     }
     std::uint32_t accepted = 0;
     flight::MissionState state = flight::MissionState::init;
+    std::uint32_t period_after = 0;
+    bool rate_maxed = false;
+    std::uint64_t now_ = 0;
+    std::unique_ptr<flight::Controller> ctrl_;
 };
 }  // namespace
+
+void test_the_builder_can_be_told_to_carry_position_after_construction() {
+    // The builder holds a COPY of the configuration, so this setter is the entire mechanism
+    // by which a command can put the position on the air. Without it the controller would
+    // change its own copy, every test that reads the controller would agree, and the packet
+    // on the bench would still have no GP- fields in it.
+    flight::Configuration c;
+    c.team_id = "CAN-Team-07";
+    CHECK(!c.transmit_gps);
+    flight::TelemetryBuilder b(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = s.orientation_valid = s.baro_valid = true;
+    s.altitude_m = 12.3; s.pressure_pa = 98765.4; s.temperature_c = 21.7;
+    s.roll_deg = -4.2; s.pitch_deg = 5.5; s.yaw_deg = 61.0;
+    s.ax_mps2 = 0.02; s.ay_mps2 = -0.1; s.az_mps2 = 9.79;
+    s.gps.valid = true;
+    s.gps.latitude = 21.1667; s.gps.longitude = 72.7833; s.gps.altitude = 12.0;
+
+    auto before = b.build(1, 1000, s);
+    CHECK(before.has_value());
+    CHECK(before->packet.find("GP-Lat-") == std::string::npos);
+    // The record carries the fix either way -- it is what the SD row renders from.
+    CHECK(before->record.gps.has_value());
+
+    b.set_transmit_gps(true);
+    auto after = b.build(2, 2000, s);
+    CHECK(after.has_value());
+    CHECK(after->packet.find("GP-Lat-") != std::string::npos);
+    CHECK(after->packet.find("GP-Lon-") != std::string::npos);
+    CHECK(after->packet.find("GP-Alt-") != std::string::npos);
+}
+
+void test_the_gps_command_speeds_up_and_puts_position_on_the_air() {
+    GroundLink link(true, cansat::CommandKind::max_rate_gps);
+    link.run(6000);
+    CHECK(link.state == flight::MissionState::ready);
+    CHECK(link.accepted == 1);
+    CHECK(link.rate_maxed);
+    CHECK(link.period_after == cansat::link::kMaxRatePeriodGpsMs);
+    CHECK(!link.radio.packets.empty());
+    const std::string& last = link.radio.packets.back();
+    CHECK(last.find("GP-Lat-") != std::string::npos);
+    // The five tags are what paid for the position and the rate.
+    CHECK(last.find("MODE-") == std::string::npos);
+    CHECK(last.find("FAULTS-") == std::string::npos);
+    CHECK(last.find("ARM-") == std::string::npos);
+    CHECK(last.find("CAL-") == std::string::npos);
+    CHECK(last.find("YR-") == std::string::npos);
+}
+
+void test_the_lean_command_speeds_up_further_and_carries_no_position() {
+    GroundLink link(true, cansat::CommandKind::max_rate_lean);
+    link.run(6000);
+    CHECK(link.accepted == 1);
+    CHECK(link.rate_maxed);
+    CHECK(link.period_after == cansat::link::kMaxRatePeriodLeanMs);
+    CHECK(link.period_after < cansat::link::kMaxRatePeriodGpsMs);
+    const std::string& last = link.radio.packets.back();
+    CHECK(last.find("GP-Lat-") == std::string::npos);
+    CHECK(last.find("MODE-") == std::string::npos);
+    // Mandatory data is untouched by either command -- it is the whole packet now.
+    CHECK(last.rfind("CAN-Team-25; P-", 0) == 0);
+    CHECK(last.find("; A-") != std::string::npos);
+    CHECK(last.find("; AZ-") != std::string::npos);
+}
+
+void test_either_command_closes_the_uplink_behind_it() {
+    // The harness keeps a command on the air the whole time, so an uplink still listening
+    // would accept another the moment the replay window allowed it. Exactly one is ever
+    // accepted and the radio is never polled again, which is the promise the button makes
+    // when it says the vehicle stops accepting commands.
+    GroundLink link(true, cansat::CommandKind::max_rate_lean);
+    link.run(8000);
+    CHECK(link.accepted == 1);
+    const int polls_at_latch = link.radio.receive_polls;
+    const std::uint32_t period_at_latch = link.period_after;
+
+    link.run_more(8000);
+    CHECK(link.accepted == 1);
+    CHECK(link.radio.receive_polls == polls_at_latch);
+    CHECK(link.period_after == period_at_latch);
+}
+
+void test_the_other_max_rate_command_is_unreachable_after_the_first() {
+    // Whichever lands first wins. The second is not refused -- it is not heard, which is a
+    // different thing and the one an operator has to understand: there is no switching
+    // between the two modes.
+    GroundLink link(true, cansat::CommandKind::max_rate_gps);
+    link.run(6000);
+    CHECK(link.period_after == cansat::link::kMaxRatePeriodGpsMs);
+
+    link.kind = cansat::CommandKind::max_rate_lean;
+    link.radio.inbox.clear();
+    link.run_more(8000);
+    CHECK(link.period_after == cansat::link::kMaxRatePeriodGpsMs);
+    CHECK(link.accepted == 1);
+}
+
+void test_an_armed_vehicle_refuses_to_change_rate() {
+    // The same window as the erase, for a stronger reason: this one cannot be undone, and a
+    // vehicle that is armed is a vehicle nobody is holding.
+    GroundLink link(true, cansat::CommandKind::max_rate_lean);
+    link.c.arming_delay_ms = 0;
+    link.c.require_calibration_to_arm = false;
+    link.run(4000);
+    CHECK(link.state == flight::MissionState::ready);
+    CHECK(link.accepted == 0);
+    CHECK(!link.rate_maxed);
+    CHECK(link.period_after == link.c.telemetry_period_ms);
+}
+
+void test_a_max_rate_command_obeys_the_replay_rules() {
+    // Minted for a packet number the vehicle has not reached. The erase has the same guard;
+    // this states it for a command whose acceptance cannot be walked back.
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    c.allow_ground_commands = true;
+    c.arming_delay_ms = 600000;
+    flight::test::MockImu imu; flight::test::MockBarometer baro; flight::test::MockGps gps;
+    flight::test::MockRadio radio; flight::test::MockLogger logger; flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    radio.inbox.push_back(cansat::format_command(
+        "CAN-Team-25", cansat::CommandKind::max_rate_gps, c.command_password, 100000));
+    for (std::uint64_t ms = 0; ms <= 5000; ms += 10) ctrl.poll(ms);
+    CHECK(!ctrl.health().rate_maxed);
+    CHECK(ctrl.telemetry_period_ms() == c.telemetry_period_ms);
+    CHECK(ctrl.health().ground_commands_ignored > 0);
+}
+
+void test_a_flight_build_cannot_be_commanded_to_max_rate() {
+    // The property the README rests on, restated for the commands that matter most: with
+    // allow_ground_commands false the radio is never polled, so neither rate command exists
+    // as far as the vehicle is concerned.
+    GroundLink link(false, cansat::CommandKind::max_rate_lean);
+    link.run(6000);
+    CHECK(link.accepted == 0);
+    CHECK(!link.rate_maxed);
+    CHECK(link.radio.receive_polls == 0);
+    CHECK(link.period_after == link.c.telemetry_period_ms);
+}
 
 void test_a_flight_build_has_no_uplink_at_all() {
     // allow_ground_commands defaults to false, and this is the property the README's "there
@@ -4037,6 +4202,14 @@ int main(int argc, char** argv) {
     test_a_fix_reaches_the_log_even_when_it_is_not_transmitted();
     test_turning_gps_transmission_on_without_the_budget_is_refused();
     test_the_packet_cadence_is_the_same_in_every_state();
+    test_the_builder_can_be_told_to_carry_position_after_construction();
+    test_the_gps_command_speeds_up_and_puts_position_on_the_air();
+    test_the_lean_command_speeds_up_further_and_carries_no_position();
+    test_either_command_closes_the_uplink_behind_it();
+    test_the_other_max_rate_command_is_unreachable_after_the_first();
+    test_an_armed_vehicle_refuses_to_change_rate();
+    test_a_max_rate_command_obeys_the_replay_rules();
+    test_a_flight_build_cannot_be_commanded_to_max_rate();
     test_a_flight_build_has_no_uplink_at_all();
     test_the_bench_build_erases_the_log_on_command();
     test_a_replayed_command_erases_nothing();

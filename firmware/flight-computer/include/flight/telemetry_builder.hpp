@@ -83,6 +83,16 @@ public:
 
 private:
     Configuration config_;
+
+  public:
+    // The packet shape is fixed at construction except for this: a ground command can put
+    // the position on the air for the rest of the power cycle. The builder holds its own
+    // COPY of the configuration, so the controller changing its own copy would never reach
+    // here -- which is exactly the kind of half-applied change that looks right in a review
+    // and transmits the old packet on the bench.
+    void set_transmit_gps(bool on) { config_.transmit_gps = on; }
+
+  private:
 };
 
 }  // namespace flight

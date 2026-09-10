@@ -50,6 +50,11 @@ public:
     // thirty rules that could have rejected it.
     const char* config_error() const { return config_error_.c_str(); }
     std::uint32_t packet_count() const { return packet_number_; }
+    // The period the telemetry task is actually running at, which after an accepted
+    // MAX_RATE command is no longer config.telemetry_period_ms. The startup summary prints
+    // this rather than the configured value, because the configured value stops being true
+    // the moment a command is obeyed.
+    std::uint32_t telemetry_period_ms() const { return telemetry_task_.period_ms(); }
     std::uint64_t mission_ms() const { return mission_ms_; }
 
 private:
@@ -57,6 +62,13 @@ private:
     void run_calibration(std::uint64_t mission_ms);
     bool is_armed(std::uint64_t mission_ms) const;
     void service_ground_commands(std::uint64_t mission_ms);
+    // One accepted MAX_RATE command, four irreversible changes. Private because there is no
+    // legitimate caller but the command handler: this is not a mode the vehicle can be put
+    // into and taken out of.
+    void engage_max_rate(bool with_gps);
+    // Set by engage_max_rate() and never cleared. The uplink is closed from that moment,
+    // including to the other MAX_RATE command.
+    bool uplink_closed_ = false;
     // Highest packet number a ground command has been accepted against. A token is
     // valid for exactly one packet number, so this makes every command single-use.
     std::uint32_t last_command_pn_ = 0;
