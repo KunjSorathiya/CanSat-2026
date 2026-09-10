@@ -8,6 +8,97 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-10 (cycle 47)
+
+Two ground commands that raise the packet rate and close the uplink behind themselves, and
+a token flaw found while adding the second one.
+
+### Fixed — a token authorised any command, not one command
+
+`command_token()` hashed the password and the packet number; the `CMD-` text was parsed
+beside it rather than covered by it. **So a captured `ERASE_LOG` frame became a valid
+`MAX_RATE_LEAN` frame by editing four words, key untouched.** Invisible while there was one
+command, unacceptable with three, two of which cannot be undone — so the fix landed before
+them rather than with them.
+
+The material is now `password | COMMAND | packet_number`, `parse_command()` resolves the
+name before checking the token, and an unrecognised name is `none` rather than the nearest
+match. `test-data/command-tokens.tsv` gained a command column and was regenerated: 14 rows,
+at least one per kind, both non-ASCII rows kept.
+
+### Added — `MAX_RATE_GPS` and `MAX_RATE_LEAN`
+
+| | Period | Rate | On the air |
+|---|---:|---:|---|
+| Normal flight | 700 ms | 1.43 Hz | Mandatory fields plus five diagnostic tags |
+| `MAX_RATE_GPS` | **364 ms** | **2.75 Hz** | Mandatory fields **plus position** |
+| `MAX_RATE_LEAN` | **281 ms** | **3.56 Hz** | Mandatory fields only |
+
+**The gain is not a duty-cap decision.** 700 ms was already the fastest the 199-byte packet
+could go under the 50 % policy. The rate comes from the packet instead: shedding the five
+project-local tags — which the rulebook's mandated twelve fields do not contain — takes the
+worst case to 145 bytes and 240 ms of measured airtime.
+
+**And position turned out to be free.** LoRa quantises the payload into symbol blocks, so
+201 bytes and 199 both come to 298 symbols at SF7/125 kHz and cost the same 317.70 ms. The
+three `GP-` fields are paid for entirely by the tags that leave, which is the whole reason
+the GPS variant exists.
+
+**The period is airtime + 40 ms, not airtime / duty.** The 40 ms is one worst-case SD block
+write ([F-11](documentation/testing/bring-up-record.md#findings): 30 ms, on two boards, in
+two of five sessions) plus the sensor loop and the watchdog feed. The rulebook scores
+consistency on the same five points as rate, so a period that fits a duty target but not the
+card buys rate by making packets late.
+
+**The `static_assert`s earned their place immediately.** The design document said 363 and
+280 ms; 323.41 + 40 is 363.41 and 240.02 + 40 is 280.02, each inside its own guard by a
+fraction of a millisecond. The build refused them. 364 and 281, and the document corrected
+to match rather than the other way round.
+
+### Added — the latch, and why it is four things
+
+One accepted command sets the period, the packet shape, the runtime oversize cap and the
+uplink itself. `service_ground_commands()` checks the latch first, so afterwards there is no
+poll, no parse and no RX for the rest of the power cycle — **including for the other rate
+command, which is therefore not refused but unheard.** Whichever lands first wins.
+
+The packet is set by the command rather than inherited from the build. That is the
+difference between transmitting 201 bytes on a 364 ms period and 255 on 281 — an airtime it
+cannot fit, discovered on the air, with no way left to tell it to stop.
+
+The latch lives in RAM. A power cycle or a watchdog reset restores the flashed
+configuration, which is deliberate: a card carrying "max rate, no uplink" from a bench
+session would apply it silently to the next flight.
+
+### Fixed — the builder had to be told separately
+
+`TelemetryBuilder` holds a **copy** of the configuration, so the controller changing its own
+copy reached every accessor a test would read and nothing that renders a packet. Found by
+writing the test first; it would have passed the controller-level assertions and transmitted
+a packet with no `GP-` fields in it.
+
+### Changed — the console, and the vehicle's own summary
+
+Three buttons share one send path and one set of guards; what differs is what each says
+before it asks for the password. Two of the three cannot be undone by any later command, and
+the prompt says so in those words.
+
+The startup summary prints the **live** period rather than the configured one, and the state
+line reads `rate COMMANDED MAX - uplink closed` once latched — the configured value stops
+being true the moment a command is obeyed.
+
+### Verification
+
+flight_tests 113 → 123 suites and 4107 → 4204 assertions; sx1278 129 → 139; Node 62 → 65;
+documented claims 278 → 286, including both rates and both periods derived from
+`link_profile.hpp` and the 201-costs-what-199-costs identity the GPS variant rests on.
+
+**None of it has transmitted a packet.** Bring-up rows 8.16, 8.17 and 8.18 are what would
+change that — one per variant, plus loss at the commanded rate, since the rulebook scores
+rate and packet loss on the same five points and a rate that costs packets is not a gain.
+
+---
+
 ## [Unreleased] — 2026-09-09 (cycle 46)
 
 A repository-wide pass with nothing new built. Everything below is something the repository
