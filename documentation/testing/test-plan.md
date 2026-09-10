@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 114 suites across the whole flight core | ✅ **4140 / 4140 assertions** |
+| `flight_tests` | 115 suites across the whole flight core | ✅ **4149 / 4149 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **139 / 139 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 114 suites, 4140 assertions
+### `flight_tests` — 115 suites, 4149 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -228,6 +228,7 @@ flowchart LR
 | `test_turning_gps_transmission_on_without_the_budget_is_refused` | Setting `transmit_gps` without raising `worst_case_packet_bytes` is refused by name; raising the budget alone is then refused on airtime; both together build. Left apart, the duty check would pass on a packet the radio never sends while the controller quietly dropped `MODE`/`FAULTS`/`CAL`/`ARM` to fit |
 | `test_the_packet_cadence_is_the_same_in_every_state` | A full profile — pad, boost, coast, descent, landing — and **every gap between consecutive packets equals `telemetry_period_ms`**, whatever state the vehicle was in. The test asserts it actually reached `FLIGHT` and `LANDED` first, so it cannot pass on a mission that never left the pad. State detection drives the `MODE` tag and the LED blink; it must never drive the rate |
 | `test_a_flight_build_has_no_uplink_at_all` | `allow_ground_commands` defaults to false, and with it false the radio's receive is **never polled** — this is the test the README's "there is no command uplink" rests on |
+| `test_the_commanded_rate_periods_clear_their_own_airtime` | Both commanded periods clear their own measured airtime plus the SD guard, 201 B costs exactly what 199 B costs, and the published rates cannot move without this failing |
 | `test_a_token_authorises_one_command_and_not_another` | A token minted for one command is refused for every other, in both directions, and an unknown command name is refused rather than matched to the nearest known one |
 | `test_the_bench_build_erases_the_log_on_command` | Enabled, in `READY` with `ARM-0`, a valid command erases the log |
 | `test_an_armed_vehicle_refuses_to_erase` | `ARM-1` closes the window, and the test asserts the vehicle actually reached `READY` first so it cannot pass for the wrong reason. Everything from arming to recovery holds a log that cannot be recreated |

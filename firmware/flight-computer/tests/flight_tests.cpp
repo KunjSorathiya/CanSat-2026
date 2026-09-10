@@ -1477,6 +1477,39 @@ void test_a_truncated_command_is_ignored() {
 
 // The digest both ends compute. A divergence here is a console that cannot command the
 // vehicle it was built for, and it would show up on the bench as "the button does nothing".
+void test_the_commanded_rate_periods_clear_their_own_airtime() {
+    // The static_asserts in link_profile.hpp already refuse a build where a period is
+    // inside its own airtime plus the guard -- they refused 363 and 280 when this was
+    // written, which is how the periods came to be 364 and 281. This states the figures the
+    // design document and the runbook quote, so a change that stays legal while moving the
+    // published rates fails here rather than on a launch day.
+    const double gps = cansat::lora_time_on_air_ms(cansat::link::kMaxRatePacketBytesGps,
+                                                   cansat::link::kModem);
+    const double lean = cansat::lora_time_on_air_ms(cansat::link::kMaxRatePacketBytesLean,
+                                                    cansat::link::kModem);
+    const auto near = [](double a, double b, double tol) { return a > b - tol && a < b + tol; };
+
+    // 201 bytes costs exactly what 199 does: both quantise to 298 symbols at SF7/125 kHz.
+    // This is the whole reason position can go on the air for free.
+    CHECK(near(gps, cansat::link::kWorstCaseAirtimeMs, 0.001));
+    CHECK(near(gps, 317.70, 0.05));
+    CHECK(near(lean, 235.78, 0.05));
+
+    CHECK(cansat::link::kMaxRatePeriodGpsMs == 364);
+    CHECK(cansat::link::kMaxRatePeriodLeanMs == 281);
+
+    // The guard is what binds, not the duty policy: at these periods the duty is ~89 % and
+    // ~85 %, and neither period would be legal if the SD write had nowhere to go.
+    CHECK(gps * 1.018 + cansat::link::kMaxRateGuardMs <=
+          static_cast<double>(cansat::link::kMaxRatePeriodGpsMs));
+    CHECK(lean * 1.018 + cansat::link::kMaxRateGuardMs <=
+          static_cast<double>(cansat::link::kMaxRatePeriodLeanMs));
+
+    // And both are genuinely faster than normal flight, in the right order.
+    CHECK(cansat::link::kMaxRatePeriodLeanMs < cansat::link::kMaxRatePeriodGpsMs);
+    CHECK(cansat::link::kMaxRatePeriodGpsMs < cansat::link::kTelemetryPeriodMs);
+}
+
 void test_a_token_authorises_one_command_and_not_another() {
     // The reason the digest covers the command. Without it, the operator who was allowed to
     // erase the log was also allowed -- by anyone holding that one frame -- to put the
@@ -4021,6 +4054,7 @@ int main(int argc, char** argv) {
     test_a_telemetry_packet_is_never_a_command();
     test_an_unconfigured_vehicle_matches_nothing();
     test_a_truncated_command_is_ignored();
+    test_the_commanded_rate_periods_clear_their_own_airtime();
     test_a_token_authorises_one_command_and_not_another();
     test_command_tokens_match_the_shared_fixture(repo_root);
     test_a_fix_with_too_few_satellites_is_refused();

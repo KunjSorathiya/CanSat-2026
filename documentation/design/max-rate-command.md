@@ -3,10 +3,10 @@
 **Status: proposed, 2026-09-10. Nothing in this document is implemented.**
 
 Two ground commands, each a one-way switch that takes the vehicle to a faster packet rate
-and closes the uplink behind itself. They exist because the rulebook scores packet rate
-with no ceiling, and because a vehicle that can be commanded is a vehicle that can be
-commanded by accident — so the same button that buys the rate also removes the ability to
-send another one.
+— 2.75 or 3.56 Hz, against 1.43 today — and closes the uplink behind itself. They exist
+because the rulebook scores packet rate with no ceiling, and because a vehicle that can be
+commanded is a vehicle that can be commanded by accident — so the same button that buys the
+rate also removes the ability to send another one.
 
 **What the rulebook actually says**, since every number here is chosen against it:
 
@@ -91,9 +91,9 @@ This is still not cryptography, and the header must keep saying so.
 | Worst-case packet | 199 B | **201 B** | **145 B** |
 | Airtime, model | 317.70 ms | **317.70 ms** | **235.78 ms** |
 | Airtime, +1.8 % hardware correction | 323.41 ms | **323.41 ms** | **240.02 ms** |
-| Period | 700 ms | **363 ms** | **280 ms** |
-| Rate | 1.43 Hz | **2.75 Hz** | **3.57 Hz** |
-| Duty | 46 % | **89 %** | **86 %** |
+| Period | 700 ms | **364 ms** | **281 ms** |
+| Rate | 1.43 Hz | **2.75 Hz** | **3.56 Hz** |
+| Duty | 46 % | **89 %** | **85 %** |
 
 **201 bytes costs exactly what 199 does.** LoRa quantises the payload into symbol blocks,
 and both land on 298 symbols at SF7/125 kHz — so putting the three `GP-` fields on the air
@@ -101,13 +101,20 @@ in place of the five diagnostic tags is airtime-free against today's budget. Tha
 the GPS variant exists at all: it nearly doubles the rate *and* transmits position, for
 nothing.
 
-**The period is `airtime + 40 ms`, not `airtime / duty`.** The 40 ms is the vehicle's own
-work between transmits. [F-11](../testing/bring-up-record.md#findings) measured the SD block
-write at 2.7 ms mean and **30 ms worst case, on two different boards, in two of five
-sessions** — that is a healthy card's internal housekeeping, not a fault, and it does not go
-away because recent runs were clean. The sensor loop and the watchdog feed share what is
-left. A period shorter than this guard does not fail loudly; it makes that packet late,
-which reaches the official ground stations as jitter on a line scored for consistency.
+**The period is `airtime + 40 ms`, rounded up, not `airtime / duty`.** The 40 ms is the
+vehicle's own work between transmits. [F-11](../testing/bring-up-record.md#findings)
+measured the SD block write at 2.7 ms mean and **30 ms worst case, on two different boards,
+in two of five sessions** — that is a healthy card's internal housekeeping, not a fault, and
+it does not go away because recent runs were clean. The sensor loop and the watchdog feed
+share what is left. A period shorter than this guard does not fail loudly; it makes that
+packet late, which reaches the official ground stations as jitter on a line scored for
+consistency.
+
+**The rounding is not cosmetic, and it was not caught by reading.** 363 ms and 280 ms — the
+figures this document carried when it was written — are each inside the guard by a fraction
+of a millisecond, 363.41 and 280.02. The `static_assert`s refused the build, which is the
+entire reason they exist rather than a comment asking somebody to check the arithmetic. The
+periods are 364 and 281.
 
 **The byte figures must be defended, not asserted.** 145 B is the repository's existing
 arithmetic (199 B worst case less 54 B of worst-case tags) and 201 B is that plus the three
@@ -156,7 +163,7 @@ flight — which is also the only signal that a reboot happened.
 
 There is no acknowledgement packet, because the vehicle stops listening in the same breath
 as it answers. The evidence is the telemetry, and it is unambiguous within one period: the
-rate moves to 2.75 or 3.57 Hz, the `MODE`, `FAULTS`, `CAL`, `ARM` and `YR` tags stop
+rate moves to 2.75 or 3.56 Hz, the `MODE`, `FAULTS`, `CAL`, `ARM` and `YR` tags stop
 appearing, and — for the GPS variant — the three `GP-` fields start.
 
 `health_.ground_commands_accepted` still increments, and the SD log still records it.
@@ -167,7 +174,7 @@ appearing, and — for the GPS variant — the three `GP-` fields start.
 |---|---|
 | **Log capacity** | ~30 hours falls to ~15.5 (GPS) or ~12 (lean). Irrelevant to a flight, relevant to a long bench session. |
 | **Average current** | The radio averages 41 mA today and ~75-78 mA at these duties; the steady-state total moves ~130 → ~165 mA. **Peaks do not change** — they are set by coincident TX, SD write and GPS acquisition, not by rate, so the 300 mA analysis in [electrical-architecture.md](electrical-architecture.md) stands unaltered. |
-| **Channel occupancy** | The vehicle transmits ~86-89 % of the time. Acceptable inside a reserved launch slot; antisocial during shared bench testing on `0xF3`, where other teams are listening on the same word. |
+| **Channel occupancy** | The vehicle transmits ~85-89 % of the time. Acceptable inside a reserved launch slot; antisocial during shared bench testing on `0xF3`, where other teams are listening on the same word. |
 | **Diagnosis** | `MODE`/`FAULTS`/`CAL`/`ARM` leave the air in both variants. A fault during a max-rate flight is visible in the log after recovery, not live. |
 | **Format compliance** | Unaffected, and checked: the rulebook's mandated packet is the twelve fields `CAN-Team-XX; P-; Ti-; A-; Pr-; T-; Ro-; Pi-; Ya-; AX-; AY-; AZ-`. The shed tags appear nowhere in it, and `GP-` fields are listed under *Optional Sensor Fields*. |
 
