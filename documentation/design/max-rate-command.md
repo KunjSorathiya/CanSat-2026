@@ -1,6 +1,9 @@
 # Max-rate commands — design
 
-**Status: proposed, 2026-09-10. Nothing in this document is implemented.**
+**Status: implemented on the host, 2026-09-10. Never run on hardware.** Every behaviour
+below is covered by the host suites; nothing here has transmitted a packet. The bench
+rows under Gate 8 of the [bring-up record](../testing/bring-up-record.md) are what would
+make it real.
 
 Two ground commands, each a one-way switch that takes the vehicle to a faster packet rate
 — 2.75 or 3.56 Hz, against 1.43 today — and closes the uplink behind itself. They exist

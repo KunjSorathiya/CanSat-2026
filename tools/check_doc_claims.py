@@ -163,6 +163,39 @@ def main() -> int:
     # 199: GPS is logged rather than transmitted, so the three GP- fields are not in the
     # longest packet. 255 is what it becomes when transmit_gps is set.
     checker.check("link profile: 199-byte budget", budget_bytes == 199, str(budget_bytes))
+
+    # ---- the two commanded maximum rates -------------------------------------------
+    # Neither can be undone from the ground, so every figure a document quotes about them
+    # has to come from the constants the firmware compiles rather than from a sentence
+    # somebody scaled by hand. The periods themselves are already held by static_asserts;
+    # what is checked here is that the documents say what the firmware does.
+    max_gps_bytes = constant(profile, "kMaxRatePacketBytesGps")
+    max_lean_bytes = constant(profile, "kMaxRatePacketBytesLean")
+    max_gps_period = constant(profile, "kMaxRatePeriodGpsMs")
+    max_lean_period = constant(profile, "kMaxRatePeriodLeanMs")
+    guard_ms = constant(profile, "kMaxRateGuardMs")
+    modem = ModemConfig(spreading_factor=spreading_factor or 7,
+                        bandwidth_hz=bandwidth or 125000,
+                        coding_rate_denominator=coding_rate or 5)
+    # 1.8 % is the measured correction from bring-up rows 5.2 and 5.3, and the periods are
+    # sized against the measurement rather than the model.
+    max_gps_airtime = time_on_air(max_gps_bytes or 201, modem).time_on_air_ms * 1.018
+    max_lean_airtime = time_on_air(max_lean_bytes or 145, modem).time_on_air_ms * 1.018
+    checker.check("the GPS max-rate period clears its own measured airtime plus the guard",
+                  (max_gps_period or 0) >= max_gps_airtime + (guard_ms or 0),
+                  f"{max_gps_period} vs {max_gps_airtime + (guard_ms or 0):.2f}")
+    checker.check("the lean max-rate period clears its own measured airtime plus the guard",
+                  (max_lean_period or 0) >= max_lean_airtime + (guard_ms or 0),
+                  f"{max_lean_period} vs {max_lean_airtime + (guard_ms or 0):.2f}")
+    # The claim the GPS variant rests on: position on the air costs nothing, because LoRa
+    # quantises the payload into symbol blocks and 201 bytes lands on the same 298 symbols
+    # as 199. If a format change ever breaks that, the variant loses its reason to exist.
+    checker.check("201 bytes still costs exactly what the 199-byte budget costs",
+                  abs(time_on_air(max_gps_bytes or 201, modem).time_on_air_ms -
+                      time_on_air(budget_bytes or 199, modem).time_on_air_ms) < 0.01)
+    checker.check("both commanded periods are faster than normal flight",
+                  (max_lean_period or 0) < (max_gps_period or 0) < (period_ms or 0),
+                  f"{max_lean_period} < {max_gps_period} < {period_ms}")
     checker.check("link profile: sync words 0xF3 / 0xA5",
                   "0xF3" in profile and "0xA5" in profile)
 
@@ -1208,6 +1241,20 @@ def main() -> int:
                   f"{penalty_pts_per_s:.2f}")
     checker.check(f"runbook.md states that {wipeout_s} s of stray transmission costs 25 points",
                   f"in **{wipeout_s} seconds**" in runbook, str(wipeout_s))
+
+    # The commanded rates, in the document an operator reads with the console open. Derived
+    # from the shipped constants, because a runbook that quotes a rate the firmware no
+    # longer has is worse here than anywhere else: these commands cannot be taken back.
+    gps_hz = 1000.0 / float(max_gps_period or 1)
+    lean_hz = 1000.0 / float(max_lean_period or 1)
+    checker.check(f"runbook.md states the GPS rate command as {gps_hz:.2f} Hz",
+                  f"{gps_hz:.2f} Hz" in runbook, f"{gps_hz:.2f}")
+    checker.check(f"runbook.md states the lean rate command as {lean_hz:.2f} Hz",
+                  f"{lean_hz:.2f} Hz" in runbook, f"{lean_hz:.2f}")
+    checker.check(f"runbook.md states the commanded periods {max_gps_period} / {max_lean_period} ms",
+                  f"**{max_gps_period} ms**" in runbook and f"**{max_lean_period} ms**" in runbook)
+    checker.check("runbook.md says the rate commands cannot be undone",
+                  "cannot be undone" in runbook and "power cycle" in runbook)
 
     # Last, and counting itself: the number of claims this script checks is itself a figure
     # the test plan quotes, so adding a check here without updating that row fails here.
