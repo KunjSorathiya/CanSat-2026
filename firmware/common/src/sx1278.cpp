@@ -246,6 +246,13 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
     }
     if (len > 255) len = 255;
 
+    // Half duplex: this transmission takes the part out of RX and clears the flags, so a
+    // frame that arrived and has not been read yet is destroyed rather than queued. Whether
+    // we were listening is therefore the caller's state to have, and restoring it is ours to
+    // do -- on every exit below, including the failures. A caller that has to remember is a
+    // caller that eventually does not, and the symptom is a station that hears one window
+    // and then nothing, with no error anywhere to say so.
+    const bool was_receiving = receiving_;
     receiving_ = false;
     set_mode(MODE_STDBY);
     write_reg(REG_DIO_MAPPING_1, 0x40);  // DIO0 = TxDone
@@ -276,6 +283,7 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
                 ++tx_timeouts_;
                 set_mode(MODE_STDBY);
                 write_reg(REG_IRQ_FLAGS, 0xFF);
+                if (was_receiving) start_receive();
                 return false;
             }
             // Yield between polls. Without this the wait spins at full SPI speed for the
@@ -290,6 +298,7 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
                 ++tx_timeouts_;
                 set_mode(MODE_STDBY);
                 write_reg(REG_IRQ_FLAGS, 0xFF);
+                if (was_receiving) start_receive();
                 return false;
             }
         }
@@ -315,11 +324,13 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
         ++tx_impossibly_fast_;
         write_reg(REG_IRQ_FLAGS, 0xFF);
         set_mode(MODE_STDBY);
+        if (was_receiving) start_receive();
         return false;
     }
 
     write_reg(REG_IRQ_FLAGS, 0xFF);
     set_mode(MODE_STDBY);
+    if (was_receiving) start_receive();
     return true;
 }
 

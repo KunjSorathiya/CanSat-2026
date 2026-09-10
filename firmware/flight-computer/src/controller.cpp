@@ -595,14 +595,19 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
     faults_.clear(FaultCode::telemetry_suppressed);
     packet_number_ = candidate;
 
+    // Before the transmit, and that ordering is load-bearing rather than tidy. The receive
+    // window is the gap between two packets, and transmitting clears the flags of anything
+    // that arrived in it -- so the only moment a command can be read is immediately before
+    // the next transmission ends its window. Polling afterwards reads the window that has
+    // just been wiped, every time.
+    service_ground_commands(mission_ms);
+
     const bool tx_ok = transmit_with_recovery(built->packet, mission_ms);
     if (tx_ok) {
         ++health_.packets_sent;
     } else {
         ++health_.packets_tx_failed;
     }
-
-    service_ground_commands(mission_ms);
 
     if (logger_enabled_) {
         if (logger_.append(builder_.sd_line(*built, state_machine_.state(),
@@ -626,9 +631,16 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
 // LANDED, RECOVERY and FAULT, which is every state in which a log exists that cannot be
 // recreated.
 //
-// Ordering matters: this runs *after* the packet has been transmitted and before the log
-// append, so listening never delays telemetry, and a poll that finds nothing costs one
-// non-blocking call against a 1 Hz budget the radio already fits inside.
+// Ordering matters, and not in the direction it first appears. This runs immediately
+// *before* the packet is transmitted, because the radio is half duplex: the transmit takes
+// the part out of RX and clears the flags, so a command that arrived during the previous
+// gap is destroyed by the next transmission unless it is read first. Polling after the
+// transmit -- which reads better, and which this did until the bug was found -- reads a
+// window that has just been wiped, and the uplink never receives anything at all.
+//
+// The cost is a non-blocking register read before each packet, and, on the one cycle where
+// a command is actually accepted, the erase itself. Both are small against a 700 ms period,
+// and the accepted-command case happens on the ground, in READY, with ARM-0.
 void Controller::service_ground_commands(std::uint64_t mission_ms) {
     if (!config_.allow_ground_commands) return;
     if (state_machine_.state() != MissionState::ready) return;

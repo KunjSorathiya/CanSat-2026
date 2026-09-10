@@ -123,6 +123,12 @@ public:
     bool transmit(const std::string& packet) override {
         if (fail_tx) return false;
         packets.push_back(packet);
+        // The real part is half duplex, and Sx1278::transmit() clears the IRQ register on
+        // its way into TX -- so a frame that arrived and was never read is destroyed by the
+        // next transmission, not queued behind it. A mock that keeps the inbox across a
+        // transmit models a mailbox rather than a radio, and lets a controller that polls
+        // on the wrong side of the transmit pass a suite it could never pass on hardware.
+        inbox.clear();
         return true;
     }
     bool poll_receive(std::string& out) override {

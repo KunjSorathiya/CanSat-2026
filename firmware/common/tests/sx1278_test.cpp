@@ -564,6 +564,53 @@ void test_a_normal_transmit_is_still_accepted() {
 // investigations, and the registers read at the moment of the failure are what separate
 // them. This pins the healthy-bus, still-trying case: the chip is the one we configured,
 // still in LoRa TX, and simply never finished. That points at the PLL, the PA or the rail.
+// A station that listens transmits between listens, and this part is half duplex: MODE_TX
+// leaves it in standby with the flags cleared, so a receiver that is not restored is a
+// receiver that heard exactly one window. Restoring it belongs to the driver rather than to
+// every caller -- the flight radio was the caller that forgot, and its uplink went deaf
+// after the first telemetry packet while every test above this line passed.
+void test_a_transmit_resumes_the_receiver_it_interrupted() {
+    FakeRadio radio;
+    radio.dio0_delay_ms = 330;
+    cansat::Sx1278 sx;
+    CHECK(sx.begin(make_hal(radio), cansat::Sx1278Settings{}));
+
+    sx.start_receive();
+    const std::uint8_t payload[206] = {};
+    CHECK(sx.transmit(payload, sizeof(payload)));
+    CHECK((radio.mode_history.back() & 0x07) == 0x05);   // back in continuous RX
+
+    // And it receives afterwards, which is the property the mode register is only evidence
+    // for. A command arriving in the window between two telemetry packets must be readable.
+    const char* command = "CAN-Team-25; CMD-ERASE_LOG; PN-42; KEY-3f9a1c04b7e25d68;";
+    const std::uint8_t len = static_cast<std::uint8_t>(std::strlen(command));
+    std::memcpy(radio.fifo, command, len);
+    radio.reg[0x10] = 0x00;   // FIFO_RX_CURRENT_ADDR
+    radio.reg[0x13] = len;    // RX_NB_BYTES
+    radio.reg[0x12] = 0x40;   // IRQ: RxDone
+    std::uint8_t out[256] = {};
+    CHECK(sx.poll_receive(out, sizeof(out)) == len);
+
+    // A failed transmit must resume it too. This is the case that would have hidden the
+    // fault the longest: one bad packet, and a vehicle that never hears the ground again.
+    FakeRadio deaf;
+    cansat::Sx1278 sx2;
+    CHECK(sx2.begin(make_hal(deaf), cansat::Sx1278Settings{}));
+    sx2.start_receive();
+    deaf.dio0 = false;   // TxDone never arrives
+    CHECK(!sx2.transmit(payload, sizeof(payload), 50));
+    CHECK((deaf.mode_history.back() & 0x07) == 0x05);
+
+    // And a station that was NOT listening stays in standby. A transmit-only vehicle --
+    // which is what a flight build is -- must not be switched into RX by transmitting.
+    FakeRadio quiet;
+    quiet.dio0_delay_ms = 330;
+    cansat::Sx1278 tx_only;
+    CHECK(tx_only.begin(make_hal(quiet), cansat::Sx1278Settings{}));
+    CHECK(tx_only.transmit(payload, sizeof(payload)));
+    CHECK((quiet.mode_history.back() & 0x07) == 0x01);   // standby
+}
+
 void test_a_timeout_captures_the_registers_that_name_the_fault() {
     FakeRadio radio;   // DIO0 never asserts
     cansat::Sx1278 sx;
@@ -632,6 +679,7 @@ int main() {
     test_probe_version_reads_the_bus_rather_than_a_cached_value();
     test_a_transmit_that_finishes_faster_than_its_airtime_is_refused();
     test_a_normal_transmit_is_still_accepted();
+    test_a_transmit_resumes_the_receiver_it_interrupted();
     test_a_timeout_captures_the_registers_that_name_the_fault();
     test_a_module_that_resets_mid_transmit_is_visible_in_op_mode();
     test_a_broken_bus_at_the_failure_shows_in_the_version();

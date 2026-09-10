@@ -94,6 +94,10 @@ bool PicoRadio::poll_receive(std::string& out) {
     // The first poll is what turns the receiver on, and only the controller's gate can
     // reach this function -- so a vehicle with allow_ground_commands false never enters
     // RX at all, and its radio behaves exactly as it did before any of this existed.
+    //
+    // It stays on across telemetry: Sx1278::transmit() restores the receiver it interrupted,
+    // so this arms once rather than after every packet. It did not always, and a driver that
+    // needed re-arming from here was a vehicle that heard one window and then nothing.
     if (!listening_) {
         listening_ = true;
         radio_.start_receive();
