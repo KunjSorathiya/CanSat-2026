@@ -145,6 +145,13 @@ int main() {
             // mean two places to get it wrong.
             int host_byte;
             while ((host_byte = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) {
+                // Fed here as well as at the top of the outer loop. This loop drains
+                // everything the host has queued, so it can relay several frames without
+                // returning -- and each relay can spend up to the transmit timeout. Two of
+                // those against a radio that is not completing is longer than the watchdog,
+                // and the bridge would reboot in the middle of the operator's command
+                // rather than because anything had hung.
+                watchdog_update();
                 std::string command;
                 switch (uplink.feed(static_cast<char>(host_byte), command)) {
                     case ground::FrameReader::Status::ok: {

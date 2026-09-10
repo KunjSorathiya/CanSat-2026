@@ -40,8 +40,11 @@ flight::Configuration make_config() {
     // validate_config() reject only the rulebook's "CAN-Team-XX" example, so a
     // wrong-but-well-formed number here would never be caught by anything.
     config.team_id = "CAN-Team-25";
-    // 1 Hz: the fastest the default SF7/125 kHz modem sustains with margin. See
-    // documentation/design/link-budget.md before raising this.
+    // 700 ms -- 1.43 Hz. The 50 % duty cap puts the floor at 647 ms for the 199-byte
+    // worst-case packet this build transmits, and 700 ms takes it with margin at 46 %
+    // duty. It is not a free parameter: transmit_gps, the packet budget and this period
+    // move together, and validate_config() refuses a combination where they disagree. See
+    // documentation/design/link-budget.md before changing any of them.
     config.telemetry_period_ms = cansat::link::kTelemetryPeriodMs;
     config.radio_mode = flight::RadioMode::test;  // switch to ::official for launch
     return config;
