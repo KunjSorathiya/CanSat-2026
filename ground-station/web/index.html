@@ -500,7 +500,7 @@ input[type=file] { display: none; }
             title="Erase the vehicle's onboard log, equivalent to prepare_sd_card.py. Serial link only, and the vehicle obeys only in READY with ARM-0">Erase SD log</button>
 
     <button class="hbtn" id="maxrate-btn" disabled
-            title="Switch to the fastest telemetry schedule: about 3.13 packets a second, with GPS and sound on the air once a second. IRREVERSIBLE until power-off: the vehicle stops accepting commands the moment it takes effect">Max rate</button>
+            title="Switch to the fastest telemetry schedule: about 3.13 packets a second, with GPS and sound on the air once a second. Only during the five-minute command window after power-on. IRREVERSIBLE until power-off: the vehicle stops accepting commands, recalibrates and arms">Max rate</button>
 
     <button class="hbtn" id="pause-btn" aria-pressed="false" title="Freeze the display; packets keep arriving and are buffered">
       <svg width="14" height="14" aria-hidden="true"><use href="#i-pause" id="pause-icon"/></svg><span id="pause-label">Pause</span>
@@ -535,6 +535,7 @@ input[type=file] { display: none; }
           <dt>Packet</dt><dd id="kv-packet">&mdash;</dd>
           <dt>Calibration</dt><dd id="kv-cal">&mdash;</dd>
           <dt>Armed</dt><dd id="kv-arm">&mdash;</dd>
+          <dt title="Estimated from the vehicle clock: the window opens at power-on and lasts five minutes">Command window</dt><dd id="kv-uplink">&mdash;</dd>
           <dt>Active faults</dt><dd id="kv-faults">&mdash;</dd>
           <dt>Sync word</dt><dd id="kv-sync">&mdash;</dd>
         </dl>
@@ -1087,6 +1088,33 @@ function formatCommand(teamId, command, password, packetNumber) {
   if (!password || !command) return "";
   return teamId + "; CMD-" + command + "; PN-" + packetNumber + "; KEY-" +
          commandToken(password, command, packetNumber) + ";";
+}
+
+// The vehicle's pre-arm command window, as the console can infer it. The vehicle no longer
+// transmits whether it is armed, so this is derived from the mission clock in every packet
+// against the window the firmware opens at power-on (Configuration::command_window_ms --
+// tools/check_doc_claims.py holds the two to one value). It is an estimate and says so: a
+// command that was sent is not proof it was accepted, and a watchdog reset skips the window
+// on the vehicle while the console, seeing the clock restart, would count it afresh.
+const COMMAND_WINDOW_MS = 300000;
+// After the window closes the vehicle recalibrates -- about 2.7 s of stillness -- and then
+// waits the 3 s arming delay. Six seconds is the estimate; a vehicle being handled takes longer.
+const ARMING_ESTIMATE_MS = 6000;
+
+function commandWindowView(timestampMs, closedAtMs) {
+  if (!Number.isFinite(timestampMs)) return { state: "unknown", text: "—" };
+  const early = Number.isFinite(closedAtMs);
+  const closeAt = early ? closedAtMs : COMMAND_WINDOW_MS;
+  if (timestampMs < closeAt) {
+    const left = Math.ceil((COMMAND_WINDOW_MS - timestampMs) / 1000);
+    return { state: "open",
+             text: "open · " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") + " left" };
+  }
+  const how = early ? "closed by Max rate" : "closed";
+  if (timestampMs < closeAt + ARMING_ESTIMATE_MS) {
+    return { state: "arming", text: how + " · recalibrating (est.)" };
+  }
+  return { state: "armed", text: how + " · should be armed (est.)" };
 }
 
 // PORTABLE-CORE:END
@@ -2511,6 +2539,14 @@ function render(force) {
   } else setStat(armEl, "—", "", "");
   const fc = latest && latest.fault_count !== undefined && latest.fault_count !== null
     ? latest.fault_count : null;
+  // The command window, from the vehicle clock. The Max rate button is only useful while it
+  // is open, so it greys out when the clock says the window has closed.
+  const wv = commandWindowView(latest ? latest.timestamp_ms : NaN, maxRateSentAtMs);
+  setStat($("#kv-uplink"), wv.text,
+          wv.state === "open" ? "warnv" : wv.state === "armed" ? "goodv" : "",
+          wv.state === "open" ? "i-warn" : wv.state === "armed" ? "i-check" : "");
+  const mrBtn = $("#maxrate-btn");
+  if (mrBtn) mrBtn.disabled = !(serialPort && serialPort.writable) || wv.state !== "open";
   setStat($("#kv-faults"), fc === null ? "—" : fc, fc ? "critv" : "", fc ? "i-warn" : "");
 
   /* ---- tiles ---- */
@@ -2745,11 +2781,15 @@ const COMMANDS = {
       "Switch to the fastest telemetry schedule: about 3.13 packets a second, with the GPS " +
       "position and the sound level on the air once a second." +
       "\n\nTHIS CANNOT BE UNDONE. The vehicle stops accepting commands the moment it takes " +
-      "effect, and only a power cycle restores it." +
+      "effect, recalibrates where it sits, and arms a few seconds later. Only a power " +
+      "cycle restores it." +
       "\n\nThe mandatory fields are unchanged and always first." +
       "\n\nThe vehicle refuses unless it is in READY with ARM-0.",
   },
 };
+
+// Mission time at which this console sent MAX_RATE, for the window estimate. Null until then.
+let maxRateSentAtMs = null;
 
 async function sendVehicleCommand(kind) {
   const spec = COMMANDS[kind];
@@ -2783,6 +2823,7 @@ async function sendVehicleCommand(kind) {
   // The password is never shown and never stored. What goes in the monitor is the frame
   // that went on the air, which carries only the digest.
   pushRow({ n: null, cls: "warn", tag: "tx", text: command, note: spec.note });
+  if (kind === "MAX_RATE") maxRateSentAtMs = pn !== undefined && latest ? latest.timestamp_ms : null;
   toast("Command sent against P-" + pn + " — a wrong password is refused silently by the vehicle");
 }
 $("#erase-btn").addEventListener("click", () => { sendVehicleCommand("ERASE_LOG"); });

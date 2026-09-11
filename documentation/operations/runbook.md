@@ -448,10 +448,11 @@ in two of five sessions on two different boards), plus the sensor loop and the w
 A slot inside that guard does not fail loudly — it makes packets late, which the official
 ground stations see as jitter on a line that scores consistency.
 
-**How to send it.** The vehicle must be in `READY` with `ARM-0` and built with
-`allow_ground_commands` — the same window as the erase. The button asks for the vehicle
-password and shows the packet number it binds the command to; the password is never
-transmitted. Then:
+**How to send it.** The vehicle listens only during its **command window** — the first five
+minutes after a clean power-on, on a build with the uplink (see below). The console's Mission
+panel counts the window down from the vehicle's own clock and greys the button out once it
+has closed. The button asks for the vehicle password and shows the packet number it binds the
+command to; the password is never transmitted. Then:
 
 1. `#tx=ok` from the bridge means the frame reached the air. **It does not mean the vehicle
    acted** — confirm on the station's rate, which moves within one cycle.
@@ -461,6 +462,28 @@ transmitted. Then:
    without the uplink. Read its startup summary over USB — the state line says
    `rate COMMANDED MAX - uplink closed` once it is latched, and the `uplink` line says how many
    commands it has accepted and refused.
+
+### The command window, and why the drone waits for it
+
+On a build with the uplink, power-on opens a **five-minute command window**. During it the
+vehicle transmits at 1.43 Hz, listens for commands, and **does not arm**. The window closes
+when `MAX_RATE` is accepted or when five minutes have passed, whichever comes first. The
+vehicle then discards the calibration it took at power-on, recalibrates where it now sits, and
+arms — about six seconds later if it is still.
+
+1. Power the vehicle on the pad and leave it still.
+2. Within five minutes, press **Max rate** if the flight is to use it. The window closes at once.
+3. **Do not lift off until the window has closed and the vehicle has armed.** The console's
+   *Command window* row reads "should be armed (est.)" when it has. A launch inside the window
+   is not detected: launch, apogee and landing detection all need the vehicle armed.
+4. A watchdog reset skips the window. The vehicle closes its uplink at once and arms, so a reset
+   in flight never leaves it deaf to its own descent.
+
+**The uplink needs a password file, and the build refuses a bad one.** Copy
+`firmware/flight-computer/include/flight/local_secrets.example.hpp` to `local_secrets.hpp` beside
+it and set your own password — eight characters or more, not `SET-ME` or `change-me`, which the
+build refuses to compile. The file is gitignored and never reaches the repository. **A build
+without it has no uplink and no window, and arms three seconds after power-on as it always has.**
 
 ### What gets written
 

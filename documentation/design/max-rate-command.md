@@ -1,18 +1,18 @@
 # Telemetry cadence and the max-rate command — design
 
-**Status: revised and approved 2026-09-11, and implemented on the host the same day. Never
-run on hardware.** This replaces the 2026-09-10 design of two max-rate commands. The packet
+**Status: revised and approved 2026-09-11 and implemented the same day. `MAX_RATE` has been
+measured on the bench at 3.11 Hz; the command window has not yet been measured.** This replaces the 2026-09-10 design of two max-rate commands. The packet
 widths were corrected by measurement the same day — see [where the numbers come
 from](#where-the-numbers-come-from). The bench rows under Gate 8 of the [bring-up
 record](../testing/bring-up-record.md) are what would make any of it real.
 
-> [!WARNING]
-> **Open at the time of writing.** On the bench, a build of the previous design raised the
-> rate and then fell back to exactly 1.43 Hz, with packet numbers still climbing — so the
-> vehicle did not reset. Nothing in the firmware can restore the configured period without a
-> reset, which makes "the vehicle never latched and the rise was a link artefact" the leading
-> explanation. An instrumented build that prints the uplink's accepted/refused counters was
-> built on 2026-09-11 and is waiting for a bench capture. **This design uses the same latch.**
+> [!NOTE]
+> **Resolved on the bench, 2026-09-11.** The fallback to 1.43 Hz an earlier build showed was a
+> command that never latched: the vehicle calibrated and armed about three seconds after
+> power-on, and the old command window — READY with `ARM-0` — closed with it. With arming held
+> off, `MAX_RATE` was accepted (`commands accepted 1`), the summary read `COMMANDED MAX` for the
+> rest of the run, and the station measured **3.11 Hz with 1 packet in 544 lost**. That is what
+> led to the [five-minute command window](#the-command-window).
 
 ---
 
@@ -23,6 +23,7 @@ record](../testing/bring-up-record.md) are what would make any of it real.
 - [Normal flight](#normal-flight)
 - [The max-rate command](#the-max-rate-command)
 - [Where the numbers come from](#where-the-numbers-come-from)
+- [The command window](#the-command-window)
 - [What latches](#what-latches)
 - [What the ground side learns](#what-the-ground-side-learns)
 - [Validation](#validation)
@@ -87,8 +88,8 @@ every packet has to carry one — alternating rich and lean would put the sensor
 ## The max-rate command
 
 One command, `MAX_RATE`, replacing the two of the previous design. The same envelope, the same
-token scheme, the same window (READY, `ARM-0`, a build with `allow_ground_commands`), and the
-same replay rules:
+token scheme and the same replay rules, accepted only during the pre-arm [command
+window](#the-command-window):
 
 ```text
 CAN-Team-25; CMD-MAX_RATE; PN-1234; KEY-<16 hex>;
@@ -154,6 +155,29 @@ and the rate from 3.17 to 3.13 Hz.
 `static_assert`s in `link_profile.hpp` refuse a build where any slot is inside its own
 airtime plus the guard, where the max-rate cycle exceeds 1000 ms, where a fourth lean slot
 would still fit, or where either shape exceeds the FIFO.
+
+## The command window
+
+The old window was READY with `ARM-0`, and on a desk the vehicle calibrates and arms about three
+seconds after power-on. That closed the window before an operator could use it — which is what
+the bench fallback turned out to be. The window is now its own phase:
+
+1. **A clean power-on opens it**, on a build with the uplink. It lasts `command_window_ms`, five
+   minutes. The vehicle transmits, listens, calibrates once for a working height reference, and
+   **does not arm**.
+2. **An accepted `MAX_RATE` or the timeout closes it**, whichever is first. An erase does not.
+3. **Closing it discards the power-on calibration.** The vehicle recalibrates where it now sits
+   — on the pad, after the operator has finished with it — and arms when that settles and the
+   3 s arming delay, counted from the close, has run.
+4. **A watchdog reset skips it.** A reset may come mid-flight, and five minutes unarmed and
+   listening would be five minutes without launch or landing detection.
+5. **A build without `local_secrets.hpp` has no uplink and no window**, and arms three seconds
+   after power-on exactly as before. The password lives in that gitignored file; the build
+   refuses `SET-ME`, `change-me` and anything under eight characters.
+
+**The operator cannot see arming directly** — the `ARM` tag is off the air. The console infers
+the window from the mission clock in every packet and labels it an estimate. **A launch inside
+the window is not detected**, so the drone waits for the vehicle to arm.
 
 ## What latches
 
@@ -253,8 +277,12 @@ a power cycle restores 1.43 Hz.
   ruling now makes costly.
 - **A slot per packet shape, not one period.** A rich packet needs 385 ms and a lean one 286;
   one period sized for the rich packet would waste 99 ms on every lean one.
-- **Ground-only window, RAM latch, token bound to the command.** Unchanged from the previous
-  design, for the same reasons.
+- **A pre-arm command window, not one gated on `ARM-0`.** Arming three seconds after power-on
+  closed the old window before anyone could use it. Five minutes of listening, then
+  recalibration and arming, is a window an operator can actually use — and a launch inside it
+  is not detected, which the runbook says in bold.
+- **RAM latch, token bound to the command.** Unchanged from the previous design, for the same
+  reasons.
 
 ## Out of scope
 

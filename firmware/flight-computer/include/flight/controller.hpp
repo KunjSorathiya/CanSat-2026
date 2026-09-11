@@ -72,6 +72,12 @@ private:
     // the next packet fills. Slot 0 is the rich one.
     bool max_rate_ = false;
     std::uint32_t max_rate_slot_ = 0;
+    // The pre-arm command window: open from a clean power-on on a build with the uplink,
+    // closed by MAX_RATE or its timeout, and never reopened. Closing it discards the
+    // power-on calibration so the vehicle recalibrates where it now sits.
+    bool window_open_ = false;
+    std::uint64_t window_closed_ms_ = 0;
+    void close_command_window(std::uint64_t mission_ms);
     // Highest packet number a ground command has been accepted against. A token is
     // valid for exactly one packet number, so this makes every command single-use.
     std::uint32_t last_command_pn_ = 0;

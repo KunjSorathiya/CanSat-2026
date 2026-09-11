@@ -8,6 +8,51 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-11 (cycle 49)
+
+The first bench run of the new schedule, what it found, and the pre-arm command window it
+led to.
+
+### Measured — `MAX_RATE` holds at 3.11 Hz
+
+With arming held off by hand, `MAX_RATE` was accepted (`commands accepted 1`), the vehicle's
+summary read `COMMANDED MAX` in every block for the rest of the run, and the station measured
+**3.11 Hz** against a predicted 3.13, with 1 packet in 544 lost at bench range. No reset. The
+latch holds. Bring-up rows 8.17 and 8.18 carry the numbers and their verdicts.
+
+### Found — the old fallback was a command that never latched
+
+The earlier build that "fell back to 1.43 Hz" never latched. The command window was READY with
+`ARM-0`, and a still vehicle calibrates and arms about three seconds after power-on — so the
+window closed before anyone could use it, and a press after that was simply not heard.
+
+### Added — a five-minute pre-arm command window
+
+A clean power-on on a build with the uplink now opens a five-minute window: the vehicle
+transmits and listens and **does not arm**. `MAX_RATE` or the timeout closes it; the vehicle
+then discards its power-on calibration, recalibrates where it sits on the pad, and arms. A
+watchdog reset skips the window, because a reset in flight must not leave the vehicle unarmed
+for five minutes. **A launch inside the window is not detected**, and the runbook says so.
+
+The console counts the window down from the vehicle clock — the `ARM` tag is off the air, so it
+is an estimate and is labelled one — and greys out **Max rate** once the window has closed. A
+claim check holds the console's window length to the firmware's.
+
+### Changed — the password leaves the repository
+
+The uplink is now part of a flight build, so the password cannot be `change-me`. It lives in a
+gitignored `local_secrets.hpp`; the build refuses a placeholder or anything under eight
+characters, and **without the file the build has no uplink at all** — no window, arming three
+seconds after power-on as before. The bench-only flags that used to sit uncommitted in
+`main.cpp` are gone.
+
+### Fixed — the summary quoted a slot, not a rate
+
+After `MAX_RATE` the summary printed whichever slot it landed in — "385 ms (2.60 Hz)", then
+"286 ms (3.50 Hz)". It now prints the pattern and its real rate.
+
+---
+
 ## [Unreleased] — 2026-09-11 (cycle 48)
 
 The organizers ruled that only transmitted telemetry earns extra-sensor points, and the

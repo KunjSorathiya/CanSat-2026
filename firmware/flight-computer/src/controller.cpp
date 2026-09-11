@@ -56,6 +56,12 @@ void Controller::set_boot_cause(bool from_watchdog) {
 
 bool Controller::initialize() {
     board_.set_status_led(true);
+    // The pre-arm command window opens here, and only on a clean power-on. A watchdog reset
+    // may have happened mid-flight, and five minutes unarmed and listening would then be five
+    // minutes with no launch or landing detection -- so a reset closes the uplink instead.
+    window_open_ = config_.allow_ground_commands && !watchdog_reboot_;
+    window_closed_ms_ = 0;
+    if (config_.allow_ground_commands && watchdog_reboot_) uplink_closed_ = true;
     if (watchdog_reboot_) {
         // Previous run hung or browned out. Telemetry restarts automatically below;
         // record it so the ground station can see the recovery.
@@ -144,6 +150,9 @@ void Controller::poll(std::uint64_t now_ms) {
         acquire_sensors(mission_ms);
     }
 
+    if (window_open_ && mission_ms >= config_.command_window_ms) {
+        close_command_window(mission_ms);
+    }
     run_calibration(mission_ms);
     feed_state_machine(mission_ms);
 
@@ -514,9 +523,24 @@ void Controller::run_calibration(std::uint64_t mission_ms) {
 }
 
 bool Controller::is_armed(std::uint64_t mission_ms) const {
-    return operational_ && snapshot_.imu_valid && snapshot_.baro_valid &&
-           mission_ms >= config_.arming_delay_ms &&
+    // Never while the command window is open, and the arming delay runs from when it closed
+    // -- zero on a build without the uplink, so that build arms exactly as it always has.
+    return operational_ && snapshot_.imu_valid && snapshot_.baro_valid && !window_open_ &&
+           mission_ms >= window_closed_ms_ + config_.arming_delay_ms &&
            (!config_.require_calibration_to_arm || calibrator_.settled());
+}
+
+// Closes the window, once. The uplink closes with it, and the power-on calibration is thrown
+// away: it gave the window a working altitude reference, but the reference the vehicle flies
+// on should be taken where it sits now, on the pad, after the operator has finished with it.
+// Arming follows when the new calibration settles and the arming delay has run.
+void Controller::close_command_window(std::uint64_t mission_ms) {
+    if (!window_open_) return;
+    window_open_ = false;
+    window_closed_ms_ = mission_ms;
+    uplink_closed_ = true;
+    calibrator_.reset();
+    calibration_applied_ = false;
 }
 
 void Controller::feed_state_machine(std::uint64_t mission_ms) {
@@ -714,6 +738,7 @@ void Controller::service_ground_commands(std::uint64_t mission_ms) {
             last_command_pn_ = command_pn;
             ++health_.ground_commands_accepted;
             engage_max_rate();
+            close_command_window(mission_ms);
             break;
         }
         case cansat::CommandKind::none:
@@ -814,6 +839,11 @@ void Controller::refresh_health(std::uint64_t mission_ms) {
     health_.calibrated = calibrator_.complete();
     health_.calibration_settled = calibrator_.settled();
     health_.armed = is_armed(mission_ms);
+    health_.command_window_open = window_open_;
+    health_.command_window_left_ms =
+        (window_open_ && mission_ms < config_.command_window_ms)
+            ? static_cast<std::uint32_t>(config_.command_window_ms - mission_ms)
+            : 0;
     health_.watchdog_reboot = watchdog_reboot_;
     for (int i = 0; i < 3; ++i) health_.gyro_bias_dps[i] = gyro_bias_dps_[i];
     health_.ground_pressure_pa = calibrator_.result().ground_pressure_pa;

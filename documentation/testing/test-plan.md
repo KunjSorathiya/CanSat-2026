@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 127 suites across the whole flight core | ✅ **4371 / 4371 assertions** |
+| `flight_tests` | 134 suites across the whole flight core | ✅ **4411 / 4411 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **139 / 139 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -105,8 +105,8 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Python ground station | 8 modules | ✅ **141 / 141 tests** |
 | Python tooling | `tools/link_budget.py`, and `tools/cad_dimensions.py` — the STEP reader the mechanical documents take their dimensions from, tested against hand-built STEP files with known extents, the trailing-dot real literal that first defeated it, a circle bulging past every vertex, and the two files it must refuse rather than under-measure | ✅ **49 / 49 tests** |
 | Python simulations | `simulations/descent.py` — canopy sizing, the closed-form fall against both of its own limits, ISA air density, and the mass-tolerance argument | ✅ **40 / 40 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **289 / 289 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **66 / 66 tests** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **290 / 290 claims** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **68 / 68 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 127 suites, 4371 assertions
+### `flight_tests` — 134 suites, 4411 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -232,9 +232,16 @@ flowchart LR
 | `test_every_normal_flight_packet_is_rich` | In normal flight every packet after the first second carries `GP-` and `SN-`, and none carries a diagnostic tag |
 | `test_max_rate_closes_the_uplink_behind_it` | With a command on the air throughout, exactly one is accepted and the radio is never polled again |
 | `test_no_command_is_heard_after_max_rate` | After the latch an erase command is not refused but unheard: nothing is accepted and nothing is erased |
-| `test_an_armed_vehicle_refuses_to_change_rate` | The rate commands obey the same READY-with-`ARM-0` window as the erase |
+| `test_a_vehicle_past_its_command_window_refuses_to_change_rate` | After the window closes by timeout a `MAX_RATE` is not heard: nothing is accepted and the schedule does not move |
 | `test_a_max_rate_command_obeys_the_replay_rules` | A token minted for a packet number the vehicle has not reached changes nothing and is counted as ignored |
 | `test_a_flight_build_cannot_be_commanded_to_max_rate` | With `allow_ground_commands` false neither rate command exists: the radio is never polled and the period never moves |
+| `test_the_vehicle_does_not_arm_while_its_command_window_is_open` | Still on a desk the vehicle calibrates in about three seconds but does not arm for the whole window; the power-on calibration still runs, giving the window a height above the pad |
+| `test_the_window_times_out_then_the_vehicle_recalibrates_and_arms` | At the timeout the uplink closes and the power-on calibration is discarded; arming waits for the new one and for the arming delay counted from the close |
+| `test_max_rate_closes_the_window_early_and_the_vehicle_arms_soon_after` | `MAX_RATE` closes the window at once, and the vehicle arms seconds later rather than five minutes later |
+| `test_an_erase_does_not_close_the_command_window` | Only `MAX_RATE` closes the window early; an erase leaves it open |
+| `test_a_watchdog_reset_skips_the_command_window` | A vehicle restarting from the watchdog never opens the window and never polls the radio, so a reset in flight does not leave it unarmed |
+| `test_a_build_without_the_uplink_arms_as_it_always_has` | With no uplink there is no window, and the vehicle arms three seconds after power-on as before |
+| `test_a_command_window_must_have_a_length` | `validate_config()` refuses a zero or unbounded window when the uplink is on, and ignores the length when it is off |
 | `test_a_flight_build_has_no_uplink_at_all` | `allow_ground_commands` defaults to false, and with it false the radio's receive is **never polled** — this is the test the README's "there is no command uplink" rests on |
 | `test_a_task_can_be_rescheduled_from_the_packet_it_just_sent` | `reschedule()` sets the next due time from the fire time of the packet just sent and the slot its shape needs — 385 ms after a rich packet, 286 after a lean one — which `due()` alone cannot, since it advances by the period it held when it fired |
 | `test_the_sound_level_goes_on_the_air_after_the_position` | `SN-` follows every mandatory field and the position; a microphone with no valid window puts nothing on the air, and `transmit_sound` false keeps it off |
@@ -243,7 +250,7 @@ flowchart LR
 | `test_the_commanded_rate_periods_clear_their_own_airtime` | Both commanded periods clear their own measured airtime plus the SD guard, 201 B costs exactly what 199 B costs, and the published rates cannot move without this failing |
 | `test_a_token_authorises_one_command_and_not_another` | A token minted for one command is refused for every other, in both directions, and an unknown command name is refused rather than matched to the nearest known one |
 | `test_the_bench_build_erases_the_log_on_command` | Enabled, in `READY` with `ARM-0`, a valid command erases the log |
-| `test_an_armed_vehicle_refuses_to_erase` | `ARM-1` closes the window, and the test asserts the vehicle actually reached `READY` first so it cannot pass for the wrong reason. Everything from arming to recovery holds a log that cannot be recreated |
+| `test_a_vehicle_past_its_command_window_refuses_to_erase` | After the window closes an erase is not heard, and the test asserts the vehicle reached `READY` so it cannot pass for the wrong reason |
 | `test_another_teams_command_erases_nothing` | A command naming another team is seen, counted as ignored, and erases nothing — `0xF3` is shared by every team in the competition |
 | `test_a_refused_erase_is_reported_rather_than_swallowed` | A logger that cannot erase raises `sd_write`; an operator who pressed the button can tell "erased" from "declined" |
 | `test_listening_never_costs_a_packet` | Identical runs with the uplink off and on transmit the same number of packets. The mandatory 1 Hz downlink may not pay for a bench feature |

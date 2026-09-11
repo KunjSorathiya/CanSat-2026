@@ -1260,6 +1260,17 @@ def main() -> int:
     checker.check(f"runbook.md states the slots {rich_slot} / {lean_slot} ms and the {cycle_ms} ms cycle",
                   f"**{rich_slot} ms**" in runbook and f"**{lean_slot} ms**" in runbook
                   and f"**{cycle_ms} ms**" in runbook)
+    # The console's command-window countdown is an estimate from the vehicle clock against
+    # the window the firmware opens at power-on. If the two numbers drift apart the countdown
+    # says "open" on a vehicle that has stopped listening, so they are held to one number.
+    fw_window = re.search(r"command_window_ms = (\d+);",
+                          read("firmware/flight-computer/include/flight/config.hpp"))
+    js_window = re.search(r"const COMMAND_WINDOW_MS = (\d+);",
+                          read("ground-station/web/index.html"))
+    checker.check("the console's command window is the firmware's",
+                  bool(fw_window and js_window and fw_window.group(1) == js_window.group(1)),
+                  f"{fw_window.group(1) if fw_window else None} vs "
+                  f"{js_window.group(1) if js_window else None}")
     checker.check("runbook.md says the rate commands cannot be undone",
                   "cannot be undone" in runbook and "power cycle" in runbook)
 

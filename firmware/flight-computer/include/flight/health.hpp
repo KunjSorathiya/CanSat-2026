@@ -21,6 +21,10 @@ struct HealthSnapshot {
     // commanded rate with the uplink closed, and only a power cycle undoes it. On a flight
     // log this is the difference between "the rate changed" and "the vehicle rebooted".
     bool rate_maxed = false;
+    // The pre-arm command window, and how long it has left. While it is open the vehicle
+    // listens and does not arm; the startup summary prints the countdown.
+    bool command_window_open = false;
+    std::uint32_t command_window_left_ms = 0;
     std::uint32_t packets_suppressed = 0;
     std::uint32_t packets_tx_failed = 0;
     std::uint32_t fault_total = 0;

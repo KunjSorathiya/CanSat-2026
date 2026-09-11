@@ -2,6 +2,15 @@
 #include "flight/controller.hpp"
 #include "flight/pico/pico_hal.hpp"
 
+// The ground-command password lives in a gitignored header and never in the repository.
+// Without it this build has no uplink at all -- no command window, and calibration and arming
+// straight after power-on, exactly as before the window existed. Copy
+// flight/local_secrets.example.hpp to flight/local_secrets.hpp and set a password to enable it.
+#if __has_include("flight/local_secrets.hpp")
+#include "flight/local_secrets.hpp"
+#define CANSAT_HAVE_LOCAL_SECRETS 1
+#endif
+
 #ifdef PICO_BUILD
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
@@ -14,6 +23,19 @@
 #include <cstdio>
 
 namespace {
+
+#ifdef CANSAT_HAVE_LOCAL_SECRETS
+constexpr bool same_text(const char* a, const char* b) {
+    return *a == *b && (*a == '\0' || same_text(a + 1, b + 1));
+}
+constexpr std::size_t text_length(const char* a) { return *a == '\0' ? 0 : 1 + text_length(a + 1); }
+// A flight build with the uplink must not carry a password anyone who has read the repository
+// knows. Refused at compile time, so it cannot be discovered on the pad.
+static_assert(!same_text(cansat_local::kCommandPassword, "SET-ME") &&
+                  !same_text(cansat_local::kCommandPassword, "change-me") &&
+                  text_length(cansat_local::kCommandPassword) >= 8,
+              "set your own ground-command password (8+ characters) in flight/local_secrets.hpp");
+#endif
 
 std::uint64_t now_ms() {
 #ifdef PICO_BUILD
@@ -47,6 +69,13 @@ flight::Configuration make_config() {
     // documentation/design/link-budget.md before changing any of them.
     config.telemetry_period_ms = cansat::link::kTelemetryPeriodMs;
     config.radio_mode = flight::RadioMode::test;  // switch to ::official for launch
+#ifdef CANSAT_HAVE_LOCAL_SECRETS
+    // The uplink, and with it the pre-arm command window: five minutes from power-on to send
+    // MAX_RATE, after which the vehicle recalibrates on the pad and arms. The drone must not
+    // lift off until it has -- a launch inside the window is not detected.
+    config.allow_ground_commands = true;
+    config.command_password = cansat_local::kCommandPassword;
+#endif
     return config;
 }
 
@@ -86,12 +115,25 @@ void print_startup_summary(const flight::Configuration& config,
     // quoting it would answer the question this line exists for with the one number that
     // has since become wrong.
     const std::uint32_t period_ms = controller.telemetry_period_ms();
-    std::printf(" team %s | radio %s | telemetry every %lu ms (%.2f Hz)\n",
-                config.team_id.c_str(),
-                config.radio_mode == flight::RadioMode::official ? "OFFICIAL 0xA5"
-                                                                 : "TEST 0xF3",
-                static_cast<unsigned long>(period_ms),
-                period_ms == 0 ? 0.0 : 1000.0 / static_cast<double>(period_ms));
+    if (controller.health().rate_maxed) {
+        // After MAX_RATE the period alternates by slot, so the live period is whichever slot
+        // this print happened to land in. The pattern and its real rate are what matter.
+        std::printf(" team %s | radio %s | telemetry MAX-RATE %lu/%lu/%lu ms (%.2f Hz)\n",
+                    config.team_id.c_str(),
+                    config.radio_mode == flight::RadioMode::official ? "OFFICIAL 0xA5"
+                                                                     : "TEST 0xF3",
+                    static_cast<unsigned long>(cansat::link::kMaxRateRichSlotMs),
+                    static_cast<unsigned long>(cansat::link::kMaxRateLeanSlotMs),
+                    static_cast<unsigned long>(cansat::link::kMaxRateLeanSlotMs),
+                    3000.0 / static_cast<double>(cansat::link::kMaxRateCycleMs));
+    } else {
+        std::printf(" team %s | radio %s | telemetry every %lu ms (%.2f Hz)\n",
+                    config.team_id.c_str(),
+                    config.radio_mode == flight::RadioMode::official ? "OFFICIAL 0xA5"
+                                                                     : "TEST 0xF3",
+                    static_cast<unsigned long>(period_ms),
+                    period_ms == 0 ? 0.0 : 1000.0 / static_cast<double>(period_ms));
+    }
     std::printf(" boot: %s\n\n", h.watchdog_reboot ? "WATCHDOG RESET" : "power-on");
 
     print_row("IMU", "MPU-6500", h.imu_ok ? "OK" : "FAILED",
@@ -127,10 +169,18 @@ void print_startup_summary(const flight::Configuration& config,
     // fixes -- the vehicle never heard the frame, heard it and refused it, or accepted it and
     // then something else happened -- and without these two counters they all look alike.
     if (!config.allow_ground_commands) {
-        std::printf(" uplink    disabled in this build\n");
+        std::printf(" uplink    disabled in this build (no flight/local_secrets.hpp)\n");
+    } else if (h.command_window_open) {
+        const unsigned long left_s = (h.command_window_left_ms + 999) / 1000;
+        std::printf(" uplink    OPEN for %lu:%02lu more -- not arming until it closes"
+                    " | commands accepted %lu, refused %lu\n",
+                    left_s / 60, left_s % 60,
+                    static_cast<unsigned long>(h.ground_commands_accepted),
+                    static_cast<unsigned long>(h.ground_commands_ignored));
     } else {
-        std::printf(" uplink    %s | commands accepted %lu, refused %lu\n",
-                    h.rate_maxed ? "CLOSED" : "listening in READY/ARM-0",
+        std::printf(" uplink    CLOSED%s -- recalibrating, then arming"
+                    " | commands accepted %lu, refused %lu\n",
+                    h.rate_maxed ? " by MAX_RATE" : "",
                     static_cast<unsigned long>(h.ground_commands_accepted),
                     static_cast<unsigned long>(h.ground_commands_ignored));
     }

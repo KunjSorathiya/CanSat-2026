@@ -331,6 +331,13 @@ struct Configuration {
     // press a button, short enough that a frame recorded during an earlier session is
     // useless.
     std::uint32_t command_replay_window = 64;
+    // The pre-arm command window. On a build with ground commands it opens at power-on and
+    // lasts this long: the vehicle listens, and does not arm. An accepted MAX_RATE closes it
+    // early. When it closes, the uplink stays closed for the rest of the power cycle, the
+    // power-on calibration is discarded and redone from where the vehicle now sits, and
+    // arming follows -- so the reference the vehicle flies on is taken on the pad, after the
+    // operator has finished with it. A watchdog reset skips the window: it may be mid-flight.
+    std::uint32_t command_window_ms = 300000;
     std::uint32_t gps_baud = 9600;          // NEO-6M default
     std::uint32_t gps_uart_fifo_bytes = 32; // RP2040 UART FIFO depth
 

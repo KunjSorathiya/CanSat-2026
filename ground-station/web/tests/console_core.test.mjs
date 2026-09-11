@@ -47,7 +47,7 @@ function loadConsoleCore() {
   }
 
   const factory = new Function(
-    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S, parseBridgeStatus, syncWordLabel, SYNC_TEST, SYNC_LAUNCH, unescapeRaw, missionStateView, commandToken, formatCommand };`
+    `${source}\nreturn { crc16ccitt, frameEncode, FrameDecoder, parsePacket, StreamValidator, LinkHealth, RATE_WINDOW_S, parseBridgeStatus, syncWordLabel, SYNC_TEST, SYNC_LAUNCH, unescapeRaw, missionStateView, commandToken, formatCommand, commandWindowView, COMMAND_WINDOW_MS };`
   );
   return factory();
 }
@@ -871,6 +871,23 @@ test("the sound level is read from SN-, and a lean packet has none", () => {
   const lean = M.parsePacket(base, null);
   assert.equal(lean.error, undefined);
   assert.equal(lean.record.sound_mv, null);
+});
+
+test("the command window counts down from power-on, then estimates arming", () => {
+  assert.strictEqual(M.COMMAND_WINDOW_MS, 300000);
+  assert.deepStrictEqual(M.commandWindowView(0, null), { state: "open", text: "open · 5:00 left" });
+  assert.strictEqual(M.commandWindowView(299001, null).text, "open · 0:01 left");
+  assert.strictEqual(M.commandWindowView(300000, null).state, "arming");
+  assert.strictEqual(M.commandWindowView(306000, null).state, "armed");
+  // With no packet there is nothing to count from, and the view says so.
+  assert.strictEqual(M.commandWindowView(NaN, null).state, "unknown");
+});
+
+test("a Max rate sent closes the window early in the estimate", () => {
+  assert.strictEqual(M.commandWindowView(59000, 60000).state, "open");
+  assert.match(M.commandWindowView(61000, 60000).text, /closed by Max rate/);
+  assert.strictEqual(M.commandWindowView(61000, 60000).state, "arming");
+  assert.strictEqual(M.commandWindowView(70000, 60000).state, "armed");
 });
 
 test("the password never appears in the frame the console transmits", () => {

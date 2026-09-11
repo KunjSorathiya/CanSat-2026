@@ -260,6 +260,15 @@ bool validate_config(const Configuration& config, std::string& why) {
         return false;
     }
 
+    // A window of zero would close before the first packet could be received, which is a
+    // build that claims an uplink it cannot use; an unbounded one is a vehicle that may never
+    // arm. Thirty minutes is past any plausible pad procedure.
+    if (config.allow_ground_commands &&
+        (config.command_window_ms == 0 || config.command_window_ms > 1800000)) {
+        why = "command_window_ms must be in 1..1800000 when ground commands are enabled";
+        return false;
+    }
+
     why.clear();
     return true;
 }

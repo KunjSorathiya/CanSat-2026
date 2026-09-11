@@ -1,4 +1,4 @@
-﻿build/
+build/
 **/build/
 __pycache__/
 *.pyc
@@ -16,3 +16,6 @@ host.log
 # Original camera dump of the board photographs. The renamed, documented set lives in
 # documentation/hardware/photos/; keeping both in the repository would double every clone.
 Hardwarepics/
+
+# The ground-command password. Never committed; see firmware/flight-computer/include/flight/local_secrets.example.hpp.
+firmware/flight-computer/include/flight/local_secrets.hpp

@@ -3827,6 +3827,9 @@ struct GroundLink {
     // Polling interval. 10 ms keeps the long runs cheap; the pattern test sets 1 so
     // the spacing it measures is the schedule's rather than the harness's.
     std::uint64_t step_ms = 10;
+    // No command goes on the air before this. Zero is the old behaviour -- a command waiting
+    // from the first poll -- and a later time is how a test sends one after the window.
+    std::uint64_t send_from_ms = 0;
 
     // Which command sits on the air. Defaulted so every erase test reads as it did before
     // there was more than one command to send.
@@ -3851,7 +3854,7 @@ struct GroundLink {
     }
     void step(std::uint64_t from_ms, std::uint64_t until_ms) {
         for (std::uint64_t t = from_ms; t <= until_ms; t += step_ms) {
-            if (radio.inbox.empty()) {
+            if (t >= send_from_ms && radio.inbox.empty()) {
                 // Minted against the number the vehicle has reached, the way the console
                 // mints it from the last packet it received. A token made for any other
                 // number is refused, so the harness has to play by the same rule.
@@ -3866,11 +3869,15 @@ struct GroundLink {
         state = ctrl_->state();
         period_after = ctrl_->telemetry_period_ms();
         rate_maxed = ctrl_->health().rate_maxed;
+        armed = ctrl_->health().armed;
+        window_open = ctrl_->health().command_window_open;
     }
     std::uint32_t accepted = 0;
     flight::MissionState state = flight::MissionState::init;
     std::uint32_t period_after = 0;
     bool rate_maxed = false;
+    bool armed = false;
+    bool window_open = false;
     std::uint64_t now_ = 0;
     std::unique_ptr<flight::Controller> ctrl_;
 };
@@ -4009,14 +4016,15 @@ void test_no_command_is_heard_after_max_rate() {
     CHECK(link.logger.erases == 0);
 }
 
-void test_an_armed_vehicle_refuses_to_change_rate() {
-    // The same window as the erase, for a stronger reason: this one cannot be undone, and a
-    // vehicle that is armed is a vehicle nobody is holding.
+void test_a_vehicle_past_its_command_window_refuses_to_change_rate() {
+    // The same rule for a command that cannot be undone: after the window, MAX_RATE is not
+    // heard, the schedule does not move, and the vehicle carries on to arm.
     GroundLink link(true, cansat::CommandKind::max_rate);
-    link.c.arming_delay_ms = 0;
-    link.c.require_calibration_to_arm = false;
-    link.run(4000);
+    link.c.command_window_ms = 1000;
+    link.send_from_ms = 2000;
+    link.run(5000);
     CHECK(link.state == flight::MissionState::ready);
+    CHECK(!link.window_open);
     CHECK(link.accepted == 0);
     CHECK(!link.rate_maxed);
     CHECK(link.period_after == link.c.telemetry_period_ms);
@@ -4052,6 +4060,133 @@ void test_a_flight_build_cannot_be_commanded_to_max_rate() {
     CHECK(!link.rate_maxed);
     CHECK(link.radio.receive_polls == 0);
     CHECK(link.period_after == link.c.telemetry_period_ms);
+}
+
+namespace {
+struct WindowRig {
+    flight::Configuration c;
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    WindowRig() {
+        c.team_id = "CAN-Team-25";
+        c.allow_ground_commands = true;
+        c.health_period_ms = 10;     // keep health() current to the tick
+    }
+};
+}  // namespace
+
+void test_the_vehicle_does_not_arm_while_its_command_window_is_open() {
+    // Sitting still on a desk the vehicle calibrates in about three seconds and would arm at
+    // three -- which used to close the command window before anyone could use it. With the
+    // window it listens instead, and does not arm, for as long as the window lasts.
+    WindowRig r;
+    flight::Controller ctrl(r.c, r.imu, r.baro, r.gps, r.radio, r.logger, r.board);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 20000; t += 10) ctrl.poll(t);
+    CHECK(ctrl.state() == flight::MissionState::ready);
+    CHECK(ctrl.health().command_window_open);
+    CHECK(!ctrl.health().armed);
+    // The power-on calibration still ran: it is what gives the window a height above the pad.
+    CHECK(ctrl.health().calibrated);
+    CHECK(ctrl.health().command_window_left_ms > 270000);
+    CHECK(ctrl.health().command_window_left_ms <= 280000);
+}
+
+void test_the_window_times_out_then_the_vehicle_recalibrates_and_arms() {
+    // At its timeout the window closes, the uplink with it, and the power-on calibration is
+    // discarded. Arming waits for the new one and for the arming delay, both counted from the
+    // close.
+    WindowRig r;
+    r.c.command_window_ms = 5000;
+    flight::Controller ctrl(r.c, r.imu, r.baro, r.gps, r.radio, r.logger, r.board);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 4990; t += 10) ctrl.poll(t);
+    CHECK(ctrl.health().command_window_open);
+    CHECK(!ctrl.health().armed);
+    const int polls_before_close = r.radio.receive_polls;
+
+    for (std::uint64_t t = 5000; t <= 5020; t += 10) ctrl.poll(t);
+    CHECK(!ctrl.health().command_window_open);
+    CHECK(!ctrl.health().calibrated);   // discarded, recalibrating
+    CHECK(!ctrl.health().armed);
+
+    for (std::uint64_t t = 5030; t <= 7990; t += 10) ctrl.poll(t);
+    CHECK(!ctrl.health().armed);        // the arming delay runs from the close: 5000 + 3000
+
+    for (std::uint64_t t = 8000; t <= 12000; t += 10) ctrl.poll(t);
+    CHECK(ctrl.health().calibrated);
+    CHECK(ctrl.health().armed);
+    // And it stopped listening the moment the window closed.
+    CHECK(r.radio.receive_polls <= polls_before_close + 1);
+}
+
+void test_max_rate_closes_the_window_early_and_the_vehicle_arms_soon_after() {
+    // The operator does not have to wait out the window: MAX_RATE closes it, and the vehicle
+    // recalibrates and arms a few seconds later instead of five minutes later.
+    GroundLink link(true, cansat::CommandKind::max_rate);
+    link.c.health_period_ms = 10;
+    link.run(12000);
+    CHECK(link.accepted == 1);
+    CHECK(link.rate_maxed);
+    CHECK(!link.window_open);
+    CHECK(link.armed);
+}
+
+void test_an_erase_does_not_close_the_command_window() {
+    // Only MAX_RATE closes the window early. An erase is maintenance, and an operator who
+    // clears the log before a flight should not lose the chance to raise the rate.
+    GroundLink link(true);                        // erase on the air throughout
+    link.c.health_period_ms = 10;
+    link.run(6000);
+    CHECK(link.logger.erases >= 1);
+    CHECK(link.window_open);
+    CHECK(!link.armed);
+}
+
+void test_a_watchdog_reset_skips_the_command_window() {
+    // A reset may come mid-flight. Five minutes unarmed and listening would be five minutes
+    // with no launch or landing detection, so a vehicle that restarts from the watchdog closes
+    // its uplink at once and arms as a build without the uplink would.
+    WindowRig r;
+    flight::Controller ctrl(r.c, r.imu, r.baro, r.gps, r.radio, r.logger, r.board);
+    ctrl.set_boot_cause(true);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 6000; t += 10) ctrl.poll(t);
+    CHECK(!ctrl.health().command_window_open);
+    CHECK(ctrl.health().armed);
+    CHECK(r.radio.receive_polls == 0);
+}
+
+void test_a_build_without_the_uplink_arms_as_it_always_has() {
+    // No secrets header, no uplink, no window: calibration and arming straight after
+    // power-on, exactly as before the window existed.
+    WindowRig r;
+    r.c.allow_ground_commands = false;
+    flight::Controller ctrl(r.c, r.imu, r.baro, r.gps, r.radio, r.logger, r.board);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 6000; t += 10) ctrl.poll(t);
+    CHECK(!ctrl.health().command_window_open);
+    CHECK(ctrl.health().armed);
+}
+
+void test_a_command_window_must_have_a_length() {
+    std::string why;
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    c.allow_ground_commands = true;
+    CHECK(flight::validate_config(c, why));
+    c.command_window_ms = 0;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("command_window_ms") != std::string::npos);
+    c.command_window_ms = 1800001;
+    CHECK(!flight::validate_config(c, why));
+    // Without the uplink the window is never opened, so its length does not matter.
+    c.allow_ground_commands = false;
+    CHECK(flight::validate_config(c, why));
 }
 
 void test_a_flight_build_has_no_uplink_at_all() {
@@ -4157,16 +4292,17 @@ void test_a_stale_command_is_refused() {
     CHECK(logger.erases == 0);
 }
 
-void test_an_armed_vehicle_refuses_to_erase() {
-    // ARM-1 means the vehicle is ready to fly. Everything from here to recovery holds a log
-    // that cannot be recreated, so the window shuts at arming rather than at launch.
+void test_a_vehicle_past_its_command_window_refuses_to_erase() {
+    // The window shuts before recalibration and arming, and everything after it holds a log
+    // that cannot be recreated. A command arriving after the window is not refused -- it is
+    // not heard at all.
     GroundLink link(true);
-    link.c.arming_delay_ms = 0;               // armed from the first poll
-    link.c.require_calibration_to_arm = false;
-    link.run(4000);
-    // It must fail because the vehicle was armed, not because it never reached READY --
-    // a gate test that passes for the wrong reason is worse than no gate test.
+    link.c.command_window_ms = 1000;
+    link.send_from_ms = 2000;
+    link.run(5000);
+    // It must fail because the window closed, not because the vehicle never reached READY.
     CHECK(link.state == flight::MissionState::ready);
+    CHECK(!link.window_open);
     CHECK(link.accepted == 0);
     CHECK(link.logger.erases == 0);
 }
@@ -4226,9 +4362,16 @@ void test_the_scrub_finishes_without_blocking_telemetry() {
     // The whole reason the scrub is incremental. A vehicle scrubbing 64 MB must keep
     // sending its 1 Hz packets throughout, so the packet count may not differ from a run
     // that never scrubbed at all.
+    //
+    // Both runs close their command window at 1.5 s, as it would close on the pad. The
+    // harness keeps an erase on the air throughout, and while the window is open each new one
+    // is a fresh, legitimate command that restarts the scrub -- which says nothing about
+    // whether a single erase finishes.
     GroundLink quiet(true);
+    quiet.c.command_window_ms = 1500;
     quiet.run(8000);
     GroundLink scrubbing(true);
+    scrubbing.c.command_window_ms = 1500;
     scrubbing.logger.scrub_blocks = 400;
     scrubbing.run(8000);
     CHECK(scrubbing.logger.scrub_remaining == 0);                       // it completed
@@ -4453,15 +4596,22 @@ int main(int argc, char** argv) {
     test_every_normal_flight_packet_is_rich();
     test_max_rate_closes_the_uplink_behind_it();
     test_no_command_is_heard_after_max_rate();
-    test_an_armed_vehicle_refuses_to_change_rate();
+    test_a_vehicle_past_its_command_window_refuses_to_change_rate();
     test_a_max_rate_command_obeys_the_replay_rules();
     test_a_flight_build_cannot_be_commanded_to_max_rate();
+    test_the_vehicle_does_not_arm_while_its_command_window_is_open();
+    test_the_window_times_out_then_the_vehicle_recalibrates_and_arms();
+    test_max_rate_closes_the_window_early_and_the_vehicle_arms_soon_after();
+    test_an_erase_does_not_close_the_command_window();
+    test_a_watchdog_reset_skips_the_command_window();
+    test_a_build_without_the_uplink_arms_as_it_always_has();
+    test_a_command_window_must_have_a_length();
     test_a_flight_build_has_no_uplink_at_all();
     test_the_bench_build_erases_the_log_on_command();
     test_a_replayed_command_erases_nothing();
     test_a_command_minted_for_a_future_packet_is_refused();
     test_a_stale_command_is_refused();
-    test_an_armed_vehicle_refuses_to_erase();
+    test_a_vehicle_past_its_command_window_refuses_to_erase();
     test_another_teams_command_erases_nothing();
     test_a_refused_erase_is_reported_rather_than_swallowed();
     test_listening_never_costs_a_packet();

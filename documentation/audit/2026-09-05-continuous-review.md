@@ -330,7 +330,7 @@ Final state, re-run from a fresh `git clone` with no build directory:
 | Host build and tests | `bash tools/build_host.sh` | All pass, zero warnings |
 | Strict warning set | `CXXFLAGS="… -Werror" bash tools/build_host.sh` | Clean |
 | Firmware syntax | `bash tools/check_pico_syntax.sh` | 11 / 11 `OK` |
-| Documented claims | `python tools/check_doc_claims.py` | 289 / 289 |
+| Documented claims | `python tools/check_doc_claims.py` | 290 / 290 |
 | Documented commands | run as written, from the directory each document names | All pass |
 | Internal links | every relative Markdown link resolved | 0 broken |
 | Web console | driven in a browser, demo and injected packets | No console errors |
