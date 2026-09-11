@@ -23,16 +23,15 @@ int main(int argc, char** argv) {
 
     flight::Configuration config;
     config.team_id = "CAN-Team-01";
-    // GPS on the air on purpose. The vehicle's default logs the fix instead of transmitting
-    // it, but this fixture is what proves the C++, Python and JavaScript parsers agree on
-    // the optional `GP-` fields -- and they have to keep agreeing, because transmit_gps is
-    // one line away from being true again for a flight where the vehicle may land out of
-    // sight. A fixture that stopped carrying GPS would retire that check silently.
-    config.transmit_gps = true;
+    // GPS on the air, which is the default, and the diagnostic tags on the air as well,
+    // which is not. This fixture is what proves the C++, Python and JavaScript parsers agree
+    // on the optional fields, and the end-to-end test also checks that MODE crosses the
+    // whole pipeline -- so the tags stay in, and the budget and period make room for them.
+    // No sound sensor is wired into this run, so no SN- field appears.
+    config.append_diagnostic_fields = true;
     config.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
-    // ...and the period that a 255-byte packet actually fits inside. 700 ms is sized
-    // for the 199-byte default and would put this configuration at 57 % duty, which
-    // validate_config() correctly refuses to build.
+    // The period a 255-byte packet actually fits inside: 700 ms would put it at 57 % duty,
+    // which validate_config() correctly refuses.
     config.telemetry_period_ms = 850;
     config.altitude_relative_to_baseline = false;
     config.calib_samples = 4;

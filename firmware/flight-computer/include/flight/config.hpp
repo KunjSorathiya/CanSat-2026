@@ -109,34 +109,25 @@ struct Configuration {
     std::uint32_t radio_recovery_backoff_ms = 1000;   // spacing between bounded re-init attempts
     std::uint8_t radio_max_consecutive_failures = 5;  // TX failures before a radio fault + re-init
 
-    // Airtime budget and runtime packet cap. Defaults to the 255-byte LoRa FIFO limit,
-    // the only size a packet cannot exceed (measured: 118 bytes mandatory-only, 206 with
-    // GPS and diagnostics, 247 absolute worst case). The controller drops its optional
-    // diagnostic tags rather than exceed this, because the radio would otherwise truncate
-    // the packet silently. `max_channel_duty` is the largest fraction of the channel one
-    // packet per telemetry period may occupy — the rest is margin for radio recovery,
-    // retries and the receiver's own timing.
-    // Whether the position goes on the air as well as into the log.
+    // What goes on the air besides the twelve mandatory fields, and the byte budget that has
+    // to hold it.
     //
-    // **The rulebook does not require it.** The mandatory packet is team, number, time,
-    // altitude, pressure, temperature, roll, pitch, yaw and the three accelerations; GPS is
-    // SEN-011, an *additional sensor* scored on evidence of data "transmitted **or**
-    // logged". The SD row carries latitude, longitude, altitude, satellites and HDOP
-    // whatever this is set to, so the five scoring points do not depend on it.
+    // **GPS and sound are transmitted by default, because only the air is scored.** The
+    // organizers ruled on 2026-09-11 that only transmitted telemetry is considered for
+    // extra-sensor points. Both used to be logged and not transmitted, which under that
+    // ruling scored them nothing. The SD row carries them either way.
     //
-    // What it does cost: `GP-Lat`/`GP-Lon`/`GP-Alt` are 56 bytes, and they take the
-    // worst-case packet from 199 to exactly 255 -- the LoRa FIFO limit, which is not a
-    // coincidence so much as a ceiling the format has grown into. Airtime scales with
-    // length, the telemetry period is computed from the worst case, and those 56 bytes are
-    // therefore the difference between 1.43 Hz and 1.18 Hz. The rulebook rewards rates
-    // above 1 Hz.
+    // `worst_case_packet_bytes` is both the airtime budget the telemetry period is checked
+    // against and the runtime cap the controller sheds optional content to stay under,
+    // rather than let the radio truncate a packet silently at 255. validate_config()
+    // refuses a budget smaller than the mandatory block plus whatever of GPS and sound is
+    // enabled: a budget that cannot hold the sensors would have the controller drop them
+    // from every packet to fit, and they would score nothing without a word said.
     //
-    // **And what it costs if it is false: there is no live position.** The ground station
-    // never sees where the vehicle is, during descent or after landing, and the fix exists
-    // only on a card inside a vehicle you have to find first. Set this true for any flight
-    // where losing sight of it is plausible; the budget and period below must move with it,
-    // and validate_config() refuses the combination if they do not.
-    bool transmit_gps = false;
+    // The diagnostic tags are not counted toward that floor. They are shed first whenever
+    // they do not fit, so they can never push the sensors off the air.
+    bool transmit_gps = true;
+    bool transmit_sound = true;
     std::size_t worst_case_packet_bytes = cansat::link::kWorstCasePacketBytes;
     double max_channel_duty = cansat::link::kMaxChannelDuty;
 
@@ -388,10 +379,13 @@ struct Configuration {
     // sensor nobody is scoring is noise.
     std::uint32_t sound_stale_after_ms = 2000;
 
-    // Append non-mandatory diagnostic fields ("MODE-<state>", "FAULTS-<n>") AFTER every
-    // mandatory (and GPS) field. The official parser ignores unknown optional fields; set
-    // this false if a stricter receiver is confirmed.
-    bool append_diagnostic_fields = true;
+    // The five project-local diagnostic tags -- MODE, FAULTS, CAL, ARM, YR -- after every
+    // mandatory and sensor field. **Off by default, and it costs the console its live view
+    // of mission state.** Tags, GPS and sound do not fit the FIFO together (267 bytes at
+    // their widest), and of the three the tags are the only part the rulebook does not
+    // reward. They are always in the SD log. Turn this on for bench work; the controller
+    // sheds the tags first whenever a packet would not fit, so it never costs the sensors.
+    bool append_diagnostic_fields = false;
 };
 
 inline std::uint8_t sync_word(const Configuration& config) {

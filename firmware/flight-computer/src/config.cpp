@@ -209,21 +209,27 @@ bool validate_config(const Configuration& config, std::string& why) {
         why = "radio.preamble_length must be >= 6 symbols (SX127x minimum)";
         return false;
     }
-    // transmit_gps and the budget have to move together. Left apart, the vehicle would
-    // build packets 56 bytes longer than the airtime budget assumes -- so the duty check
-    // below would pass on a number the radio never sends, and the controller would quietly
-    // drop MODE/FAULTS/CAL/ARM to squeeze each packet back under a cap that was set for a
-    // configuration this no longer is. Diagnostics would vanish exactly when a flight got
-    // interesting, and nothing would say why.
-    if (config.transmit_gps &&
-        config.worst_case_packet_bytes < cansat::link::kWorstCasePacketBytesWithGps) {
-        why = "transmit_gps is set but worst_case_packet_bytes is " +
-              std::to_string(config.worst_case_packet_bytes) +
-              "; the GPS fields take the longest packet to " +
-              std::to_string(cansat::link::kWorstCasePacketBytesWithGps) +
-              " bytes, so the budget must be at least that (and the telemetry period "
-              "re-derived from it)";
-        return false;
+    // The budget must hold everything that has to reach the air. Below that, the controller
+    // would shed GPS and sound from every packet to fit, the duty check would pass on a
+    // packet the radio never sends, and the extra-sensor points -- scored only on what is
+    // transmitted -- would go to zero with no fault and no message.
+    //
+    // The diagnostic tags are deliberately left out. The controller sheds them first, so
+    // they cannot displace the sensors, and counting them would forbid tagged bench builds
+    // for no protective reason.
+    {
+        const std::size_t required = cansat::link::kMandatoryPacketBytes +
+                                     (config.transmit_gps ? cansat::link::kGpsFieldBytes : 0) +
+                                     (config.transmit_sound ? cansat::link::kSoundFieldBytes : 0);
+        if (config.worst_case_packet_bytes < required) {
+            why = "worst_case_packet_bytes is " + std::to_string(config.worst_case_packet_bytes) +
+                  ", but the mandatory fields" + (config.transmit_gps ? std::string(", GPS") : std::string()) +
+                  (config.transmit_sound ? std::string(" and sound") : std::string()) +
+                  " take " + std::to_string(required) +
+                  " bytes at their widest; the controller would shed the sensors from every "
+                  "packet to fit (see documentation/design/max-rate-command.md)";
+            return false;
+        }
     }
     if (config.worst_case_packet_bytes == 0 ||
         config.worst_case_packet_bytes > cansat::kMaxLoraPayloadBytes) {

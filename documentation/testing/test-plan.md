@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 123 suites across the whole flight core | ✅ **4202 / 4202 assertions** |
+| `flight_tests` | 123 suites across the whole flight core | ✅ **4201 / 4201 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **139 / 139 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 123 suites, 4202 assertions
+### `flight_tests` — 123 suites, 4201 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -224,8 +224,8 @@ flowchart LR
 | `test_the_erase_reads_empty_immediately_and_scrubs_afterwards` | The command empties the log on the first poll and the controller then drives the background scrub |
 | `test_the_scrub_finishes_without_blocking_telemetry` | A run that scrubs 400 blocks transmits exactly as many packets as one that scrubs nothing. The mandatory 1 Hz downlink may not pay for a card wipe |
 | `test_a_vehicle_that_was_never_asked_never_scrubs` | `erase_step()` runs every poll and must be free on a vehicle that has erased nothing |
-| `test_a_fix_reaches_the_log_even_when_it_is_not_transmitted` | With the default `transmit_gps` false, no `GP-` field reaches the packet and every one of latitude, longitude, satellites and HDOP reaches the SD row. GPS is SEN-011, scored on data **transmitted or logged**, so the five points survive the 56 bytes coming off the packet |
-| `test_turning_gps_transmission_on_without_the_budget_is_refused` | Setting `transmit_gps` without raising `worst_case_packet_bytes` is refused by name; raising the budget alone is then refused on airtime; both together build. Left apart, the duty check would pass on a packet the radio never sends while the controller quietly dropped `MODE`/`FAULTS`/`CAL`/`ARM` to fit |
+| `test_a_fix_reaches_the_log_even_when_it_is_not_transmitted` | With `transmit_gps` set false — no longer the default — no `GP-` field reaches the packet, and latitude, longitude, satellites and HDOP all still reach the SD row. The same holds for every lean packet after a `MAX_RATE` command |
+| `test_a_budget_below_what_is_on_the_air_is_refused` | A budget that cannot hold the mandatory block plus the GPS and sound it transmits is refused before flight — the controller would otherwise shed the sensors from every packet, silently. Tags are not counted: they are shed first, and a tagged bench build must still validate |
 | `test_the_packet_cadence_is_the_same_in_every_state` | A full profile — pad, boost, coast, descent, landing — and **every gap between consecutive packets equals `telemetry_period_ms`**, whatever state the vehicle was in. The test asserts it actually reached `FLIGHT` and `LANDED` first, so it cannot pass on a mission that never left the pad. State detection drives the `MODE` tag and the LED blink; it must never drive the rate |
 | `test_the_builder_can_be_told_to_carry_position_after_construction` | The builder holds its own copy of the configuration, so a command putting position on the air has to tell it directly |
 | `test_the_gps_command_speeds_up_and_puts_position_on_the_air` | `MAX_RATE_GPS` moves the period to 364 ms, adds the three `GP-` fields and drops all five diagnostic tags |

@@ -1296,8 +1296,13 @@ void test_controller_drops_optional_fields_before_overrunning_the_budget() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
     c.health_period_ms = 50;
-    // A budget the 118-byte mandatory block fits inside, but GPS and diagnostics do not.
-    c.worst_case_packet_bytes = 140;
+    // A budget the mandatory block fits inside and the diagnostic tags do not. GPS and sound
+    // are off, because a budget that could not hold them would now be refused before
+    // flight -- which is why GPS, once the second thing shed, never is any more.
+    c.transmit_gps = false;
+    c.transmit_sound = false;
+    c.append_diagnostic_fields = true;
+    c.worst_case_packet_bytes = 150;
     flight::test::MockImu imu;
     flight::test::MockBarometer baro;
     flight::test::MockGps gps;
@@ -1310,10 +1315,9 @@ void test_controller_drops_optional_fields_before_overrunning_the_budget() {
 
     CHECK(radio.packets.size() == 1);
     const std::string& sent = radio.packets.front();
-    CHECK(sent.size() <= 140);
+    CHECK(sent.size() <= 150);
     CHECK(sent.find("MODE-") == std::string::npos);    // diagnostics dropped first
     CHECK(sent.find("FAULTS-") == std::string::npos);
-    CHECK(sent.find("GP-Lat-") == std::string::npos);  // then GPS, also optional
     CHECK(ctrl.faults().active(flight::FaultCode::packet_oversize));
 
     // The packet is still a valid, compliant, parseable telemetry point.
@@ -1321,7 +1325,7 @@ void test_controller_drops_optional_fields_before_overrunning_the_budget() {
     CHECK(static_cast<bool>(parsed));
     CHECK(parsed.record->packet_number == 1);
 
-    // With the default budget — the full FIFO — the diagnostics survive.
+    // The default: GPS on the air, the tags off it, and a budget that holds what is sent.
     flight::Configuration d;
     d.team_id = "CAN-Team-07";
     flight::test::MockRadio radio2;
@@ -1329,7 +1333,8 @@ void test_controller_drops_optional_fields_before_overrunning_the_budget() {
     CHECK(ctrl2.initialize());
     ctrl2.poll(0);
     CHECK(radio2.packets.size() == 1);
-    CHECK(radio2.packets.front().find("MODE-") != std::string::npos);
+    CHECK(radio2.packets.front().find("MODE-") == std::string::npos);
+    CHECK(radio2.packets.front().find("GP-Lat-") != std::string::npos);
     CHECK(radio2.packets.front().size() <= d.worst_case_packet_bytes);
     CHECK(!ctrl2.faults().active(flight::FaultCode::packet_oversize));
 }
@@ -2348,8 +2353,8 @@ void test_sd_log_row_matches_its_header() {
 void test_telemetry_builder() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
-    // This suite checks the packet's field order, GPS included, so it puts GPS on the air.
-    // The default logs it instead -- see Configuration::transmit_gps.
+    // This suite checks the packet's field order, GPS included. GPS on the air is the
+    // default now; the explicit setting keeps the suite's premise visible.
     c.transmit_gps = true;
     flight::TelemetryBuilder b(c);
 
@@ -2906,8 +2911,8 @@ void test_a_frozen_gps_fix_is_not_reported_as_a_live_position() {
     c.telemetry_period_ms = 500;
     c.radio.bandwidth_hz = 250000;  // 2 Hz needs the wider modem (link-budget.md)
     c.gps_fix_timeout_ms = 3000;
-    // This suite is about a fix ageing out of *telemetry*, so it needs the fix on the air.
-    // The default leaves GPS in the log only -- see Configuration::transmit_gps.
+    // This suite is about a fix ageing out of *telemetry*, so it needs the fix on the air,
+    // which is the default; the explicit setting keeps the suite's premise visible.
     c.transmit_gps = true;
     c.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
     flight::test::MockImu imu;
@@ -2970,6 +2975,12 @@ void test_config_rejects_a_gps_timeout_faster_than_the_receiver() {
 // interchangeable and the ground station cannot tell them apart from the number alone.
 void test_telemetry_declares_the_yaw_reference() {
     flight::Configuration c = fast_arm_config();
+    // The yaw-reference tag left the air with the other diagnostics. This tests the tag
+    // itself, so it opts back into the tagged packet -- GPS and sound off, which is what
+    // makes room for it.
+    c.append_diagnostic_fields = true;
+    c.transmit_gps = false;
+    c.transmit_sound = false;
     // Ship a calibration, as a bench-calibrated vehicle would.
     c.mag_calibration.valid = true;
     flight::test::MockImu imu;
@@ -3003,6 +3014,12 @@ void test_telemetry_declares_the_yaw_reference() {
 // vehicle must fly on six axes and say so, not refuse to start and not pretend.
 void test_a_missing_magnetometer_degrades_rather_than_stops() {
     flight::Configuration c = fast_arm_config();
+    // The yaw-reference tag left the air with the other diagnostics. This tests the tag
+    // itself, so it opts back into the tagged packet -- GPS and sound off, which is what
+    // makes room for it.
+    c.append_diagnostic_fields = true;
+    c.transmit_gps = false;
+    c.transmit_sound = false;
     c.mag_calibration.valid = true;
     flight::test::MockImu imu;
     imu.magnetometer = false;
@@ -3032,6 +3049,12 @@ void test_a_missing_magnetometer_degrades_rather_than_stops() {
 // A magnetometer that stops answering mid-flight must cost yaw, not the vehicle.
 void test_a_magnetometer_that_stops_is_reported_and_survived() {
     flight::Configuration c = fast_arm_config();
+    // The yaw-reference tag left the air with the other diagnostics. This tests the tag
+    // itself, so it opts back into the tagged packet -- GPS and sound off, which is what
+    // makes room for it.
+    c.append_diagnostic_fields = true;
+    c.transmit_gps = false;
+    c.transmit_sound = false;
     c.mag_calibration.valid = true;
     c.sensor_stale_after_ms = 500;
     flight::test::MockImu imu;
@@ -3206,7 +3229,8 @@ void test_accel_calibration_is_rotation_invariant() {
 void test_measured_packet_sizes_match_the_link_budget() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
-    // The sizes this pins are the GPS-inclusive ones the 255-byte budget is built from.
+    // Typical sizes, GPS included, and the tagged packet a bench build can still send.
+    // The widest of each shape are pinned separately, by construction.
     c.transmit_gps = true;
     c.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
     flight::TelemetryBuilder builder(c);
@@ -3235,8 +3259,9 @@ void test_measured_packet_sizes_match_the_link_budget() {
     CHECK(with_gps.has_value());
     CHECK(with_gps->packet.size() == 167);
 
-    // The in-flight packet: GPS plus every diagnostic tag, including the yaw-reference
-    // tag the nine-axis upgrade added. Six bytes more than before it existed.
+    // The tagged packet: GPS plus every diagnostic tag, including the yaw-reference tag
+    // the nine-axis upgrade added. No longer the flight default -- tags are off the air
+    // -- but still what a bench build with append_diagnostic_fields sends.
     const std::vector<std::string> tags = {"MODE-RECOVERY", "FAULTS-3", "CAL-1", "ARM-1",
                                            "YR-M"};
     const auto full = builder.build(1, 1000, s, tags);
@@ -3517,14 +3542,14 @@ void test_a_vehicle_without_a_microphone_behaves_as_before() {
     CHECK(!ctrl.faults().active(flight::FaultCode::sound_unavailable));
 }
 
-// GPS is not a mandatory telemetry field. It is SEN-011, an additional sensor scored on
-// evidence of data "transmitted **or** logged", and the three GP- fields are 56 of the
-// packet's bytes -- the difference between a 199-byte and a 255-byte worst case, and so
-// between 1.43 Hz and 1.18 Hz on a line the rulebook scores.
+// The SD row records the fix whether or not it goes on the air. GPS is transmitted by default
+// now -- the organizers count only transmitted telemetry for extra-sensor points -- but it can
+// be turned off, and after a MAX_RATE command two packets in three are lean and carry no
+// position at all. The log is what makes those packets whole again after recovery.
 void test_a_fix_reaches_the_log_even_when_it_is_not_transmitted() {
     flight::Configuration c;
     c.team_id = "CAN-Team-25";
-    CHECK(!c.transmit_gps);                     // the default
+    c.transmit_gps = false;                     // not the default any more; set on purpose
     flight::TelemetryBuilder builder(c);
 
     flight::SensorSnapshot s;
@@ -3548,33 +3573,35 @@ void test_a_fix_reaches_the_log_even_when_it_is_not_transmitted() {
     CHECK(built->packet.find("GP-Lon-") == std::string::npos);
     CHECK(built->packet.find("GP-Alt-") == std::string::npos);
 
-    // But every bit of it is in the row, which is what SEN-011 is scored on.
+    // But every bit of it is in the row.
     const std::string line = builder.sd_line(*built, flight::MissionState::flight, 0);
     CHECK(line.find("21.220094") != std::string::npos);
     CHECK(line.find("72.884836") != std::string::npos);
     CHECK(line.find(",9,1.4,") != std::string::npos);
 }
 
-void test_turning_gps_transmission_on_without_the_budget_is_refused() {
-    // The two settings must move together. Apart, the vehicle builds packets 56 bytes
-    // longer than the airtime budget assumes: the duty check passes on a packet the radio
-    // never sends, and the controller silently drops MODE/FAULTS/CAL/ARM to fit a cap set
-    // for a configuration this no longer is.
+void test_a_budget_below_what_is_on_the_air_is_refused() {
+    // The failure this exists for is silent. A budget too small for the sensors has the
+    // controller shed GPS and sound from every packet to fit it; the duty check passes on a
+    // packet that is never sent; and the extra-sensor points, scored only on what is
+    // transmitted, go to zero with no fault anywhere.
     std::string why;
     flight::Configuration c;
     c.team_id = "CAN-Team-25";
-    c.transmit_gps = true;                      // budget left at the 199-byte default
+    CHECK(c.transmit_gps && c.transmit_sound);
+    CHECK(flight::validate_config(c, why));          // the default holds what it sends
+
+    c.worst_case_packet_bytes = 205;                 // 213 needed: mandatory, GPS, sound
     CHECK(!flight::validate_config(c, why));
-    CHECK(why.find("transmit_gps") != std::string::npos);
     CHECK(why.find("worst_case_packet_bytes") != std::string::npos);
+    CHECK(why.find("213") != std::string::npos);
 
-    // Raising the budget alone is not enough either: 255 bytes will not fit a 700 ms slot.
-    c.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
-    CHECK(!flight::validate_config(c, why));
-    CHECK(why.find("airtime") != std::string::npos);
+    c.transmit_sound = false;                        // 202 needed now
+    CHECK(flight::validate_config(c, why));
 
-    // Both, and it builds.
-    c.telemetry_period_ms = 850;
+    // The tags are not counted: they are shed first, so they cannot displace the sensors,
+    // and a tagged bench build must not be refused for carrying them.
+    c.append_diagnostic_fields = true;
     CHECK(flight::validate_config(c, why));
 }
 
@@ -3730,7 +3757,7 @@ void test_the_builder_can_be_told_to_carry_position_after_construction() {
     // on the bench would still have no GP- fields in it.
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
-    CHECK(!c.transmit_gps);
+    c.transmit_gps = false;   // GPS is on by default now; this tests turning it on later
     flight::TelemetryBuilder b(c);
 
     flight::SensorSnapshot s;
@@ -4239,7 +4266,7 @@ int main(int argc, char** argv) {
     test_the_scrub_finishes_without_blocking_telemetry();
     test_a_vehicle_that_was_never_asked_never_scrubs();
     test_a_fix_reaches_the_log_even_when_it_is_not_transmitted();
-    test_turning_gps_transmission_on_without_the_budget_is_refused();
+    test_a_budget_below_what_is_on_the_air_is_refused();
     test_the_packet_cadence_is_the_same_in_every_state();
     test_the_builder_can_be_told_to_carry_position_after_construction();
     test_the_gps_command_speeds_up_and_puts_position_on_the_air();
