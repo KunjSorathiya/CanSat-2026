@@ -160,9 +160,10 @@ def main() -> int:
     checker.check("link profile: 700 ms period", period_ms == 700, str(period_ms))
     checker.check("telemetry period clears the 1 Hz rulebook minimum",
                   period_ms <= 1000, str(period_ms))
-    # 199: GPS is logged rather than transmitted, so the three GP- fields are not in the
-    # longest packet. 255 is what it becomes when transmit_gps is set.
-    checker.check("link profile: 199-byte budget", budget_bytes == 199, str(budget_bytes))
+    # 212: every normal-flight packet is rich -- the mandatory fields, GPS and sound, with
+    # the diagnostic tags off the air. The organizers count only transmitted telemetry for
+    # extra-sensor points, and there is no budget that holds the tags as well.
+    checker.check("link profile: 212-byte budget", budget_bytes == 212, str(budget_bytes))
 
     # ---- the two commanded maximum rates -------------------------------------------
     # Neither can be undone from the ground, so every figure a document quotes about them
@@ -187,12 +188,29 @@ def main() -> int:
     checker.check("the lean max-rate period clears its own measured airtime plus the guard",
                   (max_lean_period or 0) >= max_lean_airtime + (guard_ms or 0),
                   f"{max_lean_period} vs {max_lean_airtime + (guard_ms or 0):.2f}")
-    # The claim the GPS variant rests on: position on the air costs nothing, because LoRa
-    # quantises the payload into symbol blocks and 201 bytes lands on the same 298 symbols
-    # as 199. If a format change ever breaks that, the variant loses its reason to exist.
-    checker.check("201 bytes still costs exactly what the 199-byte budget costs",
-                  abs(time_on_air(max_gps_bytes or 201, modem).time_on_air_ms -
-                      time_on_air(budget_bytes or 199, modem).time_on_air_ms) < 0.01)
+    # ---- the two packet shapes, and the max-rate slots ---------------------------------
+    rich_bytes = constant(profile, "kRichPacketBytes")
+    lean_bytes = constant(profile, "kLeanPacketBytes")
+    rich_slot = constant(profile, "kMaxRateRichSlotMs")
+    lean_slot = constant(profile, "kMaxRateLeanSlotMs")
+    cycle_ms = constant(profile, "kMaxRateCycleMs")
+    checker.check("link profile: the rich packet is 212 bytes and the lean 145",
+                  rich_bytes == 212 and lean_bytes == 145, f"{rich_bytes} / {lean_bytes}")
+    checker.check("the normal-flight budget is the rich packet",
+                  budget_bytes == rich_bytes, f"{budget_bytes} vs {rich_bytes}")
+    rich_air = time_on_air(rich_bytes or 212, modem).time_on_air_ms * 1.018
+    lean_air = time_on_air(lean_bytes or 145, modem).time_on_air_ms * 1.018
+    checker.check("the rich slot clears its measured airtime plus the guard",
+                  (rich_slot or 0) >= rich_air + (guard_ms or 0),
+                  f"{rich_slot} vs {rich_air + (guard_ms or 0):.2f}")
+    checker.check("the lean slot clears its measured airtime plus the guard",
+                  (lean_slot or 0) >= lean_air + (guard_ms or 0),
+                  f"{lean_slot} vs {lean_air + (guard_ms or 0):.2f}")
+    checker.check("the max-rate cycle is one rich slot and two lean",
+                  cycle_ms == (rich_slot or 0) + 2 * (lean_slot or 0),
+                  f"{cycle_ms} vs {(rich_slot or 0) + 2 * (lean_slot or 0)}")
+    checker.check("the max-rate cycle keeps GPS and sound at 1 Hz or faster",
+                  (cycle_ms or 10 ** 9) <= 1000, str(cycle_ms))
     checker.check("both commanded periods are faster than normal flight",
                   (max_lean_period or 0) < (max_gps_period or 0) < (period_ms or 0),
                   f"{max_lean_period} < {max_gps_period} < {period_ms}")

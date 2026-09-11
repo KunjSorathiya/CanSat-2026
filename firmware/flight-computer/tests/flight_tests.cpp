@@ -1142,23 +1142,23 @@ void test_config_radio_airtime_guard() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
 
-    // Default: SF7/125 kHz, GPS logged rather than transmitted, so a 199-byte worst case
-    // at a 700 ms period -> ~318 ms airtime, ~45 % duty. The period is set from the
-    // *measured* airtime rather than this model, so the check that matters is below.
+    // Default: SF7/125 kHz and the 212-byte rich packet -- GPS and sound on the air, tags
+    // off -- at a 700 ms period: ~338 ms airtime, ~48 % duty on the model. The period is
+    // set from the *measured* airtime rather than this model, so the check that matters is
+    // below, and it is closer to the limit than it used to be.
     CHECK(flight::validate_config(c, why));
-    CHECK(!c.transmit_gps);
-    CHECK(c.worst_case_packet_bytes == 199);
+    CHECK(c.worst_case_packet_bytes == 212);
     CHECK(c.worst_case_packet_bytes < cansat::kMaxLoraPayloadBytes);
-    CHECK(approx(flight::worst_case_airtime_ms(c), 317.7, 0.5));
+    CHECK(approx(flight::worst_case_airtime_ms(c), 338.2, 0.5));
     CHECK(flight::channel_duty(c) <= c.max_channel_duty);
-    CHECK(approx(flight::channel_duty(c), 0.454, 0.005));
+    CHECK(approx(flight::channel_duty(c), 0.483, 0.005));
 
     // The real one. Bring-up rows 5.2 and 5.3 measured 406.9 ms for a full-length packet,
     // 1.8 % above the model, twice, on two different boards. A period sized from the model
     // alone would put the true duty over the policy while every test still passed.
     {
         // 406.9 ms was measured for a 255-byte packet, 1.8 % above that packet's model
-        // figure. The same 1.8 % applied to the 199-byte model figure is the honest
+        // figure. The same 1.8 % applied to the 212-byte model figure is the honest
         // estimate for the packet this configuration actually sends.
         const double measured_airtime_ms = flight::worst_case_airtime_ms(c) * 1.018;
         const double true_duty = measured_airtime_ms / c.telemetry_period_ms;
@@ -1479,36 +1479,41 @@ void test_a_truncated_command_is_ignored() {
 // The digest both ends compute. A divergence here is a console that cannot command the
 // vehicle it was built for, and it would show up on the bench as "the button does nothing".
 void test_the_commanded_rate_periods_clear_their_own_airtime() {
-    // The static_asserts in link_profile.hpp already refuse a build where a period is
-    // inside its own airtime plus the guard -- they refused 363 and 280 when this was
-    // written, which is how the periods came to be 364 and 281. This states the figures the
-    // design document and the runbook quote, so a change that stays legal while moving the
-    // published rates fails here rather than on a launch day.
-    const double gps = cansat::lora_time_on_air_ms(cansat::link::kMaxRatePacketBytesGps,
-                                                   cansat::link::kModem);
-    const double lean = cansat::lora_time_on_air_ms(cansat::link::kMaxRatePacketBytesLean,
+    // The static_asserts in link_profile.hpp refuse a build where a slot is inside its own
+    // airtime plus the guard -- they refused 363 and 280 ms in an earlier design, which is
+    // how its periods came to be rounded up. This states the figures the design document
+    // and the runbook quote, so a change that stays legal while moving them fails here.
+    const double rich = cansat::lora_time_on_air_ms(cansat::link::kRichPacketBytes,
+                                                    cansat::link::kModem);
+    const double lean = cansat::lora_time_on_air_ms(cansat::link::kLeanPacketBytes,
                                                     cansat::link::kModem);
     const auto near = [](double a, double b, double tol) { return a > b - tol && a < b + tol; };
 
-    // 201 bytes costs exactly what 199 does: both quantise to 298 symbols at SF7/125 kHz.
-    // This is the whole reason position can go on the air for free.
-    CHECK(near(gps, cansat::link::kWorstCaseAirtimeMs, 0.001));
-    CHECK(near(gps, 317.70, 0.05));
+    CHECK(cansat::link::kRichPacketBytes == 212);
+    CHECK(cansat::link::kLeanPacketBytes == 145);
+    CHECK(near(rich, 338.18, 0.05));
     CHECK(near(lean, 235.78, 0.05));
+    CHECK(cansat::link::kWorstCasePacketBytes == cansat::link::kRichPacketBytes);
 
-    CHECK(cansat::link::kMaxRatePeriodGpsMs == 364);
-    CHECK(cansat::link::kMaxRatePeriodLeanMs == 281);
+    CHECK(cansat::link::kMaxRateRichSlotMs == 385);
+    CHECK(cansat::link::kMaxRateLeanSlotMs == 281);
+    CHECK(cansat::link::kMaxRateCycleMs == 947);
 
-    // The guard is what binds, not the duty policy: at these periods the duty is ~89 % and
-    // ~85 %, and neither period would be legal if the SD write had nowhere to go.
-    CHECK(gps * 1.018 + cansat::link::kMaxRateGuardMs <=
-          static_cast<double>(cansat::link::kMaxRatePeriodGpsMs));
+    // Each slot clears its shape's measured airtime plus the guard -- the guard is the SD
+    // card's worst-case write, and it is what binds, not the duty policy.
+    CHECK(rich * 1.018 + cansat::link::kMaxRateGuardMs <=
+          static_cast<double>(cansat::link::kMaxRateRichSlotMs));
     CHECK(lean * 1.018 + cansat::link::kMaxRateGuardMs <=
-          static_cast<double>(cansat::link::kMaxRatePeriodLeanMs));
+          static_cast<double>(cansat::link::kMaxRateLeanSlotMs));
 
-    // And both are genuinely faster than normal flight, in the right order.
-    CHECK(cansat::link::kMaxRatePeriodLeanMs < cansat::link::kMaxRatePeriodGpsMs);
-    CHECK(cansat::link::kMaxRatePeriodGpsMs < cansat::link::kTelemetryPeriodMs);
+    // The requirement the pattern exists for: sensors on the air at least once a second.
+    // Two lean slots keep it; a third would not -- so three packets is the largest pattern.
+    CHECK(cansat::link::kMaxRateCycleMs <= 1000);
+    CHECK(cansat::link::kMaxRateRichSlotMs + 3 * cansat::link::kMaxRateLeanSlotMs > 1000);
+
+    // And normal flight still fits its duty cap with every packet rich.
+    CHECK(rich / static_cast<double>(cansat::link::kTelemetryPeriodMs) <=
+          cansat::link::kMaxChannelDuty);
 }
 
 void test_a_token_authorises_one_command_and_not_another() {

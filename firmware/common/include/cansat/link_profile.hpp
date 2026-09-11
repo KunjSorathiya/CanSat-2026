@@ -70,22 +70,36 @@ inline constexpr std::uint8_t kOfficialSyncWord = 0xA5;  // official launch
 // 247 for the absolute worst case (longest team id, widest packet number, extreme values).
 // The longest packet **this configuration** can transmit, measured rather than guessed.
 //
-// With the GPS fields on the air it is exactly 255 — the LoRa FIFO limit — which is a
-// ceiling the format grew into rather than a coincidence: 201 bytes of mandatory fields and
-// position, plus 54 bytes of worst-case `MODE`/`FAULTS`/`CAL`/`ARM`/`YR` tags. With
-// `Configuration::transmit_gps` false, which is the default, the three `GP-` fields are
-// logged instead of transmitted and the worst case is **199**.
+// The packet this vehicle transmits is one of two shapes, and the budget is the larger.
 //
-// That 56-byte difference is worth having. Airtime scales with length, the telemetry period
-// is computed from the worst case, and 199 bytes buys 1.43 Hz where 255 bytes allows 1.18 —
-// on a scoring line that rewards rates above 1 Hz. The position itself loses nothing: it is
-// in every SD row, and SEN-011 asks for data "transmitted or logged".
+// **Rich**: the twelve mandatory fields, then `GP-Lat`, `GP-Lon`, `GP-Alt`, then `SN-` for
+// the sound level. **Lean**: the twelve mandatory fields only. The five project-local
+// diagnostic tags -- `MODE`, `FAULTS`, `CAL`, `ARM`, `YR` -- are no longer transmitted in
+// any mode; they go to the SD log.
 //
-// This is also the runtime cap: the controller drops its optional diagnostic tags rather
-// than let a packet reach the radio's silent 255-byte truncation. Raise it back to 255
-// alongside `transmit_gps`; `validate_config()` refuses the two settings apart.
-inline constexpr std::size_t kWorstCasePacketBytes = 199;
-// The FIFO's own limit, and the figure the budget must return to if GPS is transmitted.
+// Why the shape changed: the organizers ruled on 2026-09-11 that only *transmitted*
+// telemetry is considered for extra-sensor points. GPS and sound had been logged and not
+// transmitted, so under that ruling they scored nothing. And there is no budget that holds
+// the tags as well: tags plus GPS already fill the 255-byte FIFO, and sound takes the
+// total to 266. Something had to leave the air, and the tags are the only part the
+// rulebook does not reward. See documentation/design/max-rate-command.md.
+//
+// Every figure is a worst case, and the widths are defended by a test that constructs the
+// widest packet of each shape rather than by this arithmetic.
+inline constexpr std::size_t kMandatoryPacketBytes = 145;
+inline constexpr std::size_t kGpsFieldBytes = 56;       // the three GP- fields and separators
+inline constexpr std::size_t kSoundFieldBytes = 11;     // "SN-3300.0; " -- the ADC reference
+inline constexpr std::size_t kDiagnosticTagBytes = 54;  // the five tags, when they flew
+inline constexpr std::size_t kRichPacketBytes = 212;
+inline constexpr std::size_t kLeanPacketBytes = 145;
+
+// The normal-flight budget is the rich packet: every packet in normal flight is rich,
+// because at a 700 ms cadence that is the only way to put the sensors on the air at least
+// once a second. This is also the runtime cap the controller sheds optional content to
+// stay under, rather than let a packet reach the radio's silent 255-byte truncation.
+inline constexpr std::size_t kWorstCasePacketBytes = 212;
+// Tags plus GPS: exactly the FIFO. validate_config() now computes the floor from what
+// is enabled, and this names the one legacy combination that fills the FIFO to the byte.
 inline constexpr std::size_t kWorstCasePacketBytesWithGps = 255;
 // 700 ms, 1.43 Hz. The rulebook's 1 Hz is a *minimum*, and this is as fast as the link can
 // be driven without breaking the duty policy below.
@@ -93,18 +107,18 @@ inline constexpr std::size_t kWorstCasePacketBytesWithGps = 255;
 // The arithmetic, and it is deliberately built on the measured airtime rather than the
 // model. The model reads 1.8 % low: a 255-byte packet costs 399.6 ms by the model and
 // **406.9 ms measured on this hardware**, twice, on two boards (bring-up rows 5.2 and
-// 5.3). Applying that same 1.8 % to the 199-byte packet's 317.7 ms model figure gives
-// ~323 ms, so the 50 % duty cap is a floor of ~647 ms; 700 leaves the real duty at 46 %
-// instead of sitting on the limit.
+// 5.3). Applying that same 1.8 % to the 212-byte rich packet's 338.2 ms model figure gives
+// ~344 ms, so the 50 % duty cap is a floor of ~689 ms. 700 leaves the real duty at 49 % --
+// under the limit, though not by much, and that narrowing is what GPS and sound on the air
+// cost in normal flight.
 //
 // **A second reason to be under 1000 rather than on it.** At exactly 1 Hz any jitter puts
 // an interval over a second and the vehicle momentarily below the rulebook minimum. 700
 // carries 300 ms of margin against a requirement that is checked, not estimated.
 //
-// Going faster now needs a wider bandwidth (250 kHz halves airtime and costs 3 dB of
-// sensitivity, so range) or a higher duty cap (a regulatory and courtesy question on a
-// band shared with every other team, not an engineering one). The packet itself has
-// already given up the only 56 bytes it had to give.
+// Normal flight cannot go faster without a wider bandwidth (250 kHz halves airtime and
+// costs 3 dB of sensitivity, so range) or a higher duty cap. The max-rate schedule below
+// goes faster a different way: by sending lean packets between the rich ones.
 inline constexpr std::uint32_t kTelemetryPeriodMs = 700;
 inline constexpr double kMaxChannelDuty = 0.5;
 
@@ -144,6 +158,17 @@ inline constexpr std::uint32_t kMaxRatePeriodLeanMs = 281;  // 3.56 Hz
 // measured against 399.6 modelled, twice, on two boards). A period that clears the model
 // and not the measurement is a period that fails on the bench rather than in the build.
 inline constexpr double kAirtimeMeasuredFactor = 1.018;
+
+// The max-rate schedule: a repeating pattern of one rich packet then two lean ones, each in
+// its own slot. A slot is the shape's measured airtime plus kMaxRateGuardMs, rounded up.
+//
+// Three is not a preference. The requirement is GPS and sound on the air at least once a
+// second, so the cycle -- one rich slot and N lean -- must fit in 1000 ms: N = 2 gives 947,
+// N = 3 gives 1228. The static_asserts below hold both halves of that.
+inline constexpr std::uint32_t kMaxRateRichSlotMs = 385;   // 338.18 x 1.018 + 40 = 384.26
+inline constexpr std::uint32_t kMaxRateLeanSlotMs = 281;   // 235.78 x 1.018 + 40 = 280.02
+inline constexpr std::uint32_t kMaxRateLeanPerRich = 2;
+inline constexpr std::uint32_t kMaxRateCycleMs = 947;      // 3.17 Hz, sensors at 1.06 Hz
 
 // The profile as the airtime model sees it.
 inline constexpr LoraModemParams kModem = [] {
@@ -187,6 +212,35 @@ static_assert(static_cast<double>(kMaxRatePeriodGpsMs) >=
 static_assert(static_cast<double>(kMaxRatePeriodLeanMs) >=
                   kMaxRateAirtimeLeanMs * kAirtimeMeasuredFactor + kMaxRateGuardMs,
               "the MAX_RATE_LEAN period is inside its own measured airtime plus the guard");
+
+inline constexpr double kRichAirtimeMs = lora_time_on_air_ms(kRichPacketBytes, kModem);
+inline constexpr double kLeanAirtimeMs = lora_time_on_air_ms(kLeanPacketBytes, kModem);
+
+static_assert(kRichPacketBytes == kMandatoryPacketBytes + kGpsFieldBytes + kSoundFieldBytes,
+              "the rich packet is not mandatory + GPS + sound");
+static_assert(kLeanPacketBytes == kMandatoryPacketBytes, "the lean packet is not mandatory-only");
+static_assert(kWorstCasePacketBytes == kRichPacketBytes,
+              "normal flight sends every packet rich, so its budget is the rich packet");
+static_assert(kRichPacketBytes <= kMaxLoraPayloadBytes, "the rich packet exceeds the FIFO");
+// The design's reason for taking the tags off the air, held as a fact about the bytes: if
+// tags, GPS and sound ever fit together, the reason is gone and the tags should come back.
+static_assert(kMandatoryPacketBytes + kGpsFieldBytes + kSoundFieldBytes + kDiagnosticTagBytes >
+                  kMaxLoraPayloadBytes,
+              "tags + GPS + sound now fit the FIFO -- revisit dropping the tags");
+static_assert(kRichAirtimeMs / kTelemetryPeriodMs <= kMaxChannelDuty,
+              "a rich packet every 700 ms breaks the duty cap on the model");
+static_assert(static_cast<double>(kMaxRateRichSlotMs) >=
+                  kRichAirtimeMs * kAirtimeMeasuredFactor + kMaxRateGuardMs,
+              "the rich slot is inside its own measured airtime plus the guard");
+static_assert(static_cast<double>(kMaxRateLeanSlotMs) >=
+                  kLeanAirtimeMs * kAirtimeMeasuredFactor + kMaxRateGuardMs,
+              "the lean slot is inside its own measured airtime plus the guard");
+static_assert(kMaxRateCycleMs == kMaxRateRichSlotMs + kMaxRateLeanPerRich * kMaxRateLeanSlotMs,
+              "the cycle is not one rich slot and kMaxRateLeanPerRich lean ones");
+static_assert(kMaxRateCycleMs <= 1000, "the max-rate cycle puts GPS and sound below 1 Hz");
+static_assert(kMaxRateRichSlotMs + (kMaxRateLeanPerRich + 1) * kMaxRateLeanSlotMs > 1000,
+              "one more lean slot would still keep the sensors at 1 Hz -- the pattern is not "
+              "the largest it can be");
 
 static_assert(kTelemetryPeriodMs <= kMaxTelemetryPeriodMs,
               "telemetry period must be STRICTLY faster than the rulebook's 1 Hz minimum, "
