@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 122 suites across the whole flight core | ✅ **4198 / 4198 assertions** |
+| `flight_tests` | 123 suites across the whole flight core | ✅ **4202 / 4202 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **139 / 139 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 122 suites, 4198 assertions
+### `flight_tests` — 123 suites, 4202 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -235,6 +235,7 @@ flowchart LR
 | `test_a_max_rate_command_obeys_the_replay_rules` | A token minted for a packet number the vehicle has not reached changes nothing and is counted as ignored |
 | `test_a_flight_build_cannot_be_commanded_to_max_rate` | With `allow_ground_commands` false neither rate command exists: the radio is never polled and the period never moves |
 | `test_a_flight_build_has_no_uplink_at_all` | `allow_ground_commands` defaults to false, and with it false the radio's receive is **never polled** — this is the test the README's "there is no command uplink" rests on |
+| `test_the_widest_packets_are_the_budgets_by_construction` | The widest mandatory block and GPS block the builder can produce — packet number 4294967295, a 99-hour clock, extreme negatives — are exactly `kMandatoryPacketBytes` and `kGpsFieldBytes`. It corrected them from 145 and 56 to 147 and 55 |
 | `test_the_commanded_rate_periods_clear_their_own_airtime` | Both commanded periods clear their own measured airtime plus the SD guard, 201 B costs exactly what 199 B costs, and the published rates cannot move without this failing |
 | `test_a_token_authorises_one_command_and_not_another` | A token minted for one command is refused for every other, in both directions, and an unknown command name is refused rather than matched to the nearest known one |
 | `test_the_bench_build_erases_the_log_on_command` | Enabled, in `READY` with `ARM-0`, a valid command erases the log |

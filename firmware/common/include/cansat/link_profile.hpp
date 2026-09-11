@@ -85,19 +85,25 @@ inline constexpr std::uint8_t kOfficialSyncWord = 0xA5;  // official launch
 // rulebook does not reward. See documentation/design/max-rate-command.md.
 //
 // Every figure is a worst case, and the widths are defended by a test that constructs the
-// widest packet of each shape rather than by this arithmetic.
-inline constexpr std::size_t kMandatoryPacketBytes = 145;
-inline constexpr std::size_t kGpsFieldBytes = 56;       // the three GP- fields and separators
+// widest packet of each shape rather than by this arithmetic -- at packet number
+// 4294967295, a 99:59:59:999 mission clock and the extreme values the overflow test uses.
+//
+// That test is why these read 147 and 55. The first revision of this design carried 145
+// and 56 from a commit message, and 147 is not a rounding difference: it crosses a LoRa
+// symbol boundary 145 does not (43 blocks against 42), which is 5 ms of airtime on every
+// lean packet and 5 ms on the lean slot.
+inline constexpr std::size_t kMandatoryPacketBytes = 147;
+inline constexpr std::size_t kGpsFieldBytes = 55;       // the three GP- fields and separators
 inline constexpr std::size_t kSoundFieldBytes = 11;     // "SN-3300.0; " -- the ADC reference
 inline constexpr std::size_t kDiagnosticTagBytes = 54;  // the five tags, when they flew
-inline constexpr std::size_t kRichPacketBytes = 212;
-inline constexpr std::size_t kLeanPacketBytes = 145;
+inline constexpr std::size_t kRichPacketBytes = 213;
+inline constexpr std::size_t kLeanPacketBytes = 147;
 
 // The normal-flight budget is the rich packet: every packet in normal flight is rich,
 // because at a 700 ms cadence that is the only way to put the sensors on the air at least
 // once a second. This is also the runtime cap the controller sheds optional content to
 // stay under, rather than let a packet reach the radio's silent 255-byte truncation.
-inline constexpr std::size_t kWorstCasePacketBytes = 212;
+inline constexpr std::size_t kWorstCasePacketBytes = 213;
 // Tags plus GPS: exactly the FIFO. validate_config() now computes the floor from what
 // is enabled, and this names the one legacy combination that fills the FIFO to the byte.
 inline constexpr std::size_t kWorstCasePacketBytesWithGps = 255;
@@ -107,7 +113,7 @@ inline constexpr std::size_t kWorstCasePacketBytesWithGps = 255;
 // The arithmetic, and it is deliberately built on the measured airtime rather than the
 // model. The model reads 1.8 % low: a 255-byte packet costs 399.6 ms by the model and
 // **406.9 ms measured on this hardware**, twice, on two boards (bring-up rows 5.2 and
-// 5.3). Applying that same 1.8 % to the 212-byte rich packet's 338.2 ms model figure gives
+// 5.3). Applying that same 1.8 % to the 213-byte rich packet's 338.2 ms model figure gives
 // ~344 ms, so the 50 % duty cap is a floor of ~689 ms. 700 leaves the real duty at 49 % --
 // under the limit, though not by much, and that narrowing is what GPS and sound on the air
 // cost in normal flight.
@@ -163,12 +169,12 @@ inline constexpr double kAirtimeMeasuredFactor = 1.018;
 // its own slot. A slot is the shape's measured airtime plus kMaxRateGuardMs, rounded up.
 //
 // Three is not a preference. The requirement is GPS and sound on the air at least once a
-// second, so the cycle -- one rich slot and N lean -- must fit in 1000 ms: N = 2 gives 947,
-// N = 3 gives 1228. The static_asserts below hold both halves of that.
+// second, so the cycle -- one rich slot and N lean -- must fit in 1000 ms: N = 2 gives 957,
+// N = 3 gives 1243. The static_asserts below hold both halves of that.
 inline constexpr std::uint32_t kMaxRateRichSlotMs = 385;   // 338.18 x 1.018 + 40 = 384.26
-inline constexpr std::uint32_t kMaxRateLeanSlotMs = 281;   // 235.78 x 1.018 + 40 = 280.02
+inline constexpr std::uint32_t kMaxRateLeanSlotMs = 286;   // 240.90 x 1.018 + 40 = 285.24
 inline constexpr std::uint32_t kMaxRateLeanPerRich = 2;
-inline constexpr std::uint32_t kMaxRateCycleMs = 947;      // 3.17 Hz, sensors at 1.06 Hz
+inline constexpr std::uint32_t kMaxRateCycleMs = 957;      // 3.13 Hz, sensors at 1.04 Hz
 
 // The profile as the airtime model sees it.
 inline constexpr LoraModemParams kModem = [] {

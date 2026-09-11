@@ -160,10 +160,10 @@ def main() -> int:
     checker.check("link profile: 700 ms period", period_ms == 700, str(period_ms))
     checker.check("telemetry period clears the 1 Hz rulebook minimum",
                   period_ms <= 1000, str(period_ms))
-    # 212: every normal-flight packet is rich -- the mandatory fields, GPS and sound, with
+    # 213: every normal-flight packet is rich -- the mandatory fields, GPS and sound, with
     # the diagnostic tags off the air. The organizers count only transmitted telemetry for
     # extra-sensor points, and there is no budget that holds the tags as well.
-    checker.check("link profile: 212-byte budget", budget_bytes == 212, str(budget_bytes))
+    checker.check("link profile: 213-byte budget", budget_bytes == 213, str(budget_bytes))
 
     # ---- the two commanded maximum rates -------------------------------------------
     # Neither can be undone from the ground, so every figure a document quotes about them
@@ -194,12 +194,12 @@ def main() -> int:
     rich_slot = constant(profile, "kMaxRateRichSlotMs")
     lean_slot = constant(profile, "kMaxRateLeanSlotMs")
     cycle_ms = constant(profile, "kMaxRateCycleMs")
-    checker.check("link profile: the rich packet is 212 bytes and the lean 145",
-                  rich_bytes == 212 and lean_bytes == 145, f"{rich_bytes} / {lean_bytes}")
+    checker.check("link profile: the rich packet is 213 bytes and the lean 147",
+                  rich_bytes == 213 and lean_bytes == 147, f"{rich_bytes} / {lean_bytes}")
     checker.check("the normal-flight budget is the rich packet",
                   budget_bytes == rich_bytes, f"{budget_bytes} vs {rich_bytes}")
-    rich_air = time_on_air(rich_bytes or 212, modem).time_on_air_ms * 1.018
-    lean_air = time_on_air(lean_bytes or 145, modem).time_on_air_ms * 1.018
+    rich_air = time_on_air(rich_bytes or 213, modem).time_on_air_ms * 1.018
+    lean_air = time_on_air(lean_bytes or 147, modem).time_on_air_ms * 1.018
     checker.check("the rich slot clears its measured airtime plus the guard",
                   (rich_slot or 0) >= rich_air + (guard_ms or 0),
                   f"{rich_slot} vs {rich_air + (guard_ms or 0):.2f}")

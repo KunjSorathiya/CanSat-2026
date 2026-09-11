@@ -1142,12 +1142,12 @@ void test_config_radio_airtime_guard() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
 
-    // Default: SF7/125 kHz and the 212-byte rich packet -- GPS and sound on the air, tags
+    // Default: SF7/125 kHz and the 213-byte rich packet -- GPS and sound on the air, tags
     // off -- at a 700 ms period: ~338 ms airtime, ~48 % duty on the model. The period is
     // set from the *measured* airtime rather than this model, so the check that matters is
     // below, and it is closer to the limit than it used to be.
     CHECK(flight::validate_config(c, why));
-    CHECK(c.worst_case_packet_bytes == 212);
+    CHECK(c.worst_case_packet_bytes == 213);
     CHECK(c.worst_case_packet_bytes < cansat::kMaxLoraPayloadBytes);
     CHECK(approx(flight::worst_case_airtime_ms(c), 338.2, 0.5));
     CHECK(flight::channel_duty(c) <= c.max_channel_duty);
@@ -1158,7 +1158,7 @@ void test_config_radio_airtime_guard() {
     // alone would put the true duty over the policy while every test still passed.
     {
         // 406.9 ms was measured for a 255-byte packet, 1.8 % above that packet's model
-        // figure. The same 1.8 % applied to the 212-byte model figure is the honest
+        // figure. The same 1.8 % applied to the 213-byte model figure is the honest
         // estimate for the packet this configuration actually sends.
         const double measured_airtime_ms = flight::worst_case_airtime_ms(c) * 1.018;
         const double true_duty = measured_airtime_ms / c.telemetry_period_ms;
@@ -1478,6 +1478,54 @@ void test_a_truncated_command_is_ignored() {
 
 // The digest both ends compute. A divergence here is a console that cannot command the
 // vehicle it was built for, and it would show up on the bench as "the button does nothing".
+void test_the_widest_packets_are_the_budgets_by_construction() {
+    // The widths in link_profile.hpp are held to what the builder actually produces at its
+    // widest, not to arithmetic. The first revision of the design carried 145 and 56 from a
+    // commit message; building the packets said 147 and 55, and 147 crosses a LoRa symbol
+    // boundary that 145 does not -- which moved the lean slot from 281 ms to 286.
+    //
+    // Widest means every field at its widest value: the largest packet number the format
+    // can carry, a 99-hour mission clock, and the extreme negatives the overflow test uses.
+    // The sound field is added by construction once the builder emits it.
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";   // the rulebook's format, and therefore a fixed width
+    c.transmit_gps = true;
+    flight::TelemetryBuilder builder(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = s.orientation_valid = s.baro_valid = true;
+    s.altitude_m = -9999.9;
+    s.pressure_pa = -110000.55;
+    s.temperature_c = -55.5;
+    s.roll_deg = s.pitch_deg = s.yaw_deg = -179.9;
+    s.ax_mps2 = s.ay_mps2 = s.az_mps2 = -157.99;
+
+    const auto mandatory = builder.build(4294967295u, 359999999u, s);
+    CHECK(mandatory.has_value());
+    CHECK(mandatory->packet.size() == cansat::link::kMandatoryPacketBytes);
+    if (mandatory && mandatory->packet.size() != cansat::link::kMandatoryPacketBytes) {
+        std::cerr << "  widest mandatory block is " << mandatory->packet.size()
+                  << " bytes; kMandatoryPacketBytes says " << cansat::link::kMandatoryPacketBytes
+                  << " -- move the constant, and the lean slot with it\n";
+    }
+
+    s.gps.valid = true;
+    s.gps.latitude = -89.999999;
+    s.gps.longitude = -179.999999;
+    s.gps.altitude = -9999.9;
+    const auto with_gps = builder.build(4294967295u, 359999999u, s);
+    CHECK(with_gps.has_value());
+    CHECK(with_gps->packet.size() ==
+          cansat::link::kMandatoryPacketBytes + cansat::link::kGpsFieldBytes);
+    if (with_gps && mandatory) {
+        const std::size_t gps_block = with_gps->packet.size() - mandatory->packet.size();
+        if (gps_block != cansat::link::kGpsFieldBytes) {
+            std::cerr << "  widest GP- block is " << gps_block << " bytes; kGpsFieldBytes says "
+                      << cansat::link::kGpsFieldBytes << "\n";
+        }
+    }
+}
+
 void test_the_commanded_rate_periods_clear_their_own_airtime() {
     // The static_asserts in link_profile.hpp refuse a build where a slot is inside its own
     // airtime plus the guard -- they refused 363 and 280 ms in an earlier design, which is
@@ -1489,15 +1537,15 @@ void test_the_commanded_rate_periods_clear_their_own_airtime() {
                                                     cansat::link::kModem);
     const auto near = [](double a, double b, double tol) { return a > b - tol && a < b + tol; };
 
-    CHECK(cansat::link::kRichPacketBytes == 212);
-    CHECK(cansat::link::kLeanPacketBytes == 145);
+    CHECK(cansat::link::kRichPacketBytes == 213);
+    CHECK(cansat::link::kLeanPacketBytes == 147);
     CHECK(near(rich, 338.18, 0.05));
-    CHECK(near(lean, 235.78, 0.05));
+    CHECK(near(lean, 240.90, 0.05));
     CHECK(cansat::link::kWorstCasePacketBytes == cansat::link::kRichPacketBytes);
 
     CHECK(cansat::link::kMaxRateRichSlotMs == 385);
-    CHECK(cansat::link::kMaxRateLeanSlotMs == 281);
-    CHECK(cansat::link::kMaxRateCycleMs == 947);
+    CHECK(cansat::link::kMaxRateLeanSlotMs == 286);
+    CHECK(cansat::link::kMaxRateCycleMs == 957);
 
     // Each slot clears its shape's measured airtime plus the guard -- the guard is the SD
     // card's worst-case write, and it is what binds, not the duty policy.
@@ -4217,6 +4265,7 @@ int main(int argc, char** argv) {
     test_a_telemetry_packet_is_never_a_command();
     test_an_unconfigured_vehicle_matches_nothing();
     test_a_truncated_command_is_ignored();
+    test_the_widest_packets_are_the_budgets_by_construction();
     test_the_commanded_rate_periods_clear_their_own_airtime();
     test_a_token_authorises_one_command_and_not_another();
     test_command_tokens_match_the_shared_fixture(repo_root);
