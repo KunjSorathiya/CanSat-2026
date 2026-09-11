@@ -258,7 +258,7 @@ are the only part the rulebook does not reward, so they are the part that left.
 from the shared fixture, and the console shows it under the GPS panel.
 
 **What it costs.** The console no longer sees mission state, fault count or calibration live
--- those are on the card, and in the vehicle's startup summary over USB. The link is tighter
+— those are on the card, and in the vehicle's startup summary over USB. The link is tighter
 against its duty cap than it has been. And after the max-rate command two packets in three
 are lean and carry no sensors at all, which is still at least one sensor reading a second
 ([max-rate-command.md](max-rate-command.md)).
