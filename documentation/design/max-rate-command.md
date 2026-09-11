@@ -347,6 +347,11 @@ a power cycle restores 1.43 Hz.
   closed the old window before anyone could use it. Five minutes of listening, then
   recalibration and arming, is a window an operator can actually use — and a launch inside it
   is not detected, which the runbook says in bold.
+- **The sealed build does not wait for the button** (2026-09-11). With the USB port closed a
+  missed press, or a watchdog reset in flight, could never be reflashed away, so
+  `auto_max_rate` engages the pattern when the window closes, or at once when there is no
+  window. The window stays at 700 ms: a command takes ~110 ms on the air and no max-rate gap
+  is that long. `MAX_RATE` now only closes the window early.
 - **RAM latch, token bound to the command.** Unchanged from the previous design, for the same
   reasons.
 

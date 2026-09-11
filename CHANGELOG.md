@@ -8,6 +8,26 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-11 (cycle 52) — the sealed flight build
+
+The USB port is closed after this image, so nothing a button press or a lucky boot decides may
+set the rate, and every setting is the one the vehicle flies with.
+
+### Changed — max rate without a button
+
+`auto_max_rate`: the vehicle goes to the max-rate pattern the moment its five-minute command
+window closes, and at once after a watchdog reset. A missed press, or a reset in flight, used to
+mean 1.43 Hz for the rest of the power cycle. The window itself stays at 1.43 Hz, because at max
+rate no gap between packets is long enough to hear a ~110 ms command in; `MAX_RATE` now only
+closes it early. The uplink and its `change-me` password stay, at the team's decision.
+
+### Changed — the battery divider
+
+`battery_divider_ratio` 2.0 (33 kΩ over 33 kΩ into GP26) and a 3.5 V low-battery warning, on the
+team's confirmation that the divider is fitted. Bring-up row 2.6, the measurement, is still open.
+
+---
+
 ## [Unreleased] — 2026-09-11 (cycle 51)
 
 The first bench run of cycle 50 held `MAX_RATE` at 3.10 Hz with 1 of 327 packets missing — and a

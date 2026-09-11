@@ -72,10 +72,21 @@ flight::Configuration make_config() {
     // the official word and nothing else. On the test word, 0xF3, their station heard only
     // the few packets the SX127x's sync filter lets through (2026-09-11).
     config.radio_mode = flight::RadioMode::official;
+    // The sealed flight build (2026-09-11): the USB port is closed after this image, so
+    // nothing that depends on a button press or a lucky boot may decide the rate. Max rate
+    // when the window closes, at once without one, and at once after a watchdog reset.
+    config.auto_max_rate = true;
+    // The battery divider: 33 kOhm over 33 kOhm into GP26, ratio 2.0 (bring-up row 2.6),
+    // confirmed fitted by the team on 2026-09-11. A 4.20 V cell reads 2.10 V at the pin.
+    // 3.5 V raises battery_low -- a warning, counted in the status field and nothing more.
+    config.battery_divider_ratio = 2.0f;
+    config.battery_low_voltage = 3.5f;
 #ifdef CANSAT_HAVE_LOCAL_SECRETS
-    // The uplink, and with it the pre-arm command window: five minutes from power-on to send
-    // MAX_RATE, after which the vehicle recalibrates on the pad and arms. The drone must not
-    // lift off until it has -- a launch inside the window is not detected.
+    // The uplink, and with it the pre-arm command window: five minutes from power-on, at
+    // 1.43 Hz so a command can be heard, after which the vehicle goes to max rate by itself,
+    // recalibrates on the pad and arms. MAX_RATE only closes the window early. The drone
+    // must not lift off until the vehicle has armed -- a launch inside the window is not
+    // detected.
     config.allow_ground_commands = true;
     config.command_password = cansat_local::kCommandPassword;
 #endif
@@ -175,9 +186,11 @@ void print_startup_summary(const flight::Configuration& config,
         std::printf(" uplink    disabled in this build (no flight/local_secrets.hpp)\n");
     } else if (h.command_window_open) {
         const unsigned long left_s = (h.command_window_left_ms + 999) / 1000;
-        std::printf(" uplink    OPEN for %lu:%02lu more -- not arming until it closes"
+        std::printf(" uplink    OPEN for %lu:%02lu more -- %s"
                     " | commands accepted %lu, refused %lu\n",
                     left_s / 60, left_s % 60,
+                    config.auto_max_rate ? "then MAX-RATE, recalibrate, arm"
+                                         : "not arming until it closes",
                     static_cast<unsigned long>(h.ground_commands_accepted),
                     static_cast<unsigned long>(h.ground_commands_ignored));
     } else {

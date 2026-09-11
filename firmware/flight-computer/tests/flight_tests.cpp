@@ -4446,6 +4446,73 @@ void test_a_build_without_the_uplink_arms_as_it_always_has() {
     CHECK(ctrl.health().armed);
 }
 
+// The sealed flight build. The window runs at 700 ms -- at max rate no gap is long enough to
+// hear a command in -- and the moment it closes the vehicle is at max rate with nobody
+// pressing anything, then recalibrates and arms.
+void test_the_sealed_build_goes_to_max_rate_when_its_window_closes() {
+    WindowRig r;
+    r.c.auto_max_rate = true;
+    r.c.command_window_ms = 5000;
+    flight::Controller ctrl(r.c, r.imu, r.baro, r.gps, r.radio, r.logger, r.board);
+    CHECK(ctrl.initialize());
+    CHECK(!ctrl.health().rate_maxed);
+    for (std::uint64_t t = 0; t <= 4999; ++t) ctrl.poll(t);
+    CHECK(ctrl.health().command_window_open);
+    CHECK(!ctrl.health().rate_maxed);
+    const std::size_t in_window = r.radio.packets.size();
+    CHECK(in_window == 8);                      // 0, 700, ... 4900: the normal schedule
+
+    for (std::uint64_t t = 5000; t <= 14000; ++t) ctrl.poll(t);
+    CHECK(!ctrl.health().command_window_open);
+    CHECK(ctrl.health().rate_maxed);
+    CHECK(ctrl.health().armed);                 // recalibrated and armed after the close
+
+    std::vector<std::uint64_t> times;
+    for (const std::string& p : r.radio.packets) {
+        const auto parsed = cansat::parse_packet(p);
+        CHECK(static_cast<bool>(parsed));
+        times.push_back(parsed ? parsed.record->timestamp_ms : 0);
+    }
+    for (std::size_t i = 0; i + 1 < in_window; ++i) CHECK(times[i + 1] - times[i] == 700);
+    // After the close: rich, lean, lean, in their slots, from the first packet of the pattern.
+    std::size_t start = times.size();
+    for (std::size_t i = in_window - 1; i + 1 < times.size(); ++i) {
+        if (times[i + 1] - times[i] == cansat::link::kMaxRateRichSlotMs) { start = i; break; }
+    }
+    CHECK(start < in_window + 2);               // it did not wait for anyone
+    CHECK(start + 7 < times.size());
+    for (std::size_t k = start; k + 1 < times.size(); ++k) {
+        const bool rich = (k - start) % 3 == 0;
+        CHECK(times[k + 1] - times[k] == (rich ? cansat::link::kMaxRateRichSlotMs
+                                               : cansat::link::kMaxRateLeanSlotMs));
+    }
+}
+
+// Without a window to wait for -- no uplink, or a watchdog reset that may have come mid-flight --
+// the sealed build is at max rate from its first packet.
+void test_the_sealed_build_is_at_max_rate_at_once_without_a_window() {
+    for (const bool watchdog : {false, true}) {
+        WindowRig r;
+        r.c.auto_max_rate = true;
+        r.c.allow_ground_commands = watchdog;   // the reset case keeps its uplink configured
+        flight::Controller ctrl(r.c, r.imu, r.baro, r.gps, r.radio, r.logger, r.board);
+        ctrl.set_boot_cause(watchdog);
+        CHECK(ctrl.initialize());
+        CHECK(ctrl.health().rate_maxed);
+        for (std::uint64_t t = 0; t <= 3000; ++t) ctrl.poll(t);
+        CHECK(!ctrl.health().command_window_open);
+        std::vector<std::uint64_t> times;
+        for (const std::string& p : r.radio.packets) {
+            const auto parsed = cansat::parse_packet(p);
+            times.push_back(parsed ? parsed.record->timestamp_ms : 0);
+        }
+        CHECK(times.size() >= 8);
+        CHECK(times.size() >= 2 && times[1] - times[0] == cansat::link::kMaxRateRichSlotMs);
+        CHECK(times.size() >= 3 && times[2] - times[1] == cansat::link::kMaxRateLeanSlotMs);
+        CHECK(r.radio.receive_polls == 0);      // and it never listens
+    }
+}
+
 void test_a_command_window_must_have_a_length() {
     std::string why;
     flight::Configuration c;
@@ -4882,6 +4949,8 @@ int main(int argc, char** argv) {
     test_an_erase_does_not_close_the_command_window();
     test_a_watchdog_reset_skips_the_command_window();
     test_a_build_without_the_uplink_arms_as_it_always_has();
+    test_the_sealed_build_goes_to_max_rate_when_its_window_closes();
+    test_the_sealed_build_is_at_max_rate_at_once_without_a_window();
     test_a_command_window_must_have_a_length();
     test_a_flight_build_has_no_uplink_at_all();
     test_the_bench_build_erases_the_log_on_command();

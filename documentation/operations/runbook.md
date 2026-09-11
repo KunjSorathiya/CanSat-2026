@@ -440,6 +440,12 @@ That is **3.11 Hz** of packets with GPS and sound on the air at **1.04 Hz** — 
 every 966 ms. The twelve mandatory fields are in every packet, and the SD log records GPS
 and sound for every packet, lean ones included.
 
+> [!NOTE]
+> **The sealed flight build (2026-09-11) goes to max rate by itself** — when its command
+> window closes, and at once after a watchdog reset. The window stays at 1.43 Hz because at
+> max rate no gap between packets is long enough to hear a command in. The button only
+> closes the window early.
+
 > [!WARNING]
 > **This cannot be undone.** An accepted `MAX_RATE` closes the uplink in the same instant it
 > changes the schedule: the vehicle stops listening for the rest of the power cycle, and a
@@ -482,7 +488,8 @@ vehicle then discards the calibration it took at power-on, recalibrates where it
 arms — about six seconds later if it is still.
 
 1. Power the vehicle on the pad and leave it still.
-2. Within five minutes, press **Max rate** if the flight is to use it. The window closes at once.
+2. The window closes by itself at five minutes, and the flight build then goes to max rate on
+   its own — nobody has to press anything. Press **Max rate** only to close it sooner.
 3. **Do not lift off until the window has closed and the vehicle has armed.** The console's
    **Armed** row reads `ARMED` once it has — from the `ST-` status field the vehicle sends
    about once a second — and **Calibration** reads `complete`. The *Command window* row's

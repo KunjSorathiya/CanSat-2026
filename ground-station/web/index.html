@@ -500,7 +500,7 @@ input[type=file] { display: none; }
             title="Erase the vehicle's onboard log, equivalent to prepare_sd_card.py. Serial link only, and the vehicle obeys only in READY with ARM-0">Erase SD log</button>
 
     <button class="hbtn" id="maxrate-btn" disabled
-            title="Switch to the fastest telemetry schedule: about 3.11 packets a second, with GPS and sound on the air once a second. Only during the five-minute command window after power-on. IRREVERSIBLE until power-off: the vehicle stops accepting commands, recalibrates and arms">Max rate</button>
+            title="Close the command window now. The flight build goes to its fastest schedule by itself when the five-minute window runs out -- about 3.11 packets a second, GPS and sound once a second -- and this makes it happen now. IRREVERSIBLE until power-off: the vehicle stops accepting commands, recalibrates and arms">Max rate</button>
 
     <button class="hbtn" id="pause-btn" aria-pressed="false" title="Freeze the display; packets keep arriving and are buffered">
       <svg width="14" height="14" aria-hidden="true"><use href="#i-pause" id="pause-icon"/></svg><span id="pause-label">Pause</span>
@@ -2809,11 +2809,13 @@ const COMMANDS = {
   MAX_RATE: {
     note: "max-rate command sent",
     prompt:
-      "Switch to the fastest telemetry schedule: about 3.11 packets a second, with the GPS " +
-      "position and the sound level on the air once a second." +
+      "Close the command window now: the vehicle goes to its fastest schedule -- about 3.11 " +
+      "packets a second, with the GPS position and the sound level on the air once a second. " +
+      "The flight build does this by itself when the five-minute window runs out; this only " +
+      "makes it happen now." +
       "\n\nTHIS CANNOT BE UNDONE. The vehicle stops accepting commands the moment it takes " +
       "effect, recalibrates where it sits, and arms a few seconds later. Only a power " +
-      "cycle restores it." +
+      "cycle reopens the window." +
       "\n\nThe mandatory fields are unchanged and always first." +
       "\n\nThe vehicle refuses unless it is in READY with ARM-0.",
   },

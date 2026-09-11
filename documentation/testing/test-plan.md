@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 141 suites across the whole flight core | ✅ **4582 / 4582 assertions** |
+| `flight_tests` | 143 suites across the whole flight core | ✅ **4674 / 4674 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **168 / 168 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 141 suites, 4582 assertions
+### `flight_tests` — 143 suites, 4674 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -245,6 +245,8 @@ flowchart LR
 | `test_an_erase_does_not_close_the_command_window` | Only `MAX_RATE` closes the window early; an erase leaves it open |
 | `test_a_watchdog_reset_skips_the_command_window` | A vehicle restarting from the watchdog never opens the window and never polls the radio, so a reset in flight does not leave it unarmed |
 | `test_a_build_without_the_uplink_arms_as_it_always_has` | With no uplink there is no window, and the vehicle arms three seconds after power-on as before |
+| `test_the_sealed_build_goes_to_max_rate_when_its_window_closes` | With `auto_max_rate`, the command window runs at 700 ms and the moment it times out the vehicle is in the rich, lean, lean pattern with nobody pressing anything, then recalibrates and arms |
+| `test_the_sealed_build_is_at_max_rate_at_once_without_a_window` | With no window to wait for — no uplink, or a watchdog reset — the sealed build is at max rate from its first packet and never listens |
 | `test_a_command_window_must_have_a_length` | `validate_config()` refuses a zero or unbounded window when the uplink is on, and ignores the length when it is off |
 | `test_a_flight_build_has_no_uplink_at_all` | `allow_ground_commands` defaults to false, and with it false the radio's receive is **never polled** — this is the test the README's "there is no command uplink" rests on |
 | `test_a_task_can_be_rescheduled_from_the_packet_it_just_sent` | `reschedule()` sets the next due time from the fire time of the packet just sent and the slot its shape needs — 374 ms after a rich packet, 296 after a lean one — which `due()` alone cannot, since it advances by the period it held when it fired |

@@ -338,6 +338,14 @@ struct Configuration {
     // arming follows -- so the reference the vehicle flies on is taken on the pad, after the
     // operator has finished with it. A watchdog reset skips the window: it may be mid-flight.
     std::uint32_t command_window_ms = 300000;
+    // Engage the max-rate schedule without a command: at power-on when there is no window to
+    // wait for (no uplink, or a watchdog reset, which may be mid-flight), and otherwise the
+    // moment the window closes. The window itself stays at 700 ms, because at max rate no
+    // gap between packets is long enough to hear a ~110 ms command in -- so with this on,
+    // MAX_RATE simply closes the window early. Off by default, so the suites keep testing
+    // the flashed schedule; main.cpp turns it on for the sealed flight build, where a
+    // missed button press or a reset in flight could never be reflashed away.
+    bool auto_max_rate = false;
     std::uint32_t gps_baud = 9600;          // NEO-6M default
     std::uint32_t gps_uart_fifo_bytes = 32; // RP2040 UART FIFO depth
 

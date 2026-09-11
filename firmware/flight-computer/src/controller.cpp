@@ -67,6 +67,8 @@ bool Controller::initialize() {
         // record it so the ground station can see the recovery.
         faults_.report(FaultCode::watchdog_reboot, FaultSeverity::warning, 0);
     }
+    // With no window to wait for, the sealed build is at max rate from the first packet.
+    if (config_.auto_max_rate && !window_open_) engage_max_rate();
 
     std::string why;
     if (!validate_config(config_, why)) {
@@ -552,6 +554,9 @@ void Controller::close_command_window(std::uint64_t mission_ms) {
     uplink_closed_ = true;
     calibrator_.reset();
     calibration_applied_ = false;
+    // The sealed build does not wait for the button: whichever way the window closed, the
+    // flight that follows is at max rate.
+    if (config_.auto_max_rate && !max_rate_) engage_max_rate();
 }
 
 void Controller::feed_state_machine(std::uint64_t mission_ms) {
