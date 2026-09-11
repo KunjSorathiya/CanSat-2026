@@ -1528,21 +1528,22 @@ void test_a_token_authorises_one_command_and_not_another() {
     std::string swapped = erase;
     const std::size_t at = swapped.find("ERASE_LOG");
     CHECK(at != std::string::npos);
-    swapped.replace(at, std::string("ERASE_LOG").size(), "MAX_RATE_LEAN");
+    swapped.replace(at, std::string("ERASE_LOG").size(), "MAX_RATE");
     CHECK(cansat::parse_command(swapped, team, password, pn) == cansat::CommandKind::none);
 
-    const std::string lean =
-        cansat::format_command(team, cansat::CommandKind::max_rate_lean, password, 40);
-    CHECK(cansat::parse_command(lean, team, password, pn) == cansat::CommandKind::max_rate_lean);
-    std::string back = lean;
-    const std::size_t at2 = back.find("MAX_RATE_LEAN");
+    const std::string rate =
+        cansat::format_command(team, cansat::CommandKind::max_rate, password, 40);
+    CHECK(cansat::parse_command(rate, team, password, pn) == cansat::CommandKind::max_rate);
+    std::string back = rate;
+    const std::size_t at2 = back.find("MAX_RATE");
     CHECK(at2 != std::string::npos);
-    back.replace(at2, std::string("MAX_RATE_LEAN").size(), "ERASE_LOG");
+    back.replace(at2, std::string("MAX_RATE").size(), "ERASE_LOG");
     CHECK(cansat::parse_command(back, team, password, pn) == cansat::CommandKind::none);
 
     // And a name this build does not know is none, rather than the nearest thing it knows.
-    std::string unknown = lean;
-    unknown.replace(at2, std::string("MAX_RATE_LEAN").size(), "MAX_RATE_LEANER");
+    // MAX_RATE_LEAN is the case that matters: an earlier build understood it.
+    std::string unknown = rate;
+    unknown.replace(at2, std::string("MAX_RATE").size(), "MAX_RATE_LEAN");
     CHECK(cansat::parse_command(unknown, team, password, pn) == cansat::CommandKind::none);
 }
 
@@ -1572,8 +1573,7 @@ void test_command_tokens_match_the_shared_fixture(const std::string& repo_root) 
         // beats quietly computing a token for CommandKind::none and reporting a mismatch.
         cansat::CommandKind kind = cansat::CommandKind::none;
         if (command == "ERASE_LOG") kind = cansat::CommandKind::erase_log;
-        else if (command == "MAX_RATE_GPS") kind = cansat::CommandKind::max_rate_gps;
-        else if (command == "MAX_RATE_LEAN") kind = cansat::CommandKind::max_rate_lean;
+        else if (command == "MAX_RATE") kind = cansat::CommandKind::max_rate;
         CHECK(kind != cansat::CommandKind::none);
         CHECK(cansat::command_token(password, kind, pn) == expected);
         ++rows;
@@ -3703,7 +3703,7 @@ void test_the_builder_can_be_told_to_carry_position_after_construction() {
 }
 
 void test_the_gps_command_speeds_up_and_puts_position_on_the_air() {
-    GroundLink link(true, cansat::CommandKind::max_rate_gps);
+    GroundLink link(true, cansat::CommandKind::max_rate);
     link.run(6000);
     CHECK(link.state == flight::MissionState::ready);
     CHECK(link.accepted == 1);
@@ -3720,28 +3720,12 @@ void test_the_gps_command_speeds_up_and_puts_position_on_the_air() {
     CHECK(last.find("YR-") == std::string::npos);
 }
 
-void test_the_lean_command_speeds_up_further_and_carries_no_position() {
-    GroundLink link(true, cansat::CommandKind::max_rate_lean);
-    link.run(6000);
-    CHECK(link.accepted == 1);
-    CHECK(link.rate_maxed);
-    CHECK(link.period_after == cansat::link::kMaxRatePeriodLeanMs);
-    CHECK(link.period_after < cansat::link::kMaxRatePeriodGpsMs);
-    const std::string& last = link.radio.packets.back();
-    CHECK(last.find("GP-Lat-") == std::string::npos);
-    CHECK(last.find("MODE-") == std::string::npos);
-    // Mandatory data is untouched by either command -- it is the whole packet now.
-    CHECK(last.rfind("CAN-Team-25; P-", 0) == 0);
-    CHECK(last.find("; A-") != std::string::npos);
-    CHECK(last.find("; AZ-") != std::string::npos);
-}
-
 void test_either_command_closes_the_uplink_behind_it() {
     // The harness keeps a command on the air the whole time, so an uplink still listening
     // would accept another the moment the replay window allowed it. Exactly one is ever
     // accepted and the radio is never polled again, which is the promise the button makes
     // when it says the vehicle stops accepting commands.
-    GroundLink link(true, cansat::CommandKind::max_rate_lean);
+    GroundLink link(true, cansat::CommandKind::max_rate);
     link.run(8000);
     CHECK(link.accepted == 1);
     const int polls_at_latch = link.radio.receive_polls;
@@ -3757,21 +3741,23 @@ void test_the_other_max_rate_command_is_unreachable_after_the_first() {
     // Whichever lands first wins. The second is not refused -- it is not heard, which is a
     // different thing and the one an operator has to understand: there is no switching
     // between the two modes.
-    GroundLink link(true, cansat::CommandKind::max_rate_gps);
+    GroundLink link(true, cansat::CommandKind::max_rate);
     link.run(6000);
     CHECK(link.period_after == cansat::link::kMaxRatePeriodGpsMs);
 
-    link.kind = cansat::CommandKind::max_rate_lean;
+    // The other command there is: an erase. It is not refused, it is not heard.
+    link.kind = cansat::CommandKind::erase_log;
     link.radio.inbox.clear();
     link.run_more(8000);
     CHECK(link.period_after == cansat::link::kMaxRatePeriodGpsMs);
     CHECK(link.accepted == 1);
+    CHECK(link.logger.erases == 0);
 }
 
 void test_an_armed_vehicle_refuses_to_change_rate() {
     // The same window as the erase, for a stronger reason: this one cannot be undone, and a
     // vehicle that is armed is a vehicle nobody is holding.
-    GroundLink link(true, cansat::CommandKind::max_rate_lean);
+    GroundLink link(true, cansat::CommandKind::max_rate);
     link.c.arming_delay_ms = 0;
     link.c.require_calibration_to_arm = false;
     link.run(4000);
@@ -3794,7 +3780,7 @@ void test_a_max_rate_command_obeys_the_replay_rules() {
     CHECK(ctrl.initialize());
 
     radio.inbox.push_back(cansat::format_command(
-        "CAN-Team-25", cansat::CommandKind::max_rate_gps, c.command_password, 100000));
+        "CAN-Team-25", cansat::CommandKind::max_rate, c.command_password, 100000));
     for (std::uint64_t ms = 0; ms <= 5000; ms += 10) ctrl.poll(ms);
     CHECK(!ctrl.health().rate_maxed);
     CHECK(ctrl.telemetry_period_ms() == c.telemetry_period_ms);
@@ -3805,7 +3791,7 @@ void test_a_flight_build_cannot_be_commanded_to_max_rate() {
     // The property the README rests on, restated for the commands that matter most: with
     // allow_ground_commands false the radio is never polled, so neither rate command exists
     // as far as the vehicle is concerned.
-    GroundLink link(false, cansat::CommandKind::max_rate_lean);
+    GroundLink link(false, cansat::CommandKind::max_rate);
     link.run(6000);
     CHECK(link.accepted == 0);
     CHECK(!link.rate_maxed);
@@ -4204,7 +4190,6 @@ int main(int argc, char** argv) {
     test_the_packet_cadence_is_the_same_in_every_state();
     test_the_builder_can_be_told_to_carry_position_after_construction();
     test_the_gps_command_speeds_up_and_puts_position_on_the_air();
-    test_the_lean_command_speeds_up_further_and_carries_no_position();
     test_either_command_closes_the_uplink_behind_it();
     test_the_other_max_rate_command_is_unreachable_after_the_first();
     test_an_armed_vehicle_refuses_to_change_rate();

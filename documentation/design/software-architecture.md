@@ -571,7 +571,7 @@ refactor.
 
 | Scope | Status |
 |---|---|
-| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 123 C++ suites with 4204 assertions, plus the LoRa driver (139) and the microSD driver (613) against simulated devices, 229 Python tests including an end-to-end trace, and 65 Node tests |
+| Flight core logic, telemetry format, parser, framing, GPS parsing, fix ageing and validation, state machine, attitude fusion, calibration, radio airtime, sensor timing, packet-size degradation, log recovery | **Verified on host** — 122 C++ suites with 4195 assertions, plus the LoRa driver (139) and the microSD driver (613) against simulated devices, 229 Python tests including an end-to-end trace, and 65 Node tests |
 | Pico HAL sources | **Compile-checked only** — `-fsyntax-only` against minimal SDK stubs |
 | Pico firmware image | **Not built here** — requires `PICO_SDK_PATH` and `pico_sdk_import.cmake` |
 | Sensors, radio link, SD card, power, antenna | **Verified on the soldered vehicle board, 2026-09-07.** Gates 3, 4, 5, 6 and 7 all pass: both I2C sensors on one bus, clean NMEA, airtime within 1.8 % of the model over 55 transmits, the card writing and sustaining ~300 writes/s, and the shared SPI0 bus clean across 200 interleaved rounds. See the [bring-up record](../testing/bring-up-record.md). **Not verified: the sound module, the battery divider, the switch and the antenna's range performance** |

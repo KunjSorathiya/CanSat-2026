@@ -4,7 +4,7 @@
 #
 # The command is in the material, and that is the point of this file having a command
 # column at all: without it a token authorises any command at that packet number, and a
-# captured ERASE_LOG frame becomes a valid MAX_RATE_LEAN frame with the key untouched.
+# captured ERASE_LOG frame becomes a valid MAX_RATE frame with the key untouched.
 #
 # The last row is deliberately non-ASCII: the token is computed over UTF-8 bytes, and a
 # JavaScript implementation that hashed UTF-16 code units would agree on every other row
@@ -13,15 +13,15 @@
 # password	command	packet_number	token
 change-me	ERASE_LOG	1	1d974615f01a9eee
 change-me	ERASE_LOG	2	1d974515f01a9d3b
-change-me	MAX_RATE_GPS	1	b34674efa599958b
-change-me	MAX_RATE_LEAN	1	3cff1b98addaef37
+change-me	MAX_RATE	1	313eca51fddc1998
+change-me	MAX_RATE	2	313ecd51fddc1eb1
 change-me	ERASE_LOG	4294967295	f6f2c2bfac3b0430
-change-me	MAX_RATE_LEAN	4294967295	330c371852cf276b
+change-me	MAX_RATE	4294967295	271ef6c63388298e
 hunter2	ERASE_LOG	0	3d3873c195372e80
 hunter2	ERASE_LOG	1	3d3874c195373033
-hunter2	MAX_RATE_GPS	0	20793aaa1b470dd7
+hunter2	MAX_RATE	0	2930a4aa896be6a4
 a longer pass phrase with spaces	ERASE_LOG	1234	b3177fe8d85b9325
-a longer pass phrase with spaces	MAX_RATE_LEAN	1234	70a0f224cc49d8a6
+a longer pass phrase with spaces	MAX_RATE	1234	e786515a9ada94eb
 p@ssw0rd!#$%	ERASE_LOG	42	d32bd736939bbbc4
 éàü	ERASE_LOG	7	55e7070c2da249f7
-éàü	MAX_RATE_GPS	7	6b4d99ac711eaf24
+éàü	MAX_RATE	7	82df4ffa9fe85ed3

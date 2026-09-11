@@ -681,8 +681,7 @@ void Controller::service_ground_commands(std::uint64_t mission_ms) {
             }
             break;
         }
-        case cansat::CommandKind::max_rate_gps:
-        case cansat::CommandKind::max_rate_lean: {
+        case cansat::CommandKind::max_rate: {
             // The same replay rules as the erase, and for the same reason: a token is worth
             // one use at one packet number. It matters more here -- an erase costs a log
             // that can be re-recorded, and this cannot be undone at all without a power
@@ -696,7 +695,7 @@ void Controller::service_ground_commands(std::uint64_t mission_ms) {
             }
             last_command_pn_ = command_pn;
             ++health_.ground_commands_accepted;
-            engage_max_rate(kind == cansat::CommandKind::max_rate_gps);
+            engage_max_rate(true);
             break;
         }
         case cansat::CommandKind::none:

@@ -12,9 +12,8 @@ namespace cansat {
 // where erasing the log between test runs otherwise means unplugging the vehicle and
 // pulling the card.
 //
-//     CAN-Team-25; CMD-ERASE_LOG;     PN-1234; KEY-3f9a1c04b7e25d68;
-//     CAN-Team-25; CMD-MAX_RATE_GPS;  PN-1234; KEY-b34674efa599958b;
-//     CAN-Team-25; CMD-MAX_RATE_LEAN; PN-1234; KEY-3cff1b98addaef37;
+//     CAN-Team-25; CMD-ERASE_LOG; PN-1234; KEY-faf2196294218bc3;
+//     CAN-Team-25; CMD-MAX_RATE;  PN-1234; KEY-0b6374a6c40cc799;
 //
 // **What the key is, and what it is not.**
 //
@@ -35,14 +34,12 @@ namespace cansat {
 // acts on a command only in READY with ARM-0, on the ground, and only if it was built with
 // ground commands enabled at all.
 enum class CommandKind {
-    none,           // not a command, or not one this vehicle will act on
-    erase_log,      // reset the onboard log to empty
-    // Both of these raise the packet rate for the rest of the power cycle and close the
-    // uplink behind themselves -- after either one the vehicle stops listening, so neither
-    // can be undone and the other becomes unreachable. See
-    // documentation/design/max-rate-command.md.
-    max_rate_gps,   // fastest rate that still carries the GP- fields
-    max_rate_lean,  // fastest rate this vehicle has; position stays in the log
+    none,       // not a command, or not one this vehicle will act on
+    erase_log,  // reset the onboard log to empty
+    // Switch to the fastest telemetry schedule for the rest of the power cycle and close the
+    // uplink behind it. After this the vehicle stops listening, so it can be neither repeated
+    // nor undone. See documentation/design/max-rate-command.md.
+    max_rate,
 };
 
 // FNV-1a over `password + "|" + command + "|" + packet_number`, rendered as 16 lowercase
@@ -50,10 +47,10 @@ enum class CommandKind {
 // agreed answers so the C++ and JavaScript implementations cannot drift apart unnoticed.
 //
 // **The command is in the material, and it has to be.** Without it a token authorises any
-// command at that packet number, and a captured ERASE_LOG frame becomes a valid
-// MAX_RATE_LEAN frame by editing four words with the key untouched. That was invisible
-// while there was one command; it is not acceptable with three, two of which cannot be
-// undone. Returns empty for an empty password or CommandKind::none.
+// command at that packet number, and a captured ERASE_LOG frame becomes a valid MAX_RATE
+// frame by editing one word with the key untouched. That was invisible while there was one
+// command; it is not acceptable once one of them cannot be undone. Returns empty for an
+// empty password or CommandKind::none.
 std::string command_token(const std::string& password, CommandKind kind,
                           std::uint32_t packet_number);
 

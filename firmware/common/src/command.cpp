@@ -10,20 +10,18 @@ namespace {
 const char* name_of(CommandKind kind) {
     switch (kind) {
         case CommandKind::erase_log: return "ERASE_LOG";
-        case CommandKind::max_rate_gps: return "MAX_RATE_GPS";
-        case CommandKind::max_rate_lean: return "MAX_RATE_LEAN";
+        case CommandKind::max_rate: return "MAX_RATE";
         case CommandKind::none: break;
     }
     return "";
 }
 
-// The inverse, and deliberately exhaustive rather than a prefix match: MAX_RATE_LEANER is
-// not MAX_RATE_LEAN, and a command this build does not know must read as none rather than
-// as the nearest thing it recognises.
+// The inverse, and deliberately exhaustive rather than a prefix match: MAX_RATE_LEAN, a
+// command an earlier build understood, is not MAX_RATE, and a name this build does not know
+// must read as none rather than as the nearest thing it recognises.
 CommandKind kind_of(const std::string& name) {
     if (name == "ERASE_LOG") return CommandKind::erase_log;
-    if (name == "MAX_RATE_GPS") return CommandKind::max_rate_gps;
-    if (name == "MAX_RATE_LEAN") return CommandKind::max_rate_lean;
+    if (name == "MAX_RATE") return CommandKind::max_rate;
     return CommandKind::none;
 }
 

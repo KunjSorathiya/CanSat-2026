@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 123 suites across the whole flight core | ✅ **4204 / 4204 assertions** |
+| `flight_tests` | 122 suites across the whole flight core | ✅ **4195 / 4195 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **139 / 139 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 123 suites, 4204 assertions
+### `flight_tests` — 122 suites, 4195 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -229,7 +229,6 @@ flowchart LR
 | `test_the_packet_cadence_is_the_same_in_every_state` | A full profile — pad, boost, coast, descent, landing — and **every gap between consecutive packets equals `telemetry_period_ms`**, whatever state the vehicle was in. The test asserts it actually reached `FLIGHT` and `LANDED` first, so it cannot pass on a mission that never left the pad. State detection drives the `MODE` tag and the LED blink; it must never drive the rate |
 | `test_the_builder_can_be_told_to_carry_position_after_construction` | The builder holds its own copy of the configuration, so a command putting position on the air has to tell it directly |
 | `test_the_gps_command_speeds_up_and_puts_position_on_the_air` | `MAX_RATE_GPS` moves the period to 364 ms, adds the three `GP-` fields and drops all five diagnostic tags |
-| `test_the_lean_command_speeds_up_further_and_carries_no_position` | `MAX_RATE_LEAN` moves the period to 281 ms, drops the tags, keeps position in the log, and leaves the mandatory fields intact |
 | `test_either_command_closes_the_uplink_behind_it` | After an accepted rate command the radio is never polled again, with a command still on the air the whole time |
 | `test_the_other_max_rate_command_is_unreachable_after_the_first` | Whichever command lands first wins; the other is not refused but unheard, so there is no switching between modes |
 | `test_an_armed_vehicle_refuses_to_change_rate` | The rate commands obey the same READY-with-`ARM-0` window as the erase |

@@ -839,7 +839,7 @@ test("command tokens match the fixture the firmware reads", () => {
 });
 
 test("each command renders its own name, and the password never travels", () => {
-  for (const kind of ["ERASE_LOG", "MAX_RATE_GPS", "MAX_RATE_LEAN"]) {
+  for (const kind of ["ERASE_LOG", "MAX_RATE"]) {
     const frame = M.formatCommand("CAN-Team-25", kind, "hunter2", 12);
     assert.ok(frame.includes("CMD-" + kind + ";"), `${kind} is not named in its own frame`);
     assert.ok(!frame.includes("hunter2"), "the password reached the wire");
@@ -852,7 +852,7 @@ test("a frame minted for one command is not a frame for another", () => {
   // two commands that share a key: that is the property the firmware relies on when it
   // refuses a token belonging to a different command.
   const a = M.formatCommand("CAN-Team-25", "ERASE_LOG", "hunter2", 12);
-  const b = M.formatCommand("CAN-Team-25", "MAX_RATE_LEAN", "hunter2", 12);
+  const b = M.formatCommand("CAN-Team-25", "MAX_RATE", "hunter2", 12);
   const keyOf = f => f.slice(f.indexOf("KEY-"));
   assert.notStrictEqual(keyOf(a), keyOf(b));
 });
@@ -877,5 +877,5 @@ test("a token is bound to one packet number", () => {
   assert.strictEqual(M.commandToken("", "ERASE_LOG", 42), "", "no password must mint no token");
   // The command is in the material, so one token can never stand in for another.
   assert.notStrictEqual(M.commandToken("hunter2", "ERASE_LOG", 42),
-                        M.commandToken("hunter2", "MAX_RATE_LEAN", 42));
+                        M.commandToken("hunter2", "MAX_RATE", 42));
 });
