@@ -203,6 +203,50 @@ console.log(JSON.stringify(Object.keys(result.record)));
                              f"{name} is listed as Python-only but the console now has it too")
 
 
+class StatusFieldTests(unittest.TestCase):
+    """Every case in test-data/status-tag-cases.tsv, as this parser expands it.
+
+    The firmware encodes the field and the web console decodes it from the same file, so the
+    three cannot drift apart.
+    """
+
+    CASES = Path(__file__).parents[3] / "test-data" / "status-tag-cases.tsv"
+
+    def _load(self):
+        cases = []
+        with self.CASES.open(encoding="utf-8") as handle:
+            for line in handle:
+                line = line.rstrip("\n").rstrip("\r")
+                if not line.strip() or line.lstrip().startswith("#"):
+                    continue
+                cases.append(line.split("\t"))
+        return cases
+
+    def test_every_case_expands_as_recorded(self):
+        cases = self._load()
+        self.assertGreaterEqual(len(cases), 12)
+        for name, value, mode, armed, calibrated, faults in cases:
+            with self.subTest(case=name):
+                result = parse_packet(PACKET + " ST-" + value + ";")
+                self.assertTrue(result, f"{name}: packet rejected outright")
+                record = result.record
+                if mode == "-":
+                    self.assertIsNone(record.mode)
+                    self.assertIsNone(record.armed)
+                    self.assertIsNone(record.calibrated)
+                    self.assertIsNone(record.fault_count)
+                else:
+                    self.assertEqual(record.mode, mode)
+                    self.assertEqual(record.armed, armed == "1")
+                    self.assertEqual(record.calibrated, calibrated == "1")
+                    self.assertEqual(record.fault_count, int(faults))
+
+    def test_a_tag_the_vehicle_sent_explicitly_wins(self):
+        result = parse_packet(PACKET + " MODE-FLIGHT; ST-R110;")
+        self.assertEqual(result.record.mode, "FLIGHT")
+        self.assertTrue(result.record.armed)
+
+
 class OptionalTagSplittingTests(unittest.TestCase):
     """Every case in test-data/optional-tag-cases.tsv, as this parser splits it.
 

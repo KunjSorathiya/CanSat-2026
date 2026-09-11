@@ -97,16 +97,16 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 139 suites across the whole flight core | ✅ **4473 / 4473 assertions** |
+| `flight_tests` | 141 suites across the whole flight core | ✅ **4582 / 4582 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **168 / 168 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
-| Python ground station | 8 modules | ✅ **141 / 141 tests** |
+| Python ground station | 8 modules | ✅ **143 / 143 tests** |
 | Python tooling | `tools/link_budget.py`, and `tools/cad_dimensions.py` — the STEP reader the mechanical documents take their dimensions from, tested against hand-built STEP files with known extents, the trailing-dot real literal that first defeated it, a circle bulging past every vertex, and the two files it must refuse rather than under-measure | ✅ **49 / 49 tests** |
 | Python simulations | `simulations/descent.py` — canopy sizing, the closed-form fall against both of its own limits, ISA air density, and the mass-tolerance argument | ✅ **40 / 40 tests** |
 | Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **290 / 290 claims** |
-| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **68 / 68 tests** |
+| Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **70 / 70 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
 Translation units syntax-checked: flight `main`, `bringup_main`, `pico_hal`, `pico_radio`,
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 139 suites, 4473 assertions
+### `flight_tests` — 141 suites, 4582 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -263,6 +263,8 @@ flowchart LR
 | `test_a_command_with_the_wrong_password_is_ignored` | A wrong password, or none, yields no command. The token is a digest of the password and the packet number, so the check is on the digest and the password itself never travels |
 | `test_the_password_never_appears_on_the_wire` | The formatted command does not contain the password anywhere. The link is unencrypted, so this is the property that makes a password worth having at all |
 | `test_a_token_is_valid_for_exactly_one_packet_number` | Moving a valid token to a different `PN-` breaks it. This is what makes a captured frame single-use, and everything the controller does about replay rests on it |
+| `test_the_status_field_matches_the_shared_fixture` | The firmware's `ST-` encoder produces exactly the value every row of `test-data/status-tag-cases.tsv` records, nine bytes on the air with its separators, and nine or more faults read `9`. Both ground parsers decode the same file |
+| `test_the_status_field_rides_on_rich_packets` | Every normal-flight packet carries `ST-` inside the 200-byte budget with GPS still on the air and the full tags still off it; a still vehicle's status reads armed and calibrated; dropping it raises no oversize fault; `transmit_status = false` turns it off |
 | `test_command_tokens_match_the_shared_fixture` | Every row of [`test-data/command-tokens.tsv`](../../test-data/command-tokens.tsv) hashes to its recorded token, including a non-ASCII password — the console reads the same file, so a C++/JavaScript divergence fails the build instead of appearing as "the button does nothing" |
 | `test_a_replayed_command_erases_nothing` | The exact frame that worked once, sent again later, erases nothing and is counted as ignored |
 | `test_a_command_minted_for_a_future_packet_is_refused` | A token pre-computed for a packet number the vehicle has not reached is refused, so a stockpile of them is useless |
@@ -324,7 +326,7 @@ and a known GGA sentence parses to the expected latitude with no checksum errors
 
 ## Python test suites
 
-### `test_telemetry.py` — 20 tests
+### `test_telemetry.py` — 22 tests
 
 Rulebook packet parses; the `CAN-Team-XX` placeholder is rejected; empty and corrupt
 packets are rejected; decimal precision is enforced and extra fields are tolerated;

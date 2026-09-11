@@ -831,6 +831,7 @@ function parsePacket(str, team) {
     if (k > 1 && of[k - 1] === "-") k -= 1;
     if (k > 0) rec.tags[of.slice(0, k)] = of.slice(k + 1);
   }
+  expandStatusTag(rec.tags);
   const g = k => rec.tags[k] !== undefined ? parseFloat(rec.tags[k]) : null;
   rec.gps_lat = g("GP-Lat"); rec.gps_lon = g("GP-Lon"); rec.gps_alt = g("GP-Alt");
   // The sound level, from the optional SN- field: transmitted because only the air is scored
@@ -1055,6 +1056,23 @@ function unescapeRaw(text) {
    is the one reading that costs something: a vehicle in FLIGHT or FAULT whose MODE tag
    was dropped would show a calm nominal word, and the phase ladder would light READY to
    agree with it. An unreported state is reported as unreported. */
+/* The compact status field, ST-<state><armed><calibrated><faults> -- "ST-R110" is READY,
+   armed, calibrated, no active faults. The vehicle sends it on every rich packet it fits,
+   because the five diagnostic tags are off the air. Expanded into the MODE, ARM, CAL and
+   FAULTS tags the rest of the console already reads; a tag sent explicitly wins. Mirrors
+   _expand_status() in telemetry.py; test-data/status-tag-cases.tsv holds both, and the
+   firmware's encoder, to one definition. */
+const STATUS_STATES = { I: "INIT", T: "SELF_TEST", R: "READY", F: "FLIGHT", L: "LANDED",
+                        V: "RECOVERY", X: "FAULT" };
+function expandStatusTag(tags) {
+  const m = /^([ITRFLVX])([01])([01])([0-9])$/.exec(tags["ST"] || "");
+  if (!m) return;
+  if (tags["MODE"] === undefined) tags["MODE"] = STATUS_STATES[m[1]];
+  if (tags["ARM"] === undefined) tags["ARM"] = m[2];
+  if (tags["CAL"] === undefined) tags["CAL"] = m[3];
+  if (tags["FAULTS"] === undefined) tags["FAULTS"] = m[4];
+}
+
 function missionStateView(mode) {
   if (mode === null || mode === undefined || mode === "") {
     return { name: "—", live: "Mission state not reported", phase: null };
@@ -1222,6 +1240,7 @@ function resetSession() {
   samples = [];
   rows = [];
   latest = null;
+  lastStatus = null;
   missionT = 0;
   pn = 0;
   yawState = { v: 0 };
@@ -1254,7 +1273,10 @@ function ingest(raw, frameKind) {
     tag: rep.duplicate ? "dup" : (rep.accepted ? "ok" : "rej"),
     text: raw, note: rep.notes.join("; "),
   });
-  if (rep.accepted && !rep.duplicate) { latest = res.record; pushSample(res.record); }
+  if (rep.accepted && !rep.duplicate) {
+    latest = res.record; pushSample(res.record);
+    if (res.record.mode !== null) lastStatus = res.record;
+  }
 }
 
 /* Local ENU metres from the first accepted fix — the datum for the 3D scene
@@ -2446,6 +2468,12 @@ const TILES = [
   $("#ladder-names").innerHTML = PHASE_SHORT.map(n => "<span>" + n + "</span>").join("");
 })();
 
+/* The last packet that carried the vehicle's status. It rides on rich packets only -- one in
+   three after Max rate -- so the Mission panel holds it for up to STATUS_HOLD_MS of the
+   vehicle's own clock rather than blanking on every lean packet, and then says it is not
+   reported rather than show a stale one as current. */
+let lastStatus = null;
+const STATUS_HOLD_MS = 3000;
 let lastState = "", slowTick = 0;
 
 function render(force) {
@@ -2508,7 +2536,10 @@ function render(force) {
   drawSpark($("#rate-spark"), health.rateHistory, C.accent, true);
 
   /* ---- mission ---- */
-  const st = latest ? latest.mode : (source === "demo" && missionT < 1 ? "SELF_TEST" : "INIT");
+  const age = latest && lastStatus ? latest.timestamp_ms - lastStatus.timestamp_ms : NaN;
+  const stRec = age >= 0 && age <= STATUS_HOLD_MS ? lastStatus : null;
+  const st = latest ? (stRec ? stRec.mode : null)
+                    : (source === "demo" && missionT < 1 ? "SELF_TEST" : "INIT");
   const sv = missionStateView(st);
   $("#state-name").textContent = sv.name;
   const sc = STATE_COLOR[sv.phase] || STATE_COLOR.INIT;
@@ -2530,15 +2561,15 @@ function render(force) {
   $("#kv-team").textContent = latest ? latest.team_id : "—";
   $("#kv-packet").textContent = latest ? "P-" + String(latest.packet_number).padStart(3, "0") : "—";
   const calEl = $("#kv-cal"), armEl = $("#kv-arm");
-  if (latest && latest.calibrated !== null && latest.calibrated !== undefined) {
-    setStat(calEl, latest.calibrated ? "complete" : "in progress",
-            latest.calibrated ? "goodv" : "warnv", latest.calibrated ? "i-check" : "i-warn");
+  if (stRec && stRec.calibrated !== null && stRec.calibrated !== undefined) {
+    setStat(calEl, stRec.calibrated ? "complete" : "in progress",
+            stRec.calibrated ? "goodv" : "warnv", stRec.calibrated ? "i-check" : "i-warn");
   } else setStat(calEl, "—", "", "");
-  if (latest && latest.armed !== null && latest.armed !== undefined) {
-    setStat(armEl, latest.armed ? "ARMED" : "safe", latest.armed ? "critv" : "", latest.armed ? "i-bolt" : "i-lock");
+  if (stRec && stRec.armed !== null && stRec.armed !== undefined) {
+    setStat(armEl, stRec.armed ? "ARMED" : "safe", stRec.armed ? "critv" : "", stRec.armed ? "i-bolt" : "i-lock");
   } else setStat(armEl, "—", "", "");
-  const fc = latest && latest.fault_count !== undefined && latest.fault_count !== null
-    ? latest.fault_count : null;
+  const fc = stRec && stRec.fault_count !== undefined && stRec.fault_count !== null
+    ? stRec.fault_count : null;
   // The command window, from the vehicle clock. The Max rate button is only useful while it
   // is open, so it greys out when the clock says the window has closed.
   const wv = commandWindowView(latest ? latest.timestamp_ms : NaN, maxRateSentAtMs);

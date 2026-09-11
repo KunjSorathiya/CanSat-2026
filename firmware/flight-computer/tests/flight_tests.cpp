@@ -1777,6 +1777,84 @@ void test_a_token_authorises_one_command_and_not_another() {
     CHECK(cansat::parse_command(unknown, team, password, pn) == cansat::CommandKind::none);
 }
 
+// The compact status field against its shared definition, which both ground parsers also
+// read. The firmware encodes; they decode; the file is the contract.
+void test_the_status_field_matches_the_shared_fixture(const std::string& repo_root) {
+    const std::string path = repo_root + "/test-data/status-tag-cases.tsv";
+    std::ifstream file(path);
+    CHECK(file.is_open());
+    std::string line;
+    int rows = 0;
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty() || line[0] == '#') continue;
+        std::vector<std::string> cols;
+        std::size_t start = 0;
+        for (std::size_t tab; (tab = line.find('\t', start)) != std::string::npos; start = tab + 1) {
+            cols.push_back(line.substr(start, tab - start));
+        }
+        cols.push_back(line.substr(start));
+        CHECK(cols.size() == 6);
+        if (cols.size() != 6 || cols[2] == "-") continue;  // not a field the firmware makes
+        bool found = false;
+        for (int s = 0; s <= static_cast<int>(flight::MissionState::fault); ++s) {
+            const auto state = static_cast<flight::MissionState>(s);
+            if (cols[2] != flight::to_string(state)) continue;
+            found = true;
+            const std::string field = flight::TelemetryBuilder::status_field(
+                state, cols[3] == "1", cols[4] == "1",
+                static_cast<std::uint32_t>(cols[5][0] - '0'));
+            CHECK(field == "ST-" + cols[1]);
+            CHECK(field.size() + 2 == cansat::link::kStatusFieldBytes);  // " " and ";"
+        }
+        CHECK(found);
+        ++rows;
+    }
+    CHECK(rows >= 9);
+    // Nine or more active faults all read 9: the field is one digit wide, always.
+    CHECK(flight::TelemetryBuilder::status_field(flight::MissionState::fault, false, true, 15) ==
+          "ST-X019");
+}
+
+// The console lost mission state and arming when the tags left the air. The status field puts
+// them back on every rich packet that has room -- which is every one a normal flight produces
+// -- without moving the budget, the slots, or a sensor field.
+void test_the_status_field_rides_on_rich_packets() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 7000; t += 10) ctrl.poll(t);
+
+    CHECK(!radio.packets.empty());
+    for (const auto& packet : radio.packets) {
+        CHECK(packet.find(" ST-R") != std::string::npos);  // READY on the ground
+        CHECK(packet.find("GP-Lat-") != std::string::npos);
+        CHECK(packet.find("MODE-") == std::string::npos);  // the tags stay off the air
+        CHECK(packet.size() <= cansat::link::kWorstCasePacketBytes);
+        CHECK(static_cast<bool>(cansat::parse_packet(packet)));
+    }
+    // The last packets are armed and calibrated: the vehicle sat still with no uplink.
+    CHECK(radio.packets.back().find(" ST-R11") != std::string::npos);
+    CHECK(!ctrl.faults().active(flight::FaultCode::packet_oversize));
+
+    // Off means off.
+    flight::Configuration quiet = c;
+    quiet.transmit_status = false;
+    flight::test::MockRadio radio2;
+    flight::Controller ctrl2(quiet, imu, baro, gps, radio2, logger, board);
+    CHECK(ctrl2.initialize());
+    ctrl2.poll(0);
+    CHECK(radio2.packets.size() == 1);
+    CHECK(radio2.packets.front().find("ST-") == std::string::npos);
+}
+
 void test_command_tokens_match_the_shared_fixture(const std::string& repo_root) {
     const std::string path = repo_root + "/test-data/command-tokens.tsv";
     std::ifstream file(path);
@@ -4829,6 +4907,8 @@ int main(int argc, char** argv) {
     test_the_commanded_rate_periods_clear_their_own_airtime();
     test_a_token_authorises_one_command_and_not_another();
     test_command_tokens_match_the_shared_fixture(repo_root);
+    test_the_status_field_matches_the_shared_fixture(repo_root);
+    test_the_status_field_rides_on_rich_packets();
     test_a_fix_with_too_few_satellites_is_refused();
     test_a_fix_with_poor_geometry_is_refused();
     test_a_good_fix_still_passes_and_carries_its_quality();

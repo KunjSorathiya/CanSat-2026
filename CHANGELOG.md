@@ -8,6 +8,38 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-11 (cycle 51)
+
+The first bench run of cycle 50 held `MAX_RATE` at 3.10 Hz with 1 of 327 packets missing — and a
+console that could not say whether the vehicle had armed.
+
+### Added — the vehicle's status is back on the air
+
+`ST-<state><armed><calibrated><faults>` — `ST-R110` is READY, armed, calibrated, no active
+faults — on every rich packet it fits. Nine bytes, and opportunistic: dropped silently from any
+packet it would push past 200, so it moves no budget, slot or sensor field. Both parsers expand
+it into the `MODE`, `ARM`, `CAL` and `FAULTS` tags, and the console holds the last one through
+lean packets for up to 3 s of vehicle clock. `test-data/status-tag-cases.tsv` defines it for the
+encoder and both decoders.
+
+### Fixed — the bridge talked over the vehicle
+
+The bridge relayed a command the instant the PC sent it, and a half-duplex radio cannot listen
+while it transmits. A command landing on a telemetry packet cost that packet — both `MAX_RATE`
+bench runs lost exactly one, 1 in 544 and 1 in 327, each with one command sent — and one landing
+while the vehicle was transmitting was never heard at all. The bridge now holds a command
+(`#tx=queued`) until 20 ms after it next hears the vehicle, when the vehicle is listening and
+its next packet is at least ~375 ms away, and sends it anyway after 1.5 s of silence
+(`ground/uplink_timer.hpp`).
+
+### Not changed — transmit power
+
+17 dBm is the most the RA-02 gives on PA_BOOST for continuous use. The SX1278's 20 dBm mode is
+limited by its datasheet to 1 % transmit duty; this vehicle transmits 46 % of the time, and 84 %
+after `MAX_RATE`. At −35 dBm on the bench the signal was not what lost the packet.
+
+---
+
 ## [Unreleased] — 2026-09-11 (cycle 50)
 
 The range-test log, and the organizers' ground station. Their receiver code was shared with the

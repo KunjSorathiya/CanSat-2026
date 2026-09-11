@@ -408,7 +408,9 @@ anyone who has read the repository knows it. It lives in the gitignored `local_s
 
 A wrong password produces a valid-looking frame that the vehicle silently ignores — there is
 no "wrong password" reply, because answering one would tell an attacker they had guessed
-wrong. Watch `#tx=ok` for the send and then check the vehicle itself.
+wrong. The bridge answers `#tx=queued` at once and `#tx=ok` when it sends: it holds a command
+until just after it next hears the vehicle, so the command lands while the vehicle is
+listening and never on top of a telemetry packet. Then check the vehicle itself.
 
 `#tx=ok` from the bridge means the command reached the air. **It does not mean the log was
 erased** — the vehicle may have been armed, out of range, or built with the uplink off.
@@ -461,7 +463,8 @@ panel counts the window down from the vehicle's own clock and greys the button o
 has closed. The button asks for the vehicle password and shows the packet number it binds the
 command to; the password is never transmitted. Then:
 
-1. `#tx=ok` from the bridge means the frame reached the air. **It does not mean the vehicle
+1. `#tx=queued`, then `#tx=ok` within about a second, from the bridge means the frame reached
+   the air. **It does not mean the vehicle
    acted** — confirm on the station's rate, which moves within one cycle.
 2. Every third packet carries `GP-` and `SN-`, and the two between carry neither. That
    pattern in the raw monitor is the second confirmation.
@@ -481,7 +484,9 @@ arms — about six seconds later if it is still.
 1. Power the vehicle on the pad and leave it still.
 2. Within five minutes, press **Max rate** if the flight is to use it. The window closes at once.
 3. **Do not lift off until the window has closed and the vehicle has armed.** The console's
-   *Command window* row reads "should be armed (est.)" when it has. A launch inside the window
+   **Armed** row reads `ARMED` once it has — from the `ST-` status field the vehicle sends
+   about once a second — and **Calibration** reads `complete`. The *Command window* row's
+   "should be armed (est.)" is only an estimate from the clock; trust the **Armed** row. A launch inside the window
    is not detected: launch, apogee and landing detection all need the vehicle armed.
 4. A watchdog reset skips the window. The vehicle closes its uplink at once and arms, so a reset
    in flight never leaves it deaf to its own descent.

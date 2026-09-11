@@ -224,8 +224,8 @@ the bench fallback turned out to be. The window is now its own phase:
    after power-on exactly as before. The password lives in that gitignored file; the build
    refuses the template's `SET-ME` and anything under eight characters. The team flies `change-me`.
 
-**The operator cannot see arming directly** — the `ARM` tag is off the air. The console infers
-the window from the mission clock in every packet and labels it an estimate. **A launch inside
+**The operator sees arming in the `ST-` status field**, on every rich packet. The console also
+estimates the window from the mission clock in every packet, and labels that an estimate. **A launch inside
 the window is not detected**, so the drone waits for the vehicle to arm.
 
 ## What latches
@@ -292,7 +292,7 @@ by the team's own bridge alone.
 
 | | Effect |
 |---|---|
-| **Live mission state on the console** | **Lost by default.** Without `MODE` and `ARM` on the air the console shows mission state as "unreported". The vehicle's startup summary over USB and the SD log still carry it |
+| **Live mission state on the console** | **Back since 2026-09-11, about once a second.** The `ST-` status field — state, armed, calibrated and active faults in nine bytes — rides on every rich packet it fits, and the console holds it through the lean ones. The full diagnostic tags stay off the air |
 | **The SD log** | Becomes the only in-flight record of mission state, faults and calibration. The bench vehicle currently reports **`SD card FAILED`**, which matters more under this design than before it |
 | **Log capacity** | ~30 hours at 1.43 Hz; ~13.7 hours after `MAX_RATE` |
 | **Average current** | Normal flight moves ~41 → ~43 mA for the radio. After `MAX_RATE`, ~76 mA. Peaks unchanged — they are set by coincident TX, SD write and GPS acquisition, not by rate |

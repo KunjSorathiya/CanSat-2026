@@ -102,6 +102,26 @@ std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
     return built;
 }
 
+std::string TelemetryBuilder::status_field(MissionState state, bool armed, bool calibrated,
+                                           std::uint32_t active_faults) {
+    char letter = 'I';
+    switch (state) {
+        case MissionState::init: letter = 'I'; break;
+        case MissionState::self_test: letter = 'T'; break;
+        case MissionState::ready: letter = 'R'; break;
+        case MissionState::flight: letter = 'F'; break;
+        case MissionState::landed: letter = 'L'; break;
+        case MissionState::recovery: letter = 'V'; break;
+        case MissionState::fault: letter = 'X'; break;
+    }
+    std::string out = "ST-";
+    out += letter;
+    out += armed ? '1' : '0';
+    out += calibrated ? '1' : '0';
+    out += static_cast<char>('0' + (active_faults > 9 ? 9 : active_faults));
+    return out;
+}
+
 std::string TelemetryBuilder::sd_header() {
     // sound_mv_pp and sound_clipped sit before `packet` so the packet string stays the last
     // column: it contains no commas but it is by far the widest field, and a reader opening

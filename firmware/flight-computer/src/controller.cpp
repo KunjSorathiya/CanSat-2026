@@ -591,6 +591,13 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         // Four characters, because the ground station must never have to guess which of
         // the two it is looking at and the airtime budget has no room for a longer tag.
         extra.push_back(std::string("YR-") + (snapshot_.yaw_is_magnetic ? "M" : "G"));
+    } else if (config_.transmit_status && rich) {
+        // The status the tags used to carry, in one nine-byte field, so the console can say
+        // what state the vehicle is in and whether it has armed. Rich packets only: the lean
+        // slot is sized for the mandatory block alone, and one status a second is plenty.
+        extra.push_back(TelemetryBuilder::status_field(state_machine_.state(), is_armed(mission_ms),
+                                                       calibrator_.complete(),
+                                                       faults_.active_count()));
     }
     auto built = builder_.build(candidate, mission_ms, snapshot_, extra, rich);
 
@@ -604,8 +611,12 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
     };
 
     if (too_long(built) && !extra.empty()) {
-        // 1. Diagnostic tags: project-local, the least valuable.
-        faults_.report(FaultCode::packet_oversize, FaultSeverity::warning, mission_ms);
+        // 1. Diagnostic tags or the status field: project-local, the least valuable. The
+        // status field is opportunistic -- it rides only when it fits -- so dropping it is not
+        // an oversize event and raises no fault.
+        if (config_.append_diagnostic_fields) {
+            faults_.report(FaultCode::packet_oversize, FaultSeverity::warning, mission_ms);
+        }
         extra.clear();
         built = builder_.build(candidate, mission_ms, snapshot_, extra, rich);
     }

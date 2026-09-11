@@ -98,6 +98,10 @@ inline constexpr std::size_t kMandatoryPacketBytes = 147;
 inline constexpr std::size_t kGpsFieldBytes = 51;       // the three GP- fields and separators
 inline constexpr std::size_t kSoundFieldBytes = 11;     // " SN-3300.0;" -- the ADC reference
 inline constexpr std::size_t kDiagnosticTagBytes = 54;  // the five tags, when they flew
+// " ST-R110;" -- state, armed, calibrated, active faults, in one field. It rides on a rich
+// packet only when it fits the budget and is dropped silently when it does not, so it is not
+// part of any floor or slot: see Configuration::transmit_status.
+inline constexpr std::size_t kStatusFieldBytes = 9;
 inline constexpr std::size_t kRichPacketBytes = 209;    // all three at their widest together
 inline constexpr std::size_t kLeanPacketBytes = 147;
 

@@ -1,0 +1,39 @@
+# CanSat 2026 — the compact status field
+#
+# ST-<state><armed><calibrated><faults>, nine bytes on the air with its separators, carried on
+# every rich packet it fits. It is how the console knows the vehicle's mission state, whether
+# it is armed and calibrated, and how many faults are active, now that the five diagnostic tags
+# are off the air to make room for GPS and sound inside the organizers' 200-byte limit.
+#
+#   state       I INIT, T SELF_TEST, R READY, F FLIGHT, L LANDED, V RECOVERY, X FAULT
+#   armed       1 or 0
+#   calibrated  1 or 0
+#   faults      active fault count, 0 to 9 -- 9 means nine or more
+#
+# Both ground parsers expand it into the MODE, ARM, CAL and FAULTS tags the console and the
+# CSV already read, and the firmware encodes it. All three read this file:
+#
+#   firmware/flight-computer/tests/flight_tests.cpp   (encoder)
+#   ground-station/software/tests/test_telemetry.py   (Python decoder)
+#   ground-station/web/tests/console_core.test.mjs    (JavaScript decoder)
+#
+# Format: <id> TAB <value after "ST-"> TAB <MODE> TAB <ARM> TAB <CAL> TAB <FAULTS>
+# A row whose MODE is "-" is not a status field: the firmware never produces it, and a parser
+# must leave all four tags absent rather than guess.
+#
+init	I000	INIT	0	0	0
+self_test	T000	SELF_TEST	0	0	0
+ready_calibrating	R001	READY	0	0	1
+ready_calibrated	R010	READY	0	1	0
+ready_armed	R110	READY	1	1	0
+flight	F110	FLIGHT	1	1	0
+flight_with_faults	F112	FLIGHT	1	1	2
+landed	L110	LANDED	1	1	0
+recovery	V110	RECOVERY	1	1	0
+fault_saturated	X019	FAULT	0	1	9
+
+# Not status fields.
+unknown_state	Q110	-	-	-	-
+too_long	R1100	-	-	-	-
+armed_not_binary	R210	-	-	-	-
+lowercase	r110	-	-	-	-

@@ -265,12 +265,24 @@ against its duty cap than it has been. And after the max-rate command two packet
 are lean and carry no sensors at all, which is still at least one sensor reading a second
 ([max-rate-command.md](max-rate-command.md)).
 
+### The status field
+
+Mission state and arming left the air with the diagnostic tags, and an operator who cannot see
+whether the vehicle has armed cannot follow the rule that it must be armed before lift-off.
+So one compact field puts them back: `ST-<state><armed><calibrated><faults>`, where `ST-R110`
+is READY, armed, calibrated, no active faults. It is nine bytes with its separators, and it is
+**opportunistic** — sent on every rich packet it fits and dropped silently from any packet it
+would push past the 200-byte budget, so it moves no floor, no slot and no sensor field. Every
+rich packet of the 2026-09-10 range test had room for it. Both ground parsers expand it into
+the `MODE`, `ARM`, `CAL` and `FAULTS` tags; [`status-tag-cases.tsv`](../../test-data/status-tag-cases.tsv)
+defines it for the encoder and both decoders.
+
 ### Open: the pack voltage is measured and not transmitted
 
 The vehicle samples its battery through the divider on `GP26`, keeps the result in its
 health snapshot, and raises a fault when it falls below `battery_low_voltage`. **The
 voltage itself never leaves the vehicle.** The transmitted optional fields are `GP-Lat`,
-`GP-Lon`, `GP-Alt` and `SN-`, and nothing else. The fault count left the air with the other
+`GP-Lon`, `GP-Alt`, `SN-` and the `ST-` status field, and nothing else. The fault count left the air with the other
 diagnostic tags, so an operator watching the link now sees neither the margin nor the low-
 voltage fault until the SD log is read.
 

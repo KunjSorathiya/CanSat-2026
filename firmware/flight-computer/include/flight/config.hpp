@@ -400,6 +400,14 @@ struct Configuration {
     // reward. They are always in the SD log. Turn this on for bench work; the controller
     // sheds the tags first whenever a packet would not fit, so it never costs the sensors.
     bool append_diagnostic_fields = false;
+
+    // What the tags used to tell the console, in nine bytes: ST-<state><armed><calibrated>
+    // <faults>, e.g. ST-R110 (test-data/status-tag-cases.tsv). On every rich packet it fits,
+    // and dropped from any packet it would push past the budget, silently -- it is
+    // opportunistic, so it costs no rate, no slot and never a sensor field. Every rich packet
+    // of the 2026-09-10 range test had room for it. After MAX_RATE that is one packet in
+    // three, so the console holds the last status it saw.
+    bool transmit_status = true;
 };
 
 inline std::uint8_t sync_word(const Configuration& config) {

@@ -197,6 +197,28 @@ def _finite(value: float) -> bool:
     return not (math.isnan(value) or math.isinf(value))
 
 
+# The compact status field, ST-<state><armed><calibrated><faults> -- "ST-R110" is READY,
+# armed, calibrated, no active faults. The vehicle sends it on every rich packet it fits,
+# because the five diagnostic tags are off the air. It is expanded into the MODE, ARM, CAL and
+# FAULTS tags everything downstream already reads; a tag the vehicle sent explicitly wins.
+# Mirrors expandStatusTag() in the web console; test-data/status-tag-cases.tsv holds both, and
+# the firmware's encoder, to one definition.
+_STATUS_STATES = {"I": "INIT", "T": "SELF_TEST", "R": "READY", "F": "FLIGHT",
+                  "L": "LANDED", "V": "RECOVERY", "X": "FAULT"}
+_STATUS_PATTERN = re.compile(r"([ITRFLVX])([01])([01])([0-9])")
+
+
+def _expand_status(tags: dict[str, str]) -> None:
+    match = _STATUS_PATTERN.fullmatch(tags.get("ST", ""))
+    if not match:
+        return
+    state, armed, calibrated, faults = match.groups()
+    tags.setdefault("MODE", _STATUS_STATES[state])
+    tags.setdefault("ARM", armed)
+    tags.setdefault("CAL", calibrated)
+    tags.setdefault("FAULTS", faults)
+
+
 def parse_packet(packet: str, expected_team: Optional[str] = None) -> ParseResult:
     fields = [part.strip() for part in packet.split(";") if part.strip()]
     if len(fields) < 12:
@@ -258,6 +280,7 @@ def parse_packet(packet: str, expected_team: Optional[str] = None) -> ParseResul
             if key.endswith("-"):
                 key, value = key[:-1], "-" + value
             tags[key] = value
+    _expand_status(tags)
 
     return ParseResult(
         TelemetryRecord(team_id, packet_number, timestamp, *values,

@@ -1,6 +1,7 @@
 #include "cansat/link_profile.hpp"
 #include "cansat/sx1278.hpp"
 #include "ground/framing.hpp"
+#include "ground/uplink_timer.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -126,6 +127,7 @@ int main() {
 
     std::uint8_t buffer[256];
     ground::FrameReader uplink;   // PC -> bridge, the same framing as bridge -> PC
+    ground::UplinkTimer uplink_timer;  // holds a command until the gap after a vehicle packet
     std::uint32_t frames = 0;
     std::uint32_t radio_failures = 0;
     std::uint32_t last_status = radio_millis(nullptr);
@@ -141,10 +143,11 @@ int main() {
             sleep_ms(200);
         } else {
             // Uplink, and it is the only thing this bridge ever transmits. A framed line
-            // from the PC is relayed to the air and the receiver put straight back; the
-            // bridge does not inspect the payload, because deciding whether a command is
-            // legitimate is the vehicle's job and duplicating that judgement here would
-            // mean two places to get it wrong.
+            // from the PC is held until the gap after the vehicle's next packet (see
+            // ground/uplink_timer.hpp), then relayed to the air and the receiver put straight
+            // back. The bridge does not inspect the payload, because deciding whether a
+            // command is legitimate is the vehicle's job and duplicating that judgement here
+            // would mean two places to get it wrong.
             int host_byte;
             while ((host_byte = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) {
                 // Fed here as well as at the top of the outer loop. This loop drains
@@ -156,15 +159,10 @@ int main() {
                 watchdog_update();
                 std::string command;
                 switch (uplink.feed(static_cast<char>(host_byte), command)) {
-                    case ground::FrameReader::Status::ok: {
-                        const bool sent = radio.transmit(
-                            reinterpret_cast<const std::uint8_t*>(command.data()),
-                            command.size(), 2000);
-                        radio.start_receive();
-                        if (sent) ++g_commands_sent;
-                        emit(sent ? "#tx=ok" : "#tx=failed");
+                    case ground::FrameReader::Status::ok:
+                        emit(uplink_timer.hold(command, radio_millis(nullptr))
+                                 ? "#tx=queued" : "#tx=rejected reason=busy");
                         break;
-                    }
                     case ground::FrameReader::Status::crc_error:
                         emit("#tx=rejected reason=crc");
                         break;
@@ -178,6 +176,7 @@ int main() {
 
             const std::size_t n = radio.poll_receive(buffer, sizeof(buffer));
             if (n > 0) {
+                uplink_timer.heard_packet(radio_millis(nullptr));
                 emit(std::string(reinterpret_cast<const char*>(buffer), n));
                 ++frames;
                 radio_failures = 0;
@@ -187,6 +186,15 @@ int main() {
                     radio_failures = 0;
                     emit("#radio=lost");
                 }
+            }
+
+            std::string command;
+            if (uplink_timer.due(radio_millis(nullptr), command)) {
+                const bool sent = radio.transmit(
+                    reinterpret_cast<const std::uint8_t*>(command.data()), command.size(), 2000);
+                radio.start_receive();
+                if (sent) ++g_commands_sent;
+                emit(sent ? "#tx=ok" : "#tx=failed");
             }
         }
 

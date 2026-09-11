@@ -25,6 +25,7 @@ const CONSOLE_HTML = join(REPO_ROOT, "ground-station", "web", "index.html");
 const FIXTURES = join(REPO_ROOT, "test-data", "protocol-fixtures.tsv");
 const SCENARIOS = join(REPO_ROOT, "test-data", "validator-scenarios.tsv");
 const TAG_CASES = join(REPO_ROOT, "test-data", "optional-tag-cases.tsv");
+const STATUS_CASES = join(REPO_ROOT, "test-data", "status-tag-cases.tsv");
 
 const BEGIN = "// PORTABLE-CORE:BEGIN";
 const END = "// PORTABLE-CORE:END";
@@ -770,6 +771,45 @@ test("every optional-tag case splits into its recorded key and value", () => {
     assert.ok(record, `${c.id}: packet rejected outright`);
     assert.strictEqual(record.tags[c.key], c.value, `${c.id}: wrong split`);
   }
+});
+
+/* Every case in test-data/status-tag-cases.tsv, as this console expands it. The firmware
+   encodes the field and telemetry.py decodes it from the same file. */
+test("every status-field case expands as recorded", () => {
+  const base = "CAN-Team-01; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; " +
+               "Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;";
+  let rows = 0;
+  for (const rawLine of readFileSync(STATUS_CASES, "utf8").split("\n")) {
+    const line = rawLine.replace(/\r$/, "");
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    const [id, value, mode, armed, cal, faults] = line.split("\t");
+    const { record } = M.parsePacket(`${base} ST-${value};`, null);
+    assert.ok(record, `${id}: packet rejected outright`);
+    if (mode === "-") {
+      assert.strictEqual(record.mode, null, `${id}: invented a state`);
+      assert.strictEqual(record.armed, null, `${id}: invented arming`);
+    } else {
+      assert.strictEqual(record.mode, mode, `${id}: state`);
+      assert.strictEqual(record.armed, armed === "1", `${id}: armed`);
+      assert.strictEqual(record.calibrated, cal === "1", `${id}: calibrated`);
+      assert.strictEqual(record.fault_count, Number(faults), `${id}: faults`);
+    }
+    ++rows;
+  }
+  assert.ok(rows >= 12, `expected the full status-case set, got ${rows}`);
+  // A tag the vehicle sent explicitly wins over the compact field.
+  const both = M.parsePacket(`${base} MODE-FLIGHT; ST-R110;`, null).record;
+  assert.strictEqual(both.mode, "FLIGHT");
+});
+
+test("the Mission panel holds the last status through lean packets", () => {
+  // Status rides on rich packets only, so the panel must read it from the last packet that
+  // carried one -- not from the latest packet, which after Max rate is lean two times in three.
+  const html = readFileSync(CONSOLE_HTML, "utf8");
+  const below = html.slice(html.indexOf("// PORTABLE-CORE:END"));
+  assert.ok(below.includes("if (res.record.mode !== null) lastStatus = res.record;"));
+  assert.ok(below.includes("stRec.armed"), "Armed must come from the held status");
+  assert.ok(!/latest\.armed/.test(below), "Armed must not blank on a lean packet");
 });
 
 test("a southern-hemisphere fix survives the whole console parser", () => {

@@ -1,4 +1,5 @@
 #include "ground/framing.hpp"
+#include "ground/uplink_timer.hpp"
 
 #include <cassert>
 #include <fstream>
@@ -202,6 +203,41 @@ void test_shared_framing_fixtures(const std::string& repo_root) {
     CHECK(cases >= 12);
 }
 
+// A command is sent in the gap after a vehicle packet, never on top of one.
+void test_a_command_waits_for_the_gap_after_a_packet() {
+    using ground::UplinkTimer;
+    UplinkTimer timer;
+    std::string out;
+
+    CHECK(timer.hold("CMD-1", 1000));
+    CHECK(!timer.hold("CMD-2", 1001));          // one at a time, and the first is kept
+    CHECK(!timer.due(1100, out));               // nothing heard yet
+    timer.heard_packet(1200);                   // a telemetry packet has just ended
+    CHECK(!timer.due(1200 + UplinkTimer::kAfterPacketMs - 1, out));  // vehicle still turning round
+    CHECK(timer.due(1200 + UplinkTimer::kAfterPacketMs, out));
+    CHECK(out == "CMD-1");
+    CHECK(!timer.waiting());
+    CHECK(!timer.due(9000, out));               // handed over exactly once
+
+    // A packet heard before the command was queued says nothing about the gap now.
+    timer.heard_packet(20000);
+    CHECK(timer.hold("CMD-3", 20005));
+    CHECK(!timer.due(20040, out));
+
+    // A vehicle that is never heard still gets the command, after kMaxHoldMs.
+    UplinkTimer silent;
+    CHECK(silent.hold("CMD-4", 50000));
+    CHECK(!silent.due(50000 + UplinkTimer::kMaxHoldMs - 1, out));
+    CHECK(silent.due(50000 + UplinkTimer::kMaxHoldMs, out));
+    CHECK(out == "CMD-4");
+
+    // And the millisecond clock wrapping does not strand a command.
+    UplinkTimer wrap;
+    CHECK(wrap.hold("CMD-5", 0xFFFFFFF0u));
+    wrap.heard_packet(0xFFFFFFF8u);
+    CHECK(wrap.due(0xFFFFFFF8u + UplinkTimer::kAfterPacketMs, out));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -213,6 +249,7 @@ int main(int argc, char** argv) {
     test_payload_with_newline_survives();
     test_known_crc_vector();
     test_shared_framing_fixtures(repo_root);
+    test_a_command_waits_for_the_gap_after_a_packet();
     if (failures == 0) {
         std::cout << "ground framing tests passed\n";
         return 0;

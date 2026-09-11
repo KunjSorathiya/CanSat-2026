@@ -103,6 +103,12 @@ private:
     // and transmits the old packet on the bench.
     void set_transmit_gps(bool on) { config_.transmit_gps = on; }
 
+    // The compact status field, "ST-R110": state letter, armed, calibrated, and the active
+    // fault count capped at 9. test-data/status-tag-cases.tsv is its definition, shared with
+    // both ground parsers.
+    static std::string status_field(MissionState state, bool armed, bool calibrated,
+                                    std::uint32_t active_faults);
+
   private:
 };
 
