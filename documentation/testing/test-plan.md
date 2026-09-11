@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 123 suites across the whole flight core | ✅ **4201 / 4201 assertions** |
+| `flight_tests` | 125 suites across the whole flight core | ✅ **4224 / 4224 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **139 / 139 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 123 suites, 4201 assertions
+### `flight_tests` — 125 suites, 4224 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -197,13 +197,13 @@ flowchart LR
 | `test_sound_level_reduces_a_window_to_its_envelope` | An ADC window becomes its peak-to-peak span in millivolts; the same span at a different bias reads the same, and silence reads zero |
 | `test_sound_level_refuses_a_window_it_cannot_scale` | An empty window, a zero full scale, a zero or negative reference, and a window never filled all return 0 rather than dividing by zero or reporting a negative loudness |
 | `test_a_clipped_window_is_reported_as_clipped` | A window touching either end of the converter is flagged, because the level is then a lower bound — and canopy inflation and touchdown are the two events most likely to saturate |
-| `test_the_sound_level_is_logged_and_never_transmitted` | The level appears in the SD row and in no spelling anywhere in the packet, and the CSV header and row carry the same column count |
+| `test_the_sound_level_reaches_the_log_and_the_air` | The level goes on the air as one `SN-` field and into the log's columns, and the mandatory block is byte-for-byte what it is with no microphone at all |
 | `test_the_log_records_the_numbers_the_gps_gate_judges_on` | `gps_satellites` and `gps_hdop` appear in the header and the row, and stay out of the radio packet — the quantity a decision turns on is recorded next to the decision, and [F-18](bring-up-record.md#findings) was undiagnosable because it was not |
 | `test_no_fix_leaves_the_gps_quality_columns_blank` | With no fix, every GPS column is blank and the row still has the header's column count. 0 satellites and HDOP 0.0 are both real readings, and HDOP 0.0 is perfect geometry, so zeros here would describe a fix that never happened |
 | `test_an_absent_microphone_leaves_the_columns_blank_rather_than_zero` | No sensor writes empty columns, never `0.0` — a working sensor reports zero for silence and the two must stay distinguishable |
 | `test_a_vehicle_without_a_microphone_behaves_as_before` | A null sound pointer flies the full mission, sends packets, and raises no sound fault |
 | `test_a_failed_microphone_costs_a_warning_and_nothing_else` | A microphone that fails to start and fails every read raises a warning, does not fail the self-test, does not reach `fault`, and does not cost a packet |
-| `test_a_working_microphone_reaches_the_log` | A working one is read, marks health, clears its fault, and its level appears in no transmitted packet |
+| `test_a_working_microphone_reaches_the_log` | A working one is read, marks health, clears its fault, and its level reaches both the log and the air as `SN-`, with every packet still parsing |
 | `test_a_gate_only_module_is_still_a_working_sensor` | A three-pin LM393 board with no analogue output still reports healthy on its threshold duty alone — the two variants are sold under one name |
 | `test_gate_duty_is_a_percentage_and_stays_one` | 0, 50 and 100 %; an empty window is 0 rather than a division by zero; a counter that overran its window is clamped |
 | `test_an_unwired_gate_leaves_its_column_blank` | A board with only `AO` wired leaves `sound_gate_pct` empty rather than writing a zero that reads as never above threshold |
@@ -235,6 +235,8 @@ flowchart LR
 | `test_a_max_rate_command_obeys_the_replay_rules` | A token minted for a packet number the vehicle has not reached changes nothing and is counted as ignored |
 | `test_a_flight_build_cannot_be_commanded_to_max_rate` | With `allow_ground_commands` false neither rate command exists: the radio is never polled and the period never moves |
 | `test_a_flight_build_has_no_uplink_at_all` | `allow_ground_commands` defaults to false, and with it false the radio's receive is **never polled** — this is the test the README's "there is no command uplink" rests on |
+| `test_the_sound_level_goes_on_the_air_after_the_position` | `SN-` follows every mandatory field and the position; a microphone with no valid window puts nothing on the air, and `transmit_sound` false keeps it off |
+| `test_a_packet_held_lean_still_logs_everything` | A packet built with `air_sensors` false carries neither `GP-` nor `SN-`, and its SD row still has the latitude, the longitude and the sound level |
 | `test_the_widest_packets_are_the_budgets_by_construction` | The widest mandatory block and GPS block the builder can produce — packet number 4294967295, a 99-hour clock, extreme negatives — are exactly `kMandatoryPacketBytes` and `kGpsFieldBytes`. It corrected them from 145 and 56 to 147 and 55 |
 | `test_the_commanded_rate_periods_clear_their_own_airtime` | Both commanded periods clear their own measured airtime plus the SD guard, 201 B costs exactly what 199 B costs, and the published rates cannot move without this failing |
 | `test_a_token_authorises_one_command_and_not_another` | A token minted for one command is refused for every other, in both directions, and an unknown command name is refused rather than matched to the nearest known one |

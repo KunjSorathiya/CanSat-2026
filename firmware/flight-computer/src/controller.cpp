@@ -569,12 +569,15 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         extra.clear();
         built = builder_.build(candidate, mission_ms, snapshot_, extra);
     }
-    if (too_long(built) && snapshot_.gps.valid) {
-        // 2. GPS: optional under the rulebook, and recoverable from the SD log.
+    if (too_long(built)) {
+        // 2. The sensors: GP- and SN- come off the air for this packet. Unreachable in a
+        // valid configuration -- validate_config() refuses a budget that cannot hold them --
+        // so this is the backstop for a value wider than the budget was sized for.
+        //
+        // It used to rebuild from a snapshot with GPS marked invalid, which also took the
+        // fix out of this packet's SD row. air_sensors = false shortens only what is sent.
         faults_.report(FaultCode::packet_oversize, FaultSeverity::warning, mission_ms);
-        SensorSnapshot trimmed = snapshot_;
-        trimmed.gps.valid = false;
-        built = builder_.build(candidate, mission_ms, trimmed, extra);
+        built = builder_.build(candidate, mission_ms, snapshot_, extra, /*air_sensors=*/false);
     }
     if (built && built->packet.size() > cansat::kMaxLoraPayloadBytes) {
         // 3. Mandatory fields alone still overflow the radio. Transmitting a truncated

@@ -70,11 +70,18 @@ public:
     };
 
     // Returns nullopt when mandatory data is invalid -> no telemetry point is produced.
-    // `extra_optional` fields are appended after the mandatory block and any GPS fields.
+    // `extra_optional` fields are appended after the mandatory block and any sensor fields.
+    //
+    // `air_sensors` false leaves the GP- and SN- fields off the air for this one packet --
+    // a lean packet in the max-rate pattern, or a packet the controller has to shorten --
+    // while the record and the sound fields the SD row renders from are filled exactly as
+    // they would be otherwise. What goes on the air and what goes in the log are separate
+    // decisions, and a lean packet must not cost the log anything.
     std::optional<Built> build(std::uint32_t packet_number,
                                std::uint64_t mission_ms,
                                const SensorSnapshot& snapshot,
-                               const std::vector<std::string>& extra_optional = {}) const;
+                               const std::vector<std::string>& extra_optional = {},
+                               bool air_sensors = true) const;
 
     // One CSV row for the onboard SD log (superset of the packet + local metadata).
     static std::string sd_header();

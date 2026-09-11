@@ -1483,6 +1483,80 @@ void test_a_truncated_command_is_ignored() {
 
 // The digest both ends compute. A divergence here is a console that cannot command the
 // vehicle it was built for, and it would show up on the bench as "the button does nothing".
+void test_the_sound_level_goes_on_the_air_after_the_position() {
+    // Only transmitted telemetry earns extra-sensor points, so the microphone has to reach
+    // the packet -- after every mandatory field and after the position, as the rulebook
+    // orders optional fields.
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::TelemetryBuilder b(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = s.orientation_valid = s.baro_valid = true;
+    s.altitude_m = 12.3; s.pressure_pa = 98765.4; s.temperature_c = 21.7;
+    s.roll_deg = 1.0; s.pitch_deg = 2.0; s.yaw_deg = 3.0;
+    s.ax_mps2 = 0.1; s.ay_mps2 = 0.2; s.az_mps2 = 9.8;
+    s.gps.valid = true;
+    s.gps.latitude = 21.1667; s.gps.longitude = 72.7833; s.gps.altitude = 12.0;
+    s.sound_valid = true;
+    s.sound_mv_pp = 805.9;
+
+    const auto built = b.build(1, 1000, s);
+    CHECK(built.has_value());
+    const std::string& p = built->packet;
+    const std::size_t az = p.find("; AZ-");
+    const std::size_t lat = p.find("GP-Lat-");
+    const std::size_t sn = p.find("SN-805.9;");
+    CHECK(az != std::string::npos && lat != std::string::npos && sn != std::string::npos);
+    CHECK(az < lat && lat < sn);                     // mandatory, then position, then sound
+    CHECK(static_cast<bool>(cansat::parse_packet(p)));
+
+    // A microphone that is not producing valid windows puts nothing on the air -- a stale
+    // number would look live.
+    s.sound_valid = false;
+    const auto quiet = b.build(2, 2000, s);
+    CHECK(quiet.has_value());
+    CHECK(quiet->packet.find("SN-") == std::string::npos);
+
+    // And turned off, it stays off.
+    flight::Configuration off = c;
+    off.transmit_sound = false;
+    flight::TelemetryBuilder b2(off);
+    s.sound_valid = true;
+    const auto none = b2.build(3, 3000, s);
+    CHECK(none.has_value());
+    CHECK(none->packet.find("SN-") == std::string::npos);
+}
+
+void test_a_packet_held_lean_still_logs_everything() {
+    // What goes on the air and what goes in the log are separate decisions. A lean packet
+    // -- two in three after MAX_RATE -- carries neither position nor sound, and the SD row
+    // for it must carry both anyway, or the max-rate schedule quietly thins the log.
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::TelemetryBuilder b(c);
+
+    flight::SensorSnapshot s;
+    s.imu_valid = s.orientation_valid = s.baro_valid = true;
+    s.altitude_m = 12.3; s.pressure_pa = 98765.4; s.temperature_c = 21.7;
+    s.roll_deg = 1.0; s.pitch_deg = 2.0; s.yaw_deg = 3.0;
+    s.ax_mps2 = 0.1; s.ay_mps2 = 0.2; s.az_mps2 = 9.8;
+    s.gps.valid = true;
+    s.gps.latitude = 21.220094; s.gps.longitude = 72.884836; s.gps.altitude = 15.0;
+    s.sound_valid = true;
+    s.sound_mv_pp = 805.9;
+
+    const auto lean = b.build(1, 1000, s, {}, /*air_sensors=*/false);
+    CHECK(lean.has_value());
+    CHECK(lean->packet.find("GP-") == std::string::npos);
+    CHECK(lean->packet.find("SN-") == std::string::npos);
+
+    const std::string row = b.sd_line(*lean, flight::MissionState::flight, 0);
+    CHECK(row.find("21.220094") != std::string::npos);
+    CHECK(row.find("72.884836") != std::string::npos);
+    CHECK(row.find("805.9") != std::string::npos);
+}
+
 void test_the_widest_packets_are_the_budgets_by_construction() {
     // The widths in link_profile.hpp are held to what the builder actually produces at its
     // widest, not to arithmetic. The first revision of the design carried 145 and 56 from a
@@ -1491,7 +1565,8 @@ void test_the_widest_packets_are_the_budgets_by_construction() {
     //
     // Widest means every field at its widest value: the largest packet number the format
     // can carry, a 99-hour mission clock, and the extreme negatives the overflow test uses.
-    // The sound field is added by construction once the builder emits it.
+    // And the sound field at its widest -- the ADC reference, 3300.0 mV -- which completes
+    // the rich packet.
     flight::Configuration c;
     c.team_id = "CAN-Team-25";   // the rulebook's format, and therefore a fixed width
     c.transmit_gps = true;
@@ -1529,6 +1604,21 @@ void test_the_widest_packets_are_the_budgets_by_construction() {
                       << cansat::link::kGpsFieldBytes << "\n";
         }
     }
+
+    s.sound_valid = true;
+    s.sound_mv_pp = 3300.0;
+    const auto rich = builder.build(4294967295u, 359999999u, s);
+    CHECK(rich.has_value());
+    CHECK(rich->packet.size() == cansat::link::kRichPacketBytes);
+    if (rich && rich->packet.size() != cansat::link::kRichPacketBytes) {
+        std::cerr << "  widest rich packet is " << rich->packet.size()
+                  << " bytes; kRichPacketBytes says " << cansat::link::kRichPacketBytes << "\n";
+    }
+
+    // And the same packet with the sensors held off the air is the lean one, to the byte.
+    const auto lean = builder.build(4294967295u, 359999999u, s, {}, /*air_sensors=*/false);
+    CHECK(lean.has_value());
+    CHECK(lean->packet.size() == cansat::link::kLeanPacketBytes);
 }
 
 void test_the_commanded_rate_periods_clear_their_own_airtime() {
@@ -3375,10 +3465,10 @@ void test_a_clipped_window_is_reported_as_clipped() {
     CHECK(!flight::sound_window_clipped(nothing, 4095));
 }
 
-// The point of the whole design: the level reaches the SD log and never reaches the packet.
-// The rulebook makes optional sensor data optional, and every byte of the packet is airtime
-// the mandatory fields need more.
-void test_the_sound_level_is_logged_and_never_transmitted() {
+// The level reaches the SD log and, since the organizers ruled that only transmitted
+// telemetry earns extra-sensor points, the packet as well -- as one short optional field
+// after everything mandatory. What must never change is the mandatory block itself.
+void test_the_sound_level_reaches_the_log_and_the_air() {
     flight::Configuration c;
     c.team_id = "CAN-Team-25";
     flight::TelemetryBuilder builder(c);
@@ -3394,10 +3484,22 @@ void test_the_sound_level_is_logged_and_never_transmitted() {
     const auto built = builder.build(1, 1000, s);
     CHECK(built.has_value());
 
-    // Not in the packet, under any spelling.
-    CHECK(built->packet.find("412.5") == std::string::npos);
+    // On the air, once, under its own short prefix and no other spelling.
+    CHECK(built->packet.find("SN-412.5;") != std::string::npos);
     CHECK(built->packet.find("SND") == std::string::npos);
     CHECK(built->packet.find("SOUND") == std::string::npos);
+
+    // And the mandatory block is byte-for-byte what it is with no microphone at all. An
+    // additional sensor may add a field; it may never move, reformat or displace one.
+    flight::SensorSnapshot silent = s;
+    silent.sound_valid = false;
+    const auto without = builder.build(1, 1000, silent);
+    CHECK(without.has_value());
+    const std::size_t az = built->packet.find("; AZ-");
+    CHECK(az != std::string::npos);
+    const std::size_t close = built->packet.find(';', az + 2);
+    CHECK(close != std::string::npos);
+    CHECK(built->packet.substr(0, close) == without->packet.substr(0, close));
 
     // In the log, in the columns the header names.
     const std::string header = flight::TelemetryBuilder::sd_header();
@@ -4117,12 +4219,17 @@ void test_a_working_microphone_reaches_the_log() {
     CHECK(sound.reads > 0);
     CHECK(ctrl.health().sound_ok);
     CHECK(!ctrl.faults().active(flight::FaultCode::sound_unavailable));
-    // This assertion used to read `logger.packets` and require the level to be ABSENT --
-    // the exact opposite of this test's name, and the reason F-15 survived: the guard was
-    // pointing the wrong way and passing. The radio must not carry it; the log must.
+    // This assertion once read `logger.packets` and required the level to be ABSENT -- the
+    // opposite of this test's name, and the reason F-15 survived. It then required the
+    // radio NOT to carry it, which the organizers' ruling reversed: only transmitted
+    // telemetry earns extra-sensor points. So the radio carries it, every packet still
+    // parses, and the log carries it too.
+    bool level_on_air = false;
     for (const std::string& packet : radio.packets) {
-        CHECK(packet.find("250.0") == std::string::npos);
+        CHECK(static_cast<bool>(cansat::parse_packet(packet)));
+        if (packet.find("SN-250.0;") != std::string::npos) level_on_air = true;
     }
+    CHECK(level_on_air);
     CHECK(!logger.lines.empty());
     bool level_logged = false;
     for (const std::string& line : logger.lines) {
@@ -4246,7 +4353,7 @@ int main(int argc, char** argv) {
     test_sound_level_reduces_a_window_to_its_envelope();
     test_sound_level_refuses_a_window_it_cannot_scale();
     test_a_clipped_window_is_reported_as_clipped();
-    test_the_sound_level_is_logged_and_never_transmitted();
+    test_the_sound_level_reaches_the_log_and_the_air();
     test_the_log_records_the_numbers_the_gps_gate_judges_on();
     test_no_fix_leaves_the_gps_quality_columns_blank();
     test_an_absent_microphone_leaves_the_columns_blank_rather_than_zero();
@@ -4292,6 +4399,8 @@ int main(int argc, char** argv) {
     test_a_telemetry_packet_is_never_a_command();
     test_an_unconfigured_vehicle_matches_nothing();
     test_a_truncated_command_is_ignored();
+    test_the_sound_level_goes_on_the_air_after_the_position();
+    test_a_packet_held_lean_still_logs_everything();
     test_the_widest_packets_are_the_budgets_by_construction();
     test_the_commanded_rate_periods_clear_their_own_airtime();
     test_a_token_authorises_one_command_and_not_another();

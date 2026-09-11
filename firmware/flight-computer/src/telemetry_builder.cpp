@@ -33,7 +33,8 @@ TelemetryBuilder::TelemetryBuilder(Configuration config) : config_(std::move(con
 
 std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
     std::uint32_t packet_number, std::uint64_t mission_ms,
-    const SensorSnapshot& s, const std::vector<std::string>& extra_optional) const {
+    const SensorSnapshot& s, const std::vector<std::string>& extra_optional,
+    bool air_sensors) const {
     cansat::TelemetryRecord record;
     record.team_id = config_.team_id;
     record.packet_number = packet_number;
@@ -68,11 +69,18 @@ std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
         // the packet's 255 bytes and the whole telemetry rate is computed from the worst
         // case. See Configuration::transmit_gps.
         record.gps = s.gps;
-        if (config_.transmit_gps) {
+        if (config_.transmit_gps && air_sensors) {
             optional.push_back(optional_field("GP-Lat-", s.gps.latitude, config_.gps_latlon_decimals));
             optional.push_back(optional_field("GP-Lon-", s.gps.longitude, config_.gps_latlon_decimals));
             optional.push_back(optional_field("GP-Alt-", s.gps.altitude, config_.gps_alt_decimals));
         }
+    }
+    // The sound level, after the position and before any diagnostic tag, as the rulebook
+    // asks of optional fields: short prefix, mandatory data first. Transmitted only when the
+    // microphone is producing valid windows -- a stale reading on the air would be a number
+    // that looks live and is not.
+    if (config_.transmit_sound && air_sensors && s.sound_valid && std::isfinite(s.sound_mv_pp)) {
+        optional.push_back(optional_field("SN-", s.sound_mv_pp, 1));
     }
     for (const auto& extra : extra_optional) {
         if (!extra.empty()) {
