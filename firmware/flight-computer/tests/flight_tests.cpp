@@ -1483,6 +1483,25 @@ void test_a_truncated_command_is_ignored() {
 
 // The digest both ends compute. A divergence here is a console that cannot command the
 // vehicle it was built for, and it would show up on the bench as "the button does nothing".
+void test_a_task_can_be_rescheduled_from_the_packet_it_just_sent() {
+    // The max-rate pattern needs the next interval to depend on the packet just sent. due()
+    // alone cannot do that: it advances by whatever period it held when it fired.
+    flight::PeriodicTask t(700, 1000);
+    CHECK(t.due(1000));
+    CHECK(t.next_due_ms() == 1700);      // the fixed cadence, as before
+
+    t.reschedule(1000, 385);             // a rich packet went out at 1000
+    CHECK(t.next_due_ms() == 1385);
+    CHECK(t.period_ms() == 385);
+    CHECK(!t.due(1384));
+    CHECK(t.due(1385));
+
+    t.reschedule(1385, 286);             // then a lean one
+    CHECK(t.next_due_ms() == 1671);
+    CHECK(!t.due(1670));
+    CHECK(t.due(1671));
+}
+
 void test_the_sound_level_goes_on_the_air_after_the_position() {
     // Only transmitted telemetry earns extra-sensor points, so the microphone has to reach
     // the packet -- after every mandatory field and after the position, as the rulebook
@@ -4399,6 +4418,7 @@ int main(int argc, char** argv) {
     test_a_telemetry_packet_is_never_a_command();
     test_an_unconfigured_vehicle_matches_nothing();
     test_a_truncated_command_is_ignored();
+    test_a_task_can_be_rescheduled_from_the_packet_it_just_sent();
     test_the_sound_level_goes_on_the_air_after_the_position();
     test_a_packet_held_lean_still_logs_everything();
     test_the_widest_packets_are_the_budgets_by_construction();

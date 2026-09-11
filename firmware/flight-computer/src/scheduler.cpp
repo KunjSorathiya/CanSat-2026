@@ -14,6 +14,11 @@ void PeriodicTask::set_period(std::uint32_t period_ms) {
     period_ms_ = period_ms;
 }
 
+void PeriodicTask::reschedule(std::uint64_t from_ms, std::uint32_t period_ms) {
+    period_ms_ = period_ms;
+    next_ms_ = from_ms + period_ms;
+}
+
 bool PeriodicTask::due(std::uint64_t now_ms) {
     if (period_ms_ == 0) {
         return false;
