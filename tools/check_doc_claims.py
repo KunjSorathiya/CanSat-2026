@@ -165,29 +165,16 @@ def main() -> int:
     # extra-sensor points, and there is no budget that holds the tags as well.
     checker.check("link profile: 213-byte budget", budget_bytes == 213, str(budget_bytes))
 
-    # ---- the two commanded maximum rates -------------------------------------------
-    # Neither can be undone from the ground, so every figure a document quotes about them
-    # has to come from the constants the firmware compiles rather than from a sentence
-    # somebody scaled by hand. The periods themselves are already held by static_asserts;
-    # what is checked here is that the documents say what the firmware does.
-    max_gps_bytes = constant(profile, "kMaxRatePacketBytesGps")
-    max_lean_bytes = constant(profile, "kMaxRatePacketBytesLean")
-    max_gps_period = constant(profile, "kMaxRatePeriodGpsMs")
-    max_lean_period = constant(profile, "kMaxRatePeriodLeanMs")
+    # ---- the max-rate schedule ------------------------------------------------------
+    # It cannot be undone from the ground, so every figure a document quotes about it has
+    # to come from the constants the firmware compiles rather than from a sentence somebody
+    # scaled by hand. The slots are already held by static_asserts; what is checked here is
+    # that the documents say what the firmware does.
     guard_ms = constant(profile, "kMaxRateGuardMs")
+    lean_per_rich = constant(profile, "kMaxRateLeanPerRich")
     modem = ModemConfig(spreading_factor=spreading_factor or 7,
                         bandwidth_hz=bandwidth or 125000,
                         coding_rate_denominator=coding_rate or 5)
-    # 1.8 % is the measured correction from bring-up rows 5.2 and 5.3, and the periods are
-    # sized against the measurement rather than the model.
-    max_gps_airtime = time_on_air(max_gps_bytes or 201, modem).time_on_air_ms * 1.018
-    max_lean_airtime = time_on_air(max_lean_bytes or 145, modem).time_on_air_ms * 1.018
-    checker.check("the GPS max-rate period clears its own measured airtime plus the guard",
-                  (max_gps_period or 0) >= max_gps_airtime + (guard_ms or 0),
-                  f"{max_gps_period} vs {max_gps_airtime + (guard_ms or 0):.2f}")
-    checker.check("the lean max-rate period clears its own measured airtime plus the guard",
-                  (max_lean_period or 0) >= max_lean_airtime + (guard_ms or 0),
-                  f"{max_lean_period} vs {max_lean_airtime + (guard_ms or 0):.2f}")
     # ---- the two packet shapes, and the max-rate slots ---------------------------------
     rich_bytes = constant(profile, "kRichPacketBytes")
     lean_bytes = constant(profile, "kLeanPacketBytes")
@@ -211,9 +198,9 @@ def main() -> int:
                   f"{cycle_ms} vs {(rich_slot or 0) + 2 * (lean_slot or 0)}")
     checker.check("the max-rate cycle keeps GPS and sound at 1 Hz or faster",
                   (cycle_ms or 10 ** 9) <= 1000, str(cycle_ms))
-    checker.check("both commanded periods are faster than normal flight",
-                  (max_lean_period or 0) < (max_gps_period or 0) < (period_ms or 0),
-                  f"{max_lean_period} < {max_gps_period} < {period_ms}")
+    checker.check("both max-rate slots are shorter than the normal-flight period",
+                  (lean_slot or 0) < (rich_slot or 0) < (period_ms or 0),
+                  f"{lean_slot} < {rich_slot} < {period_ms}")
     checker.check("link profile: sync words 0xF3 / 0xA5",
                   "0xF3" in profile and "0xA5" in profile)
 
@@ -1260,17 +1247,19 @@ def main() -> int:
     checker.check(f"runbook.md states that {wipeout_s} s of stray transmission costs 25 points",
                   f"in **{wipeout_s} seconds**" in runbook, str(wipeout_s))
 
-    # The commanded rates, in the document an operator reads with the console open. Derived
-    # from the shipped constants, because a runbook that quotes a rate the firmware no
-    # longer has is worse here than anywhere else: these commands cannot be taken back.
-    gps_hz = 1000.0 / float(max_gps_period or 1)
-    lean_hz = 1000.0 / float(max_lean_period or 1)
-    checker.check(f"runbook.md states the GPS rate command as {gps_hz:.2f} Hz",
-                  f"{gps_hz:.2f} Hz" in runbook, f"{gps_hz:.2f}")
-    checker.check(f"runbook.md states the lean rate command as {lean_hz:.2f} Hz",
-                  f"{lean_hz:.2f} Hz" in runbook, f"{lean_hz:.2f}")
-    checker.check(f"runbook.md states the commanded periods {max_gps_period} / {max_lean_period} ms",
-                  f"**{max_gps_period} ms**" in runbook and f"**{max_lean_period} ms**" in runbook)
+    # The commanded schedule, in the document an operator reads with the console open.
+    # Derived from the shipped constants, because a runbook that quotes a rate the firmware
+    # no longer has is worse here than anywhere else: the command cannot be taken back.
+    per_cycle = (lean_per_rich or 2) + 1
+    max_hz = 1000.0 * per_cycle / float(cycle_ms or 1)
+    sensor_hz = 1000.0 / float(cycle_ms or 1)
+    checker.check(f"runbook.md states the max-rate schedule as {max_hz:.2f} Hz",
+                  f"{max_hz:.2f} Hz" in runbook, f"{max_hz:.2f}")
+    checker.check(f"runbook.md states the sensors at {sensor_hz:.2f} Hz after it",
+                  f"{sensor_hz:.2f} Hz" in runbook, f"{sensor_hz:.2f}")
+    checker.check(f"runbook.md states the slots {rich_slot} / {lean_slot} ms and the {cycle_ms} ms cycle",
+                  f"**{rich_slot} ms**" in runbook and f"**{lean_slot} ms**" in runbook
+                  and f"**{cycle_ms} ms**" in runbook)
     checker.check("runbook.md says the rate commands cannot be undone",
                   "cannot be undone" in runbook and "power cycle" in runbook)
 

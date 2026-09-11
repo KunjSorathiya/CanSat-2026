@@ -3822,6 +3822,11 @@ struct GroundLink {
     flight::test::MockRadio radio;
     flight::test::MockLogger logger;
     flight::test::MockBoard board;
+    // A working microphone, so rich packets carry SN- as they would on the vehicle.
+    flight::test::MockSound sound;
+    // Polling interval. 10 ms keeps the long runs cheap; the pattern test sets 1 so
+    // the spacing it measures is the schedule's rather than the harness's.
+    std::uint64_t step_ms = 10;
 
     // Which command sits on the air. Defaulted so every erase test reads as it did before
     // there was more than one command to send.
@@ -3834,7 +3839,7 @@ struct GroundLink {
     }
     // Runs to `until_ms`, with the command waiting on the air the whole time.
     void run(std::uint64_t until_ms) {
-        ctrl_.reset(new flight::Controller(c, imu, baro, gps, radio, logger, board));
+        ctrl_.reset(new flight::Controller(c, imu, baro, gps, radio, logger, board, &sound));
         CHECK(ctrl_->initialize());
         step(0, until_ms);
     }
@@ -3842,10 +3847,10 @@ struct GroundLink {
     // fresh controller would come up unlatched and every such test would pass vacuously.
     void run_more(std::uint64_t extra_ms) {
         CHECK(ctrl_ != nullptr);
-        step(now_ + 10, now_ + extra_ms);
+        step(now_ + step_ms, now_ + extra_ms);
     }
     void step(std::uint64_t from_ms, std::uint64_t until_ms) {
-        for (std::uint64_t t = from_ms; t <= until_ms; t += 10) {
+        for (std::uint64_t t = from_ms; t <= until_ms; t += step_ms) {
             if (radio.inbox.empty()) {
                 // Minted against the number the vehicle has reached, the way the console
                 // mints it from the last packet it received. A token made for any other
@@ -3903,25 +3908,75 @@ void test_the_builder_can_be_told_to_carry_position_after_construction() {
     CHECK(after->packet.find("GP-Alt-") != std::string::npos);
 }
 
-void test_the_gps_command_speeds_up_and_puts_position_on_the_air() {
+void test_max_rate_is_a_pattern_of_one_rich_and_two_lean() {
+    // After MAX_RATE the vehicle sends one rich packet -- mandatory fields, position, sound --
+    // then two lean ones, each in its own slot: 385 ms after a rich packet, 286 after a lean.
+    // The harness polls every millisecond, so the spacing measured is the schedule's.
     GroundLink link(true, cansat::CommandKind::max_rate);
-    link.run(6000);
-    CHECK(link.state == flight::MissionState::ready);
+    link.step_ms = 1;
+    link.sound.level_mv_pp = 250.0;
+    link.run(8000);
     CHECK(link.accepted == 1);
     CHECK(link.rate_maxed);
-    CHECK(link.period_after == cansat::link::kMaxRatePeriodGpsMs);
-    CHECK(!link.radio.packets.empty());
-    const std::string& last = link.radio.packets.back();
-    CHECK(last.find("GP-Lat-") != std::string::npos);
-    // The five tags are what paid for the position and the rate.
-    CHECK(last.find("MODE-") == std::string::npos);
-    CHECK(last.find("FAULTS-") == std::string::npos);
-    CHECK(last.find("ARM-") == std::string::npos);
-    CHECK(last.find("CAL-") == std::string::npos);
-    CHECK(last.find("YR-") == std::string::npos);
+
+    std::vector<std::uint64_t> times;
+    for (const std::string& p : link.radio.packets) {
+        const auto parsed = cansat::parse_packet(p);
+        CHECK(static_cast<bool>(parsed));
+        times.push_back(parsed ? parsed.record->timestamp_ms : 0);
+    }
+    // The packet during which the command was accepted is the pattern's first, rich slot:
+    // before it the spacing is the normal 700 ms, and the one after it follows in 385.
+    std::size_t start = times.size();
+    for (std::size_t i = 0; i + 1 < times.size(); ++i) {
+        if (times[i + 1] - times[i] == cansat::link::kMaxRateRichSlotMs) { start = i; break; }
+    }
+    CHECK(start + 7 < times.size());   // at least two full cycles to look at
+
+    for (std::size_t k = start; k + 1 < times.size(); ++k) {
+        const bool rich = (k - start) % 3 == 0;
+        const std::string& p = link.radio.packets[k];
+        if (rich) {
+            CHECK(p.find("GP-Lat-") != std::string::npos);
+            CHECK(p.find("SN-250.0;") != std::string::npos);
+            CHECK(times[k + 1] - times[k] == cansat::link::kMaxRateRichSlotMs);
+        } else {
+            CHECK(p.find("GP-") == std::string::npos);
+            CHECK(p.find("SN-") == std::string::npos);
+            CHECK(times[k + 1] - times[k] == cansat::link::kMaxRateLeanSlotMs);
+        }
+        CHECK(p.find("MODE-") == std::string::npos);
+    }
+
+    // Lean on the air, whole in the log: the SD rows for lean packets still carry the fix.
+    std::size_t rows_with_fix = 0;
+    for (const std::string& line : link.logger.lines) {
+        if (line.find("18.000000") != std::string::npos) ++rows_with_fix;
+    }
+    CHECK(rows_with_fix + 2 >= link.logger.lines.size());   // all but the first packets
 }
 
-void test_either_command_closes_the_uplink_behind_it() {
+void test_every_normal_flight_packet_is_rich() {
+    // At 700 ms, putting the sensors on the air at least once a second means every packet
+    // carries them -- and no packet carries a tag, because the tags gave up the room.
+    GroundLink link(false, cansat::CommandKind::max_rate);   // no uplink: normal flight only
+    link.sound.level_mv_pp = 250.0;
+    link.run(6000);
+    CHECK(link.radio.packets.size() >= 8);
+    std::size_t checked = 0;
+    for (const std::string& p : link.radio.packets) {
+        const auto parsed = cansat::parse_packet(p);
+        CHECK(static_cast<bool>(parsed));
+        if (!parsed || parsed.record->timestamp_ms < 1000) continue;  // sensors settling
+        CHECK(p.find("GP-Lat-") != std::string::npos);
+        CHECK(p.find("SN-250.0;") != std::string::npos);
+        CHECK(p.find("MODE-") == std::string::npos);
+        ++checked;
+    }
+    CHECK(checked >= 6);
+}
+
+void test_max_rate_closes_the_uplink_behind_it() {
     // The harness keeps a command on the air the whole time, so an uplink still listening
     // would accept another the moment the replay window allowed it. Exactly one is ever
     // accepted and the radio is never polled again, which is the promise the button makes
@@ -3930,27 +3985,26 @@ void test_either_command_closes_the_uplink_behind_it() {
     link.run(8000);
     CHECK(link.accepted == 1);
     const int polls_at_latch = link.radio.receive_polls;
-    const std::uint32_t period_at_latch = link.period_after;
 
     link.run_more(8000);
     CHECK(link.accepted == 1);
     CHECK(link.radio.receive_polls == polls_at_latch);
-    CHECK(link.period_after == period_at_latch);
+    CHECK(link.rate_maxed);
 }
 
-void test_the_other_max_rate_command_is_unreachable_after_the_first() {
+void test_no_command_is_heard_after_max_rate() {
     // Whichever lands first wins. The second is not refused -- it is not heard, which is a
     // different thing and the one an operator has to understand: there is no switching
     // between the two modes.
     GroundLink link(true, cansat::CommandKind::max_rate);
     link.run(6000);
-    CHECK(link.period_after == cansat::link::kMaxRatePeriodGpsMs);
+    CHECK(link.rate_maxed);
 
     // The other command there is: an erase. It is not refused, it is not heard.
     link.kind = cansat::CommandKind::erase_log;
     link.radio.inbox.clear();
     link.run_more(8000);
-    CHECK(link.period_after == cansat::link::kMaxRatePeriodGpsMs);
+    CHECK(link.rate_maxed);
     CHECK(link.accepted == 1);
     CHECK(link.logger.erases == 0);
 }
@@ -4395,9 +4449,10 @@ int main(int argc, char** argv) {
     test_a_budget_below_what_is_on_the_air_is_refused();
     test_the_packet_cadence_is_the_same_in_every_state();
     test_the_builder_can_be_told_to_carry_position_after_construction();
-    test_the_gps_command_speeds_up_and_puts_position_on_the_air();
-    test_either_command_closes_the_uplink_behind_it();
-    test_the_other_max_rate_command_is_unreachable_after_the_first();
+    test_max_rate_is_a_pattern_of_one_rich_and_two_lean();
+    test_every_normal_flight_packet_is_rich();
+    test_max_rate_closes_the_uplink_behind_it();
+    test_no_command_is_heard_after_max_rate();
     test_an_armed_vehicle_refuses_to_change_rate();
     test_a_max_rate_command_obeys_the_replay_rules();
     test_a_flight_build_cannot_be_commanded_to_max_rate();

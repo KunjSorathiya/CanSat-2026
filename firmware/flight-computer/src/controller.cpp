@@ -540,6 +540,11 @@ void Controller::feed_state_machine(std::uint64_t mission_ms) {
 void Controller::emit_telemetry(std::uint64_t mission_ms) {
     const std::uint32_t candidate = packet_number_ + 1;
 
+    // Which shape this packet is. Normal flight: always rich, because at 700 ms that is the
+    // only way to put GPS and sound on the air at least once a second. After MAX_RATE: the
+    // first of every three is rich and the other two are lean.
+    const bool rich = !max_rate_ || max_rate_slot_ == 0;
+
     std::vector<std::string> extra;
     if (config_.append_diagnostic_fields) {
         extra.push_back(std::string("MODE-") + to_string(state_machine_.state()));
@@ -552,7 +557,7 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         // the two it is looking at and the airtime budget has no room for a longer tag.
         extra.push_back(std::string("YR-") + (snapshot_.yaw_is_magnetic ? "M" : "G"));
     }
-    auto built = builder_.build(candidate, mission_ms, snapshot_, extra);
+    auto built = builder_.build(candidate, mission_ms, snapshot_, extra, rich);
 
     // The airtime budget assumes packets never exceed worst_case_packet_bytes, and the
     // radio silently clamps anything past the 255-byte LoRa FIFO — a truncated packet the
@@ -567,7 +572,7 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         // 1. Diagnostic tags: project-local, the least valuable.
         faults_.report(FaultCode::packet_oversize, FaultSeverity::warning, mission_ms);
         extra.clear();
-        built = builder_.build(candidate, mission_ms, snapshot_, extra);
+        built = builder_.build(candidate, mission_ms, snapshot_, extra, rich);
     }
     if (too_long(built)) {
         // 2. The sensors: GP- and SN- come off the air for this packet. Unreachable in a
@@ -610,6 +615,16 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         ++health_.packets_sent;
     } else {
         ++health_.packets_tx_failed;
+    }
+
+    // The max-rate pattern: the next packet is due one slot after this one, and the slot is
+    // this packet's shape. due() cannot do that alone -- it advances by the period it held
+    // when it fired -- so the next due time is set here, where the shape is known. A failed
+    // transmit still used its slot, so the cadence does not stretch around it.
+    if (max_rate_) {
+        telemetry_task_.reschedule(mission_ms, rich ? cansat::link::kMaxRateRichSlotMs
+                                                    : cansat::link::kMaxRateLeanSlotMs);
+        max_rate_slot_ = (max_rate_slot_ + 1) % (cansat::link::kMaxRateLeanPerRich + 1);
     }
 
     if (logger_enabled_) {
@@ -698,7 +713,7 @@ void Controller::service_ground_commands(std::uint64_t mission_ms) {
             }
             last_command_pn_ = command_pn;
             ++health_.ground_commands_accepted;
-            engage_max_rate(true);
+            engage_max_rate();
             break;
         }
         case cansat::CommandKind::none:
@@ -709,28 +724,18 @@ void Controller::service_ground_commands(std::uint64_t mission_ms) {
     }
 }
 
-// Four changes, none of them undoable, and the fourth is what makes the first three so.
+// One accepted MAX_RATE. The packet shapes do not change here -- both schedules send rich
+// packets and carry no tags -- only how often, and whether two lean packets follow each rich
+// one. The pattern counts the packet during which the command was accepted as its first,
+// rich, slot.
 //
-// The packet is set here explicitly rather than left to whatever the build was configured
-// with. That is deliberate: the period below is sized for one specific worst case, and
-// inheriting half of the packet shape from a compiled-in flag is how a vehicle ends up
-// transmitting 255 bytes on a 281 ms period -- an airtime it cannot fit, discovered on the
-// air, with no way left to tell it to stop.
-void Controller::engage_max_rate(bool with_gps) {
-    const std::size_t budget = with_gps ? cansat::link::kMaxRatePacketBytesGps
-                                        : cansat::link::kMaxRatePacketBytesLean;
-    const std::uint32_t period = with_gps ? cansat::link::kMaxRatePeriodGpsMs
-                                          : cansat::link::kMaxRatePeriodLeanMs;
-
-    // The five project-local tags come off the air in both variants. The rulebook's
-    // mandated packet does not contain them, and they are what the airtime is bought with.
+// The diagnostic tags are forced off even though that is the default. The slots are sized
+// for the rich and lean shapes; a bench build that had turned the tags on would otherwise
+// transmit packets its own slots were never measured for.
+void Controller::engage_max_rate() {
     config_.append_diagnostic_fields = false;
-    config_.transmit_gps = with_gps;
-    config_.worst_case_packet_bytes = budget;
-    // The builder holds its own copy of the configuration, so it has to be told separately.
-    builder_.set_transmit_gps(with_gps);
-
-    telemetry_task_.set_period(period);
+    max_rate_ = true;
+    max_rate_slot_ = 0;
     health_.rate_maxed = true;
     uplink_closed_ = true;
 }

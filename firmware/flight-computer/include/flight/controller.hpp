@@ -62,13 +62,16 @@ private:
     void run_calibration(std::uint64_t mission_ms);
     bool is_armed(std::uint64_t mission_ms) const;
     void service_ground_commands(std::uint64_t mission_ms);
-    // One accepted MAX_RATE command, four irreversible changes. Private because there is no
-    // legitimate caller but the command handler: this is not a mode the vehicle can be put
-    // into and taken out of.
-    void engage_max_rate(bool with_gps);
-    // Set by engage_max_rate() and never cleared. The uplink is closed from that moment,
-    // including to the other MAX_RATE command.
+    // One accepted MAX_RATE command: the slot pattern, the closed uplink, the report. None of
+    // it can be undone, and it is private because the command handler is its only caller --
+    // this is not a mode the vehicle can be put into and taken back out of.
+    void engage_max_rate();
+    // Set by engage_max_rate() and never cleared. The uplink is closed from that moment.
     bool uplink_closed_ = false;
+    // The max-rate schedule: engaged or not, and which slot of the rich, lean, lean pattern
+    // the next packet fills. Slot 0 is the rich one.
+    bool max_rate_ = false;
+    std::uint32_t max_rate_slot_ = 0;
     // Highest packet number a ground command has been accepted against. A token is
     // valid for exactly one packet number, so this makes every command single-use.
     std::uint32_t last_command_pn_ = 0;

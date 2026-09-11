@@ -419,49 +419,48 @@ Confirm on the vehicle.
 ### Commanding the maximum packet rate
 
 The rulebook scores packet rate with no ceiling — "higher packet rates will be rewarded
-with more points, provided transmissions remain consistent" — and the vehicle flies at
-1.43 Hz so that a normal flight keeps its diagnostic tags and its duty margin. Two console
-buttons trade those away for rate, once:
+with more points, provided transmissions remain consistent" — and the organizers count only
+*transmitted* telemetry for the extra-sensor points. Normal flight already sends GPS and
+sound in every packet at 1.43 Hz. One console button, **Max rate**, trades some of that
+per-packet content for rate, once:
 
-| Button | Period | Rate | What goes on the air |
-|---|---:|---:|---|
-| **Max rate + GPS** | **364 ms** | 2.75 Hz | Mandatory fields **plus the three `GP-` position fields**. The five diagnostic tags stop |
-| **Max rate 3.56 Hz** | **281 ms** | 3.56 Hz | Mandatory fields only. Position stays in the SD log |
+| Slot | Shape | Length |
+|---|---|---:|
+| 1 | rich — mandatory fields, `GP-` position, `SN-` sound | **385 ms** |
+| 2 | lean — mandatory fields only | **286 ms** |
+| 3 | lean | **286 ms** |
+| | one full cycle | **957 ms** |
+
+That is **3.13 Hz** of packets with GPS and sound on the air at **1.04 Hz** — one rich packet
+every 957 ms. The twelve mandatory fields are in every packet, and the SD log records GPS
+and sound for every packet, lean ones included.
 
 > [!WARNING]
-> **This cannot be undone, and the second press does nothing.** An accepted rate command
-> closes the uplink in the same instant it changes the rate: the vehicle stops listening for
-> the rest of the power cycle, including to the other rate button. Only a power cycle
-> restores the flashed configuration — 1.43 Hz with the uplink open.
+> **This cannot be undone.** An accepted `MAX_RATE` closes the uplink in the same instant it
+> changes the schedule: the vehicle stops listening for the rest of the power cycle, and a
+> second press does nothing. Only a power cycle restores the flashed schedule — 1.43 Hz with
+> the uplink open.
 
-**Why 364 and 281 rather than something rounder.** The period is the packet's measured
-airtime plus 40 ms, and the 40 ms is the vehicle's own work between transmits: one SD block
-write at its worst case ([F-11](../testing/bring-up-record.md#findings) measured 30 ms in
-two of five sessions on two different boards), plus the sensor loop and the watchdog feed. A
-period inside that guard does not fail loudly — it makes packets late, which the official
+**Why 385 and 286 rather than something rounder.** Each slot is its packet's measured airtime
+plus 40 ms, rounded up, and the 40 ms is the vehicle's own work between transmits: one SD
+block write at its worst case ([F-11](../testing/bring-up-record.md#findings) measured 30 ms
+in two of five sessions on two different boards), plus the sensor loop and the watchdog feed.
+A slot inside that guard does not fail loudly — it makes packets late, which the official
 ground stations see as jitter on a line that scores consistency.
 
-**The GPS variant costs nothing in airtime.** LoRa quantises the payload into symbol blocks,
-so a 201-byte packet and a 199-byte one both take 298 symbols and the same 317.7 ms. The
-three `GP-` fields are paid for entirely by the five tags that leave.
-
-**What you lose either way.** `MODE`, `FAULTS`, `CAL`, `ARM` and `YR` stop being
-transmitted. They keep going to the SD log, so a fault during a max-rate flight is
-diagnosable after recovery rather than live. The mandatory twelve fields are untouched, and
-the packet stays rulebook-compliant.
-
-**How to send one.** The vehicle must be in `READY` with `ARM-0` and built with
+**How to send it.** The vehicle must be in `READY` with `ARM-0` and built with
 `allow_ground_commands` — the same window as the erase. The button asks for the vehicle
-password and shows the packet number it will bind the command to; the password is never
+password and shows the packet number it binds the command to; the password is never
 transmitted. Then:
 
 1. `#tx=ok` from the bridge means the frame reached the air. **It does not mean the vehicle
-   acted** — confirm on the station's rate, which moves within one period.
-2. The `MODE`/`FAULTS`/`CAL`/`ARM` tags disappearing from the raw packets is the second
-   confirmation, and the `GP-` fields appearing is the third for the GPS variant.
+   acted** — confirm on the station's rate, which moves within one cycle.
+2. Every third packet carries `GP-` and `SN-`, and the two between carry neither. That
+   pattern in the raw monitor is the second confirmation.
 3. If the rate does not move: the vehicle was armed, out of range, already latched, or built
    without the uplink. Read its startup summary over USB — the state line says
-   `rate COMMANDED MAX - uplink closed` once it is latched.
+   `rate COMMANDED MAX - uplink closed` once it is latched, and the `uplink` line says how many
+   commands it has accepted and refused.
 
 ### What gets written
 

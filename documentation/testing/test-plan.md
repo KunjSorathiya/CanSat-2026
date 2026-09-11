@@ -97,7 +97,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 126 suites across the whole flight core | ✅ **4233 / 4233 assertions** |
+| `flight_tests` | 127 suites across the whole flight core | ✅ **4371 / 4371 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
 | `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **139 / 139 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
@@ -105,7 +105,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Python ground station | 8 modules | ✅ **140 / 140 tests** |
 | Python tooling | `tools/link_budget.py`, and `tools/cad_dimensions.py` — the STEP reader the mechanical documents take their dimensions from, tested against hand-built STEP files with known extents, the trailing-dot real literal that first defeated it, a circle bulging past every vertex, and the two files it must refuse rather than under-measure | ✅ **49 / 49 tests** |
 | Python simulations | `simulations/descent.py` — canopy sizing, the closed-form fall against both of its own limits, ISA air density, and the mass-tolerance argument | ✅ **40 / 40 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **291 / 291 claims** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **289 / 289 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **65 / 65 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 126 suites, 4233 assertions
+### `flight_tests` — 127 suites, 4371 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -228,9 +228,10 @@ flowchart LR
 | `test_a_budget_below_what_is_on_the_air_is_refused` | A budget that cannot hold the mandatory block plus the GPS and sound it transmits is refused before flight — the controller would otherwise shed the sensors from every packet, silently. Tags are not counted: they are shed first, and a tagged bench build must still validate |
 | `test_the_packet_cadence_is_the_same_in_every_state` | A full profile — pad, boost, coast, descent, landing — and **every gap between consecutive packets equals `telemetry_period_ms`**, whatever state the vehicle was in. The test asserts it actually reached `FLIGHT` and `LANDED` first, so it cannot pass on a mission that never left the pad. State detection drives the `MODE` tag and the LED blink; it must never drive the rate |
 | `test_the_builder_can_be_told_to_carry_position_after_construction` | The builder holds its own copy of the configuration, so a command putting position on the air has to tell it directly |
-| `test_the_gps_command_speeds_up_and_puts_position_on_the_air` | `MAX_RATE_GPS` moves the period to 364 ms, adds the three `GP-` fields and drops all five diagnostic tags |
-| `test_either_command_closes_the_uplink_behind_it` | After an accepted rate command the radio is never polled again, with a command still on the air the whole time |
-| `test_the_other_max_rate_command_is_unreachable_after_the_first` | Whichever command lands first wins; the other is not refused but unheard, so there is no switching between modes |
+| `test_max_rate_is_a_pattern_of_one_rich_and_two_lean` | After `MAX_RATE`, packets go rich, lean, lean — `GP-` and `SN-` only on the rich one — spaced 385 ms after a rich packet and 286 after a lean one, polled at 1 ms so the spacing is the schedule's; the SD rows of lean packets still carry the fix |
+| `test_every_normal_flight_packet_is_rich` | In normal flight every packet after the first second carries `GP-` and `SN-`, and none carries a diagnostic tag |
+| `test_max_rate_closes_the_uplink_behind_it` | With a command on the air throughout, exactly one is accepted and the radio is never polled again |
+| `test_no_command_is_heard_after_max_rate` | After the latch an erase command is not refused but unheard: nothing is accepted and nothing is erased |
 | `test_an_armed_vehicle_refuses_to_change_rate` | The rate commands obey the same READY-with-`ARM-0` window as the erase |
 | `test_a_max_rate_command_obeys_the_replay_rules` | A token minted for a packet number the vehicle has not reached changes nothing and is counted as ignored |
 | `test_a_flight_build_cannot_be_commanded_to_max_rate` | With `allow_ground_commands` false neither rate command exists: the radio is never polled and the period never moves |
