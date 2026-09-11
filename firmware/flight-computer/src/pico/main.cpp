@@ -40,9 +40,9 @@ flight::Configuration make_config() {
     // validate_config() reject only the rulebook's "CAN-Team-XX" example, so a
     // wrong-but-well-formed number here would never be caught by anything.
     config.team_id = "CAN-Team-25";
-    // 700 ms -- 1.43 Hz. The 50 % duty cap puts the floor at 647 ms for the 199-byte
-    // worst-case packet this build transmits, and 700 ms takes it with margin at 46 %
-    // duty. It is not a free parameter: transmit_gps, the packet budget and this period
+    // 700 ms -- 1.43 Hz. The 50 % duty cap puts the floor at 689 ms for the 213-byte
+    // rich packet every normal-flight packet now is, and 700 ms takes it at 49 % duty --
+    // under the limit, though not by much. It is not a free parameter: transmit_gps, the packet budget and this period
     // move together, and validate_config() refuses a combination where they disagree. See
     // documentation/design/link-budget.md before changing any of them.
     config.telemetry_period_ms = cansat::link::kTelemetryPeriodMs;
@@ -122,6 +122,18 @@ void print_startup_summary(const flight::Configuration& config,
     std::printf("\n state %s | armed %s | calibrated %s | rate %s\n", flight::to_string(h.state),
                 h.armed ? "yes" : "no", h.calibrated ? "yes" : "no",
                 h.rate_maxed ? "COMMANDED MAX - uplink closed" : "normal");
+    // What the uplink has actually done, which is the one thing an operator cannot see
+    // from the ground. "The button did nothing" has three causes that want three different
+    // fixes -- the vehicle never heard the frame, heard it and refused it, or accepted it and
+    // then something else happened -- and without these two counters they all look alike.
+    if (!config.allow_ground_commands) {
+        std::printf(" uplink    disabled in this build\n");
+    } else {
+        std::printf(" uplink    %s | commands accepted %lu, refused %lu\n",
+                    h.rate_maxed ? "CLOSED" : "listening in READY/ARM-0",
+                    static_cast<unsigned long>(h.ground_commands_accepted),
+                    static_cast<unsigned long>(h.ground_commands_ignored));
+    }
 
     // A count is not actionable. Three active faults on a vehicle where every subsystem
     // reports OK is a puzzle; "mag_unavailable watchdog_reboot calibration" is an answer.
