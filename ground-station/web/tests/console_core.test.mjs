@@ -802,6 +802,19 @@ test("every status-field case expands as recorded", () => {
   assert.strictEqual(both.mode, "FLIGHT");
 });
 
+test("every inline script in the console compiles", () => {
+  // The suites above run only the portable core. A syntax error anywhere else -- the renderer,
+  // the serial glue -- stops the whole page before it draws anything, and none of them would
+  // notice: that is exactly how a duplicated `const age` shipped on 2026-09-11. Compiled here,
+  // not run, so no DOM is needed.
+  const html = readFileSync(CONSOLE_HTML, "utf8");
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+  assert.ok(scripts.length >= 1, "no inline script found");
+  for (const [i, body] of scripts.entries()) {
+    assert.doesNotThrow(() => new Function(body), `inline script ${i} does not compile`);
+  }
+});
+
 test("the Mission panel holds the last status through lean packets", () => {
   // Status rides on rich packets only, so the panel must read it from the last packet that
   // carried one -- not from the latest packet, which after Max rate is lean two times in three.

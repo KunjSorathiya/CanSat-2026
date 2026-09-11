@@ -2536,8 +2536,8 @@ function render(force) {
   drawSpark($("#rate-spark"), health.rateHistory, C.accent, true);
 
   /* ---- mission ---- */
-  const age = latest && lastStatus ? latest.timestamp_ms - lastStatus.timestamp_ms : NaN;
-  const stRec = age >= 0 && age <= STATUS_HOLD_MS ? lastStatus : null;
+  const statusAge = latest && lastStatus ? latest.timestamp_ms - lastStatus.timestamp_ms : NaN;
+  const stRec = statusAge >= 0 && statusAge <= STATUS_HOLD_MS ? lastStatus : null;
   const st = latest ? (stRec ? stRec.mode : null)
                     : (source === "demo" && missionT < 1 ? "SELF_TEST" : "INIT");
   const sv = missionStateView(st);
