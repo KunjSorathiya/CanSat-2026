@@ -645,8 +645,8 @@ and pressure, each against time or packet number.
    | Attitude | `roll_deg`, `pitch_deg`, `yaw_deg` | `roll`, `pitch`, `yaw` |
    | Acceleration | `ax_mps2`, `ay_mps2`, `az_mps2` | `ax`, `ay`, `az` |
    | GPS | `gps_valid`, `gps_lat`, `gps_lon`, `gps_alt`, `gps_satellites`, `gps_hdop` | `gps_lat`, `gps_lon`, `gps_alt`, `gps_satellites`, `gps_hdop` (all blank when there was no fix — 0 satellites and HDOP 0.0 are both readings a receiver produces, so zeros would describe a perfect fix that never happened). `gps_satellites` and `gps_hdop` are the two numbers the fix gate judged on, recorded beside the position it let through ([F-18](../testing/bring-up-record.md#findings)) |
-   | Mission state and faults | `state`, `fault_total` | not carried as columns — they are inside `raw_packet` as `MODE` and `FAULTS` |
-   | Acoustic level | `sound_mv_pp`, `sound_clipped`, `sound_gate_pct` | **not carried at all — this is on the card only.** The microphone is an additional sensor and its level is deliberately not transmitted, so the SD log is the only copy. Blank in both columns means no microphone was fitted or it was not reporting; `0.0` means it measured silence, and the two are not the same thing |
+   | Mission state and faults | `state`, `fault_total` | **not carried — on the card only by default.** The diagnostic tags left the air so GPS and sound could have the room. A bench build with `append_diagnostic_fields` on still carries them inside `raw_packet` as `MODE` and `FAULTS` |
+   | Acoustic level | `sound_mv_pp`, `sound_clipped`, `sound_gate_pct` | `sound_mv` — the `SN-` field as received, the same peak-to-peak level in millivolts. Blank for a lean packet after `MAX_RATE`, which carries no sensors, and for a microphone that was not producing valid windows. Clipping and the gate are on the card only. Blank on the card means no microphone was fitted or it was not reporting; `0.0` means it measured silence, and the two are not the same thing |
    | The packet itself | `packet` | `raw_packet` |
 
    The onboard names carry their units because they are written by the flight computer,

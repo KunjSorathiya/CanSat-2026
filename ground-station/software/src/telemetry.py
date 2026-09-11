@@ -85,6 +85,16 @@ class TelemetryRecord:
         return self.gps_lat is not None and self.gps_lon is not None
 
     @property
+    def sound_mv(self) -> Optional[float]:
+        """The microphone's peak-to-peak level in millivolts, from the optional ``SN-`` field.
+
+        A relative loudness, not a sound pressure level: it tracks the module's gain trimpot as
+        much as the room. None when the vehicle did not send it -- a lean max-rate packet, or a
+        microphone that was not producing valid windows.
+        """
+        return self._opt_float("SN")
+
+    @property
     def mode(self) -> Optional[str]:
         return self.tags.get("MODE")
 
@@ -165,6 +175,7 @@ class TelemetryRecord:
             "gps_lat": self.gps_lat if self.gps_lat is not None else "",
             "gps_lon": self.gps_lon if self.gps_lon is not None else "",
             "gps_alt": self.gps_alt if self.gps_alt is not None else "",
+            "sound_mv": self.sound_mv if self.sound_mv is not None else "",
             # Recorded alongside yaw so a log analysed months later still says which of
             # the two kinds of yaw its numbers are.
             "yaw_reference": self.yaw_reference or "",

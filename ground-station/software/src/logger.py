@@ -31,7 +31,7 @@ CSV_FIELDS = [
     "receipt_time", "team_id", "packet_number", "timestamp", "altitude",
     "pressure", "temperature", "roll", "pitch", "yaw", "yaw_reference", "heading",
     "ax", "ay", "az",
-    "gps_lat", "gps_lon", "gps_alt", "valid", "error", "seq_missing",
+    "gps_lat", "gps_lon", "gps_alt", "sound_mv", "valid", "error", "seq_missing",
     "seq_note", "raw_packet",
 ]
 

@@ -160,6 +160,13 @@ class StreamValidator:
                 report.notes.append("implausible GPS fix ignored")
                 self.stats.gps_rejected += 1
 
+        # Sound sanity (optional field): the level is a span of a 0..3300 mV ADC, so anything
+        # outside that range is a corrupted field rather than a loud room. Noted and ignored,
+        # never a rejection -- an additional sensor must not cost a mandatory packet.
+        sound = record.sound_mv
+        if sound is not None and not (0.0 <= sound <= 3300.0):
+            report.notes.append("implausible sound level ignored")
+
         self._remember(number)
         if self._last_number is None or number > self._last_number:
             self._last_number = number

@@ -862,6 +862,17 @@ test("a command with no name mints nothing", () => {
   assert.strictEqual(M.commandToken("hunter2", "", 12), "");
 });
 
+test("the sound level is read from SN-, and a lean packet has none", () => {
+  const base = "CAN-Team-01; P-001; Ti-00:00:01:000; A-10.0; Pr-101325.00; T-25.0; " +
+               "Ro-1.0; Pi-2.0; Ya-3.0; AX-0.10; AY-0.20; AZ-9.80;";
+  const rich = M.parsePacket(base + " SN-805.9;", null);
+  assert.equal(rich.error, undefined, "a packet carrying SN- must parse");
+  assert.equal(rich.record.sound_mv, 805.9);
+  const lean = M.parsePacket(base, null);
+  assert.equal(lean.error, undefined);
+  assert.equal(lean.record.sound_mv, null);
+});
+
 test("the password never appears in the frame the console transmits", () => {
   const command = M.formatCommand("CAN-Team-25", "ERASE_LOG", "hunter2", 42);
   assert.ok(!command.includes("hunter2"), "the password reached the wire");

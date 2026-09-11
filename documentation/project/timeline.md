@@ -102,7 +102,7 @@ appear when a real board is powered up.
 | Sensor drivers | IMU (MPU-9250 family), BMP280, NEO-6M | Register encodings and timing model host-tested; the IMU, barometer and GPS have since read on hardware. The delivered IMU is a six-axis MPU-6500, so the magnetometer path is dormant ([F-1](../hardware/receiving-inspection.md#findings)) |
 | Ground bridge | Continuous RX, CRC framing, status lines, watchdog | Framing unit-tested |
 | Ground software | Transport, parser, validator, health, logger, orchestrator, Tk dashboard, CLI, end-to-end trace | 140 Python tests |
-| Web console | Framing, parser, validator and link health extracted from `index.html` and run under Node | 65 Node tests |
+| Web console | Framing, parser, validator and link health extracted from `index.html` and run under Node | 66 Node tests |
 | SPI drivers | LoRa radio and microSD command sequences against simulated devices | 772 assertions |
 | Tooling | LoRa airtime calculator, STEP dimension reader, netlist and drawing generators, SD-card preparation, flight-log reader, documentation-claim checker | 49 Python tests |
 | Simulations | Descent model: canopy sizing, descent time and telemetry yield | 40 Python tests |

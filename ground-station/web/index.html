@@ -700,6 +700,7 @@ input[type=file] { display: none; }
             <dt class="label">Longitude</dt><dd class="v" id="gps-lon">&mdash;</dd>
             <dt class="label">Altitude</dt><dd class="v" id="gps-alt">&mdash;</dd>
             <dt class="label">Range</dt><dd class="v" id="gps-range">&mdash;</dd>
+            <dt class="label">Sound</dt><dd class="v" id="snd-mv">&mdash;</dd>
           </dl>
         </div>
       </section>
@@ -831,6 +832,9 @@ function parsePacket(str, team) {
   }
   const g = k => rec.tags[k] !== undefined ? parseFloat(rec.tags[k]) : null;
   rec.gps_lat = g("GP-Lat"); rec.gps_lon = g("GP-Lon"); rec.gps_alt = g("GP-Alt");
+  // The sound level, from the optional SN- field: transmitted because only the air is scored
+  // for extra sensors. Null on a lean max-rate packet, which carries no sensors at all.
+  rec.sound_mv = g("SN");
   rec.mode = rec.tags["MODE"] || null;
   /* fault_count, not faults: the Python parser exposes this quantity under that name, and
      a hand-port that reads the wrong one gets `undefined` here rather than an error. */
@@ -1272,7 +1276,7 @@ function pushSample(r) {
     temperature: r.temperature, amag, roll: r.roll, pitch: r.pitch, yaw: r.yaw,
     yawRef: r.yaw_reference, heading: r.heading, vspd, spin,
     x, y, fx, fy, hasFix, mode: r.mode,
-    lat: r.gps_lat, lon: r.gps_lon, galt: r.gps_alt };
+    lat: r.gps_lat, lon: r.gps_lon, galt: r.gps_alt, snd: r.sound_mv };
   samples.push(s);
   if (samples.length > MAX_SAMPLES) samples.shift();
   markEvents(s);
@@ -2584,6 +2588,14 @@ function render(force) {
   const rng = s && s.hasFix ? Math.hypot(s.fx, s.fy) : null;
   const brg = rng !== null ? (Math.atan2(s.fx, s.fy) * 180 / Math.PI + 360) % 360 : null;
   $("#gps-range").textContent = rng === null ? "—" : rng.toFixed(1) + " m @ " + brg.toFixed(0) + "°";
+  // The sound level from the newest packet that carried one. After MAX_RATE two packets in
+  // three are lean and carry none, so the readout holds the last value rather than
+  // flickering to a dash between rich packets.
+  let lastSnd = null;
+  for (let i = samples.length - 1; i >= 0 && i >= samples.length - 10; i--) {
+    if (samples[i].snd !== null && samples[i].snd !== undefined) { lastSnd = samples[i].snd; break; }
+  }
+  $("#snd-mv").textContent = lastSnd === null ? "—" : lastSnd.toFixed(1) + " mV p-p";
   drawPolar();
 
   /* ---- 3D HUD + accessible description ---- */
@@ -2811,11 +2823,12 @@ $("#toggle-table").addEventListener("click", () => {
 });
 
 $("#copy-csv").addEventListener("click", async () => {
-  const header = "t_s,altitude_m,pressure_pa,temperature_c,accel_mag_mps2,roll_deg,pitch_deg,yaw_deg,yaw_reference,heading_deg,vspeed_mps,east_m,north_m";
+  const header = "t_s,altitude_m,pressure_pa,temperature_c,accel_mag_mps2,roll_deg,pitch_deg,yaw_deg,yaw_reference,heading_deg,vspeed_mps,east_m,north_m,sound_mv";
   const lines = samples.map(s => [s.t.toFixed(2), s.altitude.toFixed(1), s.pressure.toFixed(2),
     s.temperature.toFixed(1), s.amag.toFixed(2), s.roll.toFixed(1), s.pitch.toFixed(1), s.yaw.toFixed(1),
     s.yawRef || "", s.heading === null || s.heading === undefined ? "" : s.heading.toFixed(1),
-    s.vspd.toFixed(2), s.x.toFixed(2), s.y.toFixed(2)].join(","));
+    s.vspd.toFixed(2), s.x.toFixed(2), s.y.toFixed(2),
+    s.snd === null || s.snd === undefined ? "" : s.snd.toFixed(1)].join(","));
   const csv = [header, ...lines].join("\n");
   try { await navigator.clipboard.writeText(csv); toast(samples.length + " rows copied to clipboard"); }
   catch (e) { toast("Clipboard blocked — open the data table and copy from there"); }

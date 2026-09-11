@@ -231,6 +231,12 @@ class OptionalTagSplittingTests(unittest.TestCase):
                 cases.append((name, field, key, value))
         return cases
 
+    def test_the_fixture_covers_the_sound_field(self):
+        # SN- went on the air when the organizers ruled that only transmitted telemetry earns
+        # extra-sensor points. Both parsers read this file, so both are held to it.
+        keys = {c[2] for c in self._load()}
+        self.assertIn("SN", keys)
+
     def test_the_fixture_file_is_present_and_covers_negative_values(self):
         cases = self._load()
         self.assertGreaterEqual(len(cases), 8)

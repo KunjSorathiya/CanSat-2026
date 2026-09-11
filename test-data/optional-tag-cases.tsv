@@ -33,3 +33,6 @@ negative_plain_key	TREND--1	TREND	-1
 # A value that is only a minus sign is not a number, but it must not be mis-split either:
 # the key stays the key.
 lone_minus	GP-Alt--	GP-Alt	-
+sound_zero	SN-0.0	SN	0.0
+sound_typical	SN-805.9	SN	805.9
+sound_full_scale	SN-3300.0	SN	3300.0
