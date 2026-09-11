@@ -8,6 +8,74 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-11 (cycle 48)
+
+The organizers ruled that only transmitted telemetry earns extra-sensor points, and the
+packet changed shape around that ruling. Nothing in this cycle has transmitted a packet on
+hardware yet.
+
+### Changed — GPS and sound on the air, tags off it
+
+Until now neither GPS nor the microphone was transmitted in normal flight; both went to the
+SD log, which under the ruling scored them nothing. Every normal-flight packet now carries
+`GP-Lat`, `GP-Lon`, `GP-Alt` and a new `SN-` sound level after the twelve mandatory fields,
+at the same 700 ms and 1.43 Hz. The room came from the five diagnostic tags — `MODE`,
+`FAULTS`, `CAL`, `ARM`, `YR` — which left the air by default: tags, GPS and sound together
+are 267 bytes at their widest, past the FIFO, and the tags are the only part the rulebook
+does not reward. They stay in the SD log. **The console loses its live view of mission state
+as a result**, and says so rather than guessing.
+
+### Changed — one max-rate command, and it is a pattern of slots
+
+`MAX_RATE_GPS` and `MAX_RATE_LEAN` became `MAX_RATE`. After it the vehicle sends one rich
+packet — mandatory, position, sound — then two lean ones, in slots of 385, 286 and 286 ms:
+957 ms a cycle, **3.13 Hz**, with the sensors still on the air at **1.04 Hz**. Three packets is
+not a preference; a fourth slot would take the sensors under once a second. `PeriodicTask`
+gained `reschedule()`, because the interval after a packet depends on which shape it was.
+
+### Fixed — the widths were a commit message, not a measurement
+
+The first revision of the design carried 145 bytes for the mandatory block and 56 for GPS.
+A test that constructs the widest packets — packet number 4294967295, a 99-hour clock,
+extreme negatives — said **147 and 55**, and 147 crosses a LoRa symbol boundary that 145 does
+not. The lean slot moved from 281 to 286 ms and the rate from 3.17 to 3.13 Hz. The
+`static_assert`s had already refused 363 and 280 ms in the design before that, for being
+inside their own guard by a fraction of a millisecond.
+
+### Changed — a byte floor that protects the sensors
+
+`validate_config()` now refuses a budget smaller than the mandatory block plus whatever of
+GPS and sound is enabled. The failure it refuses is silent: a budget too small for the
+sensors has the controller shed them from every packet, and the sensor points go to zero with
+no fault. The tags are deliberately not counted — they are shed first and cannot displace
+the sensors. The controller's own shedding step used to drop the fix from that packet's SD row
+as well; it now takes the sensors off the air only.
+
+### Added — the ground side reads `SN-`
+
+The Python station and the web console learned the field in one commit, because a test holds
+their field names equal. The console shows the sound level under the GPS panel and holds the
+last value through the lean packets, rather than flickering to a dash between rich ones.
+
+### Added — the vehicle says what its uplink did
+
+The startup summary prints whether the uplink is listening or closed and how many commands it
+has accepted and refused. It was added to chase an open bench fault and kept because it is the
+one line an operator needs when a command appears to do nothing.
+
+### Open
+
+- **The bench fallback.** A build of the previous design raised the rate and then returned to
+  exactly 1.43 Hz with packet numbers still climbing, so the vehicle did not reset — and nothing
+  in the firmware restores the period without one. The summary's new uplink line is what will
+  say whether the vehicle ever latched. Bring-up rows 8.16 to 8.18 are waiting for it.
+- **The bench card reports `SD card FAILED`.** With the tags off the air the SD log is the only
+  in-flight record of mission state, so this matters more than it did.
+- **Official ground-station compatibility.** The updated guidelines require it, and this
+  repository has never seen the Physics Club stations' modem parameters.
+
+---
+
 ## [Unreleased] — 2026-09-10 (cycle 47)
 
 Two ground commands that raise the packet rate and close the uplink behind themselves, and

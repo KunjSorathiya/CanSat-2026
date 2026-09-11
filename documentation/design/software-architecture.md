@@ -155,7 +155,7 @@ sequenceDiagram
 
     S->>C: raw samples over I2C and UART
     C->>C: plausibility gate, bias correction, orientation, AGL, vertical rate
-    C->>B: SensorSnapshot plus diagnostic tags
+    C->>B: SensorSnapshot, and whether this packet carries the sensors
     B-->>C: nothing built if any mandatory field is invalid
     B->>C: record plus rulebook packet string
     C->>R: transmit(packet)
@@ -348,7 +348,7 @@ never blocks the mission.
 ```mermaid
 flowchart TD
     A["emit_telemetry"] --> B["candidate = packet_number + 1"]
-    B --> C["append diagnostic tags MODE, FAULTS, CAL, ARM"]
+    B --> C["append GP- and SN- on a rich packet; tags only on a bench build"]
     C --> D["TelemetryBuilder::build"]
     D --> E{"all nine mandatory fields valid and finite, team id registered?"}
     E -- no --> F["no packet produced, packet number NOT consumed, raise telemetry_suppressed"]
@@ -531,7 +531,7 @@ packet file, or a live Web Serial connection to the bridge Pico.
 |---|---:|---|---|
 | Main tick | 2 ms | `loop_tick_ms` | The loop is non-blocking; the delay only yields. Bounded above twice over: it sets scheduling jitter (under 6 % of the 33 ms acquisition period) **and** it must drain the GPS UART before its 32-byte FIFO fills, which at 9600 baud takes 33 ms. `validate_config()` enforces both |
 | Sensor acquisition and orientation | 33 ms | `sensor_period_ms` | 30 Hz attitude and altitude-rate update; bounded by the barometer, see [sensor-rates.md](sensor-rates.md) |
-| Telemetry packet | 700 ms | `telemetry_period_ms` | **1.43 Hz — the fastest the SF7/125 kHz modem sustains inside the 50 % duty cap.** Sized from the *measured* airtime, not the model: the model under-reads by 1.8 %. GPS is logged rather than transmitted, which is what takes the worst case from 255 bytes to 199. **1000 ms remains the enforced ceiling** for the rulebook minimum, and 850 keeps 150 ms of margin against jitter crossing it. See [link-budget.md](link-budget.md) |
+| Telemetry packet | 700 ms | `telemetry_period_ms` | **1.43 Hz — the fastest the SF7/125 kHz modem sustains inside the 50 % duty cap.** Sized from the *measured* airtime, not the model: the model under-reads by 1.8 %. Every packet carries GPS and sound and no diagnostic tags — a 213-byte worst case — because the organizers count only transmitted telemetry for extra-sensor points. After the max-rate command the vehicle leaves this period for a rich, lean, lean pattern of 385 and 286 ms slots ([max-rate-command.md](max-rate-command.md)). **1000 ms remains the enforced ceiling** for the rulebook minimum, and 850 keeps 150 ms of margin against jitter crossing it. See [link-budget.md](link-budget.md) |
 | SD flush | 2000 ms | `sd_flush_period_ms` | Appends happen per packet; this is the sync |
 | Battery sample | 1000 ms | `battery_period_ms` | |
 | Health refresh | 1000 ms | `health_period_ms` | |

@@ -207,7 +207,18 @@ Optional data may be appended after the complete mandatory packet using short pr
 GP-Lat-...; GP-Lon-...; GP-Alt-...;
 ```
 
-The exact value formatting for optional fields is TBD because the supplied rulebook extract gives prefixes but not complete precision, units, or field syntax for each optional value.
+The rulebook gives the prefixes and leaves the precision to the team. This vehicle transmits four optional fields, in this order, after every mandatory one:
+
+| Field | Meaning | Format | Widest |
+|---|---|---|---|
+| `GP-Lat-` | Latitude, degrees | 6 decimals, signed | `GP-Lat--89.999999` |
+| `GP-Lon-` | Longitude, degrees | 6 decimals, signed | `GP-Lon--179.999999` |
+| `GP-Alt-` | GPS altitude, metres | 1 decimal, signed | `GP-Alt--9999.9` |
+| `SN-` | Sound level, millivolts peak to peak | 1 decimal | `SN-3300.0` |
+
+Each is sent only when its data is valid, so a packet from a vehicle with no fix carries `SN-` alone. A negative value keeps its own minus sign after the separator, which is why a parser must split on the last dash that is not itself a sign; `test-data/optional-tag-cases.tsv` holds every parser to that.
+
+The five diagnostic tags — `MODE`, `FAULTS`, `CAL`, `ARM`, `YR` — still exist, and a bench build with `append_diagnostic_fields` on sends them after the sensor fields. They are off the air by default: see the decision below.
 
 Rules:
 
@@ -216,56 +227,59 @@ Rules:
 - Optional fields are omitted when they would threaten the 1 Hz minimum, packet stability, or mandatory data priority.
 - GPS remains an additional sensor; no scoring result is claimed until it works.
 - Do not add optional fields without a documented consumer and bandwidth assessment.
-- **Not every sensor belongs in the packet.** The onboard log is a wider record than the link, and an additional sensor whose questions are all post-flight belongs in the first and not the second. See the acoustic level below.
+- **Every scored sensor belongs in the packet.** The organizers count only transmitted telemetry for extra-sensor points, so an additional sensor that is only logged earns nothing. See the decision below.
 
-### Decided: the acoustic level is logged and not transmitted
+### Decided: GPS and sound are transmitted, and the tags are not
 
-The vehicle carries an analogue microphone on `GP27` as an additional sensor. **Its level
-is written to the SD log and is never put in a packet.** That is a decision, taken against
-this document's own rule that an optional field needs a documented consumer and a bandwidth
-assessment, and both are recorded here.
+**This reverses the decision this section used to record**, and the reasoning that led to
+the old one is worth keeping beside the reason it no longer holds.
 
-**The rulebook does not require it.** `TEL-022` says optional sensor data *may* be appended
-after mandatory data and must not displace it. May, not must. Nothing in the mandatory
-packet format has a place for an acoustic level, and the scoring for additional sensors
-rewards integrating the sensor, not transmitting it.
+The old decision logged the acoustic level and never transmitted it, and an earlier revision
+took GPS off the air on the same grounds: the rulebook says optional data *may* be appended,
+the scoring for additional sensors rewards integrating the sensor rather than transmitting
+it, and every question the microphone answers is a post-flight one. That was a reasonable
+reading of a rulebook that says two things — "Additional Working Sensors (5 Points each)"
+in one place, and "rewarded ... only if data is correctly formatted and consistently
+transmitted" in another.
 
-**The bandwidth assessment.** A `SND-xxx.x` field is about nine bytes against a 255-byte
-budget whose measured worst case is 206. It is affordable. But affordable is not free: those
-nine bytes are airtime, the packet already sheds optional fields when it grows, and buying
-them for a field no rule asks for and no ground display reads is a poor trade.
+**The organizers settled it on 2026-09-11: only transmitted telemetry is considered for
+extra-sensor points.** Under that ruling a sensor that is only logged scores nothing, however
+well it works. So both go on the air, in every normal-flight packet, as `GP-` and `SN-`.
 
-**The consumer is the analysis, not the link.** Every question this sensor exists to answer
-is a post-flight one — when did the canopy inflate, when did it land, how did the acoustic
-level track descent rate. All of them are asked of the log, at leisure, against the altitude
-and acceleration columns beside them. None of them needs an answer during the flight, and an
-operator watching a live link can do nothing with a millivolt figure.
+**The bandwidth assessment**, which this document requires of any new field. The widest
+packet carrying the twelve mandatory fields, the position and the sound level is **213 bytes**,
+measured by constructing it rather than by adding up field widths. At SF7/125 kHz that is
+338 ms of airtime by the model and ~344 ms on this hardware — 49 % of the 700 ms period,
+under the 50 % cap by less than a point. There was no room left for the five diagnostic tags:
+tags, GPS and sound together are 267 bytes at their widest, past the 255-byte FIFO. The tags
+are the only part the rulebook does not reward, so they are the part that left.
 
-**What that costs.** The link is the only telemetry that survives a lost vehicle. If the
-CanSat is never recovered the acoustic record is gone, where a transmitted field would have
-been on the ground already. That is accepted: this is an additional sensor, and the mandatory
-data — which does go over the link — is what a lost vehicle must still have delivered.
+**The consumer** is the judges' ground station first and ours second: both parsers read `SN-`
+from the shared fixture, and the console shows it under the GPS panel.
 
-Reversing the decision is a one-line change in the controller, and it must come with a
-bandwidth re-check and a ground-station consumer, exactly as this document requires of any
-new field.
+**What it costs.** The console no longer sees mission state, fault count or calibration live
+-- those are on the card, and in the vehicle's startup summary over USB. The link is tighter
+against its duty cap than it has been. And after the max-rate command two packets in three
+are lean and carry no sensors at all, which is still at least one sensor reading a second
+([max-rate-command.md](max-rate-command.md)).
 
 ### Open: the pack voltage is measured and not transmitted
 
 The vehicle samples its battery through the divider on `GP26`, keeps the result in its
 health snapshot, and raises a fault when it falls below `battery_low_voltage`. **The
-voltage itself never leaves the vehicle.** The transmitted optional fields are `MODE`,
-`FAULTS`, `CAL`, `ARM` and `YR`, and nothing else, so an operator watching the link sees a
-fault count increment and cannot see how much margin is left before it does.
+voltage itself never leaves the vehicle.** The transmitted optional fields are `GP-Lat`,
+`GP-Lon`, `GP-Alt` and `SN-`, and nothing else. The fault count left the air with the other
+diagnostic tags, so an operator watching the link now sees neither the margin nor the low-
+voltage fault until the SD log is read.
 
 The ground station used to imply otherwise: its dashboard carried a **Battery (V)** row
 reading a `battery` key out of the *bridge's* status dictionary — a key nothing has ever
 written, from a Pico with no battery sense. It could only ever display `n/a`, which reads
 as a link that is not reporting rather than a quantity that is not sent. The row is gone.
 
-Adding `BAT-x.xx` would cost roughly nine bytes of a 255-byte budget whose measured
-worst case is 206, and the controller already drops optional fields before overrunning it.
-That makes it affordable, not decided: it is a change to the packet contract, and this
+Adding `BAT-x.xx` would cost roughly nine bytes against a 213-byte rich packet whose slots
+are derived from its width by construction, so it would move the byte floor, the rich slot
+and the max-rate cycle together. That makes it possible, not decided: it is a change to the packet contract, and this
 document requires a documented consumer and a bandwidth assessment before one is made.
 **The decision is open, and it is the team's, not the firmware's.**
 

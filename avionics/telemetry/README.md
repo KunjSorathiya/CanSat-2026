@@ -16,7 +16,7 @@ been tested beyond bench range.
 | Power | 17 dBm on PA_BOOST — the RA-02's maximum without PA_DAC |
 | Sync words | **`0xF3` testing, `0xA5` official launch** — the only radio parameters the rulebook fixes |
 | Telemetry period | **700 ms — 1.43 Hz** |
-| Worst-case packet | 199 bytes with GPS logged rather than transmitted; 255 with it on the air |
+| Worst-case packet | **213 bytes** — every packet carries GPS and sound, and the diagnostic tags are off the air |
 
 Every one of those except the sync words is a project engineering choice, defined **once**
 in [`link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp) and used by
@@ -53,9 +53,9 @@ From [bring-up-record.md](../../documentation/testing/bring-up-record.md), gates
 
 **The model reads 1.8 % low, consistently, on two boards.** That is not noise — it
 reproduced to 0.1 ms across four sessions. The telemetry period is sized from the
-**measured** airtime rather than the model because of it: 199 bytes costs ~323 ms once the
-1.8 % is applied, so the 50 % duty cap puts the floor at ~647 ms, and 700 ms leaves the
-real duty at 46 % rather than sitting on the limit.
+**measured** airtime rather than the model because of it: 213 bytes costs ~344 ms once the
+1.8 % is applied, so the 50 % duty cap puts the floor at ~689 ms, and 700 ms leaves the
+real duty at 49 % — under the limit, though not by much.
 
 ---
 
@@ -64,17 +64,22 @@ real duty at 46 % rather than sitting on the limit.
 The rulebook's 1 Hz is a **minimum**, and the 2026 revision scores rates above it. Two
 changes took the vehicle from exactly the floor to 43 % above it:
 
-1. **GPS moved out of the packet and into the log.** `GP-Lat`/`GP-Lon`/`GP-Alt` are 56
-   bytes, and they take the worst case from 199 to exactly 255 — the FIFO limit. SEN-011
-   scores an additional sensor on data *transmitted **or** logged*, and every SD row carries
-   latitude, longitude, altitude, satellite count and HDOP, so the five points are untouched.
+1. **The packet carries only what is scored.** `GP-Lat`/`GP-Lon`/`GP-Alt` and the `SN-`
+   sound level are on the air in every packet, because the organizers count only
+   transmitted telemetry for extra-sensor points. The room came from the five diagnostic
+   tags, which the rulebook does not reward: tags, GPS and sound together would not fit the
+   FIFO. An earlier revision made the opposite trade — GPS to the log, on the reading that
+   logging was enough — and the ruling reversed it.
 2. **The period sized from measured airtime**, as above.
 
-**What it costs is recovery, not points.** With the position off the air the ground station
-cannot say where the vehicle is — during descent or after landing — and the fix is on a card
-inside the thing you are looking for. `Configuration::transmit_gps` puts it back at 1.18 Hz,
-and `validate_config()` refuses the two settings apart. That is a launch-day judgement about
-the site.
+**What it costs is live mission state, not points.** Without `MODE` and `ARM` on the air the
+console shows mission state as unreported; it is in the SD log and in the vehicle's startup
+summary over USB. The position is back on the air, which is also what makes a vehicle that
+lands out of sight findable from the ground station.
+
+After the max-rate command the vehicle leaves 700 ms for a rich, lean, lean pattern — 3.13 Hz
+with the sensors still at 1.04 Hz. See
+[max-rate-command.md](../../documentation/design/max-rate-command.md).
 
 **Sitting at exactly 1000 ms was its own hazard.** Any jitter puts an interval over a second
 and the vehicle momentarily below a requirement that is *checked, not estimated*. 700 ms
@@ -87,7 +92,7 @@ carries 300 ms of margin — and since 2026-09-08 the hazard is not merely avoid
 
 ```text
 CAN-Team-25; P-042; Ti-00:01:23:450; A-118.4; Pr-99821.33; T-24.6; Ro-2.1; Pi--1.4;
-Ya-15.9; AX-0.12; AY--0.31; AZ-9.79; MODE-FLIGHT; FAULTS-0; CAL-1; ARM-1; YR-G;
+Ya-15.9; AX-0.12; AY--0.31; AZ-9.79; GP-Lat-21.166700; GP-Lon-72.783300; GP-Alt-131.2; SN-412.5;
 ```
 
 Mandatory fields first, in the rulebook's order and to its exact precision, then optional

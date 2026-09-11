@@ -1,8 +1,8 @@
 # Telemetry cadence and the max-rate command — design
 
-**Status: revised and approved 2026-09-11; implementation in progress. Never run on
-hardware.** This replaces the 2026-09-10 design of two max-rate commands. The packet widths
-were corrected by measurement the same day — see [where the numbers come
+**Status: revised and approved 2026-09-11, and implemented on the host the same day. Never
+run on hardware.** This replaces the 2026-09-10 design of two max-rate commands. The packet
+widths were corrected by measurement the same day — see [where the numbers come
 from](#where-the-numbers-come-from). The bench rows under Gate 8 of the [bring-up
 record](../testing/bring-up-record.md) are what would make any of it real.
 
