@@ -87,7 +87,12 @@ private:
     // A cross-check only: the course is never fed back into the attitude estimator.
     void check_yaw_reference(std::uint64_t mission_ms);
     void emit_telemetry(std::uint64_t mission_ms);
-    bool transmit_with_recovery(const std::string& packet, std::uint64_t mission_ms);
+    // Starts the packet, recovering a radio that has gone unhealthy first. True when the
+    // packet is on the air; it is counted sent or failed later, by service_transmit().
+    bool start_with_recovery(const std::string& packet, std::uint64_t mission_ms);
+    // Every poll: has the packet on the air finished, and how.
+    void service_transmit(std::uint64_t mission_ms);
+    void note_tx_failure(std::uint64_t mission_ms);
     void sample_battery(std::uint64_t mission_ms);
     void refresh_health(std::uint64_t mission_ms);
     void update_led(std::uint64_t mission_ms) const;
@@ -148,6 +153,9 @@ private:
     double last_baro_pressure_pa_ = 0.0;  // detects a re-read of an unchanged conversion
     double altitude_rate_mps_ = 0.0;
 
+    // A packet is on the air. Set by emit_telemetry(), cleared by service_transmit() when
+    // the radio reports it sent or failed; while it is set no new packet is started.
+    bool tx_in_flight_ = false;
     std::uint8_t radio_consecutive_failures_ = 0;
     std::uint64_t radio_retry_after_ms_ = 0;
 

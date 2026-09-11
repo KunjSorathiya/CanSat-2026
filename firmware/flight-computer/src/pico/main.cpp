@@ -29,10 +29,10 @@ constexpr bool same_text(const char* a, const char* b) {
     return *a == *b && (*a == '\0' || same_text(a + 1, b + 1));
 }
 constexpr std::size_t text_length(const char* a) { return *a == '\0' ? 0 : 1 + text_length(a + 1); }
-// A flight build with the uplink must not carry a password anyone who has read the repository
-// knows. Refused at compile time, so it cannot be discovered on the pad.
+// The template's placeholder is refused, so a copied-but-unedited file cannot fly. The
+// password itself is the team's choice -- change-me, at the team's decision of 2026-09-11,
+// which is the repository default and therefore known to anyone who has read it.
 static_assert(!same_text(cansat_local::kCommandPassword, "SET-ME") &&
-                  !same_text(cansat_local::kCommandPassword, "change-me") &&
                   text_length(cansat_local::kCommandPassword) >= 8,
               "set your own ground-command password (8+ characters) in flight/local_secrets.hpp");
 #endif
@@ -62,13 +62,16 @@ flight::Configuration make_config() {
     // validate_config() reject only the rulebook's "CAN-Team-XX" example, so a
     // wrong-but-well-formed number here would never be caught by anything.
     config.team_id = "CAN-Team-25";
-    // 700 ms -- 1.43 Hz. The 50 % duty cap puts the floor at 689 ms for the 213-byte
-    // rich packet every normal-flight packet now is, and 700 ms takes it at 49 % duty --
-    // under the limit, though not by much. It is not a free parameter: transmit_gps, the packet budget and this period
+    // 700 ms -- 1.43 Hz. The 50 % duty cap puts the floor at 647 ms for the 200-byte
+    // budget every normal-flight packet is held to, and 700 ms takes it at 46 % duty.
+    // It is not a free parameter: transmit_gps, the packet budget and this period
     // move together, and validate_config() refuses a combination where they disagree. See
     // documentation/design/link-budget.md before changing any of them.
     config.telemetry_period_ms = cansat::link::kTelemetryPeriodMs;
-    config.radio_mode = flight::RadioMode::test;  // switch to ::official for launch
+    // 0xA5, for testing as well as the launch: the organizers' ground station listens on
+    // the official word and nothing else. On the test word, 0xF3, their station heard only
+    // the few packets the SX127x's sync filter lets through (2026-09-11).
+    config.radio_mode = flight::RadioMode::official;
 #ifdef CANSAT_HAVE_LOCAL_SECRETS
     // The uplink, and with it the pre-arm command window: five minutes from power-on to send
     // MAX_RATE, after which the vehicle recalibrates on the pad and arms. The drone must not

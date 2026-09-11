@@ -77,11 +77,15 @@ public:
     // while the record and the sound fields the SD row renders from are filled exactly as
     // they would be otherwise. What goes on the air and what goes in the log are separate
     // decisions, and a lean packet must not cost the log anything.
+    //
+    // `air_sound` false leaves SN- alone off the air and keeps GP-: the first thing the
+    // controller sheds from a packet that would pass the organizers' 200-byte ceiling.
     std::optional<Built> build(std::uint32_t packet_number,
                                std::uint64_t mission_ms,
                                const SensorSnapshot& snapshot,
                                const std::vector<std::string>& extra_optional = {},
-                               bool air_sensors = true) const;
+                               bool air_sensors = true,
+                               bool air_sound = true) const;
 
     // One CSV row for the onboard SD log (superset of the packet + local metadata).
     static std::string sd_header();

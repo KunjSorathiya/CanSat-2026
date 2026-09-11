@@ -500,7 +500,7 @@ input[type=file] { display: none; }
             title="Erase the vehicle's onboard log, equivalent to prepare_sd_card.py. Serial link only, and the vehicle obeys only in READY with ARM-0">Erase SD log</button>
 
     <button class="hbtn" id="maxrate-btn" disabled
-            title="Switch to the fastest telemetry schedule: about 3.13 packets a second, with GPS and sound on the air once a second. Only during the five-minute command window after power-on. IRREVERSIBLE until power-off: the vehicle stops accepting commands, recalibrates and arms">Max rate</button>
+            title="Switch to the fastest telemetry schedule: about 3.11 packets a second, with GPS and sound on the air once a second. Only during the five-minute command window after power-on. IRREVERSIBLE until power-off: the vehicle stops accepting commands, recalibrates and arms">Max rate</button>
 
     <button class="hbtn" id="pause-btn" aria-pressed="false" title="Freeze the display; packets keep arriving and are buffered">
       <svg width="14" height="14" aria-hidden="true"><use href="#i-pause" id="pause-icon"/></svg><span id="pause-label">Pause</span>
@@ -2778,7 +2778,7 @@ const COMMANDS = {
   MAX_RATE: {
     note: "max-rate command sent",
     prompt:
-      "Switch to the fastest telemetry schedule: about 3.13 packets a second, with the GPS " +
+      "Switch to the fastest telemetry schedule: about 3.11 packets a second, with the GPS " +
       "position and the sound level on the air once a second." +
       "\n\nTHIS CANNOT BE UNDONE. The vehicle stops accepting commands the moment it takes " +
       "effect, recalibrates where it sits, and arms a few seconds later. Only a power " +

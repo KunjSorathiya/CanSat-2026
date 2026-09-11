@@ -14,9 +14,9 @@ been tested beyond bench range.
 | Radio | SX1278 RA-02, 433 MHz, one on the vehicle and one on the ground bridge |
 | Modem | SF7, 125 kHz, CR 4/5, 8-symbol preamble, payload CRC on |
 | Power | 17 dBm on PA_BOOST — the RA-02's maximum without PA_DAC |
-| Sync words | **`0xF3` testing, `0xA5` official launch** — the only radio parameters the rulebook fixes |
+| Sync words | **`0xA5` on both ends** — the rulebook's official word, and the only one the organizers' station hears (`0xF3` is the rulebook's test word). The only radio parameters the rulebook fixes |
 | Telemetry period | **700 ms — 1.43 Hz** |
-| Worst-case packet | **213 bytes** — every packet carries GPS and sound, and the diagnostic tags are off the air |
+| Worst-case packet | **200 bytes** — the organizers' receiver discards anything longer. Every packet carries GPS and sound; the diagnostic tags are off the air |
 
 Every one of those except the sync words is a project engineering choice, defined **once**
 in [`link_profile.hpp`](../../firmware/common/include/cansat/link_profile.hpp) and used by
@@ -53,9 +53,9 @@ From [bring-up-record.md](../../documentation/testing/bring-up-record.md), gates
 
 **The model reads 1.8 % low, consistently, on two boards.** That is not noise — it
 reproduced to 0.1 ms across four sessions. The telemetry period is sized from the
-**measured** airtime rather than the model because of it: 213 bytes costs ~344 ms once the
-1.8 % is applied, so the 50 % duty cap puts the floor at ~689 ms, and 700 ms leaves the
-real duty at 49 % — under the limit, though not by much.
+**measured** airtime rather than the model because of it: 200 bytes costs ~323 ms once the
+1.8 % is applied, so the 50 % duty cap puts the floor at ~647 ms, and 700 ms leaves the
+real duty at 46 %.
 
 ---
 
@@ -77,7 +77,7 @@ console shows mission state as unreported; it is in the SD log and in the vehicl
 summary over USB. The position is back on the air, which is also what makes a vehicle that
 lands out of sight findable from the ground station.
 
-After the max-rate command the vehicle leaves 700 ms for a rich, lean, lean pattern — 3.13 Hz
+After the max-rate command the vehicle leaves 700 ms for a rich, lean, lean pattern — 3.11 Hz
 with the sensors still at 1.04 Hz. See
 [max-rate-command.md](../../documentation/design/max-rate-command.md).
 
@@ -92,7 +92,7 @@ carries 300 ms of margin — and since 2026-09-08 the hazard is not merely avoid
 
 ```text
 CAN-Team-25; P-042; Ti-00:01:23:450; A-118.4; Pr-99821.33; T-24.6; Ro-2.1; Pi--1.4;
-Ya-15.9; AX-0.12; AY--0.31; AZ-9.79; GP-Lat-21.166700; GP-Lon-72.783300; GP-Alt-131.2; SN-412.5;
+Ya-15.9; AX-0.12; AY--0.31; AZ-9.79; GP-Lat-21.16670; GP-Lon-72.78330; GP-Alt-131; SN-412.5;
 ```
 
 Mandatory fields first, in the rulebook's order and to its exact precision, then optional
@@ -105,8 +105,9 @@ disagree.
 - **Wrong data is never transmitted.** If any mandatory field cannot be trusted, no packet
   is produced — and the packet number is **not consumed**. Transmitted numbers stay strictly
   sequential, so a gap at the ground station means radio loss and nothing else.
-- **Optional fields shed before the packet overruns.** The controller drops its diagnostic
-  tags rather than let a packet reach the radio's silent 255-byte truncation.
+- **Optional fields shed before the packet overruns.** The controller drops the diagnostic
+  tags, then `SN-`, then `GP-`, rather than let a packet pass the 200 bytes the organizers'
+  station accepts.
 
 Full specification: [telemetry-protocol.md](../../documentation/design/telemetry-protocol.md).
 
@@ -119,8 +120,8 @@ The card is the primary record; the radio is the live view.
 - **No filesystem.** Records go into raw 512-byte blocks, with the header rewritten after
   every record, so a brownout or an impact reset resumes at the correct block instead of
   overwriting flight data.
-- **It carries more than the packet does** — GPS position, satellite count, HDOP, and the
-  microphone columns, none of which are transmitted.
+- **It carries more than the packet does** — satellite count, HDOP, the microphone's clipping
+  and gate columns, GPS at full precision, and GPS and sound for lean packets too.
 - **It degrades quietly.** Ten consecutive write failures disable logging; telemetry is
   untouched.
 - Measured: **2.677 ms mean write, 297–367 writes/s sustained**, 100/100 written across
@@ -134,7 +135,7 @@ Read it back with [`tools/read_flight_log.py`](../../tools/read_flight_log.py).
 
 | Item | Note |
 |---|---|
-| **The official sync word `0xA5` has never been tried** | Only `0xF3` has linked. `0xA5` is what the launch runs on |
+| **The official sync word `0xA5` has never been tried** | Only `0xF3` has linked. Both Picos now fly `0xA5`, so the next bench run is its first try — and a run against the organizers' receiver code on an ESP32 is the test that matters |
 | **Range** | Every RSSI row past bench range is empty: 10 m, 100 m, 500 m, 1 km, and the range at which loss reaches 5 % |
 | **Loss over 500 packets** | The bench run was 66 |
 | **CRC errors on the USB link** | Row 8.3, never counted over a long run |

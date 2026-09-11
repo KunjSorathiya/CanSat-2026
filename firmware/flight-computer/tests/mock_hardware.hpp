@@ -26,6 +26,7 @@ public:
     }
     bool read(ImuSample& out, std::uint64_t now_ms) override {
         if (fail_read) return false;  // a real driver only advances health on success
+        ++reads;
         health_.last_update_ms = now_ms;
         out = sample;
         out.valid = true;
@@ -45,6 +46,7 @@ public:
     bool magnetometer = true;
     bool fail_init = false;
     bool fail_read = false;
+    int reads = 0;  // successful samples taken
 
 private:
     SensorHealth health_;
@@ -120,17 +122,30 @@ public:
         healthy_ = !fail_init;
         return healthy_;
     }
-    bool transmit(const std::string& packet) override {
-        if (fail_tx) return false;
+    bool start_transmit(const std::string& packet) override {
+        ++start_calls;
+        if (fail_tx || in_flight_) return false;
         packets.push_back(packet);
-        // The real part is half duplex, and Sx1278::transmit() clears the IRQ register on
-        // its way into TX -- so a frame that arrived and was never read is destroyed by the
+        // The real part is half duplex, and Sx1278::start_transmit() clears the IRQ register
+        // on its way into TX -- so a frame that arrived and was never read is destroyed by the
         // next transmission, not queued behind it. A mock that keeps the inbox across a
         // transmit models a mailbox rather than a radio, and lets a controller that polls
         // on the wrong side of the transmit pass a suite it could never pass on hardware.
         inbox.clear();
+        in_flight_ = true;
+        busy_left_ = airtime_polls;
         return true;
     }
+    TxState poll_transmit() override {
+        if (!in_flight_) return TxState::idle;
+        if (busy_left_ > 0) {
+            --busy_left_;
+            return TxState::busy;
+        }
+        in_flight_ = false;
+        return fail_on_air ? TxState::failed : TxState::sent;
+    }
+    bool transmitting() const { return in_flight_; }
     bool poll_receive(std::string& out) override {
         if (inbox.empty()) return false;
         out = inbox.front();
@@ -146,10 +161,17 @@ public:
     int receive_polls = 0;
     int init_calls = 0;
     bool fail_init = false;
-    bool fail_tx = false;
+    bool fail_tx = false;       // the packet cannot be started
+    bool fail_on_air = false;   // it starts, and then reports failed when it ends
+    // How many polls a packet stays on the air. Zero finishes it at the first poll, which is
+    // how every suite written before the transmit stopped blocking still sees it.
+    int airtime_polls = 0;
+    int start_calls = 0;
 
 private:
     bool healthy_ = false;
+    bool in_flight_ = false;
+    int busy_left_ = 0;
 };
 
 class MockLogger final : public SdLogger {

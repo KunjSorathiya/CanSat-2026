@@ -16,8 +16,8 @@ public:
     // Sets the next due time to `from_ms + period_ms`, and the period to `period_ms` for
     // every firing after that. due() advances by the period it held when it fired, which is
     // right for a fixed cadence and wrong for a schedule whose next interval depends on what
-    // was just sent: in the max-rate pattern a rich packet needs a 385 ms slot and a lean
-    // one 286, and only the caller knows which it just transmitted.
+    // was just sent: in the max-rate pattern a rich packet needs a 374 ms slot and a lean
+    // one 296, and only the caller knows which it just transmitted.
     void reschedule(std::uint64_t from_ms, std::uint32_t period_ms);
 
     // Returns true at most once per period. When it fires, the next due time advances by

@@ -139,12 +139,24 @@ public:
     virtual SensorHealth health() const = 0;
 };
 
+// Where the packet handed to Radio::start_transmit() is.
+enum class TxState { idle, busy, sent, failed };
+
 // LoRa radio (SX1278 / RA-02).
 class Radio {
 public:
     virtual ~Radio() = default;
     virtual bool initialize(std::uint8_t sync_word) = 0;
-    virtual bool transmit(const std::string& packet) = 0;
+    // Non-blocking. Puts the packet on the air and returns at once; the radio sends it on its
+    // own while the flight loop carries on. False means it could not be started, and the
+    // packet is lost. A packet that is still on the air refuses the next one.
+    //
+    // It used to be one blocking transmit(), and the flight loop stood still for the whole
+    // airtime -- up to ~320 ms a packet, 84 % of the time after MAX_RATE.
+    virtual bool start_transmit(const std::string& packet) = 0;
+    // Non-blocking. `busy` while the packet started last is on the air, then `sent` or
+    // `failed` exactly once when it ends, and `idle` when nothing is in flight.
+    virtual TxState poll_transmit() = 0;
     // Non-blocking. Returns true and fills `out` when a payload was waiting. Defaulted to
     // "nothing ever arrives" so a radio that only transmits -- which is every radio this
     // vehicle flies with, since allow_ground_commands defaults to false -- needs no code.

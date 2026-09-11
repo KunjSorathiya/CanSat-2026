@@ -34,6 +34,25 @@ void FaultManager::report(FaultCode code, FaultSeverity severity, std::uint64_t 
     }
 }
 
+void FaultManager::hold(FaultCode code, FaultSeverity severity, std::uint64_t now_ms) {
+    const std::size_t index = static_cast<std::size_t>(code);
+    if (index >= kCount) {
+        return;
+    }
+    FaultRecord& record = records_[index];
+    if (!record.active) {
+        report(code, severity, now_ms);  // a new episode: counted once, here
+        return;
+    }
+    if (severity > record.severity) {
+        record.severity = severity;
+    }
+    record.last_ms = now_ms;
+    if (severity == FaultSeverity::critical) {
+        ever_critical_ = true;
+    }
+}
+
 void FaultManager::clear(FaultCode code) {
     const std::size_t index = static_cast<std::size_t>(code);
     if (index < kCount) {

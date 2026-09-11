@@ -68,7 +68,7 @@ are none yet, because nothing has flown.
 | [wiring.md](design/wiring.md) | Signal wiring for both Picos, pin table, bus-sharing rules, power tree, bring-up order |
 | [electrical-architecture.md](design/electrical-architecture.md) | Power topology, regulation analysis, grounding, decoupling, power budget, electrical risks |
 | [link-budget.md](design/link-budget.md) | LoRa airtime arithmetic, the spreading-factor and packet-rate decision, range margin, and the guards that enforce them |
-| [max-rate-command.md](design/max-rate-command.md) | **Implemented 2026-09-11; `MAX_RATE` measured on the bench, the command window not yet.** Telemetry cadence: GPS and sound on the air in every packet of normal flight, and the one ground command that takes the vehicle to 3.13 Hz with the sensors at 1.04 Hz. The two packet shapes, the slot arithmetic, the five-minute pre-arm command window, what latches, and the bench measurement at 3.11 Hz |
+| [max-rate-command.md](design/max-rate-command.md) | **Implemented 2026-09-11; `MAX_RATE` measured on the bench, the command window not yet.** Telemetry cadence: GPS and sound on the air in every packet of normal flight, and the one ground command that takes the vehicle to 3.11 Hz with the sensors at 1.04 Hz. The two packet shapes, the organizers' 200-byte receiver limit, the slot arithmetic, the five-minute pre-arm command window, what latches, and the first bench measurement |
 | [sensor-rates.md](design/sensor-rates.md) | The 30 Hz acquisition loop: barometer conversion time, IMU anti-aliasing, bus budget, and why over-sampling corrupts vertical speed |
 
 ## Hardware

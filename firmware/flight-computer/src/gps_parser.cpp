@@ -179,10 +179,16 @@ bool NmeaParser::apply_sentence() {
             // a poor sentence must not erase a position the vehicle already had, and it
             // must not be mistaken for the receiver reporting no fix, which is what the
             // quality <= 0 path above means.
+            //
+            // And a refused sentence is not an applied one. The driver stamps the fix clock for
+            // every applied sentence while a fix is held, so returning true here renewed the
+            // age of the last good position on every refusal: a receiver stuck at three
+            // satellites kept a position of any age looking current, which is exactly what
+            // gps_fix_timeout_ms exists to stop.
             if (satellites < kMinGpsSatellites || !hdop_present || hdop > kMaxGpsHdop) {
                 ++fixes_rejected_;
                 ++sentences_parsed_;
-                return true;
+                return false;
             }
 
             latest_.latitude = lat;
@@ -215,9 +221,13 @@ bool NmeaParser::apply_sentence() {
         double lon = 0.0;
         if (parse_coordinate(fields[3], fields[4][0], 90.0, 'N', 'S', lat) &&
             parse_coordinate(fields[5], fields[6][0], 180.0, 'E', 'W', lon)) {
-            latest_.latitude = lat;
-            latest_.longitude = lon;
-            latest_.valid = true;
+            // RMC renews the ground track and nothing else. It carries no satellite count, no
+            // HDOP and no altitude, so a fix taken from it has passed none of the gates GGA
+            // applies -- and in the 2026-09-10 range test it put 219 such fixes on the air,
+            // each with 0 satellites, HDOP 0.0 and GP-Alt-0.0, in the seconds before GGA
+            // agreed there was a fix at all. The position, its altitude and the fix itself
+            // come from GGA alone; a well-formed RMC is still checked, above and below, and
+            // its void form and a corrupt one still clear the fix.
 
             // Ground track. Both fields are legitimately empty on a receiver that has a
             // fix but is not moving, so absence is not an error -- it just means there is
@@ -236,7 +246,7 @@ bool NmeaParser::apply_sentence() {
                 }
             }
             ++sentences_parsed_;
-            return true;
+            return false;  // the fix is unchanged, so its clock must not be renewed
         }
         latest_.valid = false;
         latest_.course_valid = false;

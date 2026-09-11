@@ -48,8 +48,10 @@ class NmeaParser {
 public:
     static constexpr std::size_t kMaxSentence = 100;  // NMEA sentences are <= 82 chars + margin
 
-    // Feed one received byte. Returns true when a complete, checksum-valid sentence of a
-    // recognised type was applied.
+    // Feed one received byte. Returns true when a complete, checksum-valid sentence changed
+    // the fix: a GGA that passed the gates, or a sentence that cleared it. A GGA the gates
+    // refused and an RMC (ground track only) return false, because the driver renews the
+    // fix clock on true and neither of them renewed the position.
     bool consume(char character);
 
     const cansat::GpsData& latest() const { return latest_; }

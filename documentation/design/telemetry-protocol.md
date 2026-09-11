@@ -247,11 +247,13 @@ extra-sensor points.** Under that ruling a sensor that is only logged scores not
 well it works. So both go on the air, in every normal-flight packet, as `GP-` and `SN-`.
 
 **The bandwidth assessment**, which this document requires of any new field. The widest
-packet carrying the twelve mandatory fields, the position and the sound level is **213 bytes**,
-measured by constructing it rather than by adding up field widths. At SF7/125 kHz that is
-338 ms of airtime by the model and ~344 ms on this hardware — 49 % of the 700 ms period,
-under the 50 % cap by less than a point. There was no room left for the five diagnostic tags:
-tags, GPS and sound together are 267 bytes at their widest, past the 255-byte FIFO. The tags
+packet carrying the twelve mandatory fields, the position and the sound level is **209 bytes**,
+measured by constructing it rather than by adding up field widths — and the organizers' ground
+station discards anything over **200**. So 200 is the budget: the position is printed to 5
+decimals and whole metres so that mandatory + GPS fit it at their widest (198), and `SN-` is
+shed from any single packet that would pass it. At SF7/125 kHz the budget is 318 ms of airtime
+by the model and ~323 ms on this hardware — 46 % of the 700 ms period. There was no room left
+for the five diagnostic tags: tags, GPS and sound together are 263 bytes at their widest. The tags
 are the only part the rulebook does not reward, so they are the part that left.
 
 **The consumer** is the judges' ground station first and ours second: both parsers read `SN-`
@@ -277,9 +279,9 @@ reading a `battery` key out of the *bridge's* status dictionary — a key nothin
 written, from a Pico with no battery sense. It could only ever display `n/a`, which reads
 as a link that is not reporting rather than a quantity that is not sent. The row is gone.
 
-Adding `BAT-x.xx` would cost roughly nine bytes against a 213-byte rich packet whose slots
-are derived from its width by construction, so it would move the byte floor, the rich slot
-and the max-rate cycle together. That makes it possible, not decided: it is a change to the packet contract, and this
+Adding `BAT-x.xx` would cost roughly nine bytes against a rich packet that already reaches the
+organizers' 200-byte ceiling at its widest, so it would compete with `SN-` for the same bytes
+and move the byte floor with it. That makes it possible, not decided: it is a change to the packet contract, and this
 document requires a documented consumer and a bandwidth assessment before one is made.
 **The decision is open, and it is the team's, not the firmware's.**
 

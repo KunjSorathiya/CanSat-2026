@@ -6,7 +6,7 @@
 and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml)
-[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-5193%20assertions-1b5e20)](documentation/testing/test-plan.md)
+[![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-5284%20assertions-1b5e20)](documentation/testing/test-plan.md)
 [![Python tests](https://img.shields.io/badge/Python%20tests-229%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
@@ -30,7 +30,7 @@ and streams telemetry from power-on through recovery.**
 
 | Layer | State |
 |---|---|
-| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 5491 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
+| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 5582 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
 | 🟢 **Firmware drivers** | **Every driver has run on real silicon** and its numbers are recorded — IMU, barometer, GPS, radio and microSD. **The flight image itself runs**: it was flashed, it printed its startup summary, it wrote a card, and it produced [F-16](documentation/testing/bring-up-record.md#findings) and [F-19](documentation/testing/bring-up-record.md#findings), which are defects only a running image could have found |
 | 🟢 **Hardware** | **The vehicle board is built and every device on it works** — **34 of 94 recorded measurements taken.** **The radio link closed end to end on 2026-09-07** — 66 packets, `P-001` to `P-066`, no gaps, no duplicates, 1.0000 Hz, −44 dBm at bench range, so Gate 8 has a bench link. Gates 3, 4, 5, 6 and 7 all pass on the soldered board — the IMU and barometer share I2C0 (`0x68` and `0x76`, `0x0C` correctly absent), the GPS emits clean NMEA at 162 B/s, the radio sends 5/5, 5/5 and 45/45 with airtimes within 1.8 % of the model, the card writes 100/100 and sustains ~300 writes/s, and the shared SPI0 bus passes every row. **Power is answered:** the Pico's own 3.3 V rail held **3.28–3.29 V through 45 back-to-back transmits** and 3.28–3.30 V at 100 % write duty, so no separate rail is needed. Sensor read costs 0.833 ms worst against a 33 ms period. **Open:** [F-12](documentation/testing/bring-up-record.md#findings), a card intermittent that failed three of its first four runs and has passed twelve since with the supply measured innocent; and [F-17](documentation/testing/bring-up-record.md#findings), **yaw measured drifting more than a full revolution in a 36.8-minute stationary log** — and, more usefully, holding to ±0.8° for the first 15 minutes before switching to 0.4 dps, which is **70° over a 3-minute flight** on a vehicle with no magnetometer; and [F-18](documentation/testing/bring-up-record.md#findings), a stationary GPS jumping 55.6 m in one second because nothing gates a fix on satellite count or HDOP. Still to fit: the sound module, the switch, the divider, and the Schottky |
 | 🟡 **Mechanical** | **Designed, simulated, and out for 3D printing in PETG.** `Cansat_D1` is **118.5 × 115.0 × 110.0 mm** — inside the height allowance with 91.5 mm spare and inside the 120 mm section with **2.5 and 5.0 mm of clearance per side**, the organizers having confirmed a 12 cm *sided box*. Three static-stress studies report **minimum safety factor ≥ 15** in every case, and even derated for the anisotropy of a printed part that is still **6 to 13**. **Mass: 344.299 g committed** — electronics weighed at 151.299 g, PETG structure 193 g — and the projected all-up **414–479 g** makes coming in *under* the 450 g floor the likelier risk. Parachute sized at **80.0 cm**. Still to do: **print it, weigh it, drop-test it** |
@@ -117,7 +117,7 @@ flowchart LR
         R2 --> BR --> PC --> UI
     end
 
-    R1 -. "433 MHz LoRa<br/>sync 0xF3 test · 0xA5 launch" .-> R2
+    R1 -. "433 MHz LoRa<br/>sync 0xA5 · 200 B max" .-> R2
 
     classDef vehicle fill:#0d47a1,stroke:#0d47a1,color:#fff
     classDef ground fill:#00695c,stroke:#00695c,color:#fff
@@ -317,8 +317,10 @@ priority, and unknown optional fields are ignored by a conforming parser.
 > gyroscope. See [open question 6](#open-questions-for-the-organizers).
 
 **Radio:** 433 MHz LoRa. Only the sync words are fixed by the rulebook — **`0xF3` for
-testing, `0xA5` for the official launch**. Spreading factor, bandwidth, coding rate,
-power and preamble are provisional engineering defaults.
+testing, `0xA5` for the official launch**. Both Picos fly `0xA5`, the word the organizers'
+ground station listens on, and no packet passes the 200 bytes that station accepts.
+Spreading factor, bandwidth, coding rate, power and preamble are provisional engineering
+defaults.
 
 **Full specification:** [telemetry-protocol.md](documentation/design/telemetry-protocol.md)
 
@@ -439,9 +441,9 @@ bash tools/build_host.sh
 
 | Suite | Coverage | Result |
 |---|---|---|
-| `flight_tests` | 134 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math, IMU range encoding, sensor timing, calibration, faults, scheduler, block log and torn-header recovery, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **4411 / 4411** |
+| `flight_tests` | 139 suites: packet format and edge cases, parser, shared protocol fixtures, state machine, orientation and angle wrapping, GPS validation, sensor math, IMU range encoding, sensor timing, calibration, faults, scheduler, block log and torn-header recovery, controller behaviour and packet-size degradation, link profile, LoRa airtime | ✅ **4473 / 4473** |
 | `flight_smoke_test` | Boot, first three packets, GPS parse | ✅ Passed |
-| `sx1278_tests` | LoRa driver register sequence, TX timeout, RX and CRC handling, RSSI conversion, against a fake register bank | ✅ **139 / 139** |
+| `sx1278_tests` | LoRa driver register sequence, TX timeout, RX and CRC handling, RSSI conversion, against a fake register bank | ✅ **168 / 168** |
 | `sd_card_tests` | microSD init sequence, SDHC vs SDSC addressing, block round trip, bus release, timeouts and write-error paths, against a simulated card | ✅ **613 / 613** |
 | `fat_volume_tests` | FAT32 log-file lookup: MBR and superfloppy volumes, contiguity, a missing file, a card that stops answering, against a synthetic image | ✅ **30 / 30** |
 | `ground_station_tests` | Framing, CRC detection, resync, known-answer vector | ✅ Passed |
@@ -488,7 +490,7 @@ requirement is satisfied in flight.
 | At least one packet per second | **1.43 Hz** (700 ms), sized from *measured* airtime rather than the model, which reads 1.8 % low. **The rulebook figure is a floor this vehicle cannot be configured onto:** `validate_config()` refuses any period above 950 ms and a `static_assert` refuses to compile one, so a build physically cannot ship at or below 1 Hz. The ground station reports whether what arrived cleared it | 🟢 **Rate demonstrated on a closed link**, at the 1 Hz configuration it then carried |
 | Correct team identifier in every packet | Formatter enforces it; `CAN-Team-XX` is rejected | 🟢 Implemented and enforced |
 | Required packet format, numbering from `P-001` | Byte-exact formatter, tested against the rulebook example | 🟢 Implemented and tested |
-| Sync words `0xA5` launch, `0xF3` test | `RadioMode` selects it; procedure documented | 🟡 Implemented, link unverified |
+| Sync words `0xA5` launch, `0xF3` test | Both images fly `0xA5`, which the organizers' station listens on; `RadioMode` can still select `0xF3` | 🟡 Implemented, link unverified |
 | Others powered off during another team's launch | Procedure documented in the runbook | 🟡 Documented |
 | Manual ON/OFF switch and visible power LED | **Both parts are held, neither is fitted.** The power LED must light the instant the switch closes, so it goes on the rail rather than on a GPIO; the firmware separately drives a status LED on GP14 whose blink rate names the mission state | 🔴 Not satisfied |
 | Automatic telemetry at power-on | No manual trigger anywhere in the firmware | 🟡 Implemented, unverified |

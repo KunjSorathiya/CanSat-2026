@@ -49,6 +49,12 @@ public:
     FaultManager();
 
     void report(FaultCode code, FaultSeverity severity, std::uint64_t now_ms);
+    // A condition the controller re-checks every cycle -- no GPS fix, a stale sensor, a
+    // low battery. One occurrence per episode, not per check: reported through report()
+    // it counted every 33 ms poll, and the range-test log's fault_total climbed 21 a
+    // second on a vehicle whose only fault was no sky view. Severity and last_ms still
+    // follow every call.
+    void hold(FaultCode code, FaultSeverity severity, std::uint64_t now_ms);
     void clear(FaultCode code);  // mark recovered (inactive); history is kept
 
     bool active(FaultCode code) const;

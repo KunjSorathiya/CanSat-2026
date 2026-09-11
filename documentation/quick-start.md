@@ -135,7 +135,7 @@ bash tools/build_host.sh
 
 This compiles the shared telemetry library, the whole flight core, the ground-station
 framing library and every host test, runs them, then runs the Python and Node suites.
-Expect **5193 C++ assertions, 230 Python tests and 68 Node tests, all passing, with zero
+Expect **5284 C++ assertions, 230 Python tests and 68 Node tests, all passing, with zero
 compiler warnings.**
 
 ```bash
@@ -373,9 +373,10 @@ Edit [`firmware/flight-computer/src/pico/main.cpp`](../firmware/flight-computer/
 config.team_id = "CAN-Team-25";   // <-- your registered competition identifier
 ```
 
-Also decide the radio mode. `RadioMode::test` uses sync word `0xF3`; the official launch
-requires `0xA5`. Both the vehicle and the bridge must be changed together — the bridge's
-sync word is in
+The radio mode is already set: both Picos ship on the official sync word `0xA5`, because the
+organizers' ground station listens on nothing else. `RadioMode::test` (`0xF3`) is still there
+for bench work on a shared field; the vehicle and the bridge must be changed together — the
+bridge's sync word is in
 [`firmware/ground-station/src/pico/main.cpp`](../firmware/ground-station/src/pico/main.cpp).
 
 **Rehearse the switch before launch day.** A mismatched sync word receives nothing and
@@ -465,7 +466,7 @@ exists because a fault in a shared bus is far easier to find with one device on 
 | 5b | Acquisition rate | Loop actually achieves 30 Hz ([sensor-rates.md](design/sensor-rates.md)) |
 | 6 | GPS | Raw NMEA arrives; fix acquired **outdoors**; checksum errors ≈ 0 |
 | 7 | Radio identity | RA-02 version register reads back over SPI |
-| 8 | Bench link | Packets received end to end at sync word `0xF3` |
+| 8 | Bench link | Packets received end to end at sync word `0xA5` |
 | 9 | Range test | Acceptable loss at launch distance, antenna mounted as flown |
 | 10 | microSD alone | Block read and write on its own supply |
 | 11 | Shared SPI | Radio and SD both work with the other present |
@@ -528,7 +529,8 @@ the full checklist. The items people forget:
 
 - **Set `reference_pressure_pa`** from a field barometer reading on the day. Altitude is
   meaningless otherwise.
-- **Switch the sync word to `0xA5`** on **both** Picos and re-flash both.
+- **Confirm the sync word is `0xA5`** on **both** Picos — the shipped setting — from the build's
+  `vehicle and bridge agree` line and the bridge's `sync=` field.
 - **Charge the battery and check the antenna** is connected at both ends.
 - **Power off during other teams' launches** — the rulebook requires it.
 - **Hold the vehicle still** during startup calibration so the gyro bias is captured

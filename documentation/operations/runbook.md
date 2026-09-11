@@ -47,20 +47,23 @@ Two values must be set before any official test or launch. Both live in
 
 ```cpp
 config.team_id = "CAN-Team-25";               // registered competition identifier
-config.radio_mode = flight::RadioMode::test;  // ::official for the launch
+config.radio_mode = flight::RadioMode::official;  // 0xA5: the organizers' station hears nothing else
 ```
 
 | Setting | Test configuration | Launch configuration |
 |---|---|---|
 | `team_id` | The registered identifier — never `CAN-Team-XX` | Same |
-| `radio_mode` | `RadioMode::test` → sync word `0xF3` | `RadioMode::official` → sync word `0xA5` |
-| Bridge `SYNC_WORD` | `0xF3` in [ground `main.cpp`](../../firmware/ground-station/src/pico/main.cpp) | Change to `0xA5` |
+| `radio_mode` | `RadioMode::official` → sync word `0xA5` — **shipped this way since 2026-09-11** | Same |
+| Bridge `SYNC_WORD` | `kOfficialSyncWord` (`0xA5`) in [ground `main.cpp`](../../firmware/ground-station/src/pico/main.cpp) | Same |
 
 > [!CAUTION]
 > **The sync words must match on both ends, and the wrong one during another team's launch
-> incurs penalties.** `0xF3` is for pre-launch testing only; `0xA5` is the official
-> launch configuration. Changing the vehicle without changing the bridge produces a silent
-> total loss of telemetry — the receiver simply never sees a packet.
+> incurs penalties.** `0xF3` is the rulebook's pre-launch testing word and `0xA5` the official
+> launch configuration — but **both Picos now ship on `0xA5` for testing too**, because the
+> organizers' ground station listens on nothing else. So the vehicle must be **off** whenever
+> another team is launching, which the rulebook requires anyway. Changing the vehicle without
+> changing the bridge produces a near-total loss of telemetry — the receiver sees at most the
+> few packets a mismatched sync filter lets through.
 >
 > **The 2026 revision made stray transmission five times more expensive: -1 point per 2
 > packets, where the earlier rulebook said per 10.** This vehicle transmits at **1.43 Hz**, so
@@ -92,7 +95,7 @@ Other tunables worth reviewing before a flight, all in
 | Setting | Default | Review when |
 |---|---:|---|
 | `telemetry_period_ms` | **700** (1.43 Hz) | Rarely. **1000 ms is refused**, not a ceiling to sit on: the rulebook's 1 Hz is a floor, so `validate_config()` and a `static_assert` both reject any period above `kMaxTelemetryPeriodMs` (950 ms). Going *faster* than 700 needs a wider bandwidth or a shorter packet, and `validate_config()` refuses a period the radio cannot deliver — read [link-budget.md](../design/link-budget.md) first |
-| `transmit_gps` | `false` | Deciding whether the position goes on the air as well as into the log. True costs 56 bytes and drops the rate to **1.18 Hz**; false means the ground station cannot see where the vehicle is. `validate_config()` refuses it without `worst_case_packet_bytes` and the period moving with it |
+| `transmit_gps` | `true` | Rarely. The position is on the air in every normal-flight packet and every rich one after `MAX_RATE`, because the organizers score only transmitted sensors. It costs 51 bytes at its widest, inside the 200-byte budget, and `validate_config()` refuses a budget that cannot hold it |
 | `sensor_period_ms` | 33 | Changing the acquisition rate — `validate_config()` refuses a period the barometer cannot feed ([sensor-rates.md](../design/sensor-rates.md)) |
 | `reference_pressure_pa` | 101325 | Always — set it from a field barometer reading on the day |
 | `launch_accel_mps2` / `launch_altitude_gain_m` | 30 / 15 | After the first flight data exists |
@@ -105,7 +108,8 @@ Other tunables worth reviewing before a flight, all in
 
 **This is the procedure [TEL-025](../requirements/requirements.md) asks for.** The rulebook
 fixes two sync words: `0xF3` for pre-launch testing, `0xA5` for the official launch. The
-vehicle must be on `0xA5` for its own launch and must not be sitting on it at any other time.
+vehicle must be on `0xA5` for its own launch — and since `0xA5` is now the word it ships on,
+it must be switched off during every other team's.
 
 ### Why this needs a procedure rather than a note
 
@@ -133,55 +137,53 @@ FAIL  vehicle and bridge agree: OFFICIAL sync word (0xA5)   [vehicle=official br
 and on a consistent tree it **names the configuration you would fly**:
 
 ```text
-  ok  vehicle and bridge agree: TEST sync word (0xF3)
+  ok  vehicle and bridge agree: OFFICIAL sync word (0xA5)
 ```
 
 Read that line. It is the cheapest confirmation available, it costs nothing, and it is the
 only check that runs before the images exist.
 
-### Switching to the launch configuration
+### Both Picos are already on the launch word
 
-Do this at **T-60**, not at the pad.
+Since 2026-09-11 the vehicle and the bridge both ship on `0xA5`, for bench work as well as the
+launch. The organizers' ground station listens on `0xA5` and nothing else, and on the
+2026-09-10 range test — vehicle on `0xF3` — it heard only a few packets while the team's own
+station heard every one. So there is no switch to make at T-60, only confirmations:
 
-- [ ] **1 · Vehicle** — [`flight-computer/src/pico/main.cpp`](../../firmware/flight-computer/src/pico/main.cpp):
-
-      config.radio_mode = flight::RadioMode::official;   // was ::test
-
-- [ ] **2 · Bridge** — [`firmware/ground-station/src/pico/main.cpp`](../../firmware/ground-station/src/pico/main.cpp):
-
-      constexpr std::uint8_t SYNC_WORD = cansat::link::kOfficialSyncWord;   // was kTestSyncWord
-
-- [ ] **3 · Prove the tree agrees**, before building anything:
+- [ ] **1 · Prove the tree agrees**, before building anything:
 
       bash tools/build_host.sh
 
-      The line must read `vehicle and bridge agree: OFFICIAL sync word (0xA5)`. If it does
-      not, stop — you changed one file.
+      The line must read `vehicle and bridge agree: OFFICIAL sync word (0xA5)`.
 
-- [ ] **4 · Build both images from that one tree**, in one command, so they cannot come from
+- [ ] **2 · Build both images from that one tree**, in one command, so they cannot come from
       different revisions:
 
       cmake -S . -B build/pico && cmake --build build/pico --parallel
 
-- [ ] **5 · Flash both Picos.** Both. This is the step that is actually skipped.
-- [ ] **6 · Confirm on the vehicle.** Serial monitor, startup summary:
+- [ ] **3 · Flash both Picos.** Both. This is the step that is actually skipped.
+- [ ] **4 · Confirm on the vehicle.** Serial monitor, startup summary:
 
       team CAN-Team-25 | radio OFFICIAL 0xA5 | telemetry every 700 ms (1.43 Hz)
 
-- [ ] **7 · Confirm on the bridge.** Its status line reports the word rather than assuming it:
+- [ ] **5 · Confirm on the bridge.** Its status line reports the word rather than assuming it:
 
       #state=RX radio=1 frames=0 dropped=0 rssi=-44 snr=9.5 sync=0xA5 tx=0
 
-- [ ] **8 · Confirm end to end.** Power the vehicle and watch packets arrive. Nothing before
-      this point proves the two ends can actually hear each other; steps 6 and 7 only prove
+- [ ] **6 · Confirm end to end.** Power the vehicle and watch packets arrive. Nothing before
+      this point proves the two ends can actually hear each other; steps 4 and 5 only prove
       each end believes what it was told.
-- [ ] **9 · Record the revision flown** — `git rev-parse --short HEAD` — in the flight log.
+- [ ] **7 · Record the revision flown** — `git rev-parse --short HEAD` — in the flight log.
 
-### After the launch
+### Bench testing near other teams
 
-- [ ] **Revert both files to the test configuration and reflash both Picos.** `0xA5` is the
-      launch word, and a vehicle left on it is transmitting into every other team's launch.
-- [ ] Confirm `vehicle and bridge agree: TEST sync word (0xF3)` before any further bench work.
+`0xA5` is every team's launch word. **Never power the vehicle while another team is
+launching** — the rulebook requires that on any sync word, and on this one the vehicle would be
+transmitting into their launch. For a long bench session on a shared field you may move both
+ends to the test word — `RadioMode::test` in the vehicle's `main.cpp`, `kTestSyncWord` in the
+bridge's — and the build's agreement line will name it `TEST sync word (0xF3)`. The organizers'
+station will not hear the vehicle while it is there, and both must come back to `0xA5` before
+the launch.
 
 > [!CAUTION]
 > **`0xA5` does not separate you from other teams — every team uses it for their launch.**
@@ -243,18 +245,18 @@ fifty points. There is no recovering that with a good flight.
 supposedly off, leave the bridge running and watch its status line:
 
 ```text
-#state=RX radio=1 frames=12 dropped=0 rssi=-44 snr=9.5 sync=0xF3 tx=0
+#state=RX radio=1 frames=12 dropped=0 rssi=-44 snr=9.5 sync=0xA5 tx=0
 ```
 
 - [ ] **Watch `frames=` for 30 seconds.** If it does not move, nothing is transmitting on
       your bridge's sync word.
 - [ ] **If it moves, read the team identifier in the packet.** If it is yours, your vehicle
-      is on — go and find it. If it is not, another team is testing, which is theirs to
-      manage and is exactly what `0xF3` is for.
+      is on — go and find it. If it is not, another team is on the air — theirs to
+      manage, and worth noting.
 
 This is the same trick the launch-configuration procedure uses: an existing counter turning
-an assumption into an observation. It will not catch a vehicle transmitting on `0xA5` while
-your bridge listens on `0xF3` — for that, reflash the bridge or ask the organizers' station.
+an assumption into an observation. With both ends on `0xA5` it watches the word that matters; a
+vehicle moved to the test word for bench work is visible only to a bridge moved with it.
 
 ### During your own launch
 
@@ -392,13 +394,14 @@ vehicle refuses any packet number it has already accepted, has not yet reached, 
 older than `command_replay_window` (64 packets, about 45 seconds at 1.43 Hz). **A recorded
 command is therefore worth exactly one erase — the one you meant.**
 
-Set `command_password` to something of your own and do not commit it. The default in the
-repository is `change-me`, which is a placeholder, not a password.
+The password is `change-me` — the team's choice (2026-09-11), and the repository default, so
+anyone who has read the repository knows it. It lives in the gitignored `local_secrets.hpp`
+(below); change it there if that matters more than convenience.
 
 > [!WARNING]
 > **This is not cryptography and must not be relied on as though it were.** FNV-1a is a
 > hash, not a MAC; the digest is 64 bits; the link is unencrypted. It defeats accidents,
-> corrupted frames, another team's traffic on the shared `0xF3` sync word, and replay of a
+> corrupted frames, another team's traffic on the shared sync word, and replay of a
 > command someone watched work. It does not defeat somebody who knows the password. What
 > protects the log is that the vehicle listens only in `READY` with `ARM-0`, on the ground,
 > and only if it was built to listen at all.
@@ -413,7 +416,7 @@ Confirm on the vehicle.
 
 > [!WARNING]
 > The command key is four clear-text characters on a link every team shares at sync word
-> `0xF3`. It stops accidents, not people. The protection that matters is the state window
+> `0xA5`. It stops accidents, not people. The protection that matters is the state window
 > and the compile-time default.
 
 ### Commanding the maximum packet rate
@@ -426,13 +429,13 @@ per-packet content for rate, once:
 
 | Slot | Shape | Length |
 |---|---|---:|
-| 1 | rich — mandatory fields, `GP-` position, `SN-` sound | **385 ms** |
-| 2 | lean — mandatory fields only | **286 ms** |
-| 3 | lean | **286 ms** |
-| | one full cycle | **957 ms** |
+| 1 | rich — mandatory fields, `GP-` position, `SN-` sound | **374 ms** |
+| 2 | lean — mandatory fields only | **296 ms** |
+| 3 | lean | **296 ms** |
+| | one full cycle | **966 ms** |
 
-That is **3.13 Hz** of packets with GPS and sound on the air at **1.04 Hz** — one rich packet
-every 957 ms. The twelve mandatory fields are in every packet, and the SD log records GPS
+That is **3.11 Hz** of packets with GPS and sound on the air at **1.04 Hz** — one rich packet
+every 966 ms. The twelve mandatory fields are in every packet, and the SD log records GPS
 and sound for every packet, lean ones included.
 
 > [!WARNING]
@@ -441,12 +444,16 @@ and sound for every packet, lean ones included.
 > second press does nothing. Only a power cycle restores the flashed schedule — 1.43 Hz with
 > the uplink open.
 
-**Why 385 and 286 rather than something rounder.** Each slot is its packet's measured airtime
-plus 40 ms, rounded up, and the 40 ms is the vehicle's own work between transmits: one SD
-block write at its worst case ([F-11](../testing/bring-up-record.md#findings) measured 30 ms
-in two of five sessions on two different boards), plus the sensor loop and the watchdog feed.
-A slot inside that guard does not fail loudly — it makes packets late, which the official
-ground stations see as jitter on a line that scores consistency.
+**Why 374 and 296 rather than something rounder.** Each slot is its packet's measured airtime
+plus 50 ms, rounded up, and the rich slot is sized for 200 bytes — the longest packet the
+organizers' station accepts, and so the longest ever sent. The 50 ms covers two things that
+happen in the same gap: the vehicle's own work between transmits — one SD block write at its
+worst case ([F-11](../testing/bring-up-record.md#findings) measured 30 ms in two of five
+sessions on two different boards), plus the sensor loop and the watchdog feed — and the
+organizers' receiver, which spends about 35 ms printing each packet to its serial port before
+it listens again. A slot inside that guard does not fail loudly — it loses packets on the
+station that scores them. Since the transmit stopped blocking, the card write overlaps the
+packet itself, so the organizers' receiver is what the 50 ms is really for.
 
 **How to send it.** The vehicle listens only during its **command window** — the first five
 minutes after a clean power-on, on a build with the uplink (see below). The console's Mission
@@ -481,8 +488,8 @@ arms — about six seconds later if it is still.
 
 **The uplink needs a password file, and the build refuses a bad one.** Copy
 `firmware/flight-computer/include/flight/local_secrets.example.hpp` to `local_secrets.hpp` beside
-it and set your own password — eight characters or more, not `SET-ME` or `change-me`, which the
-build refuses to compile. The file is gitignored and never reaches the repository. **A build
+it and set the password — eight characters or more, and not the template's `SET-ME`, which the
+build refuses to compile. This vehicle's file says `change-me`. The file is gitignored and never reaches the repository. **A build
 without it has no uplink and no window, and arms three seconds after power-on as it always has.**
 
 ### What gets written
@@ -513,8 +520,8 @@ without it has no uplink and no window, and arms three seconds after power-on as
 - [ ] Bridge Pico connected; the serial port enumerates
 - [ ] Ground station started with `--framed` and the correct `--team`
 - [ ] Bridge status frames arriving once a second (`#state=RX radio=1 …`)
-- [ ] **Sync word on screen matches the one this flight is using** — `TEST · 0xF3`
-      for bench work, `LAUNCH · 0xA5` for the official launch. The console reads it
+- [ ] **Sync word on screen matches the one this flight is using** — `LAUNCH · 0xA5`,
+      the shipped setting on both Picos (`TEST · 0xF3` only if both were moved for bench work). The console reads it
       from the bridge, so a mismatch here means one of the two Picos was not
       reflashed. `UNKNOWN` means neither rulebook word is programmed.
 - [ ] Log directory writable and empty of previous runs

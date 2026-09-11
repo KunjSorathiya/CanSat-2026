@@ -160,10 +160,12 @@ def main() -> int:
     checker.check("link profile: 700 ms period", period_ms == 700, str(period_ms))
     checker.check("telemetry period clears the 1 Hz rulebook minimum",
                   period_ms <= 1000, str(period_ms))
-    # 213: every normal-flight packet is rich -- the mandatory fields, GPS and sound, with
-    # the diagnostic tags off the air. The organizers count only transmitted telemetry for
-    # extra-sensor points, and there is no budget that holds the tags as well.
-    checker.check("link profile: 213-byte budget", budget_bytes == 213, str(budget_bytes))
+    # 200: the organizers' ground station discards any packet over 200 bytes, and it is the
+    # station that scores. Every normal-flight packet is rich -- the mandatory fields, GPS
+    # and sound, tags off the air -- and every packet is held to that ceiling.
+    checker.check("link profile: 200-byte budget, the organizers' receiver limit",
+                  budget_bytes == 200 and constant(profile, "kGroundStationMaxPacketBytes") == 200,
+                  str(budget_bytes))
 
     # ---- the max-rate schedule ------------------------------------------------------
     # It cannot be undone from the ground, so every figure a document quotes about it has
@@ -181,11 +183,15 @@ def main() -> int:
     rich_slot = constant(profile, "kMaxRateRichSlotMs")
     lean_slot = constant(profile, "kMaxRateLeanSlotMs")
     cycle_ms = constant(profile, "kMaxRateCycleMs")
-    checker.check("link profile: the rich packet is 213 bytes and the lean 147",
-                  rich_bytes == 213 and lean_bytes == 147, f"{rich_bytes} / {lean_bytes}")
-    checker.check("the normal-flight budget is the rich packet",
-                  budget_bytes == rich_bytes, f"{budget_bytes} vs {rich_bytes}")
-    rich_air = time_on_air(rich_bytes or 213, modem).time_on_air_ms * 1.018
+    mandatory_bytes = constant(profile, "kMandatoryPacketBytes")
+    gps_bytes = constant(profile, "kGpsFieldBytes")
+    checker.check("link profile: the rich packet is 209 bytes at its widest and the lean 147",
+                  rich_bytes == 209 and lean_bytes == 147, f"{rich_bytes} / {lean_bytes}")
+    checker.check("mandatory + GPS fit the budget at their widest",
+                  (mandatory_bytes or 999) + (gps_bytes or 999) <= (budget_bytes or 0),
+                  f"{mandatory_bytes} + {gps_bytes} vs {budget_bytes}")
+    # The rich slot is sized for the budget: no longer rich packet is ever sent.
+    rich_air = time_on_air(budget_bytes or 200, modem).time_on_air_ms * 1.018
     lean_air = time_on_air(lean_bytes or 147, modem).time_on_air_ms * 1.018
     checker.check("the rich slot clears its measured airtime plus the guard",
                   (rich_slot or 0) >= rich_air + (guard_ms or 0),
@@ -221,7 +227,7 @@ def main() -> int:
     checker.check("telemetry period keeps measured duty under the cap",
                   measured_airtime / (period_ms or 1) <= 0.5,
                   f"{measured_airtime / (period_ms or 1):.3f}")
-    for measured in ("118", "167", "212"):
+    for measured in ("118", "163", "208"):
         checker.check(f"link-budget.md quotes the measured {measured}-byte packet size",
                       f"**{measured}**" in link_budget)
 

@@ -184,6 +184,7 @@ bool Sx1278::begin(const Sx1278Hal& hal, const Sx1278Settings& settings) {
     hal_ = hal;
     healthy_ = false;
     receiving_ = false;
+    tx_active_ = false;
     if (!hal_.select || !hal_.transfer || !hal_.set_reset || !hal_.delay_ms) {
         return false;
     }
@@ -210,6 +211,7 @@ bool Sx1278::begin(const Sx1278Hal& hal, const Sx1278Settings& settings) {
 bool Sx1278::reconfigure(const Sx1278Settings& settings) {
     if (!healthy_) return false;
     receiving_ = false;
+    tx_active_ = false;
     return apply_settings(settings);
 }
 
@@ -240,8 +242,8 @@ void Sx1278::capture_tx_state() {
     last_tx_version_ = read_reg(REG_VERSION);
 }
 
-bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t timeout_ms) {
-    if (!healthy_ || data == nullptr || len == 0) {
+bool Sx1278::start_transmit(const std::uint8_t* data, std::size_t len) {
+    if (!healthy_ || tx_active_ || data == nullptr || len == 0) {
         return false;
     }
     if (len > 255) len = 255;
@@ -249,10 +251,10 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
     // Half duplex: this transmission takes the part out of RX and clears the flags, so a
     // frame that arrived and has not been read yet is destroyed rather than queued. Whether
     // we were listening is therefore the caller's state to have, and restoring it is ours to
-    // do -- on every exit below, including the failures. A caller that has to remember is a
-    // caller that eventually does not, and the symptom is a station that hears one window
-    // and then nothing, with no error anywhere to say so.
-    const bool was_receiving = receiving_;
+    // do -- on every ending, including the failures (end_transmit()). A caller that has to
+    // remember is a caller that eventually does not, and the symptom is a station that hears
+    // one window and then nothing, with no error anywhere to say so.
+    tx_was_receiving_ = receiving_;
     receiving_ = false;
     set_mode(MODE_STDBY);
     write_reg(REG_DIO_MAPPING_1, 0x40);  // DIO0 = TxDone
@@ -262,76 +264,90 @@ bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t t
     write_reg(REG_IRQ_FLAGS, 0xFF);  // clear
     set_mode(MODE_TX);
 
-    // Wait for TxDone via DIO0 if wired, otherwise poll the IRQ register. Bounded either
-    // way so a stuck radio can never stall the caller.
-    const std::uint32_t start = now_ms();
+    tx_active_ = true;
+    tx_len_ = len;
+    tx_start_ms_ = now_ms();
+    return true;
+}
+
+void Sx1278::end_transmit() {
+    write_reg(REG_IRQ_FLAGS, 0xFF);
+    set_mode(MODE_STDBY);
+    tx_active_ = false;
+    if (tx_was_receiving_) start_receive();
+}
+
+Sx1278::TxStatus Sx1278::check_transmit(std::uint32_t elapsed_ms, std::uint32_t timeout_ms) {
+    if (!tx_active_) {
+        return TxStatus::idle;
+    }
+    // TxDone via DIO0 if wired, otherwise the IRQ register.
+    const bool done = hal_.read_dio0 ? hal_.read_dio0(hal_.ctx)
+                                     : (read_reg(REG_IRQ_FLAGS) & IRQ_TX_DONE) != 0;
+    if (done) {
+        // A transmission cannot finish faster than its own airtime. If it appears to, the
+        // completion signal is lying rather than the physics bending -- and the way that
+        // happens is a DIO0 line that is not connected and floats high, in which case DIO0
+        // reads "done" the instant it is polled and every packet reports sent while none
+        // leave the antenna.
+        //
+        // That failure is worse than a timeout by a long way. A timeout is loud: the caller
+        // sees a failure and the fault register says why. This one is silent, and a vehicle
+        // would fly a whole mission reporting a healthy radio and transmitting nothing.
+        //
+        // The airtime model is the check. It is derived from the datasheet, pinned by tests
+        // against published reference vectors, and measured against this radio to within
+        // 1.8 % -- so half of it is a floor no real transmission can pass under.
+        const double airtime_ms = lora_time_on_air_ms(tx_len_, modem_params());
+        if (elapsed_ms + 1 < static_cast<std::uint32_t>(airtime_ms * 0.5)) {
+            capture_tx_state();
+            ++tx_impossibly_fast_;
+            end_transmit();
+            return TxStatus::failed;
+        }
+        end_transmit();
+        return TxStatus::done;
+    }
+    if (elapsed_ms >= timeout_ms) {
+        // Read the IRQ register before clearing it. This is the one measurement that
+        // separates two faults which look identical from outside: if TxDone is set here, the
+        // radio finished and DIO0 failed to tell us -- a wiring problem. If it is clear, the
+        // transmission never completed, which is the radio or its supply.
+        capture_tx_state();
+        ++tx_timeouts_;
+        end_transmit();
+        return TxStatus::failed;
+    }
+    return TxStatus::busy;
+}
+
+Sx1278::TxStatus Sx1278::poll_transmit(std::uint32_t timeout_ms) {
+    const std::uint32_t elapsed = hal_.millis ? now_ms() - tx_start_ms_ : 0;
+    return check_transmit(elapsed, timeout_ms);
+}
+
+bool Sx1278::transmit(const std::uint8_t* data, std::size_t len, std::uint32_t timeout_ms) {
+    if (!start_transmit(data, len)) {
+        return false;
+    }
+    // Bounded either way, so a stuck radio can never stall the caller: by the clock when
+    // there is one, and by counting its own delays when there is not.
     std::uint32_t waited = 0;
     while (true) {
-        const bool done = hal_.read_dio0 ? hal_.read_dio0(hal_.ctx)
-                                         : (read_reg(REG_IRQ_FLAGS) & IRQ_TX_DONE) != 0;
-        if (done) {
-            break;
-        }
+        const std::uint32_t elapsed = hal_.millis ? now_ms() - tx_start_ms_ : waited;
+        const TxStatus status = check_transmit(elapsed, timeout_ms);
+        if (status == TxStatus::done) return true;
+        if (status != TxStatus::busy) return false;
         if (hal_.millis) {
-            if (now_ms() - start >= timeout_ms) {
-                // Read the IRQ register before clearing it. This is the one measurement
-                // that separates two faults which look identical from outside: if TxDone
-                // is set here, the radio finished and DIO0 failed to tell us -- a wiring
-                // problem. If it is clear, the transmission never completed, which is the
-                // radio or its supply.
-                capture_tx_state();
-                ++tx_timeouts_;
-                set_mode(MODE_STDBY);
-                write_reg(REG_IRQ_FLAGS, 0xFF);
-                if (was_receiving) start_receive();
-                return false;
-            }
             // Yield between polls. Without this the wait spins at full SPI speed for the
-            // whole transmission — hundreds of milliseconds of needless bus traffic on a
-            // bus the SD card shares, and needless current while the PA is running.
+            // whole transmission -- hundreds of milliseconds of needless bus traffic on a bus
+            // the SD card shares, and needless current while the PA is running.
             sleep(1);
         } else {
             sleep(2);
             waited += 2;
-            if (waited >= timeout_ms) {
-                capture_tx_state();
-                ++tx_timeouts_;
-                set_mode(MODE_STDBY);
-                write_reg(REG_IRQ_FLAGS, 0xFF);
-                if (was_receiving) start_receive();
-                return false;
-            }
         }
     }
-
-    // A transmission cannot finish faster than its own airtime. If it appears to, the
-    // completion signal is lying rather than the physics bending -- and the way that
-    // happens is a DIO0 line that is not connected and floats high, in which case DIO0
-    // reads "done" the instant it is polled and every packet reports sent while none
-    // leave the antenna.
-    //
-    // That failure is worse than a timeout by a long way. A timeout is loud: the caller
-    // sees false and the fault register says why. This one is silent, and a vehicle would
-    // fly a whole mission reporting a healthy radio and transmitting nothing at all.
-    //
-    // The airtime model is the check. It is derived from the datasheet, pinned by tests
-    // against published reference vectors, and measured against this radio to within 1.8 %
-    // -- so half of it is a floor no real transmission can pass under.
-    const std::uint32_t elapsed = hal_.millis ? (now_ms() - start) : waited;
-    const double airtime_ms = lora_time_on_air_ms(len, modem_params());
-    if (elapsed + 1 < static_cast<std::uint32_t>(airtime_ms * 0.5)) {
-        capture_tx_state();
-        ++tx_impossibly_fast_;
-        write_reg(REG_IRQ_FLAGS, 0xFF);
-        set_mode(MODE_STDBY);
-        if (was_receiving) start_receive();
-        return false;
-    }
-
-    write_reg(REG_IRQ_FLAGS, 0xFF);
-    set_mode(MODE_STDBY);
-    if (was_receiving) start_receive();
-    return true;
 }
 
 LoraModemParams Sx1278::modem_params() const {
@@ -346,7 +362,9 @@ LoraModemParams Sx1278::modem_params() const {
 }
 
 void Sx1278::start_receive() {
-    if (!healthy_) return;
+    // Keying RX now would cut off the packet on the air; end_transmit() resumes the receiver
+    // itself once the packet has gone.
+    if (!healthy_ || tx_active_) return;
     set_mode(MODE_STDBY);
     write_reg(REG_DIO_MAPPING_1, 0x00);  // DIO0 = RxDone
     write_reg(REG_FIFO_ADDR_PTR, 0x00);

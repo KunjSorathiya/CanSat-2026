@@ -643,6 +643,24 @@ void test_fault_manager() {
     CHECK(!fm.has_critical());
     CHECK(fm.ever_critical());
     CHECK(fm.total_occurrences() == 3);
+
+    // A condition re-checked every poll is one occurrence per episode. The range-test log's
+    // fault_total climbed 21 a second on a vehicle whose only fault was no GPS fix.
+    flight::FaultManager held;
+    for (std::uint64_t t = 0; t <= 990; t += 33) {
+        held.hold(flight::FaultCode::gps_unavailable, flight::FaultSeverity::warning, t);
+    }
+    CHECK(held.record(flight::FaultCode::gps_unavailable).occurrences == 1);
+    CHECK(held.record(flight::FaultCode::gps_unavailable).first_ms == 0);
+    CHECK(held.record(flight::FaultCode::gps_unavailable).last_ms == 990);
+    // Escalation still lands on a held fault.
+    held.hold(flight::FaultCode::gps_unavailable, flight::FaultSeverity::error, 1000);
+    CHECK(held.record(flight::FaultCode::gps_unavailable).severity == flight::FaultSeverity::error);
+    CHECK(held.record(flight::FaultCode::gps_unavailable).occurrences == 1);
+    // Cleared and back is a second episode.
+    held.clear(flight::FaultCode::gps_unavailable);
+    held.hold(flight::FaultCode::gps_unavailable, flight::FaultSeverity::warning, 2000);
+    CHECK(held.record(flight::FaultCode::gps_unavailable).occurrences == 2);
 }
 
 // ----------------------------------------------------------------------------
@@ -1142,23 +1160,23 @@ void test_config_radio_airtime_guard() {
     flight::Configuration c;
     c.team_id = "CAN-Team-07";
 
-    // Default: SF7/125 kHz and the 213-byte rich packet -- GPS and sound on the air, tags
-    // off -- at a 700 ms period: ~338 ms airtime, ~48 % duty on the model. The period is
-    // set from the *measured* airtime rather than this model, so the check that matters is
-    // below, and it is closer to the limit than it used to be.
+    // Default: SF7/125 kHz and the 200-byte budget -- the organizers' ceiling, GPS and sound
+    // on the air, tags off -- at a 700 ms period: ~318 ms airtime, ~45 % duty on the model.
+    // The period is set from the *measured* airtime rather than this model, so the check
+    // that matters is below.
     CHECK(flight::validate_config(c, why));
-    CHECK(c.worst_case_packet_bytes == 213);
-    CHECK(c.worst_case_packet_bytes < cansat::kMaxLoraPayloadBytes);
-    CHECK(approx(flight::worst_case_airtime_ms(c), 338.2, 0.5));
+    CHECK(c.worst_case_packet_bytes == 200);
+    CHECK(c.worst_case_packet_bytes == cansat::link::kGroundStationMaxPacketBytes);
+    CHECK(approx(flight::worst_case_airtime_ms(c), 317.7, 0.5));
     CHECK(flight::channel_duty(c) <= c.max_channel_duty);
-    CHECK(approx(flight::channel_duty(c), 0.483, 0.005));
+    CHECK(approx(flight::channel_duty(c), 0.454, 0.005));
 
     // The real one. Bring-up rows 5.2 and 5.3 measured 406.9 ms for a full-length packet,
     // 1.8 % above the model, twice, on two different boards. A period sized from the model
     // alone would put the true duty over the policy while every test still passed.
     {
         // 406.9 ms was measured for a 255-byte packet, 1.8 % above that packet's model
-        // figure. The same 1.8 % applied to the 213-byte model figure is the honest
+        // figure. The same 1.8 % applied to the 200-byte model figure is the honest
         // estimate for the packet this configuration actually sends.
         const double measured_airtime_ms = flight::worst_case_airtime_ms(c) * 1.018;
         const double true_duty = measured_airtime_ms / c.telemetry_period_ms;
@@ -1403,6 +1421,36 @@ void test_a_refused_fix_does_not_disturb_the_last_good_one() {
     CHECK(!feed_nmea(parser, nmea("GPGGA,120002.00,,,,,0,00,,,M,,M,,")));
 }
 
+// [2026-09-10 range test] 219 packets carried a "fix" with 0 satellites, HDOP 0.0 and
+// GP-Alt-0.0. GGA had refused the epoch, or not yet reported a fix, and RMC -- which has no
+// satellites, HDOP or altitude to be refused on -- made one anyway from what GGA had left.
+// And a refused GGA renewed the fix clock, so an old position could not age out.
+void test_an_rmc_cannot_make_a_fix_the_gga_gate_refused() {
+    flight::NmeaParser parser;
+    const auto applied = [&parser](const std::string& sentence) {
+        bool any = false;
+        for (const char c : sentence) any = parser.consume(c) || any;
+        return any;
+    };
+    // Three satellites: refused, and not "applied", so the driver renews nothing.
+    CHECK(!applied(nmea("GPGGA,120000.00,2110.0000,N,07246.9980,E,1,03,1.0,15.0,M,0.0,M,,")));
+    CHECK(!parser.has_fix());
+    // The same epoch's RMC says 'A'. It must not make a fix of it.
+    CHECK(!applied(nmea("GPRMC,120000.00,A,2110.0000,N,07246.9980,E,0.5,90.0,100926,,,A")));
+    CHECK(!parser.has_fix());
+    CHECK(parser.latest().satellites == 0);  // and nothing was invented to go with it
+    // A good GGA makes the fix, with its own altitude and quality.
+    CHECK(applied(nmea("GPGGA,120001.00,2110.0000,N,07246.9980,E,1,06,1.5,15.0,M,0.0,M,,")));
+    CHECK(parser.has_fix());
+    CHECK(parser.latest().satellites == 6);
+    CHECK(parser.latest().altitude > 14.9 && parser.latest().altitude < 15.1);
+    // Neither a refused GGA nor an RMC renews it: both return false, so its clock ages.
+    CHECK(!applied(nmea("GPGGA,120002.00,2110.0100,N,07246.9980,E,1,03,1.0,15.0,M,0.0,M,,")));
+    CHECK(!applied(nmea("GPRMC,120002.00,A,2110.0100,N,07246.9980,E,0.5,90.0,100926,,,A")));
+    CHECK(parser.has_fix());                    // the last good one stands, ageing
+    CHECK(parser.latest().latitude < 21.1668);  // 21.16667 from GGA, not RMC's 21.16683
+}
+
 // Ground-to-vehicle maintenance commands. The vehicle flies with no uplink -- the config
 // flag defaults to false -- so everything here is about the bench, and about making sure a
 // command can never be produced by accident from traffic that is not one.
@@ -1580,7 +1628,8 @@ void test_the_widest_packets_are_the_budgets_by_construction() {
     // The widths in link_profile.hpp are held to what the builder actually produces at its
     // widest, not to arithmetic. The first revision of the design carried 145 and 56 from a
     // commit message; building the packets said 147 and 55, and 147 crosses a LoRa symbol
-    // boundary that 145 does not -- which moved the lean slot from 281 ms to 286.
+    // boundary that 145 does not -- which moved the lean slot from 281 ms to 286. The GPS
+    // block is 51 since its precision was cut to fit the organizers' 200-byte ceiling.
     //
     // Widest means every field at its widest value: the largest packet number the format
     // can carry, a 99-hour mission clock, and the extreme negatives the overflow test uses.
@@ -1611,7 +1660,7 @@ void test_the_widest_packets_are_the_budgets_by_construction() {
     s.gps.valid = true;
     s.gps.latitude = -89.999999;
     s.gps.longitude = -179.999999;
-    s.gps.altitude = -9999.9;
+    s.gps.altitude = flight::kMinGpsAltitudeM;  // the widest altitude the parser admits
     const auto with_gps = builder.build(4294967295u, 359999999u, s);
     CHECK(with_gps.has_value());
     CHECK(with_gps->packet.size() ==
@@ -1634,6 +1683,17 @@ void test_the_widest_packets_are_the_budgets_by_construction() {
                   << " bytes; kRichPacketBytes says " << cansat::link::kRichPacketBytes << "\n";
     }
 
+    // All three at their widest do not fit the ceiling -- which is why the controller sheds
+    // SN- first -- and without SN- they do, by construction.
+    CHECK(rich && rich->packet.size() > cansat::link::kWorstCasePacketBytes);
+    const auto no_sound = builder.build(4294967295u, 359999999u, s, {}, true, /*air_sound=*/false);
+    CHECK(no_sound.has_value());
+    CHECK(no_sound->packet.size() ==
+          cansat::link::kMandatoryPacketBytes + cansat::link::kGpsFieldBytes);
+    CHECK(no_sound->packet.size() <= cansat::link::kGroundStationMaxPacketBytes);
+    CHECK(no_sound->packet.find("GP-Lat-") != std::string::npos);
+    CHECK(no_sound->packet.find("SN-") == std::string::npos);
+
     // And the same packet with the sensors held off the air is the lean one, to the byte.
     const auto lean = builder.build(4294967295u, 359999999u, s, {}, /*air_sensors=*/false);
     CHECK(lean.has_value());
@@ -1645,24 +1705,27 @@ void test_the_commanded_rate_periods_clear_their_own_airtime() {
     // airtime plus the guard -- they refused 363 and 280 ms in an earlier design, which is
     // how its periods came to be rounded up. This states the figures the design document
     // and the runbook quote, so a change that stays legal while moving them fails here.
-    const double rich = cansat::lora_time_on_air_ms(cansat::link::kRichPacketBytes,
+    const double rich = cansat::lora_time_on_air_ms(cansat::link::kWorstCasePacketBytes,
                                                     cansat::link::kModem);
     const double lean = cansat::lora_time_on_air_ms(cansat::link::kLeanPacketBytes,
                                                     cansat::link::kModem);
     const auto near = [](double a, double b, double tol) { return a > b - tol && a < b + tol; };
 
-    CHECK(cansat::link::kRichPacketBytes == 213);
+    CHECK(cansat::link::kRichPacketBytes == 209);
     CHECK(cansat::link::kLeanPacketBytes == 147);
-    CHECK(near(rich, 338.18, 0.05));
+    CHECK(cansat::link::kWorstCasePacketBytes == 200);
+    CHECK(cansat::link::kWorstCasePacketBytes == cansat::link::kGroundStationMaxPacketBytes);
+    CHECK(near(rich, 317.70, 0.05));
     CHECK(near(lean, 240.90, 0.05));
-    CHECK(cansat::link::kWorstCasePacketBytes == cansat::link::kRichPacketBytes);
 
-    CHECK(cansat::link::kMaxRateRichSlotMs == 385);
-    CHECK(cansat::link::kMaxRateLeanSlotMs == 286);
-    CHECK(cansat::link::kMaxRateCycleMs == 957);
+    CHECK(cansat::link::kMaxRateGuardMs == 50);
+    CHECK(cansat::link::kMaxRateRichSlotMs == 374);
+    CHECK(cansat::link::kMaxRateLeanSlotMs == 296);
+    CHECK(cansat::link::kMaxRateCycleMs == 966);
 
-    // Each slot clears its shape's measured airtime plus the guard -- the guard is the SD
-    // card's worst-case write, and it is what binds, not the duty policy.
+    // Each slot clears its shape's measured airtime plus the guard -- the guard covers the SD
+    // card's worst-case write and the organizers' receiver printing the packet before it
+    // listens again, and it is what binds, not the duty policy.
     CHECK(rich * 1.018 + cansat::link::kMaxRateGuardMs <=
           static_cast<double>(cansat::link::kMaxRateRichSlotMs));
     CHECK(lean * 1.018 + cansat::link::kMaxRateGuardMs <=
@@ -1827,11 +1890,14 @@ void test_gps_coordinate_validation() {
     CHECK(!feed_nmea(no_hemi,
         "$GPGGA,123519,4807.038,,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*09\r\n"));
 
-    // RMC carries a fix too, and its void form must clear the fix without inventing one.
+    // RMC renews the ground track and never the fix: it has no satellite count, HDOP or
+    // altitude for the gates to judge. Its void form still clears a fix GGA made.
     flight::NmeaParser rmc;
-    CHECK(feed_nmea(rmc,
+    CHECK(!feed_nmea(rmc,
         "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A\r\n"));
-    CHECK(approx(rmc.latest().latitude, 48.1173, 0.001));
+    CHECK(rmc.latest().course_valid);
+    CHECK(feed_nmea(rmc,
+        "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47\r\n"));
     for (const char c : std::string("$GPRMC,123519,V,,,,,,,230394,,*33\r\n")) rmc.consume(c);
     CHECK(!rmc.has_fix());
 
@@ -3023,7 +3089,6 @@ void test_a_frozen_gps_fix_is_not_reported_as_a_live_position() {
     // This suite is about a fix ageing out of *telemetry*, so it needs the fix on the air,
     // which is the default; the explicit setting keeps the suite's premise visible.
     c.transmit_gps = true;
-    c.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
     flight::test::MockImu imu;
     flight::test::MockBarometer baro;
     flight::test::MockGps gps;
@@ -3341,7 +3406,6 @@ void test_measured_packet_sizes_match_the_link_budget() {
     // Typical sizes, GPS included, and the tagged packet a bench build can still send.
     // The widest of each shape are pinned separately, by construction.
     c.transmit_gps = true;
-    c.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
     flight::TelemetryBuilder builder(c);
 
     flight::SensorSnapshot s;
@@ -3366,17 +3430,18 @@ void test_measured_packet_sizes_match_the_link_budget() {
     s.gps.altitude = 15.0;
     const auto with_gps = builder.build(1, 1000, s, {});
     CHECK(with_gps.has_value());
-    CHECK(with_gps->packet.size() == 167);
+    CHECK(with_gps->packet.size() == 163);
 
     // The tagged packet: GPS plus every diagnostic tag, including the yaw-reference tag
-    // the nine-axis upgrade added. No longer the flight default -- tags are off the air
-    // -- but still what a bench build with append_diagnostic_fields sends.
+    // the nine-axis upgrade added. No longer the flight default -- tags are off the air, and
+    // with them on even this ordinary packet is over the organizers' 200-byte ceiling -- but
+    // still what a bench build with append_diagnostic_fields sends.
     const std::vector<std::string> tags = {"MODE-RECOVERY", "FAULTS-3", "CAL-1", "ARM-1",
                                            "YR-M"};
     const auto full = builder.build(1, 1000, s, tags);
     CHECK(full.has_value());
-    CHECK(full->packet.size() == 212);
-    CHECK(full->packet.size() <= c.worst_case_packet_bytes);
+    CHECK(full->packet.size() == 208);
+    CHECK(full->packet.size() > cansat::link::kWorstCasePacketBytes);
     CHECK(static_cast<bool>(cansat::parse_packet(full->packet)));
 
     // The absolute worst case is not bounded by the format -- the team identifier has no
@@ -3393,6 +3458,8 @@ void test_measured_packet_sizes_match_the_link_budget() {
     extreme.gps.latitude = -12.345678;
     extreme.gps.longitude = -123.456789;
     extreme.gps.altitude = -1234.5;
+    extreme.sound_valid = true;
+    extreme.sound_mv_pp = 3300.0;
     const auto worst = builder.build(
         4294967295u, 359999999u, extreme,
         {"MODE-RECOVERY", "FAULTS-4294967295", "CAL-0", "ARM-0", "YR-M"});
@@ -3712,18 +3779,146 @@ void test_a_budget_below_what_is_on_the_air_is_refused() {
     CHECK(c.transmit_gps && c.transmit_sound);
     CHECK(flight::validate_config(c, why));          // the default holds what it sends
 
-    c.worst_case_packet_bytes = 205;                 // 213 needed: mandatory, GPS, sound
+    c.worst_case_packet_bytes = 190;                 // 198 needed: mandatory and GPS
     CHECK(!flight::validate_config(c, why));
     CHECK(why.find("worst_case_packet_bytes") != std::string::npos);
-    CHECK(why.find("213") != std::string::npos);
+    CHECK(why.find("198") != std::string::npos);
 
-    c.transmit_sound = false;                        // 202 needed now
+    c.transmit_gps = false;                          // 147 needed now
     CHECK(flight::validate_config(c, why));
+    c.transmit_gps = true;
+    c.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytes;
 
-    // The tags are not counted: they are shed first, so they cannot displace the sensors,
-    // and a tagged bench build must not be refused for carrying them.
+    // Sound and the tags are not counted: they are shed first, a packet at a time, so they
+    // cannot displace GPS, and a tagged bench build must not be refused for carrying them.
     c.append_diagnostic_fields = true;
     CHECK(flight::validate_config(c, why));
+    c.append_diagnostic_fields = false;
+
+    // The organizers' ceiling. Their station discards any packet over 200 bytes, so a flight
+    // build -- tags off -- may not budget past it, even where the duty cap would allow it.
+    c.worst_case_packet_bytes = 213;
+    CHECK(!flight::validate_config(c, why));
+    CHECK(why.find("organizers") != std::string::npos);
+
+    // A bench build with the tags on the air is heard by this project's bridge alone, and
+    // may use the whole FIFO.
+    c.append_diagnostic_fields = true;
+    c.worst_case_packet_bytes = cansat::link::kBenchPacketBytes;
+    c.telemetry_period_ms = 850;
+    CHECK(flight::validate_config(c, why));
+}
+
+// The sensors keep running while a packet is on the air. The transmit used to wait out the
+// airtime, and the 2026-09-10 range-test log shows what that cost: 15 sensor reads per 700 ms
+// packet instead of 21, and about 11 a second after MAX_RATE -- roughly a 9 Hz loop in flight.
+void test_the_sensor_loop_runs_while_a_packet_is_on_the_air() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    radio.airtime_polls = 170;  // 340 ms at a 2 ms loop: a rich packet's airtime
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    ctrl.poll(0);
+    CHECK(radio.packets.size() == 1);
+    CHECK(radio.transmitting());
+    CHECK(ctrl.health().packets_sent == 0);  // started is not sent
+
+    const int reads_before = imu.reads;
+    for (std::uint64_t t = 2; t <= 300; t += 2) ctrl.poll(t);
+    CHECK(radio.transmitting());             // still on the air...
+    CHECK(imu.reads - reads_before >= 8);    // ...and the sensors ran through it: 300 / 33
+
+    for (std::uint64_t t = 302; t <= 6998; t += 2) ctrl.poll(t);
+    // A 30 Hz loop over seven seconds, whatever the radio was doing.
+    CHECK(imu.reads >= 7000 / 33 - 3);
+    CHECK(radio.packets.size() == 10);       // 0, 700, ... 6300: the cadence is unchanged
+    CHECK(ctrl.health().packets_sent == 10);
+    CHECK(radio.start_calls == 10);          // never started over a packet on the air
+}
+
+// A packet that outlasts its slot holds the next one back instead of being cut off by it, and
+// the numbering stays strictly sequential. Only a hung radio can do this -- every slot
+// outlasts its packet -- and the driver's 1000 ms timeout bounds it.
+void test_a_packet_on_the_air_holds_the_next_one_back() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    radio.airtime_polls = 500;  // 1000 ms at a 2 ms loop: longer than the 700 ms period
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+
+    for (std::uint64_t t = 0; t <= 2998; t += 2) ctrl.poll(t);
+    CHECK(radio.start_calls == static_cast<int>(radio.packets.size()));
+    CHECK(radio.packets.size() == 3);        // at 0, then as each one ends: ~1000, ~2000
+    for (std::size_t i = 0; i < radio.packets.size(); ++i) {
+        const auto parsed = cansat::parse_packet(radio.packets[i]);
+        CHECK(static_cast<bool>(parsed));
+        CHECK(parsed && parsed.record->packet_number == i + 1);
+    }
+    CHECK(ctrl.health().packets_tx_failed == 0);
+}
+
+// A packet that starts and then fails on the air is counted as failed when it ends, and
+// enough of them in a row raise radio_tx and re-initialise the radio -- the same recovery a
+// packet that could not be started always had.
+void test_a_packet_that_fails_on_the_air_is_counted_and_recovered() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    flight::test::MockRadio radio;
+    radio.fail_on_air = true;
+    radio.airtime_polls = 10;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+    const int inits = radio.init_calls;
+
+    for (std::uint64_t t = 0; t <= 20000; t += 2) ctrl.poll(t);
+    CHECK(ctrl.health().packets_sent == 0);
+    CHECK(ctrl.health().packets_tx_failed >= c.radio_max_consecutive_failures);
+    CHECK(ctrl.faults().record(flight::FaultCode::radio_tx).occurrences >= 1);
+    CHECK(radio.init_calls > inits);
+
+    // And it recovers the moment packets get through again.
+    radio.fail_on_air = false;
+    for (std::uint64_t t = 20002; t <= 40000; t += 2) ctrl.poll(t);
+    CHECK(ctrl.health().packets_sent > 0);
+    CHECK(!ctrl.faults().active(flight::FaultCode::radio_tx));
+}
+
+// The range-test log's fault_total rose by 15 on every packet, and the rise stopped
+// dead whenever the GPS had a fix: gps_unavailable was being counted once per 33 ms poll.
+void test_a_missing_gps_fix_is_one_fault_not_one_per_poll() {
+    flight::Configuration c;
+    c.team_id = "CAN-Team-25";
+    flight::test::MockImu imu;
+    flight::test::MockBarometer baro;
+    flight::test::MockGps gps;
+    gps.fix.valid = false;  // no sky view
+    flight::test::MockRadio radio;
+    flight::test::MockLogger logger;
+    flight::test::MockBoard board;
+    flight::Controller ctrl(c, imu, baro, gps, radio, logger, board);
+    CHECK(ctrl.initialize());
+    for (std::uint64_t t = 0; t <= 10000; t += 11) ctrl.poll(t);
+    CHECK(ctrl.faults().active(flight::FaultCode::gps_unavailable));
+    CHECK(ctrl.faults().record(flight::FaultCode::gps_unavailable).occurrences == 1);
+    CHECK(ctrl.faults().total_occurrences() < 10);
 }
 
 // The rulebook wants continuous telemetry, and "continuous" has to mean the same cadence
@@ -4590,6 +4785,10 @@ int main(int argc, char** argv) {
     test_a_vehicle_that_was_never_asked_never_scrubs();
     test_a_fix_reaches_the_log_even_when_it_is_not_transmitted();
     test_a_budget_below_what_is_on_the_air_is_refused();
+    test_a_missing_gps_fix_is_one_fault_not_one_per_poll();
+    test_the_sensor_loop_runs_while_a_packet_is_on_the_air();
+    test_a_packet_on_the_air_holds_the_next_one_back();
+    test_a_packet_that_fails_on_the_air_is_counted_and_recovered();
     test_the_packet_cadence_is_the_same_in_every_state();
     test_the_builder_can_be_told_to_carry_position_after_construction();
     test_max_rate_is_a_pattern_of_one_rich_and_two_lean();
@@ -4634,6 +4833,7 @@ int main(int argc, char** argv) {
     test_a_fix_with_poor_geometry_is_refused();
     test_a_good_fix_still_passes_and_carries_its_quality();
     test_a_refused_fix_does_not_disturb_the_last_good_one();
+    test_an_rmc_cannot_make_a_fix_the_gga_gate_refused();
     test_a_hemisphere_from_the_wrong_axis_is_rejected();
     test_orientation_survives_the_wrap_and_the_poles();
     test_calibration_rejects_a_steady_rotation_as_bias();

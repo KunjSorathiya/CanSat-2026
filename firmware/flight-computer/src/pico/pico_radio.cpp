@@ -33,6 +33,12 @@ void radio_delay_ms(void*, std::uint32_t ms) { sleep_ms(ms); }
 bool radio_read_dio0(void*) { return gpio_get(BoardPins::lora_dio0) != 0; }
 std::uint32_t radio_millis(void*) { return to_ms_since_boot(get_absolute_time()); }
 
+// 1000 ms: two and a half times the longest packet the FIFO holds (406.9 ms measured). It
+// was 2000, which is the watchdog's timeout -- so a transmission that hung was never
+// reported as radio_tx: the watchdog reset the board first, and the log showed only a
+// reboot. Well inside the watchdog, the fault is recorded and the radio re-initialised.
+constexpr std::uint32_t kTxTimeoutMs = 1000;
+
 cansat::Sx1278Settings settings_from(const Configuration& config, std::uint8_t sync_word) {
     cansat::Sx1278Settings s;
     s.frequency_hz = config.radio.frequency_hz;
@@ -74,17 +80,40 @@ bool PicoRadio::initialize(std::uint8_t sync_word) {
     return healthy_;
 }
 
+bool PicoRadio::start_transmit(const std::string& packet) {
+    if (!healthy_) return false;
+    return radio_.start_transmit(reinterpret_cast<const std::uint8_t*>(packet.data()),
+                                 packet.size());
+}
+
+TxState PicoRadio::poll_transmit() {
+    switch (radio_.poll_transmit(kTxTimeoutMs)) {
+        case cansat::Sx1278::TxStatus::busy:
+            return TxState::busy;
+        case cansat::Sx1278::TxStatus::idle:
+            return TxState::idle;
+        case cansat::Sx1278::TxStatus::done:
+            // Transmitting leaves the modem in standby. If the controller is going to listen
+            // at all, the receiver has to be running before it asks -- and putting it back
+            // here, right after the packet is away, gives the whole gap between packets as the
+            // listening window rather than the few milliseconds around the poll.
+            if (listening_) radio_.start_receive();
+            return TxState::sent;
+        case cansat::Sx1278::TxStatus::failed:
+            healthy_ = radio_.healthy();
+            if (listening_) radio_.start_receive();
+            return TxState::failed;
+    }
+    return TxState::idle;
+}
+
 bool PicoRadio::transmit(const std::string& packet) {
     if (!healthy_) return false;
     const bool ok = radio_.transmit(reinterpret_cast<const std::uint8_t*>(packet.data()),
-                                    packet.size(), 2000);
+                                    packet.size(), kTxTimeoutMs);
     if (!ok) {
         healthy_ = radio_.healthy();
     }
-    // Transmitting leaves the modem in standby. If the controller is going to listen at
-    // all, the receiver has to be running before it asks -- and putting it back here, right
-    // after the packet is away, gives the whole gap between packets as the listening
-    // window rather than the few milliseconds around the poll.
     if (listening_) radio_.start_receive();
     return ok;
 }
@@ -116,6 +145,8 @@ bool PicoRadio::initialize(std::uint8_t) {
     healthy_ = false;
     return false;
 }
+bool PicoRadio::start_transmit(const std::string&) { return false; }
+TxState PicoRadio::poll_transmit() { return TxState::idle; }
 bool PicoRadio::transmit(const std::string&) { return false; }
 bool PicoRadio::poll_receive(std::string&) { return false; }
 

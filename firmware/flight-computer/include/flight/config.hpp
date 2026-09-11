@@ -357,8 +357,15 @@ struct Configuration {
     std::uint32_t gps_silence_after_ms = 3000;
 
     // ---- GPS optional-field precision (rulebook unspecified) --------------
-    int gps_latlon_decimals = 6;
-    int gps_alt_decimals = 1;
+    // On the air, to what the NEO-6M resolves and no further: 5 decimals is 1.1 m against
+    // its ~2.5 m horizontal error, and whole metres of altitude against a vertical error of
+    // several. The digits this saves are what keep mandatory + GPS inside the organizers'
+    // 200-byte ceiling (cansat::link::kGroundStationMaxPacketBytes).
+    int gps_latlon_decimals = 5;
+    int gps_alt_decimals = 0;
+    // In the SD row, the receiver's full output: the log costs no airtime.
+    int gps_log_latlon_decimals = 6;
+    int gps_log_alt_decimals = 1;
 
     // ---- Analogue microphone (additional sensor) -------------------------
     //
@@ -388,7 +395,7 @@ struct Configuration {
 
     // The five project-local diagnostic tags -- MODE, FAULTS, CAL, ARM, YR -- after every
     // mandatory and sensor field. **Off by default, and it costs the console its live view
-    // of mission state.** Tags, GPS and sound do not fit the FIFO together (267 bytes at
+    // of mission state.** Tags, GPS and sound do not fit the FIFO together (263 bytes at
     // their widest), and of the three the tags are the only part the rulebook does not
     // reward. They are always in the SD log. Turn this on for bench work; the controller
     // sheds the tags first whenever a packet would not fit, so it never costs the sensors.

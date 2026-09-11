@@ -656,6 +656,70 @@ void test_a_broken_bus_at_the_failure_shows_in_the_version() {
     CHECK(sx.last_tx_version() == 0x00);
 }
 
+// The flight computer's transmit. start_transmit() keys the radio and returns without
+// waiting; poll_transmit() reports the packet's end once. Everything the blocking form
+// guarantees -- the timeout, the airtime floor, the receiver resumed -- holds here too,
+// because the blocking form is now built on these two calls.
+void test_a_transmit_runs_while_the_caller_does_other_work() {
+    using Status = cansat::Sx1278::TxStatus;
+    const std::uint8_t payload[206] = {};
+
+    FakeRadio radio;
+    radio.dio0_delay_ms = 330;   // a 206-byte packet's real airtime
+    cansat::Sx1278 sx;
+    CHECK(sx.begin(make_hal(radio), cansat::Sx1278Settings{}));
+    const std::uint32_t t0 = radio.millis;
+    CHECK(sx.start_transmit(payload, sizeof(payload)));
+    CHECK(radio.millis == t0);                             // it returned without waiting
+    CHECK(sx.tx_busy());
+    CHECK(!sx.start_transmit(payload, sizeof(payload)));  // one packet on the air at a time
+    CHECK(sx.poll_transmit(1000) == Status::busy);
+    radio.millis += 200;
+    CHECK(sx.poll_transmit(1000) == Status::busy);
+    radio.millis += 140;
+    CHECK(sx.poll_transmit(1000) == Status::done);
+    CHECK(!sx.tx_busy());
+    CHECK((radio.mode_history.back() & 0x07) == 0x01);    // back in standby
+    CHECK(sx.poll_transmit(1000) == Status::idle);        // its end is reported once
+    CHECK(sx.tx_timeouts() == 0);
+    CHECK(sx.tx_impossibly_fast() == 0);
+
+    // A radio that never finishes is failed by the clock, not waited on.
+    FakeRadio deaf;   // DIO0 never asserts
+    cansat::Sx1278 sx2;
+    CHECK(sx2.begin(make_hal(deaf), cansat::Sx1278Settings{}));
+    CHECK(sx2.start_transmit(payload, sizeof(payload)));
+    CHECK(sx2.poll_transmit(1000) == Status::busy);
+    deaf.millis += 1000;
+    CHECK(sx2.poll_transmit(1000) == Status::failed);
+    CHECK(sx2.tx_timeouts() == 1);
+    CHECK(sx2.last_tx_op_mode() == 0x83);   // the chip accepted the job and never finished
+    CHECK(!sx2.tx_busy());
+
+    // A floating DIO0 is still caught: "done" at once is not done.
+    FakeRadio loose;
+    loose.dio0 = true;
+    cansat::Sx1278 sx3;
+    CHECK(sx3.begin(make_hal(loose), cansat::Sx1278Settings{}));
+    CHECK(sx3.start_transmit(payload, sizeof(payload)));
+    CHECK(sx3.poll_transmit(1000) == Status::failed);
+    CHECK(sx3.tx_impossibly_fast() == 1);
+
+    // And a receiver that was running is running again once the packet has gone -- and is
+    // not keyed over the packet while it is on the air.
+    FakeRadio listening;
+    listening.dio0_delay_ms = 330;
+    cansat::Sx1278 sx4;
+    CHECK(sx4.begin(make_hal(listening), cansat::Sx1278Settings{}));
+    sx4.start_receive();
+    CHECK(sx4.start_transmit(payload, sizeof(payload)));
+    sx4.start_receive();
+    CHECK((listening.mode_history.back() & 0x07) == 0x03);   // still transmitting
+    listening.millis += 340;
+    CHECK(sx4.poll_transmit(1000) == Status::done);
+    CHECK((listening.mode_history.back() & 0x07) == 0x05);   // continuous RX again
+}
+
 int main() {
     test_begin_requires_the_right_silicon();
     test_begin_requires_a_complete_hal();
@@ -683,6 +747,7 @@ int main() {
     test_a_timeout_captures_the_registers_that_name_the_fault();
     test_a_module_that_resets_mid_transmit_is_visible_in_op_mode();
     test_a_broken_bus_at_the_failure_shows_in_the_version();
+    test_a_transmit_runs_while_the_caller_does_other_work();
 
     std::cout << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
     if (g_failures != 0) {

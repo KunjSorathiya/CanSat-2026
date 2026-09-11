@@ -70,7 +70,11 @@ class PicoRadio final : public Radio {
 public:
     explicit PicoRadio(const Configuration& config) : config_(config) {}
     bool initialize(std::uint8_t sync_word) override;
-    bool transmit(const std::string& packet) override;
+    bool start_transmit(const std::string& packet) override;
+    TxState poll_transmit() override;
+    // Blocking: waits out the airtime. The bring-up image only -- the flight loop must never
+    // stand still for a packet, so the controller uses the two calls above.
+    bool transmit(const std::string& packet);
     bool poll_receive(std::string& out) override;
     bool healthy() const override { return healthy_; }
 

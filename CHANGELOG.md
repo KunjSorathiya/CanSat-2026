@@ -8,6 +8,63 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-11 (cycle 50)
+
+The range-test log, and the organizers' ground station. Their receiver code was shared with the
+team: it discards any packet over 200 bytes and listens only on `0xA5`. On the 2026-09-10 range
+test it heard a few packets at a slower rate while the team's own station heard every one.
+
+### Changed — every packet fits the organizers' receiver
+
+- **Sync word `0xA5` on both Picos**, for testing as well as the launch. The vehicle was on the
+  test word, `0xF3`, and their station listens on nothing else. The bring-up image follows the
+  bridge.
+- **A 200-byte budget**, `kGroundStationMaxPacketBytes`, their `MAX_PACKET_SIZE`. GPS goes on the
+  air at 5 decimals and whole metres — 1.1 m against the receiver's ~2.5 m, and a vertical error
+  of several — so mandatory + GPS are 198 at their widest; the SD row keeps 6 and 1. `SN-` is
+  shed from any packet that would pass 200, then `GP-`. `validate_config()` refuses a flight
+  budget above 200; a tagged bench build may still use the FIFO.
+- **A 50 ms guard between max-rate packets**, up from 40: their receiver prints each packet to a
+  115200-baud port, about 35 ms deaf, before it listens again. Slots 374 and 296 ms, a 966 ms
+  cycle: 3.11 Hz with the sensors at 1.04 Hz, 84 % duty. Normal flight stays 1.43 Hz, now 46 %.
+
+### Fixed — from the range-test log
+
+- **GPS fixes with no satellites went on the air.** `RMC` set a fix on its own, with no
+  satellite count, HDOP or altitude for the gates to judge, and the log holds 219 of them — 0
+  satellites, HDOP 0.0, `GP-Alt-0.0`. `RMC` now renews the ground track only, and a refused
+  `GGA` no longer renews the fix clock, so a position the gates keep refusing ages out.
+- **`fault_total` counted polls, not faults.** It rose 21 a second on a vehicle whose only fault
+  was no GPS fix: `gps_unavailable` was counted on every 33 ms poll. Conditions re-checked every
+  cycle now count once per episode, through `FaultManager::hold()`.
+- **A hung transmission reset the board instead of raising `radio_tx`.** The transmit timeout
+  was 2000 ms, the watchdog's own. It is 1000 ms.
+- **The sensor loop stood still while a packet was on the air.** `Sx1278::transmit()` waited
+  for TxDone, so the 33 ms sensor task ran 15 times per 700 ms packet in the log instead of 21,
+  and about 11 times a second after `MAX_RATE` — roughly a 9 Hz loop in flight, with gaps of up
+  to ~320 ms. The driver now starts a packet and returns (`start_transmit()` and
+  `poll_transmit()`), the controller counts it sent or failed when it ends, and a packet still
+  on the air holds the next one back. The blocking `transmit()` stays for the bridge and the
+  bring-up image.
+
+### Checked — the organizers' receiver's modem settings
+
+Frequency, spreading factor, bandwidth, coding rate, CRC, preamble, header mode, IQ and
+low-data-rate optimisation all match their arduino-LoRa receiver. The carrier registers are
+identical: both write `0x6C4000` for 433 MHz. The sync word was the only mismatch.
+
+### Changed — the password
+
+`change-me`, at the team's decision. The build still refuses the template's `SET-ME`.
+
+### Found — not yet fixed
+
+- **Two boots began with one fault more than a clean power-on**, which is what a watchdog reset
+  leaves behind; the sessions before them ended at 3 min 43 s and at 23 s. The log cannot say
+  why.
+
+---
+
 ## [Unreleased] — 2026-09-11 (cycle 49)
 
 The first bench run of the new schedule, what it found, and the pre-arm command window it

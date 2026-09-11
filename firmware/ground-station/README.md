@@ -9,8 +9,9 @@ Physical LoRa bridge: `RA-02 -> ground-station Pico -> USB serial -> PC`.
   mirrors it byte for byte.
 - `src/pico/main.cpp` - the bridge firmware: brings up the SX1278 in continuous RX,
   frames every received payload and every `#status` line to USB, and re-initialises the
-  radio after repeated failures. Reuses `firmware/common/src/sx1278.cpp`. Default sync
-  word `0xF3` (test); change `SYNC_WORD` to `0xA5` for the official launch configuration.
+  radio after repeated failures. Reuses `firmware/common/src/sx1278.cpp`. Sync word
+  `0xA5` (official), for testing as well as the launch: the organizers' ground station listens
+  on nothing else, and the vehicle flies it too.
 
 The Pico SDK is required only for the `cansat_ground_bridge_firmware` target. The framing
 library and its tests build with the host toolchain (`tools/build_host.sh`).

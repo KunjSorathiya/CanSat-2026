@@ -719,10 +719,12 @@ void radio_sustained(flight::PicoRadio& radio, std::size_t bytes, std::uint32_t 
 void report_radio(const flight::Configuration& config) {
     std::printf("\n-- 5.1 Radio identity --\n");
     flight::PicoRadio radio(config);
-    const bool ok = radio.initialize(cansat::link::kTestSyncWord);
-    std::printf("   init: %s, sync word 0x%02X (test - the launch word is 0x%02X)\n",
-                ok ? "ok" : "FAILED", cansat::link::kTestSyncWord,
-                cansat::link::kOfficialSyncWord);
+    // The official word, which the bridge now listens on: a bring-up radio on any other
+    // word would be a radio the bridge cannot hear.
+    const bool ok = radio.initialize(cansat::link::kOfficialSyncWord);
+    std::printf("   init: %s, sync word 0x%02X (official - the rulebook test word is 0x%02X)\n",
+                ok ? "ok" : "FAILED", cansat::link::kOfficialSyncWord,
+                cansat::link::kTestSyncWord);
     const std::uint8_t v = radio.chip_version();
     std::printf("   version register 0x42 = 0x%02X  ", v);
     if (v == 0x12) {
@@ -1155,7 +1157,7 @@ void report_shared_bus(const flight::Configuration& config) {
     std::printf("\n-- Gate 7: radio and microSD sharing SPI0 --\n");
 
     flight::PicoRadio radio(config);
-    const bool radio_ok = radio.initialize(cansat::link::kTestSyncWord);
+    const bool radio_ok = radio.initialize(cansat::link::kOfficialSyncWord);
     std::printf("   radio init: %s, version 0x%02X\n", radio_ok ? "ok" : "FAILED",
                 radio.chip_version());
 

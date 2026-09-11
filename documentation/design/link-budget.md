@@ -80,15 +80,17 @@ running the formatter, not estimated:
 | Packet content | Bytes |
 |---|---:|
 | Team id + 12 mandatory fields | **118** |
-| \+ GPS latitude, longitude, altitude | **167** |
-| \+ `MODE`, `FAULTS`, `CAL`, `ARM`, `YR` diagnostic tags | **212** |
-| Budgeted (`kWorstCasePacketBytes`) | **255** |
+| \+ GPS latitude, longitude, altitude | **163** |
+| \+ `MODE`, `FAULTS`, `CAL`, `ARM`, `YR` diagnostic tags | **208** |
+| Budgeted (`kWorstCasePacketBytes`) — the organizers' receiver limit | **200** |
 
 The first three rows are asserted by `test_measured_packet_sizes_match_the_link_budget`, so
 a change to the packet format that makes this table wrong fails the build.
 
-The budget is the LoRa FIFO limit itself. That is the only size a packet cannot exceed, so
-it is the only honest basis for an airtime figure.
+The budget is the organizers' ground station's limit: their receiver discards any packet over
+200 bytes, and it is their station that scores. That, not the 255-byte FIFO, is the size a
+packet cannot exceed, so it is the only honest basis for an airtime figure. The tagged row
+above is over it, which is one more reason the tags are off the air.
 
 There is no meaningful "absolute worst case" row, and the earlier one was misleading: the
 team identifier has no length limit in the rulebook format, so the worst case a packet can
@@ -112,14 +114,19 @@ which is exactly why that shedding path exists and is tested.
 > diagnostic tag is **212 bytes** — so the airtime budget sat below the *typical* packet
 > and under-estimated occupancy on every single transmission. The numbers above now come
 > from running `format_packet()` and reading the lengths, in a test.
+>
+> The budget is 200 again now, for a better reason than an estimate: it is the organizers'
+> receiver limit, and the packet was reshaped to fit it.
 
-Because a packet can approach the FIFO limit, the flight computer sheds optional content
+Because a packet can approach the 200-byte ceiling, the flight computer sheds optional content
 rather than letting the radio truncate it silently. The rulebook sets the priority —
 mandatory fields first, optional fields "only if bandwidth allows" — so the ladder is:
 
-1. Drop the diagnostic tags (`MODE`, `FAULTS`, `CAL`, `ARM`): project-local, least valuable.
-2. Drop the GPS fields: optional under the rulebook, and still recoverable from the SD log.
-3. If the mandatory block alone would overflow, suppress the packet and raise
+1. Drop the diagnostic tags (`MODE`, `FAULTS`, `CAL`, `ARM`, `YR`): project-local, least valuable.
+2. Drop `SN-`: mandatory + GPS + sound are 209 bytes at their widest, so this one is reachable,
+   though only at widths no flight produces together.
+3. Drop the GPS fields: unreachable in a valid configuration, and recoverable from the SD log.
+4. If the mandatory block alone would overflow, suppress the packet and raise
    `packet_oversize` — a truncated packet reads as corruption at the ground station, which
    is worse than a missing one.
 
@@ -188,12 +195,12 @@ Defined once, in [`cansat/link_profile.hpp`](../../firmware/common/include/cansa
 | Preamble | 8 symbols | SX127x default; the receiver must match |
 | CRC | on | Corruption must be detectable, not silently accepted |
 | TX power | 17 dBm | RA-02 PA_BOOST maximum without PA_DAC |
-| Sync word | 0xF3 test / 0xA5 official | **Rulebook-fixed** |
-| Worst-case airtime | **338.2 ms** | The 213-byte rich packet at SF7/125 kHz/CR4-5 — the twelve mandatory fields, GPS and sound, with the diagnostic tags off the air. Measured airtime runs ~1.8 % above the model (bring-up 5.2/5.3), so budget ~344 ms |
-| Telemetry period | 700 ms | **1.43 Hz at ~48 % worst-case channel occupancy** on the model, ~49 % measured, on a 213-byte worst case. Every normal-flight packet is rich: the organizers count only transmitted telemetry for extra-sensor points, and at a 700 ms cadence carrying the sensors in every packet is the only way to put GPS and sound on the air at least once a second. The five diagnostic tags that used to fill that space are logged instead. The rulebook's 1 Hz is a minimum, and the period is derived from the **measured** airtime (bring-up 5.2/5.3), 1.8 % above the model. After the max-rate command the vehicle leaves this period for the slot pattern in [max-rate-command.md](max-rate-command.md) |
+| Sync word | 0xF3 test / 0xA5 official — **both images fly 0xA5**, the organizers' station's word | **Rulebook-fixed** |
+| Worst-case airtime | **317.7 ms** | The 200-byte budget at SF7/125 kHz/CR4-5 — the organizers' receiver limit, which every packet is held to. Measured airtime runs ~1.8 % above the model (bring-up 5.2/5.3), so budget ~323 ms |
+| Telemetry period | 700 ms | **1.43 Hz at ~45 % worst-case channel occupancy** on the model, ~46 % measured, on the 200-byte budget. Every normal-flight packet is rich: the organizers count only transmitted telemetry for extra-sensor points, and at a 700 ms cadence carrying the sensors in every packet is the only way to put GPS and sound on the air at least once a second. The five diagnostic tags that used to fill that space are logged instead. The rulebook's 1 Hz is a minimum, and the period is derived from the **measured** airtime (bring-up 5.2/5.3), 1.8 % above the model. After the max-rate command the vehicle leaves this period for the slot pattern in [max-rate-command.md](max-rate-command.md) |
 
-Resulting budget: **399.6 ms worst-case airtime, 40 % channel duty, 60 % of the channel
-free.** A typical 212-byte in-flight packet costs about 335 ms, or 34 %.
+Resulting budget: **317.7 ms worst-case airtime, 45 % channel duty, 55 % of the channel
+free.** A typical 180-byte rich packet costs about 287 ms, or 41 %.
 
 The 2 Hz option is real but conditional: SF7 at **250 kHz** gives 199.8 ms worst-case
 airtime and a comfortable 40 % duty at a 500 ms period. It costs about 3 dB of receiver sensitivity, which

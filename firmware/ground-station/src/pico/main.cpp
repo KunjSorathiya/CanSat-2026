@@ -27,8 +27,10 @@ constexpr std::uint32_t PIN_CS = 17;
 constexpr std::uint32_t PIN_RESET = 20;
 constexpr std::uint32_t PIN_DIO0 = 21;
 
-// Switch to cansat::link::kOfficialSyncWord for the official launch configuration.
-constexpr std::uint8_t SYNC_WORD = cansat::link::kTestSyncWord;  // rulebook: pre-launch testing
+// The official word, for testing as well as the launch: the vehicle flies it because the
+// organizers' ground station listens on nothing else, and this bridge has to match the
+// vehicle (tools/check_doc_claims.py holds the two to each other).
+constexpr std::uint8_t SYNC_WORD = cansat::link::kOfficialSyncWord;  // rulebook: official
 constexpr std::uint32_t STATUS_PERIOD_MS = 1000;
 constexpr std::uint8_t MAX_RADIO_FAILURES = 20;
 

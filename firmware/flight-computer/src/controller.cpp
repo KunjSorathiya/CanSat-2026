@@ -146,6 +146,12 @@ void Controller::poll(std::uint64_t now_ms) {
     // all comparable against one another.
     gps_.poll(mission_ms);
 
+    // The packet on the air, if any. The radio sends it on its own; this only notices it has
+    // finished. Nothing in this loop waits for a transmission any more -- the sensor task
+    // below runs at its own 33 ms through every packet, where it used to stand still for the
+    // whole airtime.
+    service_transmit(mission_ms);
+
     if (sensor_task_.due(mission_ms)) {
         acquire_sensors(mission_ms);
     }
@@ -156,8 +162,13 @@ void Controller::poll(std::uint64_t now_ms) {
     run_calibration(mission_ms);
     feed_state_machine(mission_ms);
 
-    if (telemetry_task_.due(mission_ms)) {
+    // A packet still on the air holds the next one back rather than being cut off by it:
+    // due() is not consulted, so the next packet stays pending and goes the moment the radio
+    // is free. Every slot outlasts its packet's airtime, so only a radio that has hung --
+    // bounded by its 1000 ms timeout -- ever holds one back.
+    if (!tx_in_flight_ && telemetry_task_.due(mission_ms)) {
         emit_telemetry(mission_ms);
+        service_transmit(mission_ms);  // a radio that finished at once settles in this poll
     }
 
     // One slice of any background scrub, every poll. It costs nothing when none is
@@ -269,7 +280,7 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
         } else if (imu_.has_magnetometer() &&
                    mission_ms - last_good_mag_ms_ > config_.sensor_stale_after_ms) {
             snapshot_.mag_valid = false;
-            faults_.report(FaultCode::mag_unavailable, FaultSeverity::warning, mission_ms);
+            faults_.hold(FaultCode::mag_unavailable, FaultSeverity::warning, mission_ms);
         }
 
         double dt = (last_sensor_ms_ == 0)
@@ -304,8 +315,8 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
         snapshot_.mag_valid = false;
         snapshot_.orientation_valid = false;
         snapshot_.yaw_is_magnetic = false;
-        faults_.report(FaultCode::imu_stale, FaultSeverity::error, mission_ms);
-        faults_.report(FaultCode::orientation_invalid, FaultSeverity::error, mission_ms);
+        faults_.hold(FaultCode::imu_stale, FaultSeverity::error, mission_ms);
+        faults_.hold(FaultCode::orientation_invalid, FaultSeverity::error, mission_ms);
     }
     last_sensor_ms_ = mission_ms;
 
@@ -372,7 +383,7 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
         last_good_baro_ms_ = mission_ms;
     } else if (mission_ms - last_good_baro_ms_ > config_.sensor_stale_after_ms) {
         snapshot_.baro_valid = false;
-        faults_.report(FaultCode::baro_stale, FaultSeverity::error, mission_ms);
+        faults_.hold(FaultCode::baro_stale, FaultSeverity::error, mission_ms);
     }
 
     // ---- GPS snapshot (never blocks) ----
@@ -392,7 +403,7 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
         faults_.clear(FaultCode::gps_unavailable);
     } else {
         snapshot_.gps.valid = false;
-        faults_.report(FaultCode::gps_unavailable, FaultSeverity::warning, mission_ms);
+        faults_.hold(FaultCode::gps_unavailable, FaultSeverity::warning, mission_ms);
     }
 
     // ---- Analogue microphone (additional sensor) ----
@@ -427,7 +438,7 @@ void Controller::acquire_sensors(std::uint64_t mission_ms) {
             // an additional sensor must not be able to move the mission state.
             snapshot_.sound_valid = false;
             snapshot_.sound_gate_valid = false;
-            faults_.report(FaultCode::sound_unavailable, FaultSeverity::warning, mission_ms);
+            faults_.hold(FaultCode::sound_unavailable, FaultSeverity::warning, mission_ms);
         }
     }
 
@@ -599,9 +610,17 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         built = builder_.build(candidate, mission_ms, snapshot_, extra, rich);
     }
     if (too_long(built)) {
-        // 2. The sensors: GP- and SN- come off the air for this packet. Unreachable in a
-        // valid configuration -- validate_config() refuses a budget that cannot hold them --
-        // so this is the backstop for a value wider than the budget was sized for.
+        // 2. Sound. The budget is the organizers' 200-byte ceiling, and mandatory + GPS fit it
+        // by construction while mandatory + GPS + sound do not quite (209 at their widest). So
+        // SN- leaves the one packet whose other fields are wide enough to need its bytes --
+        // a combination no flight produces together, but a ceiling is not a typical case.
+        faults_.report(FaultCode::packet_oversize, FaultSeverity::warning, mission_ms);
+        built = builder_.build(candidate, mission_ms, snapshot_, extra, rich, /*air_sound=*/false);
+    }
+    if (too_long(built)) {
+        // 3. GPS. Unreachable in a valid configuration -- validate_config() refuses a budget
+        // that cannot hold mandatory + GPS -- so this is the backstop for a value wider than
+        // the budget was sized for.
         //
         // It used to rebuild from a snapshot with GPS marked invalid, which also took the
         // fix out of this packet's SD row. air_sensors = false shortens only what is sent.
@@ -609,7 +628,7 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
         built = builder_.build(candidate, mission_ms, snapshot_, extra, /*air_sensors=*/false);
     }
     if (built && built->packet.size() > cansat::kMaxLoraPayloadBytes) {
-        // 3. Mandatory fields alone still overflow the radio. Transmitting a truncated
+        // 4. Mandatory fields alone still overflow the radio. Transmitting a truncated
         // packet would present as corruption; suppress it and say so instead.
         faults_.report(FaultCode::packet_oversize, FaultSeverity::error, mission_ms);
         ++health_.packets_suppressed;
@@ -634,9 +653,11 @@ void Controller::emit_telemetry(std::uint64_t mission_ms) {
     // just been wiped, every time.
     service_ground_commands(mission_ms);
 
-    const bool tx_ok = transmit_with_recovery(built->packet, mission_ms);
-    if (tx_ok) {
-        ++health_.packets_sent;
+    // Started, not finished. The radio sends the packet on its own from here, and
+    // service_transmit() counts it sent or failed when it ends; the SD row below is written
+    // while it is still on the air.
+    if (start_with_recovery(built->packet, mission_ms)) {
+        tx_in_flight_ = true;
     } else {
         ++health_.packets_tx_failed;
     }
@@ -765,7 +786,7 @@ void Controller::engage_max_rate() {
     uplink_closed_ = true;
 }
 
-bool Controller::transmit_with_recovery(const std::string& packet, std::uint64_t mission_ms) {
+bool Controller::start_with_recovery(const std::string& packet, std::uint64_t mission_ms) {
     if (radio_retry_after_ms_ != 0 && mission_ms < radio_retry_after_ms_) {
         return false;  // inside bounded back-off window; skip this cycle
     }
@@ -779,20 +800,39 @@ bool Controller::transmit_with_recovery(const std::string& packet, std::uint64_t
         faults_.clear(FaultCode::radio_init);
     }
 
-    if (radio_.transmit(packet)) {
+    if (radio_.start_transmit(packet)) {
+        return true;
+    }
+    note_tx_failure(mission_ms);
+    return false;
+}
+
+void Controller::service_transmit(std::uint64_t mission_ms) {
+    if (!tx_in_flight_) return;
+    const TxState state = radio_.poll_transmit();
+    if (state == TxState::busy) return;
+    tx_in_flight_ = false;
+
+    if (state == TxState::sent) {
+        ++health_.packets_sent;
         radio_retry_after_ms_ = 0;
         radio_consecutive_failures_ = 0;
         faults_.clear(FaultCode::radio_tx);
-        return true;
+        return;
     }
+    // Failed -- or a radio that forgot the packet it was given (idle), which is the same
+    // thing from the ground: a packet number that never arrived.
+    ++health_.packets_tx_failed;
+    note_tx_failure(mission_ms);
+}
 
+void Controller::note_tx_failure(std::uint64_t mission_ms) {
     if (++radio_consecutive_failures_ >= config_.radio_max_consecutive_failures) {
         faults_.report(FaultCode::radio_tx, FaultSeverity::error, mission_ms);
         radio_.initialize(sync_word(config_));  // one bounded re-init attempt
         radio_retry_after_ms_ = mission_ms + config_.radio_recovery_backoff_ms;
         radio_consecutive_failures_ = 0;
     }
-    return false;
 }
 
 void Controller::sample_battery(std::uint64_t mission_ms) {
@@ -804,7 +844,7 @@ void Controller::sample_battery(std::uint64_t mission_ms) {
 
     if (config_.battery_low_voltage > 0.0f && ratio > 0.0f) {
         if (voltage < config_.battery_low_voltage) {
-            faults_.report(FaultCode::battery_low, FaultSeverity::warning, mission_ms);
+            faults_.hold(FaultCode::battery_low, FaultSeverity::warning, mission_ms);
         } else {
             faults_.clear(FaultCode::battery_low);
         }

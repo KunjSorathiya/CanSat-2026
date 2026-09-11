@@ -34,7 +34,7 @@ TelemetryBuilder::TelemetryBuilder(Configuration config) : config_(std::move(con
 std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
     std::uint32_t packet_number, std::uint64_t mission_ms,
     const SensorSnapshot& s, const std::vector<std::string>& extra_optional,
-    bool air_sensors) const {
+    bool air_sensors, bool air_sound) const {
     cansat::TelemetryRecord record;
     record.team_id = config_.team_id;
     record.packet_number = packet_number;
@@ -65,8 +65,8 @@ std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
         std::isfinite(s.gps.altitude)) {
         // The record always carries the fix: it is what the SD row is rendered from, and
         // SEN-011 is satisfied by data that is "transmitted or logged". Whether it also
-        // goes on the air is a separate decision, because the three GP- fields are 56 of
-        // the packet's 255 bytes and the whole telemetry rate is computed from the worst
+        // goes on the air is a separate decision, because the three GP- fields are 51 of
+        // the packet's 200 bytes and the whole telemetry rate is computed from the worst
         // case. See Configuration::transmit_gps.
         record.gps = s.gps;
         if (config_.transmit_gps && air_sensors) {
@@ -79,7 +79,8 @@ std::optional<TelemetryBuilder::Built> TelemetryBuilder::build(
     // asks of optional fields: short prefix, mandatory data first. Transmitted only when the
     // microphone is producing valid windows -- a stale reading on the air would be a number
     // that looks live and is not.
-    if (config_.transmit_sound && air_sensors && s.sound_valid && std::isfinite(s.sound_mv_pp)) {
+    if (config_.transmit_sound && air_sensors && air_sound && s.sound_valid &&
+        std::isfinite(s.sound_mv_pp)) {
         optional.push_back(optional_field("SN-", s.sound_mv_pp, 1));
     }
     for (const auto& extra : extra_optional) {
@@ -139,11 +140,11 @@ std::string TelemetryBuilder::sd_line(const Built& b, MissionState state,
     out += (r.gps ? '1' : '0');
     out += ',';
     if (r.gps) {
-        out += fixed(r.gps->latitude, config_.gps_latlon_decimals);
+        out += fixed(r.gps->latitude, config_.gps_log_latlon_decimals);
         out += ',';
-        out += fixed(r.gps->longitude, config_.gps_latlon_decimals);
+        out += fixed(r.gps->longitude, config_.gps_log_latlon_decimals);
         out += ',';
-        out += fixed(r.gps->altitude, config_.gps_alt_decimals);
+        out += fixed(r.gps->altitude, config_.gps_log_alt_decimals);
         out += ',';
         // The two numbers the fix gate judged on, recorded beside the position it let
         // through. [F-18] could not be diagnosed from a log because these were computed,

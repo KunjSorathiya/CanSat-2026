@@ -97,9 +97,9 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Suite | Scope | Result |
 |---|---|---|
 | `flight_smoke_test` | Controller boot, first three packets, GPS parse | ✅ Passed |
-| `flight_tests` | 134 suites across the whole flight core | ✅ **4411 / 4411 assertions** |
+| `flight_tests` | 139 suites across the whole flight core | ✅ **4473 / 4473 assertions** |
 | `fat_volume_tests` | The FAT32 log-file locator against a synthetic card image | ✅ **30 / 30 assertions** |
-| `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **139 / 139 assertions** |
+| `sx1278_tests` | The LoRa driver against a fake register bank | ✅ **168 / 168 assertions** |
 | `sd_card_tests` | The microSD SPI driver against a simulated card | ✅ **613 / 613 assertions** |
 | `ground_station_tests` | Framing encode, decode, CRC, resync | ✅ Passed |
 | Python ground station | 8 modules | ✅ **141 / 141 tests** |
@@ -158,7 +158,7 @@ flowchart LR
 
 ## C++ test suites
 
-### `flight_tests` — 134 suites, 4411 assertions
+### `flight_tests` — 139 suites, 4473 assertions
 
 | Suite | What it proves |
 |---|---|
@@ -225,10 +225,14 @@ flowchart LR
 | `test_the_scrub_finishes_without_blocking_telemetry` | A run that scrubs 400 blocks transmits exactly as many packets as one that scrubs nothing. The mandatory 1 Hz downlink may not pay for a card wipe |
 | `test_a_vehicle_that_was_never_asked_never_scrubs` | `erase_step()` runs every poll and must be free on a vehicle that has erased nothing |
 | `test_a_fix_reaches_the_log_even_when_it_is_not_transmitted` | With `transmit_gps` set false — no longer the default — no `GP-` field reaches the packet, and latitude, longitude, satellites and HDOP all still reach the SD row. The same holds for every lean packet after a `MAX_RATE` command |
-| `test_a_budget_below_what_is_on_the_air_is_refused` | A budget that cannot hold the mandatory block plus the GPS and sound it transmits is refused before flight — the controller would otherwise shed the sensors from every packet, silently. Tags are not counted: they are shed first, and a tagged bench build must still validate |
+| `test_a_budget_below_what_is_on_the_air_is_refused` | A budget that cannot hold the mandatory block plus the GPS it transmits is refused before flight — the controller would otherwise shed GPS from every packet, silently. Sound and tags are not counted: they are shed first, a packet at a time. A flight budget (tags off) above the organizers' 200 bytes is refused; a tagged bench build may use the whole FIFO |
+| `test_the_sensor_loop_runs_while_a_packet_is_on_the_air` | With a radio that stays busy for a rich packet's 340 ms, the 33 ms sensor task still runs through every packet — a 30 Hz loop over seven seconds — and the cadence and packet count are unchanged. A packet counts as sent only when the radio says it has gone. The transmit used to wait out the airtime: the range-test log showed 15 reads per 700 ms packet instead of 21 |
+| `test_a_packet_on_the_air_holds_the_next_one_back` | A packet that outlasts its slot — only a hung radio can — holds the next one back rather than being cut off by it; nothing is ever started over a packet on the air, and the numbering stays sequential |
+| `test_a_packet_that_fails_on_the_air_is_counted_and_recovered` | A packet that starts and then fails is counted as failed when it ends; enough in a row raise `radio_tx` and re-initialise the radio, and the fault clears once packets get through |
+| `test_a_missing_gps_fix_is_one_fault_not_one_per_poll` | Ten seconds without a fix is one `gps_unavailable` occurrence, not one per 33 ms poll. The range-test log's `fault_total` climbed 21 a second on a vehicle whose only fault was no sky view |
 | `test_the_packet_cadence_is_the_same_in_every_state` | A full profile — pad, boost, coast, descent, landing — and **every gap between consecutive packets equals `telemetry_period_ms`**, whatever state the vehicle was in. The test asserts it actually reached `FLIGHT` and `LANDED` first, so it cannot pass on a mission that never left the pad. State detection drives the `MODE` tag and the LED blink; it must never drive the rate |
 | `test_the_builder_can_be_told_to_carry_position_after_construction` | The builder holds its own copy of the configuration, so a command putting position on the air has to tell it directly |
-| `test_max_rate_is_a_pattern_of_one_rich_and_two_lean` | After `MAX_RATE`, packets go rich, lean, lean — `GP-` and `SN-` only on the rich one — spaced 385 ms after a rich packet and 286 after a lean one, polled at 1 ms so the spacing is the schedule's; the SD rows of lean packets still carry the fix |
+| `test_max_rate_is_a_pattern_of_one_rich_and_two_lean` | After `MAX_RATE`, packets go rich, lean, lean — `GP-` and `SN-` only on the rich one — spaced 374 ms after a rich packet and 296 after a lean one, polled at 1 ms so the spacing is the schedule's; the SD rows of lean packets still carry the fix |
 | `test_every_normal_flight_packet_is_rich` | In normal flight every packet after the first second carries `GP-` and `SN-`, and none carries a diagnostic tag |
 | `test_max_rate_closes_the_uplink_behind_it` | With a command on the air throughout, exactly one is accepted and the radio is never polled again |
 | `test_no_command_is_heard_after_max_rate` | After the latch an erase command is not refused but unheard: nothing is accepted and nothing is erased |
@@ -243,19 +247,19 @@ flowchart LR
 | `test_a_build_without_the_uplink_arms_as_it_always_has` | With no uplink there is no window, and the vehicle arms three seconds after power-on as before |
 | `test_a_command_window_must_have_a_length` | `validate_config()` refuses a zero or unbounded window when the uplink is on, and ignores the length when it is off |
 | `test_a_flight_build_has_no_uplink_at_all` | `allow_ground_commands` defaults to false, and with it false the radio's receive is **never polled** — this is the test the README's "there is no command uplink" rests on |
-| `test_a_task_can_be_rescheduled_from_the_packet_it_just_sent` | `reschedule()` sets the next due time from the fire time of the packet just sent and the slot its shape needs — 385 ms after a rich packet, 286 after a lean one — which `due()` alone cannot, since it advances by the period it held when it fired |
+| `test_a_task_can_be_rescheduled_from_the_packet_it_just_sent` | `reschedule()` sets the next due time from the fire time of the packet just sent and the slot its shape needs — 374 ms after a rich packet, 296 after a lean one — which `due()` alone cannot, since it advances by the period it held when it fired |
 | `test_the_sound_level_goes_on_the_air_after_the_position` | `SN-` follows every mandatory field and the position; a microphone with no valid window puts nothing on the air, and `transmit_sound` false keeps it off |
 | `test_a_packet_held_lean_still_logs_everything` | A packet built with `air_sensors` false carries neither `GP-` nor `SN-`, and its SD row still has the latitude, the longitude and the sound level |
-| `test_the_widest_packets_are_the_budgets_by_construction` | The widest mandatory block and GPS block the builder can produce — packet number 4294967295, a 99-hour clock, extreme negatives — are exactly `kMandatoryPacketBytes` and `kGpsFieldBytes`. It corrected them from 145 and 56 to 147 and 55 |
+| `test_the_widest_packets_are_the_budgets_by_construction` | The widest mandatory block and GPS block the builder can produce — packet number 4294967295, a 99-hour clock, extreme negatives — are exactly `kMandatoryPacketBytes` and `kGpsFieldBytes`. It corrected them from 145 and 56 to 147 and 55, and holds the GPS block at 51 since its precision was cut for the organizers' 200-byte ceiling. The widest rich packet (209) is over that ceiling and fits it without `SN-` |
 | `test_the_commanded_rate_periods_clear_their_own_airtime` | Both commanded periods clear their own measured airtime plus the SD guard, 201 B costs exactly what 199 B costs, and the published rates cannot move without this failing |
 | `test_a_token_authorises_one_command_and_not_another` | A token minted for one command is refused for every other, in both directions, and an unknown command name is refused rather than matched to the nearest known one |
 | `test_the_bench_build_erases_the_log_on_command` | Enabled, in `READY` with `ARM-0`, a valid command erases the log |
 | `test_a_vehicle_past_its_command_window_refuses_to_erase` | After the window closes an erase is not heard, and the test asserts the vehicle reached `READY` so it cannot pass for the wrong reason |
-| `test_another_teams_command_erases_nothing` | A command naming another team is seen, counted as ignored, and erases nothing — `0xF3` is shared by every team in the competition |
+| `test_another_teams_command_erases_nothing` | A command naming another team is seen, counted as ignored, and erases nothing — the sync word is shared by every team in the competition |
 | `test_a_refused_erase_is_reported_rather_than_swallowed` | A logger that cannot erase raises `sd_write`; an operator who pressed the button can tell "erased" from "declined" |
 | `test_listening_never_costs_a_packet` | Identical runs with the uplink off and on transmit the same number of packets. The mandatory 1 Hz downlink may not pay for a bench feature |
 | `test_a_command_round_trips_for_its_own_team` | A formatted `ERASE_LOG` command parses back to the same command for the team it names |
-| `test_a_command_for_another_team_is_ignored` | A command addressed to `CAN-Team-07` is inert here. `0xF3` is the shared test sync word, so another team's traffic must be structurally inert rather than merely unlikely |
+| `test_a_command_for_another_team_is_ignored` | A command addressed to `CAN-Team-07` is inert here. The sync word is shared by every team, so another team's traffic must be structurally inert rather than merely unlikely |
 | `test_a_command_with_the_wrong_password_is_ignored` | A wrong password, or none, yields no command. The token is a digest of the password and the packet number, so the check is on the digest and the password itself never travels |
 | `test_the_password_never_appears_on_the_wire` | The formatted command does not contain the password anywhere. The link is unencrypted, so this is the property that makes a password worth having at all |
 | `test_a_token_is_valid_for_exactly_one_packet_number` | Moving a valid token to a different `PN-` breaks it. This is what makes a captured frame single-use, and everything the controller does about replay rests on it |
@@ -270,6 +274,7 @@ flowchart LR
 | `test_a_fix_with_poor_geometry_is_refused` | Eight satellites at HDOP 20 are refused: geometry, not count, is what produces a large confident wrong position |
 | `test_a_good_fix_still_passes_and_carries_its_quality` | Eight satellites at HDOP 0.9 still pass, and `satellites` and `hdop` are both readable afterwards — a gate whose inputs are not recorded cannot be tuned in the field |
 | `test_a_refused_fix_does_not_disturb_the_last_good_one` | A refused sentence leaves the previous position untouched and the vehicle still holding a fix; only a genuine `quality <= 0` clears it. Declining an update is not the same as losing the fix |
+| `test_an_rmc_cannot_make_a_fix_the_gga_gate_refused` | An `RMC` sentence renews the ground track and never the fix — it has no satellites, HDOP or altitude to gate on — and neither it nor a refused `GGA` renews the fix clock. The 2026-09-10 range test put 219 fixes with 0 satellites, HDOP 0.0 and `GP-Alt-0.0` on the air |
 | `test_a_hemisphere_from_the_wrong_axis_is_rejected` | A latitude marked `E` or `W`, or a longitude marked `N` or `S`, is rejected rather than read as a sign — a sentence that passed its checksum can still carry a hemisphere character from the other axis, and taking it puts the fix on the wrong side of the equator |
 | `test_gps_coordinate_validation` | A checksum-valid sentence carrying an impossible position is rejected: the vehicle transmits no fix rather than a wrong one |
 | `test_orientation_survives_the_wrap_and_the_poles` | The quaternion state stays well formed across the ±180° roll seam and through a 20 s tumble at 100 °/s about all three axes — including the ±90° pitch singularity that broke the previous Euler integration |
@@ -279,7 +284,7 @@ flowchart LR
 | `test_gps_course_is_a_cross_check_not_a_yaw_source` | A grossly disagreeing GPS course raises a warning and does **not** move the heading; slowing below the speed gate withdraws the comparison |
 | `test_mag_calibration_requires_real_coverage` | The sweep calibrator refuses to certify itself until every axis has been swept, recovers a known hard-iron offset and soft-iron squash, and rejects saturated samples |
 | `test_accel_calibration_is_rotation_invariant` | The accelerometer correction is a scalar scale, so it still returns 1 g in attitudes the vehicle was never calibrated in |
-| `test_measured_packet_sizes_match_the_link_budget` | The 118 / 167 / 212-byte figures the link budget quotes are the ones the formatter actually produces |
+| `test_measured_packet_sizes_match_the_link_budget` | The 118 / 163 / 208-byte figures the link budget quotes are the ones the formatter actually produces |
 | `test_calibration_rejects_a_steady_rotation_as_bias` | A vehicle turning at a constant rate on the pad is steady by variance alone; the gate refuses to subtract that real body rate as gyro bias for the whole flight |
 | `test_fault_severity_never_falls_while_active` | Severity is monotonic while a fault is active — escalation is honoured, a later routine report at a lower severity cannot downgrade a fault that still applies, and clearing genuinely resets it |
 | `test_landing_is_not_declared_during_a_steady_descent` | A steady parachute descent reads as 1 g, indistinguishable from resting on the ground; only the vertical rate separates them, and it does |

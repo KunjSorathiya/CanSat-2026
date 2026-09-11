@@ -49,11 +49,30 @@ public:
     bool set_sync_word(std::uint8_t sync_word);
     bool reconfigure(const Sx1278Settings& settings);  // full re-init with new parameters
 
-    // Blocking transmit with a bounded timeout. Returns false on timeout or if the modem
-    // is not ready. `len` is clamped to 255 (LoRa FIFO limit).
+    // Where a packet handed to start_transmit() is.
+    enum class TxStatus : std::uint8_t { idle, busy, done, failed };
+
+    // Non-blocking transmit, in two halves. start_transmit() loads the FIFO and keys the
+    // transmitter, then returns at once: the modem sends the packet on its own. It refuses a
+    // second packet while one is on the air. poll_transmit() reports `busy` until the packet
+    // ends, then `done` or `failed` exactly once, and `idle` when nothing is in flight. Both
+    // the timeout and the airtime floor below need the HAL's millis() clock; without one the
+    // blocking transmit() is the only bounded way to send.
+    //
+    // This is what the flight computer uses, because the blocking form stops the caller for
+    // the whole airtime: in the 2026-09-10 range-test log the 33 ms sensor task ran 15 times
+    // per 700 ms packet instead of 21, and about 11 times a second after MAX_RATE.
+    bool start_transmit(const std::uint8_t* data, std::size_t len);
+    TxStatus poll_transmit(std::uint32_t timeout_ms);
+    bool tx_busy() const { return tx_active_; }
+
+    // Blocking transmit with a bounded timeout, built on the two halves above. Returns false
+    // on timeout or if the modem is not ready. `len` is clamped to 255 (LoRa FIFO limit).
+    // The ground bridge and the bring-up image use it; a caller with nothing else to do loses
+    // nothing by waiting.
     bool transmit(const std::uint8_t* data, std::size_t len, std::uint32_t timeout_ms = 2000);
 
-    void start_receive();  // enter continuous RX
+    void start_receive();  // enter continuous RX (not while a packet is on the air)
     // Non-blocking: returns payload length (0 if nothing) into `out` (capacity `cap`).
     std::size_t poll_receive(std::uint8_t* out, std::size_t cap);
 
@@ -109,6 +128,8 @@ private:
     void read_fifo(std::uint8_t* out, std::size_t len);
     void set_mode(std::uint8_t mode);
     void capture_tx_state();
+    TxStatus check_transmit(std::uint32_t elapsed_ms, std::uint32_t timeout_ms);
+    void end_transmit();
     bool apply_settings(const Sx1278Settings& settings);
     std::uint32_t now_ms();
     LoraModemParams modem_params() const;
@@ -118,6 +139,12 @@ private:
     Sx1278Settings settings_{};
     bool healthy_ = false;
     bool receiving_ = false;
+    // The packet on the air: whether there is one, whether RX was running when it started
+    // (and so must be resumed when it ends), when it started and how long it is.
+    bool tx_active_ = false;
+    bool tx_was_receiving_ = false;
+    std::uint32_t tx_start_ms_ = 0;
+    std::size_t tx_len_ = 0;
     std::uint8_t version_ = 0;
     std::uint8_t last_tx_irq_flags_ = 0;
     std::uint8_t last_tx_op_mode_ = 0;

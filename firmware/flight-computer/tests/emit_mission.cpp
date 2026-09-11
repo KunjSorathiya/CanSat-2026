@@ -29,7 +29,9 @@ int main(int argc, char** argv) {
     // whole pipeline -- so the tags stay in, and the budget and period make room for them.
     // No sound sensor is wired into this run, so no SN- field appears.
     config.append_diagnostic_fields = true;
-    config.worst_case_packet_bytes = cansat::link::kWorstCasePacketBytesWithGps;
+    // A bench budget: with the tags on, packets pass the organizers' 200-byte ceiling,
+    // which validate_config() allows only for a tagged build like this one.
+    config.worst_case_packet_bytes = cansat::link::kBenchPacketBytes;
     // The period a 255-byte packet actually fits inside: 700 ms would put it at 57 % duty,
     // which validate_config() correctly refuses.
     config.telemetry_period_ms = 850;
