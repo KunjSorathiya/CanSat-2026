@@ -4,7 +4,7 @@
 
 **Report date: 12 September 2026**
 
-**Repository:** `github.com/KunjSorathiya/CanSat-2026`
+**Repository:** `github.com/KunjSorathiya/CanSat-Team-Singularity`
 
 ---
 
