@@ -29,9 +29,12 @@ USAGE
 Run it again after every flight, once you have copied the data off. Re-running deletes and
 recreates the file, which resets the log.
 
-If the firmware reports the file as fragmented, free space on the card is broken up. Quick-
-format it FAT32 again and run this on the empty card: contiguity is then guaranteed, because
-the whole volume is one free run.
+If the firmware reports the file as fragmented, that is usually nothing to act on: it tracks
+up to FatVolume::kMaxExtents (16) separate runs and maps log block numbers through them, so
+a file in a few pieces costs it nothing. Only a file broken into more runs than that is
+refused. If it is, free space on the card is genuinely broken up - quick-format it FAT32 and
+run this on the empty card: contiguity is then guaranteed, because the whole volume is one
+free run. Use tools/inspect_sd_log.py to see the actual extent count.
 """
 
 import argparse
@@ -44,6 +47,10 @@ DEFAULT_SIZE_MB = 64
 # Must match kMinLogBlocks in firmware/flight-computer/src/pico/sd_logger.cpp.
 MIN_BLOCKS = 8192
 BLOCK = 512
+# Must match FatVolume::kMaxExtents in
+# firmware/flight-computer/include/flight/fat_volume.hpp. A file in this many runs or
+# fewer is mapped through the extent list and accepted; only more than this is refused.
+MAX_EXTENTS = 16
 
 
 def human(n: int) -> str:
@@ -165,15 +172,19 @@ def main() -> int:
         piece = ("size verified. Contiguity is not checkable from here on FAT32 - "
                  "run tools/inspect_sd_log.py to confirm it, or let the "
                  "firmware report it")
+    elif extents <= MAX_EXTENTS:
+        piece = f"in {extents} pieces - fine, the firmware maps up to {MAX_EXTENTS}"
     else:
-        piece = f"in {extents} pieces - FRAGMENTED"
+        piece = f"in {extents} pieces - TOO FRAGMENTED"
 
-    if extents is not None and extents > 1:
+    # Only more runs than the firmware can track is an actual failure. A file in a few
+    # pieces is mapped through the extent list and costs nothing, so it is not reported
+    # as a problem here: telling an operator to reformat a flight-ready card is the way
+    # the pre-flight step gets skipped for real.
+    if extents is not None and extents > MAX_EXTENTS:
         print(f"""
-PROBLEM: {FILENAME} is {human(actual)} but lands in {extents} separate runs.
-
-The firmware will refuse it, and it is right to: writing linearly into a fragmented
-file would scribble over whatever occupies the gaps.
+PROBLEM: {FILENAME} is {human(actual)} but lands in {extents} separate runs, more
+than the {MAX_EXTENTS} the firmware tracks. It will refuse the file.
 
 Free space on this card is broken up. Quick-format it FAT32 again - which empties it
 completely - and run this script on the clean card. Contiguity is then guaranteed,
@@ -186,8 +197,9 @@ Done. {FILENAME} is {human(actual)}, {piece}.
 
   1. Eject the card properly, then put it in the vehicle.
   2. The firmware locates this file and writes records into its blocks. It refuses to
-     start if the file is missing, fragmented or too small - it never falls back to a
-     guessed address, because that would destroy the filesystem.
+     start if the file is missing, too small, or in more than {MAX_EXTENTS} separate runs -
+     it never falls back to a guessed address, because that would destroy the filesystem.
+     A file in a few runs is mapped through the extent list and is fine.
   3. After the flight, mount the card and open {FILENAME}.
 
      The first two lines are the log's own header blocks and are not data. Skip them.
@@ -196,8 +208,9 @@ Done. {FILENAME} is {human(actual)}, {piece}.
 
   4. Copy the file off, then run this script again with --force before the next flight.
 
-If the firmware reports the file as fragmented, the card has been written to enough that
-free space is broken up. Reformat it and re-run this script on the empty card.
+If the firmware reports the file as fragmented, check the count before acting: up to
+{MAX_EXTENTS} runs is fine and needs nothing done. Only past that is the card's free space
+broken up enough to matter - reformat it and re-run this script on the empty card.
 """)
     return 0
 

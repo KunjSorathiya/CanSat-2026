@@ -189,24 +189,47 @@ def main():
     print(f"  clusters walked in the chain   : {walked}")
     print(f"  extents (runs of consecutive clusters): {len(runs)}")
 
-    if len(runs) == 1:
-        print("\nCONTIGUOUS. The firmware will accept this file.")
-        print(f"  It should report {walked * bpb['spc']} blocks over 1 extent.")
+    def lba_note():
         print("")
         print("  NOTE: the LBAs above are VOLUME-relative, because this opens the")
         print("  volume directly. The firmware opens the whole card, walks the MBR,")
         print("  and reports CARD-absolute LBAs - larger by the partition start.")
         print("  A difference of exactly the partition offset is the two agreeing,")
         print("  not a discrepancy.")
+
+    def list_runs():
+        for i, (start, count) in enumerate(runs[:10]):
+            print(f"  run {i}: cluster {start} .. {start + count - 1}  "
+                  f"({count} clusters, LBA {cluster_lba(bpb, start)})")
+        if len(runs) > 10:
+            print(f"  ... and {len(runs) - 10} more")
+
+    if len(runs) == 1:
+        print("\nCONTIGUOUS. The firmware will accept this file.")
+        print(f"  It should report {walked * bpb['spc']} blocks over 1 extent.")
+        lba_note()
         vol.close()
         return 0
 
-    print("\nFRAGMENTED. The firmware will refuse it, correctly.")
-    for i, (start, count) in enumerate(runs[:10]):
-        print(f"  run {i}: cluster {start} .. {start + count - 1}  "
-              f"({count} clusters, LBA {cluster_lba(bpb, start)})")
-    if len(runs) > 10:
-        print(f"  ... and {len(runs) - 10} more")
+    if len(runs) <= MAX_EXTENTS:
+        # A file in a handful of runs is not a fault and must not be reported as one.
+        # The firmware maps log block numbers through its extent list and gives up only
+        # past kMaxExtents. This branch used to print "the firmware will refuse it",
+        # which sent an operator off to reformat a card that was ready to fly -- exactly
+        # the skipped pre-flight step the extent list was added to make unnecessary.
+        print(f"\nFRAGMENTED into {len(runs)} runs - and that is FINE.")
+        print(f"  The firmware tracks up to {MAX_EXTENTS} extents and maps its own block")
+        print("  numbers through them, so it will accept this file as it stands.")
+        print(f"  It should report {walked * bpb['spc']} blocks over {len(runs)} extents.")
+        print("")
+        list_runs()
+        lba_note()
+        vol.close()
+        return 0
+
+    print(f"\nTOO FRAGMENTED: {len(runs)} runs, more than the {MAX_EXTENTS} the firmware")
+    print("tracks. It will refuse this file, correctly.")
+    list_runs()
     print("\nFree space on this card is broken up. Quick-format it FAT32 and run\n"
           "prepare_sd_card.py on the empty volume: contiguity is then guaranteed,\n"
           "because the whole volume is one free run.")
