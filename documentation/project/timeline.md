@@ -2,7 +2,7 @@
 
 Where the project has been, where it stands today, and what has to happen next.
 
-**Status date: 2026-09-09.**
+**Status date: 2026-09-12.**
 
 > [!NOTE]
 > No competition deadline appears in the supplied rulebook text, so the forward plan is
@@ -11,9 +11,11 @@ Where the project has been, where it stands today, and what has to happen next.
 > be confirmed with the organizers before this page can carry real dates.
 
 > [!IMPORTANT]
-> **The centre of gravity of this project has moved.** For its first four days everything was
-> blocked on hardware. The board is now built and working, and **every remaining blocker is
-> mechanical or procedural.** Nothing electronic or software is waiting on anybody.
+> **The centre of gravity has moved twice.** For its first four days everything was blocked on
+> hardware; the board was then built and every remaining blocker became mechanical. **As of
+> 2026-09-12 the structure is printed, the vehicle is assembled, and it has been weighed at
+> 280 g.** What is left is a parachute, a drop test, four small parts on the power path, and
+> flights — plus one organizer answer that decides whether the structure is re-printed heavier.
 
 ---
 
@@ -40,12 +42,13 @@ Where the project has been, where it stands today, and what has to happen next.
 | 4 · Documentation | Architecture, wiring, timeline, test plan, runbook, audit | ✅ Complete |
 | 5 · Procurement + bring-up | Verify boards, resolve power, bench each subsystem | 🟢 **Substantially complete.** Every board inspected, the power question closed by measurement, gates 3–7 passed on the soldered board |
 | 6 · Electrical build | Regulator, switch, LED, divider, PCB, harness | 🟠 **Board built and working.** No regulator is needed. Switch, LEDs, Schottky and divider not fitted |
-| 7 · Mechanical build | Structure, egg chamber, parachute, recovery | 🟠 **Designed and simulated; out for printing.** `Cansat_D1` in PETG, three static-stress studies, envelope confirmed with the organizers, canopy sized at 80.0 cm. Nothing printed, no egg chamber, no parachute, no drop test |
+| 7 · Mechanical build | Structure, egg chamber, parachute, recovery | 🟠 **Structure printed and assembled 2026-09-12.** `Cansat_D1` in white PETG, electronics mounted, egg chamber fitted, **weighed at 280 g**. Three static-stress studies, envelope confirmed with the organizers, canopy sized at 80.0 cm. **Still open: the parachute, the drop test, and 105–135 g of missing mass** |
 | 8 · Integration + flight test | Full-system, drop and range testing | 🟠 **Bench link closed.** No range test, no drop test, never run on battery |
 | 9 · Competition | Launch, analysis, reports, media | ⬜ Not started |
 
-Phases 0–4 are complete and phase 5 is substantially so. **What remains is a structure, a
-parachute, four small parts on the power path, and flights.**
+Phases 0–4 are complete and phase 5 is substantially so. **What remains is a parachute, a
+drop test, four small parts on the power path, and flights** — and a decision, waiting on the
+organizers, about whether a 280 g vehicle has to be made heavier.
 
 ---
 
@@ -55,7 +58,7 @@ All development so far is recorded in the repository history.
 
 ```mermaid
 timeline
-    title Development to date (2026-09-03 to 2026-09-09)
+    title Development to date (2026-09-03 to 2026-09-12)
     Repository setup : Project directory structure : Hardware overview drafted
     Requirements : Rulebook captured : 30 requirements extracted : 9 development gates defined : 10 organizer questions raised
     Hardware analysis : BOM identified against Robu SKUs : Pico and BMP280 datasheets stored : Electrical compatibility assessed : GPIO and resource maps drafted : AMS1117-3.3 rejected for direct regulation : microSD supply flagged as blocking
@@ -69,6 +72,8 @@ timeline
     Rate and record : GPS moved to the log and the period to 700 ms : 1.43 Hz : Ground-to-vehicle erase, inert by construction : GPS gated on satellite count and HDOP : Flight log reader written
     Mission and mechanics : Descent model : 80 cm canopy : Board does not fit a 12 cm section laid flat : Concept of operations written : F-20 found - a landing declared under a hovering drone
     The design lands : Cansat_D1 modelled and exported : Organizers confirm a 12 cm sided box : PETG chosen and argued : Three static-stress studies : Electronics weighed at 151.299 g : Structure estimated at 193 g : Print orientation decided : Sync-word and radio-silence procedures written
+    Range and rate : First range test : The organizers' station heard almost nothing on the test sync word : Their receiver discards packets over 200 bytes : Both Picos move to 0xA5 : GPS and sound go on the air : MAX_RATE measured at 3.11 Hz : A five-minute command window
+    The vehicle becomes an object : Structure printed in white PETG : Electronics mounted : Egg chamber fitted : Assembled vehicle weighed at 280 g : The print came in 64 g under its upper bound : The mass risk inverts and doubles : Final project report written
 ```
 
 ### Commit history
@@ -86,6 +91,8 @@ so this is the shape of it instead:
 | **2026-09-07** | The board is built, and gates 3 through 7 pass on it. **The first radio link closes** — 66 packets, no gaps. Running the flight image finds a chip-select ordering bug no host test could have | [bring-up-record.md](../testing/bring-up-record.md), F-12 to F-19 |
 | **2026-09-08** | Telemetry to 1.43 Hz, an authorised erase command that is inert by construction, GPS gated on satellite count and HDOP, and the first mechanical and mission analysis this project has had | This document, [concept-of-operations.md](../mission/concept-of-operations.md) |
 | **2026-09-09** | **The mechanical design arrives and the vehicle stops being an idea with a board in it.** `Cansat_D1` modelled and exported, the organizers confirm a 12 cm *sided box* so it fits, PETG chosen and argued, three static-stress studies run, the electronics weighed for the first time at **151.299 g**, and the print orientation decided. The mass finding runs the other way: **coming in under the 450 g floor is now likelier than exceeding the cap** | [mechanical/README.md](../../mechanical/README.md), [simulation/README.md](../../mechanical/simulation/README.md) |
+| **2026-09-10 → 11** | **The first range test, and the discovery that the organizers' ground station had barely heard the vehicle.** Their receiver was given to the team: an ESP32 on sync word `0xA5` that discards any packet over 200 bytes. The vehicle was on `0xF3`. Both Picos move to `0xA5`, the packet budget drops to 200 bytes, GPS and sound go **on the air** rather than to the card — the organizers having ruled that only transmitted telemetry counts for extra-sensor points — and a `MAX_RATE` uplink command is measured at **3.11 Hz with 1 packet in 544 lost** | [max-rate-command.md](../design/max-rate-command.md), rows 8.17 and 8.18 |
+| **2026-09-12** | **The structure comes back from the printer and the vehicle becomes a physical object.** White PETG, electronics mounted, egg chamber fitted, and **280 g on a scale** — the first mechanical measurement the project has had. The print came in at **≈ 128.7 g against a 193 g upper bound**, a 33 % overshoot in the estimate, and the mass risk that inverted on 09-09 **roughly doubled**: the projection is now 315–345 g against a 450 g floor. The final project report is written | [mechanical/README.md](../../mechanical/README.md#mass-budget), [final-report.md](final-report.md) |
 
 **Two things are worth noticing about that list.** Every one of those days ends with a
 finding, and most of the findings came from *running* something rather than from reading it.
@@ -169,13 +176,15 @@ gantt
 
 ### Phase 7 — Mechanical build 🟠 *designed and simulated, out for printing*
 
-- ~~Structure sized to **21 cm (+7 cm) × 12 cm**~~ — done: `Cansat_D1`, 118.5 × 115.0 × 110.0 mm, **PETG**, out for printing
+- ~~Structure sized to **21 cm (+7 cm) × 12 cm**~~ — done: `Cansat_D1`, 118.5 × 115.0 × 110.0 mm, **printed in white PETG and assembled 2026-09-12**
 - ~~Decide the board orientation~~ — settled by the design: the 115 × 110 mm section takes the 100 mm board flat
 - ~~Confirm how "12 cm across" is measured~~ — **organizers confirmed a 12 cm sided box, 2026-09-09**
 - ~~Decide and record the print orientation~~ — **decided 2026-09-09: printed as modelled, on its base.** Layers stack vertically, so the weak directions are tension normal to the layers and interlayer shear, and the derated safety factor is still **6 to 13**
 - **Run the base-first load case.** All three studies load horizontally, and a vehicle hanging under a parachute lands along the build axis — which is exactly the print's weak direction. The one load case not run
-- **Weigh the printed structure.** The electronics are measured at 151.299 g and the structure is estimated at 193 g, which has never been on a scale. It is the number that decides the budget, and the projected all-up **414–479 g** makes coming in *under* the 450 g floor the likelier risk
-- Cushioned, secure egg chamber. **Build it even though no egg flies:** PAY-002 is a separate requirement, it carries the +7 cm allowance, and section D scores use of permitted volume
+- ~~**Weigh the printed structure.**~~ **Done 2026-09-12: the assembled vehicle is 280 g** without a parachute, so the structure and egg chamber together are **≈ 128.7 g** against a 193 g estimate. The projected all-up is **315–345 g**, entirely below the 450 g floor — see [the mass budget](../../mechanical/README.md#mass-budget)
+- **Decide whether to re-print heavier**, once the organizers say whether 450 g binds. A high-infill re-print recovers at most ~64 g of a 105–135 g gap, so ballast is probably needed as well
+- **Check the printed envelope with calipers.** Every dimension the repository holds is read from the STEP, and a printed part is not its model. 2.5 mm per side is the whole clearance
+- ~~Cushioned, secure egg chamber~~ — **built and fitted 2026-09-12**, inside the 280 g. PAY-002 is a separate requirement from PAY-001, it carries the +7 cm allowance, and section D scores use of permitted volume
 - Parachute: **80.0 cm flat canopy**, sized at 550 g on a hot day by [`simulations/descent.py`](../../simulations/descent.py). Vented or cruciform, and **not tightly packed** — REC-003 and REC-004
 - ~~Weigh the electronics~~ — done 2026-09-09: **151.299 g**, and it overran the estimate by 26 %
 - Drop testing for structural integrity, and to measure the drag coefficient the model assumes
@@ -214,8 +223,8 @@ flowchart LR
     classDef done fill:#1b5e20,stroke:#1b5e20,color:#fff
     classDef partial fill:#e65100,stroke:#e65100,color:#fff
     classDef todo fill:#37474f,stroke:#37474f,color:#fff
-    class G1,G2,G3,G4,G5,G6 partial
-    class G7,G8,G9 todo
+    class G1,G2,G3,G4,G5,G6,G7 partial
+    class G8,G9 todo
 ```
 
 | Gate | Status | What is missing |
@@ -226,8 +235,8 @@ flowchart LR
 | 4 · Sensors individually verified | 🟠 Partial | **Both I2C sensors verified together on the soldered board 2026-09-07** — `0x68` and `0x76` on one bus, `0x0C` correctly absent, rates, biases and noise recorded. GPS delivers all six NMEA sentences with zero checksum errors. The microSD writes and sustains ~300 writes/s. Missing: a GPS fix outdoors, the sound module, and [F-13](../testing/bring-up-record.md#findings)'s gyro drift across temperature |
 | 5 · Telemetry verified | 🟠 Partial | **A link has been established.** 66 packets, `P-001` to `P-066`, no gaps and no duplicates, sync word `0xF3`, on 2026-09-07. Transmit is proven on the soldered board: 55 transmits, zero failures, airtime within 1.8 % of the model on both packet sizes, and channel occupancy 33.4 % typical. Missing: the `0xA5` sync word, which is a reflash of *both* Picos; a loss figure over the 500-packet window the row asks for rather than 66; and the lift, flight, landing and post-impact transmissions, which need a flight |
 | 6 · Ground station verified | 🟠 Partial | The bridge image runs on its Pico, enumerates over USB and emits status frames at a verified 1 Hz with byte-exact CRC framing, and **the receive pipeline has now seen 66 packets that arrived over the air** — parsed, validated and counted, with the bridge's `frames` counter incrementing once per packet and `dropped=0` throughout. Missing: compatibility with the official dual ground stations, which only the organizers or the venue can settle |
-| 7 · Mechanical and recovery verified | ⬜ Not passed | Nothing built |
-| 8 · Full system integration | ⬜ Not passed | Blocked by gates 2–7 |
+| 7 · Mechanical and recovery verified | 🟠 Partial | **The structure half is built.** `Cansat_D1` printed in white PETG, electronics mounted, egg chamber fitted, assembled vehicle **weighed at 280 g** — the first mechanical measurement in the project. Missing: the parachute, a drop test, a measured descent rate, a vertical impact case in simulation, calipers on the printed envelope, and the **105–135 g** that separates the vehicle from the mass floor if that floor binds |
+| 8 · Full system integration | 🟠 Partial | A bench link and a range test have happened, and `MAX_RATE` was measured at 3.11 Hz. Blocked on the rest by gates 2, 3 and 7 — chiefly a parachute and running on the battery |
 | 9 · Competition readiness | ⬜ Not passed | Blocked by gate 8 |
 
 ---
@@ -243,26 +252,36 @@ flowchart TD
     E --> F["Radio link closed, bench ✓"]
     F --> N["Fit switch, LED, Schottky, divider"]
     N --> G["Full integration on battery power"]
-    H["Choose the board orientation"] --> I["Freeze the mechanical design"]
-    I --> J["Build the structure and egg chamber"]
+    H["Board orientation chosen ✓"] --> I["Mechanical design frozen ✓"]
+    I --> J["Structure and egg chamber printed ✓"]
+    J --> W["Vehicle assembled and weighed ✓"]
+    W --> X["Mass floor: organizer answer"]
+    X --> Y["Re-print heavier / ballast"]
     I --> K["Sew and drop-test the 80 cm canopy"]
-    J --> G
+    Y --> G
     K --> G
-    G --> O["Range test"] --> L["Mission rehearsal"] --> M["Launch"]
+    G --> O["Range test ✓"] --> L["Mission rehearsal"] --> M["Launch"]
 
     classDef done fill:#1b5e20,stroke:#1b5e20,color:#fff
     classDef blocker fill:#b71c1c,stroke:#b71c1c,color:#fff
-    class A,B,C,D,E,F done
-    class H,N blocker
+    class A,B,C,D,E,F,H,I,J,W,O done
+    class N,K,X blocker
 ```
 
-**The critical path is now mechanical.** Every electronic item on it is green. Two things
-gate the rest: **the board orientation decision**, which nothing outside the team is waiting
-on and which the [envelope drawing](../../mechanical/drawings/envelope-and-board-fit.svg)
-already answers, and **four small parts on the power path**, of which exactly one still has
-to be bought.
+**The critical path is now the parachute and one email.** Every electronic item on it is
+green, and so is the structure — it is printed, assembled and weighed. Three things gate the
+rest:
 
-**The longest single item is the structure**, and nothing has started on it.
+1. **The canopy**, which nobody is waiting on. It is sized at 80.0 cm and stays compliant from
+   315 g to 550 g, so it can be sewn before the mass question is settled.
+2. **Whether 450 g binds**, which only the organizers can answer and which decides whether the
+   structure is re-printed. **Ask it now** — a re-print has a lead time and the answer costs
+   them a sentence.
+3. **Four small parts on the power path**, of which exactly one still has to be bought.
+
+**The longest single item is no longer the structure.** It is the drop test, because it is the
+only thing that measures the drag coefficient the whole descent model rests on — and section C
+scores the real descent, not the model.
 
 ---
 
@@ -280,7 +299,8 @@ to be bought.
 | Battery-life estimate | The series current draw, which four bench sessions have skipped. The 3.3 V test link exists to make it a one-minute measurement | Team |
 | ~~Landing detection on a drone profile~~ | **Unblocked 2026-09-08.** The descent gate closed [F-20](../testing/bring-up-record.md#findings). The thresholds stay PROVISIONAL until drop-test data tunes them | — |
 | Anything on a battery | The switch and the Schottky. Until the diode is fitted, USB and the pack must never be connected at once | Team |
-| The whole of section C and D scoring | A structure that does not exist | Team |
+| ~~The whole of section C and D scoring~~ | **Partly unblocked 2026-09-12.** A structure exists, is assembled and is photographable, so section D's compactness, material, fabrication and build-quality marks are now available. Section C still needs a parachute and a descent | Team |
+| **Whether the structure is re-printed** | The organizers, on whether 450 g is a floor or a nominal under a ceiling. The vehicle measures 280 g | Organizers |
 
 ---
 
@@ -295,13 +315,16 @@ to be bought.
 | ~~No regulator selected~~ | ~~Blocks the whole power build~~ | **Closed 2026-09-07.** None is needed: the Pico's own rail held 3.28–3.29 V through 45 back-to-back transmits and 3.28–3.30 V at 100 % write duty |
 | ~~microSD write transient browns out the shared rail~~ | ~~Loses onboard logging~~ | **Closed 2026-09-07** by measurement, and by the decoupling that [F-10](../testing/bring-up-record.md#findings) forced. The radio-and-card-together case is still untested |
 | **The drag coefficient the canopy is sized against is unmeasured** | A descent above 5 m/s, which is a scored requirement | The model sweeps every canopy type and the spread is ~10 % on diameter; sizing is at the pessimistic end and at the top of the mass tolerance. Only a drop test closes it |
-| ~~Nothing has been weighed~~ | ~~The mass budget is vendor figures~~ | **Partly closed 2026-09-09.** The electronics are measured: **151.299 g**, 30 % of the 500 g budget. **The estimate they replaced was wrong in the dangerous direction** — it predicted the avionics would not exceed 120 g. The PETG structure is out for printing and has never been on a scale, so the binding number is still unmeasured |
+| ~~Nothing has been weighed~~ | ~~The mass budget is vendor figures~~ | **Closed 2026-09-12.** Every mass in the budget is now measured or derived from a measurement: electronics **151.299 g**, assembled vehicle **280 g**. **Both estimates they replaced were wrong by tens of grams** — the avionics estimate by 31 g low, the structure estimate by 64 g high — and in opposite directions, which is the argument for the scale over the spreadsheet |
 | Yaw may be judged non-compliant if a relative angle is not accepted | Mandatory field may be judged non-compliant | **Raised by F-1:** the delivered IMU is a six-axis MPU-6500, so this vehicle transmits a relative yaw and declares it `YR-G`. The nine-axis path is implemented and tested and would produce `YR-M` on a real MPU-9250. Mitigation is procurement — a genuine nine-axis part — or an organizer ruling that a declared relative yaw is acceptable |
 | Antenna connector gender mismatch | Cannot connect the RF chain | Flagged for physical verification before assembly |
 | Dimension contradiction unresolved | Mechanical rework, or disqualification on size | No value invented locally; escalated to the organizers |
 | Radio link untested at range | Telemetry loss during flight | Link testing is a named gate; firmware already recovers from radio failure with bounded back-off |
 | ~~Hardware bring-up not started~~ | ~~Compresses every later phase~~ | **Closed.** Gates 3–7 pass on the soldered board and the link has closed once |
-| **Mechanical build not started** | It is now the only thing compressing the schedule, and it is the largest block of unclaimed points | Envelope locked, canopy sized, board-fit constraint found and drawn. Everything needed to start exists — see [mechanical/README.md](../../mechanical/README.md) |
+| ~~**Mechanical build not started**~~ | ~~It is the only thing compressing the schedule~~ | **Closed 2026-09-12.** The structure is printed in white PETG, the electronics are mounted, the egg chamber is fitted, and the vehicle is weighed at 280 g |
+| **The vehicle is 105–135 g under the mass floor** | If GEN-005's 450 g is a floor rather than a nominal, an underweight vehicle is out of the band on a limit whose breach is a disqualification — and this one misses it by more than a fifth | **Bounded but not closed, and it grew.** The as-built 280 g is measured; the 315–345 g projection adds a parachute and four small parts. Two routes: a high-infill re-print, worth at most ~64 g and buying strength at the same time, and ballast for the rest. **The blocking item is an organizer answer, not the work** — see [mechanical/README.md](../../mechanical/README.md#the-risk-did-not-just-materialise-it-grew) |
+| **No parachute, and nothing has been dropped** | Section C scores the real descent, and the drag coefficient the 80 cm canopy is sized against is unmeasured. It is also the only test that says whether the printed structure survives an arrival | Canopy sized and compliant across 315–550 g, so it can be sewn now. Three static-stress studies say the structure has margin; none of them models a base-first landing, which is the load a parachute guarantees |
+| **All three stress studies load horizontally** | A vehicle under a canopy lands base-first — along the build axis, which is the print's weak direction. The one load case never run, and the part is now printed | Open. The margin is large enough (≥ 15 capped, 6–13 derated) that this is a confirmation rather than a doubt, but it is a confirmation nobody has done |
 
 ---
 

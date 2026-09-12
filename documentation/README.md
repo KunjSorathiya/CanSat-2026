@@ -23,6 +23,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | Know what is tested | [Test Plan](testing/test-plan.md) |
 | Measure the vehicle on hardware day | [Bring-Up Record](testing/bring-up-record.md) |
 | Know what one subsystem's state is | [Avionics](../avionics/README.md) · [Electrical](../electrical/README.md) · [Mechanical](../mechanical/README.md) |
+| **Read the whole project in one document** | **[Final Project Report](project/final-report.md)** — also as [`.docx`](project/CanSat-2026-Final-Report.docx) and [`.pdf`](project/CanSat-2026-Final-Report.pdf) |
 | Know where the points are | [Scoring Assessment](project/scoring-assessment.md) |
 | Know what is still to buy | [Purchase List](hardware/purchase-list.md) |
 | Understand why telemetry runs at 1.43 Hz | [Link Budget](design/link-budget.md) |

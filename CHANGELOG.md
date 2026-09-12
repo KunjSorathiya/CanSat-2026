@@ -8,6 +8,90 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-12 (cycle 53) — the vehicle becomes an object
+
+The structure came back from the printer, the electronics went into it, and the whole thing
+went on a scale. It is the first mechanical measurement this project has had, and it moved
+the largest open risk in the wrong direction.
+
+### Added — the structure exists
+
+`Cansat_D1` printed in **white PETG**, electronics mounted, **egg chamber fitted**. The
+assembled vehicle weighs **280 g without a parachute**. Every mechanical claim in this
+repository up to now was a model; this one is a scale reading.
+
+White was a finish decision and it is defensible: section D puts 15 of its 30 points on
+aesthetics and build quality, white shows a clean print rather than hiding a poor one, and it
+photographs against any background — which section F separately requires.
+
+### Changed — the mass budget is now a measurement, and the risk doubled
+
+The solid-volume estimate was **193 g** and was stated as an upper bound. It was one, by
+33 %: the printed structure **and its egg chamber together** are **≈ 128.7 g**, derived as
+280 − 151.299 g of separately weighed electronics.
+
+| | Before (2026-09-09) | After (2026-09-12) |
+|---|---:|---:|
+| Structure | 193 g, estimated | **≈ 128.7 g**, measured by difference |
+| Committed / as-built | 344.3 g | **280 g** |
+| Projected all-up | 414–479 g | **315–345 g** |
+| Against the 450 g floor | straddles it | **105–135 g under it** |
+
+**The finding of 2026-09-09 — that coming in light was the likelier risk — was right, and it
+outran its own mitigation.** The advice then was to thicken the walls *before* printing. The
+part is printed, and a high-infill re-print can recover at most ~64 g of a 105–135 g gap, so
+ballast is likely needed as well.
+
+**Whether 450 g binds is now the single most consequential open question in the project**,
+because it decides whether the structure is re-printed. GEN-005 reads as a band; GEN-006's
+disqualification is worded one-sidedly, about *exceeding*. It is
+[question 7](README.md#open-questions-for-the-organizers) and it wants an email today.
+
+### Changed — what the new mass does to the descent, which is nothing bad
+
+The 80.0 cm canopy was sized at 550 g on a hot day and **stays compliant across everything
+this vehicle can now weigh**, so it does not have to be re-sized before the mass decision:
+
+| Flight mass | Rate | Descent time | Packets at 1.43 Hz |
+|---|---:|---:|---:|
+| 315 g, as-built | **3.66 m/s** | **8.59 s** | **12** |
+| 500 g, ballasted | 4.61 m/s | 6.94 s | 9 |
+| 550 g, 35 °C — the sizing case | 5.00 m/s | 6.45 s | 9 |
+
+Flying light descends a third slower and yields a third more descent telemetry, and section C
+scores descent time *comparatively*. So if 450 g does not bind, staying light is the better
+flight — which is an unusual thing for a mass problem to be.
+
+The as-built mass also makes study 3's 100 N impact load **more** conservative, not less:
+1.15 N·s of momentum at 315 g and 3.66 m/s, against the 2.50 N·s it assumed.
+
+### Changed — Gate 7 is part-passed
+
+It read "Nothing built". The structure half is now built, assembled and weighed; recovery —
+canopy, deployment, drop test — is untouched. Section D moves from ~0 to **~12 of 30**, and
+the project's secured estimate from ~47 to **~61 of 200**, without a purchase.
+
+### Added — the final project report
+
+[`documentation/project/final-report.md`](documentation/project/final-report.md), with
+`.docx` and `.pdf` generated beside it. Mission, requirements, architecture, hardware,
+firmware, ground station, protocol, simulations, structure, testing, timeline, findings and
+lessons learned, against section F's 25 points.
+
+### Fixed — documentation that the repository had already overtaken
+
+- The README described the microphone as fitted but reaching "neither the card nor the
+  radio". It reaches both, as `sound_mv_pp` and `SN-`, and has since cycle 48.
+- The README listed the battery divider as unfitted; it is fitted at ratio 2.0.
+- The concept of operations described GPS as logged and not transmitted, from before the
+  organizers' ruling moved it onto the air.
+- The Python test badge read 229; the suite is 232.
+- `check_doc_claims.py` now holds the as-built masses, the estimate's overshoot, the all-up
+  projection, the distance to both edges of the band, and the three descent cases — 299
+  claims, up from 290. **The checker caught two of the errors in this list itself.**
+
+---
+
 ## [Unreleased] — 2026-09-11 (cycle 52) — the sealed flight build
 
 The USB port is closed after this image, so nothing a button press or a lucky boot decides may

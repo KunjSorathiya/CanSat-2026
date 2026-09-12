@@ -1138,34 +1138,76 @@ def main() -> int:
                   "run python tools/gen_envelope_drawing.py")
 
     # ---- the mass budget adds up ----------------------------------------------------
-    # Two measured masses and two sums. Sums in a table are exactly the kind of thing that
-    # is right when written and wrong after the next edit, and this table is the one that
-    # decides whether the vehicle is inside a limit whose breach is a disqualification.
-    pcb_g, battery_g, structure_g = 110.573, 40.726, 193.0
+    # The vehicle is printed, assembled and on a scale as of 2026-09-12, so this table is
+    # now two measurements and one difference rather than a measurement and an estimate.
+    # It is still the table that decides whether the vehicle is inside a limit whose breach
+    # is a disqualification, which is why the arithmetic is held here rather than trusted.
+    pcb_g, battery_g = 110.573, 40.726          # weighed separately, 2026-09-09
+    as_built_g = 280.0                          # weighed assembled, no parachute, 2026-09-12
+    predicted_structure_g = 193.0               # the solid-volume upper bound it replaced
     floor_g, ceiling_g = 450.0, 550.0
     electronics_g = pcb_g + battery_g
-    committed_g = electronics_g + structure_g
-    for label, value in (("assembled PCB", f"**{pcb_g:.3f} g**"),
-                         ("battery", f"**{battery_g:.3f} g**"),
-                         ("electronics total", f"**{electronics_g:.3f} g**"),
-                         ("PETG structure", f"**{structure_g:.3f} g**"),
-                         ("committed total", f"**{committed_g:.3f} g**")):
-        checker.check(f"mechanical/README.md states the {label} mass ({value.strip('*')})",
-                      value in mechanical, value)
+    # The structure line is DERIVED, not weighed: the scale saw the whole vehicle, and the
+    # electronics inside it were weighed three days earlier. Quoted to one decimal because
+    # the 280 g reading is whole grams, so the difference is no better than +/-1 g.
+    structure_g = as_built_g - electronics_g
+    # The printed row is quoted with a "roughly" sign in the document, which is deliberate --
+    # it is a difference of two measurements, not a third one. The check name stays ASCII so
+    # a Windows console can print it.
+    for label, shown, value in (
+            ("assembled PCB", f"{pcb_g:.3f} g", f"**{pcb_g:.3f} g**"),
+            ("battery", f"{battery_g:.3f} g", f"**{battery_g:.3f} g**"),
+            ("electronics total", f"{electronics_g:.3f} g", f"**{electronics_g:.3f} g**"),
+            ("printed structure + egg chamber", f"~{structure_g:.1f} g",
+             f"**≈ {structure_g:.1f} g**"),
+            ("as-built vehicle", f"{as_built_g:.0f} g", f"**{as_built_g:.0f} g**")):
+        checker.check(f"mechanical/README.md states the {label} mass ({shown})",
+                      value in mechanical, shown)
+    checker.check("mechanical/README.md shows the structure mass as a difference",
+                  f"{as_built_g:.0f} − {electronics_g:.3f} = {structure_g:.3f} g" in mechanical,
+                  f"{as_built_g:.0f} - {electronics_g:.3f} = {structure_g:.3f}")
+    # The solid-volume estimate was stated as an upper bound and behaved like one. How far
+    # under it landed is the number that says how much mass a re-print could buy back, so
+    # it is held rather than left as prose.
+    overestimate_g = predicted_structure_g - structure_g
+    overestimate_pct = 100.0 * overestimate_g / predicted_structure_g
+    checker.check(f"mechanical/README.md states the {overestimate_g:.0f} g estimate overshoot",
+                  f"**−{overestimate_g:.0f} g, −{overestimate_pct:.0f} %**" in mechanical,
+                  f"-{overestimate_g:.0f} g, -{overestimate_pct:.0f} %")
     # The band is two-sided in GEN-005 and the disqualification is one-sided in GEN-006, so
-    # the distance to BOTH edges is quoted. The distance to the floor is the surprising one:
-    # this design is more likely to come in light than heavy.
-    to_floor = floor_g - committed_g
-    to_ceiling = ceiling_g - committed_g
-    checker.check(f"mechanical/README.md states {to_floor:.1f} g needed to reach the floor",
-                  f"**+{to_floor:.1f} g**" in mechanical, f"{to_floor:.1f}")
-    checker.check(f"mechanical/README.md states {to_ceiling:.1f} g of headroom to the cap",
-                  f"+{to_ceiling:.1f} g available" in mechanical, f"{to_ceiling:.1f}")
-    # The structure mass is an estimate from volume, so the volume it implies is quoted as
-    # its own sanity check -- a density slip would move it by an order of magnitude.
-    volume_cm3 = structure_g / 1.27
+    # the distance to BOTH edges is quoted. The distance to the floor is the one that now
+    # matters: the measured vehicle is below it by more than the estimate ever suggested.
+    # The projection spans the parachute and the four unfitted power parts.
+    lightest_g, heaviest_g = as_built_g + 30.0 + 5.0, as_built_g + 55.0 + 10.0
+    checker.check(f"mechanical/README.md projects {lightest_g:.0f}-{heaviest_g:.0f} g all-up",
+                  f"**{lightest_g:.0f}–{heaviest_g:.0f} g**" in mechanical,
+                  f"{lightest_g:.0f}-{heaviest_g:.0f}")
+    checker.check("mechanical/README.md states the gap to the 450 g floor",
+                  f"**+{floor_g - heaviest_g:.0f} to +{floor_g - lightest_g:.0f} g** needed"
+                  in mechanical, f"+{floor_g - heaviest_g:.0f} to +{floor_g - lightest_g:.0f}")
+    checker.check("mechanical/README.md states the headroom to the 550 g cap",
+                  f"+{ceiling_g - heaviest_g:.0f} to +{ceiling_g - lightest_g:.0f} g available"
+                  in mechanical, f"{ceiling_g - heaviest_g:.0f} to {ceiling_g - lightest_g:.0f}")
+    # The solid volume the superseded estimate implied is still quoted, because it is the
+    # ceiling a high-infill re-print could climb back to -- which is the whole of route 1.
+    volume_cm3 = predicted_structure_g / 1.27
     checker.check(f"mechanical/README.md states the implied {volume_cm3:.1f} cm3 of PETG",
-                  f"**{volume_cm3:.1f} cm³**" in mechanical, f"{volume_cm3:.1f}")
+                  f"{volume_cm3:.1f} cm³" in mechanical, f"{volume_cm3:.1f}")
+    # The descent table on the mechanical page is the descent model's own output, so it is
+    # recomputed rather than transcribed. If the canopy or the model moves, this fails.
+    for mass_kg, temp_c, rate, secs in ((0.315, 15.0, 3.66, 8.59),
+                                        (0.500, 15.0, 4.61, 6.94),
+                                        (0.550, 35.0, 5.00, 6.45)):
+        r = descent.descend(mass_kg=mass_kg, diameter_m=0.80, temperature_c=temp_c)
+        checker.check(f"the 80 cm canopy at {mass_kg * 1000:.0f} g descends at {rate} m/s",
+                      abs(r.terminal_mps - rate) < 0.005
+                      and (f"**{rate:.2f} m/s**" in mechanical
+                           or f"| {rate:.2f} m/s |" in mechanical),
+                      f"{r.terminal_mps:.2f}")
+        checker.check(f"the 80 cm canopy at {mass_kg * 1000:.0f} g takes {secs} s to fall",
+                      abs(r.total_time_s - secs) < 0.005
+                      and (f"**{secs:.2f} s**" in mechanical or f"| {secs:.2f} s |" in mechanical),
+                      f"{r.total_time_s:.2f}")
 
     # ---- the simulation figures the mechanical page quotes ---------------------------
     # Read off the exported plots by hand, so they cannot be re-derived -- but the safety

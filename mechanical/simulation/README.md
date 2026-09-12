@@ -48,7 +48,7 @@ statement of the two.
 **So: minimum safety factor ≥ 15 across the whole part, in all three load cases.** The
 "expected to break" sentence can be disregarded.
 
-### 2 · The simulation material is PET. The part is being printed in PETG.
+### 2 · The simulation material is PET. The part was printed in PETG.
 
 The studies assign Fusion's **"PET Plastic"**:
 
@@ -63,6 +63,13 @@ The studies assign Fusion's **"PET Plastic"**:
 PET is stiffer, denser and slightly stronger than PETG, so the studies are **mildly
 optimistic on strength and materially wrong on mass** — the density is **21 % high**, which
 matters directly to the mass budget.
+
+**And the mass error turned out to be larger than the density alone.** The printed part
+weighs **≈ 128.7 g** where the PET-density model implies 234.2 g and the ×0.82 density
+correction implies 192.0 g. The remaining gap is infill: a solid-volume figure assumes no
+infill saving at all, and a real slice of a thin-walled open frame is mostly perimeter and
+air. **The studies model a solid part; the printed one is not solid**, which is a separate
+optimism from the material choice and is not covered by the anisotropy derating below.
 
 ### 3 · A printed part is not a bulk part, and this is the bigger caveat
 
@@ -80,7 +87,7 @@ therefore stack vertically, and the weak directions are tension normal to the la
 
 | Study | Yield ÷ stress | ×0.40 | ×0.55 | ×0.70 |
 |---|---:|---:|---:|---:|
-| Horizontal | 18.9 | **7.5** | 10.4 | 13.2 |
+| Horizontal | 18.9 | **7.6** | 10.4 | 13.2 |
 | Tearing | 40.9 | 16.4 | 22.5 | 28.6 |
 | Impact | 23.2 | **9.3** | 12.8 | 16.2 |
 
@@ -95,10 +102,10 @@ smallest margin either way, so this changes the reasoning rather than the conclu
 
 ### 4 · The 100 N impact load is an assumption, and it is worth stating
 
-The vehicle lands at **5 m/s** under its 500 g budget, which is 2.5 N·s of momentum to
-absorb. The force depends entirely on how long the arrest takes:
+The 100 N came from a **500 g vehicle at 5 m/s**, which is 2.5 N·s of momentum to absorb. The
+force depends entirely on how long the arrest takes:
 
-| Arrest time | Force |
+| Arrest time | Force at 500 g / 5 m/s |
 |---:|---:|
 | 25 ms | **100 N** ← what study 3 assumes |
 | 10 ms | 250 N |
@@ -108,6 +115,24 @@ absorb. The force depends entirely on how long the arrest takes:
 or soil, with the structure and the parachute doing some of the work. A rigid landing on
 concrete is several times worse. Neither is wrong; the assumption just has to be written
 down beside the result, which is what this section is for.
+
+**The as-built vehicle makes the assumption more conservative, not less.** At the measured
+315 g all-up under the 80 cm canopy the descent rate is **3.66 m/s**, not 5.00, so the
+momentum to absorb is **1.15 N·s against the 2.50 N·s study 3 assumed** — less than half.
+A 25 ms arrest at that momentum is 46 N, and even a hard 10 ms arrest is 115 N, barely above
+the load already analysed.
+
+| Case | Mass | Rate | Momentum | Force at 25 ms | at 10 ms |
+|---|---:|---:|---:|---:|---:|
+| Study 3's assumption | 500 g | 5.00 m/s | 2.50 N·s | **100 N** | 250 N |
+| As-built, unballasted | 315 g | 3.66 m/s | 1.15 N·s | 46 N | 115 N |
+| Ballasted to 500 g | 500 g | 4.61 m/s | 2.31 N·s | 92 N | 231 N |
+
+**So the structure is analysed against a harder landing than the one it is now likely to
+have** — which is the right way round, and it stays true in both mass cases. It does not
+retire the caveat: **all three studies still load horizontally**, and a vehicle under a
+canopy lands base-first along the print's weak axis. Lower force in the wrong direction is
+still the wrong direction.
 
 **A drop test settles it**, and it is also what section C actually scores.
 
@@ -130,8 +155,8 @@ element order, material properties, constraints and loads.
 |---|---|
 | ~~Minimum safety factor~~ | **Done 2026-09-09: ≥ 15 in all three**, at Fusion's display cap |
 | ~~Print orientation~~ | **Done 2026-09-09: as modelled**, printed on its base |
-| ~~The structure's mass~~ | **Done: 193 g** from solid volume at PETG density — [mass budget](../README.md#mass-budget) |
-| **A vertical impact case** | All three studies load horizontally. **A vehicle hanging under a parachute lands base-first**, so the impact that matters is along the build axis — which is also the print's weak direction. The one load case not yet run |
+| ~~The structure's mass~~ | **Measured 2026-09-12, and the estimate was 33 % high.** The printed part with its egg chamber is **≈ 128.7 g**, against the 193 g the solid-volume route predicted — see the [mass budget](../README.md#mass-budget). Stress and safety factor are unaffected: they scale with geometry and yield, not density. **The mass budget is affected, and in the safe direction** — the vehicle is well under the limit rather than near it |
+| **A vertical impact case** | All three studies load horizontally. **A vehicle hanging under a parachute lands base-first**, so the impact that matters is along the build axis — which is also the print's weak direction. The one load case not yet run, and **the part is now printed**, so the answer arrives from a drop test rather than a re-run if nobody re-runs it |
 | **Total displacement, per study** | The displacement legend is cropped out of the exported plot in study 1 |
 | **A PETG material definition** | See above — the current one is 21 % too dense and somewhat too strong. It would lower every stress figure and raise every safety factor's honesty |
 | **A drop test** | The only thing that answers what a real landing does, and the only thing section C scores |

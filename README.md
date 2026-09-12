@@ -7,12 +7,12 @@ and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-2026/actions/workflows/ci.yml)
 [![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-5485%20assertions-1b5e20)](documentation/testing/test-plan.md)
-[![Python tests](https://img.shields.io/badge/Python%20tests-229%20passing-1b5e20)](documentation/testing/test-plan.md)
+[![Python tests](https://img.shields.io/badge/Python%20tests-232%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
 [![Link](https://img.shields.io/badge/telemetry-433%20MHz%20LoRa-4527a0)](documentation/design/telemetry-protocol.md)
 [![Hardware](https://img.shields.io/badge/hardware-board%20built%20%C2%B7%20link%20closed-1b5e20)](documentation/testing/bring-up-record.md)
-[![Mechanical](https://img.shields.io/badge/mechanical-designed%20%C2%B7%20not%20built-e65100)](mechanical/README.md)
+[![Mechanical](https://img.shields.io/badge/mechanical-printed%20%C2%B7%20assembled%20%C2%B7%20280%20g-1b5e20)](mechanical/README.md)
 
 [Mission profile](documentation/mission/concept-of-operations.md) ·
 [Architecture](documentation/design/software-architecture.md) ·
@@ -32,8 +32,8 @@ and streams telemetry from power-on through recovery.**
 |---|---|
 | 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 5788 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
 | 🟢 **Firmware drivers** | **Every driver has run on real silicon** and its numbers are recorded — IMU, barometer, GPS, radio and microSD. **The flight image itself runs**: it was flashed, it printed its startup summary, it wrote a card, and it produced [F-16](documentation/testing/bring-up-record.md#findings) and [F-19](documentation/testing/bring-up-record.md#findings), which are defects only a running image could have found |
-| 🟢 **Hardware** | **The vehicle board is built and every device on it works** — **34 of 94 recorded measurements taken.** **The radio link closed end to end on 2026-09-07** — 66 packets, `P-001` to `P-066`, no gaps, no duplicates, 1.0000 Hz, −44 dBm at bench range, so Gate 8 has a bench link. Gates 3, 4, 5, 6 and 7 all pass on the soldered board — the IMU and barometer share I2C0 (`0x68` and `0x76`, `0x0C` correctly absent), the GPS emits clean NMEA at 162 B/s, the radio sends 5/5, 5/5 and 45/45 with airtimes within 1.8 % of the model, the card writes 100/100 and sustains ~300 writes/s, and the shared SPI0 bus passes every row. **Power is answered:** the Pico's own 3.3 V rail held **3.28–3.29 V through 45 back-to-back transmits** and 3.28–3.30 V at 100 % write duty, so no separate rail is needed. Sensor read costs 0.833 ms worst against a 33 ms period. **Open:** [F-12](documentation/testing/bring-up-record.md#findings), a card intermittent that failed three of its first four runs and has passed twelve since with the supply measured innocent; and [F-17](documentation/testing/bring-up-record.md#findings), **yaw measured drifting more than a full revolution in a 36.8-minute stationary log** — and, more usefully, holding to ±0.8° for the first 15 minutes before switching to 0.4 dps, which is **70° over a 3-minute flight** on a vehicle with no magnetometer; and [F-18](documentation/testing/bring-up-record.md#findings), a stationary GPS jumping 55.6 m in one second because nothing gates a fix on satellite count or HDOP. Still to fit: the sound module, the switch, the divider, and the Schottky |
-| 🟡 **Mechanical** | **Designed, simulated, and out for 3D printing in PETG.** `Cansat_D1` is **118.5 × 115.0 × 110.0 mm** — inside the height allowance with 91.5 mm spare and inside the 120 mm section with **2.5 and 5.0 mm of clearance per side**, the organizers having confirmed a 12 cm *sided box*. Three static-stress studies report **minimum safety factor ≥ 15** in every case, and even derated for the anisotropy of a printed part that is still **6 to 13**. **Mass: 344.299 g committed** — electronics weighed at 151.299 g, PETG structure 193 g — and the projected all-up **414–479 g** makes coming in *under* the 450 g floor the likelier risk. Parachute sized at **80.0 cm**. Still to do: **print it, weigh it, drop-test it** |
+| 🟢 **Hardware** | **The vehicle board is built and every device on it works** — **34 of 94 recorded measurements taken.** **The radio link closed end to end on 2026-09-07** — 66 packets, `P-001` to `P-066`, no gaps, no duplicates, 1.0000 Hz, −44 dBm at bench range, so Gate 8 has a bench link. Gates 3, 4, 5, 6 and 7 all pass on the soldered board — the IMU and barometer share I2C0 (`0x68` and `0x76`, `0x0C` correctly absent), the GPS emits clean NMEA at 162 B/s, the radio sends 5/5, 5/5 and 45/45 with airtimes within 1.8 % of the model, the card writes 100/100 and sustains ~300 writes/s, and the shared SPI0 bus passes every row. **Power is answered:** the Pico's own 3.3 V rail held **3.28–3.29 V through 45 back-to-back transmits** and 3.28–3.30 V at 100 % write duty, so no separate rail is needed. Sensor read costs 0.833 ms worst against a 33 ms period. **Open:** [F-12](documentation/testing/bring-up-record.md#findings), a card intermittent that failed three of its first four runs and has passed twelve since with the supply measured innocent; and [F-17](documentation/testing/bring-up-record.md#findings), **yaw measured drifting more than a full revolution in a 36.8-minute stationary log** — and, more usefully, holding to ±0.8° for the first 15 minutes before switching to 0.4 dps, which is **70° over a 3-minute flight** on a vehicle with no magnetometer; and [F-18](documentation/testing/bring-up-record.md#findings), a stationary GPS jumping 55.6 m in one second because nothing gates a fix on satellite count or HDOP. Still to fit: **the switch, the power LED and the Schottky** — the microphone now reaches the air as `SN-`, and the battery divider is fitted (33 kΩ / 33 kΩ, ratio 2.0), though bring-up row 2.6 has not measured it |
+| 🟡 **Mechanical** | **Printed, assembled and weighed.** `Cansat_D1` came back from the printer in **white PETG**, the electronics are mounted in it, the egg chamber is fitted, and the assembled vehicle is **280 g without a parachute** — the first mechanical measurement this project has had. Designed at **118.5 × 115.0 × 110.0 mm**: inside the height allowance with 91.5 mm spare and inside the 120 mm section with **2.5 and 5.0 mm of clearance per side**, the organizers having confirmed a 12 cm *sided box*. Three static-stress studies report **minimum safety factor ≥ 15** in every case, and derated for the anisotropy of a printed part still **6 to 13**. **The mass risk inverted and then doubled:** the print came in **≈ 128.7 g against a 193 g upper bound**, so the all-up projection is **315–345 g** against a 450–550 g band — **105 to 135 g *under* the floor**, not near the cap. Parachute sized at **80.0 cm**, which stays compliant from 315 g to 550 g. Still to do: **sew the canopy, drop-test it, and settle whether 450 g binds** |
 
 > [!IMPORTANT]
 > This project does not claim compliance for anything it has not evidenced. Owning a
@@ -71,12 +71,24 @@ It has to do all of that on its own. There is no command uplink and no manual tr
 vehicle powers on, calibrates itself, arms itself, detects its own launch and landing, and
 keeps talking through every failure it can survive.
 
-That statement is enforced rather than asserted. A ground-to-vehicle command exists for the
-bench — it erases the onboard log between test runs — but `allow_ground_commands` defaults
-to **false**, so a flight build never enters receive mode and has no uplink to reason about.
-Even enabled, the vehicle acts on a command only in `READY` with `ARM-0`: the window is shut
-for the whole of flight, landing and recovery, which is every state holding a log that
-cannot be recreated. See [operations](documentation/operations/runbook.md#erasing-the-onboard-log).
+**Flight itself is autonomous; the pad is not.** The sealed flight image of 2026-09-11 opens
+a **five-minute uplink window from power-on**, during which the vehicle transmits at 1.43 Hz
+so a command can be heard in the gap between packets. When the window closes — or when a
+`MAX_RATE` command closes it early — the vehicle goes to its max-rate pattern **by itself**,
+recalibrates on the pad and arms. `allow_ground_commands` still defaults to false, and a
+build without a local secrets header has no uplink at all; the flight image enables it
+deliberately.
+
+> [!WARNING]
+> **The drone must not lift off until the vehicle has armed.** Launch detection is disabled
+> for the whole command window, so a lift that starts inside it is never detected and the
+> vehicle stays in `READY`. Wait for the arming blink — 400 ms on, 400 ms off — or for
+> `ARM-1`. See the [runbook](documentation/operations/runbook.md).
+
+Once armed there is no launch command, no manual trigger and no way to change the rate: the
+uplink is closed for the whole of flight, landing and recovery, which is every state holding
+a log that cannot be recreated. See
+[max-rate-command.md](documentation/design/max-rate-command.md).
 
 **The mission minute by minute** — what the vehicle, the ground station and the operators are
 each doing from power-on to recovery — is
@@ -369,15 +381,17 @@ receipt time and the reason.
 | Sensors | Sold as MPU-9250; **delivered an MPU-6500** — accelerometer + gyroscope, no magnetometer | 1 | Acceleration and angular rate | 🟠 **Working, but it is the wrong part:** `WHO_AM_I` `0x70`, and `0x0C` never answers ([F-1](documentation/hardware/receiving-inspection.md#findings)). Bias and noise measured |
 | Sensors | GY-BMP280-3.3 | 1 | Pressure, altitude, temperature | 🟢 **Verified on the bus at `0x76`**, 83.0 Hz output as predicted |
 | Sensors | NEO-6M GPS with EEPROM | 1 | Position and timing | 🟠 **Talking** — all six NMEA sentences, 0 checksum errors. **No fix acquired yet** |
-| Sensors | LM393 sound module, 4-pin | 1 | Additional sensor — acoustic level | 🟠 Fitted; its data reaches neither the card nor the radio ([F-15](documentation/testing/bring-up-record.md#findings)) |
+| Sensors | LM393 sound module, 4-pin | 1 | Additional sensor — acoustic level | 🟢 **Fitted, logged and transmitted.** [F-15](documentation/testing/bring-up-record.md#findings) is closed: the level reaches the SD log as `sound_mv_pp` and the air as `SN-`, which is what the organizers' ruling on extra-sensor points requires |
 | Storage | microSD card reader | 1 | Onboard logging | 🟠 **Writes 100/100 and sustains ~300 writes/s.** Still carries [F-12](documentation/testing/bring-up-record.md#findings), an unexplained intermittent |
+| Structure | `Cansat_D1`, white PETG, 3D printed | 1 | Airframe and egg chamber | 🟢 **Printed, assembled and weighed 2026-09-12.** ≈ 128.7 g with the egg chamber, inside a 280 g vehicle |
 | Power | Orange 3.7 V 1500 mAh 25C 1S LiPo | 1 | Primary power | 🟠 Held and charged. **Never yet used to power the vehicle** — that needs the switch and the Schottky |
 | Power | ~~3.3 V regulated supply~~ | — | ~~Peripheral rail~~ | 🟢 **Not needed.** The Pico's own rail carries every load, measured |
 | Prototyping | 10 × 10 cm universal PCB | 2 | Electronics mounting | 🟢 One built, one spare. **Note it does not fit a 12 cm section laid flat** |
 
 Still to fit, and the first two are mandatory requirements: **manual ON/OFF switch**,
 **visible power LED**, the **Schottky diode**, and the **battery divider**. Still to build:
-**egg chamber** and **parachute** — see [mechanical/README.md](mechanical/README.md).
+the **parachute** — the egg chamber is printed and fitted. See
+[mechanical/README.md](mechanical/README.md).
 </details>
 
 <details>
@@ -429,7 +443,9 @@ fact that they did.
 |---|---|---|
 | **The Schottky diode is not bought** | Without it USB back-powers the LiPo, so the battery switch must be OFF whenever a cable is connected — which is most of bring-up | ~₹10, the only outstanding purchase |
 | **Switch, LEDs and divider are not fitted** | Two of them are mandatory requirements, and the power LED is **5 of the cheapest points in the rulebook** | Held, an evening |
-| **Nothing mechanical exists** | The largest block of unclaimed points, and it is no longer waiting on anybody — see [mechanical/README.md](mechanical/README.md) | Weeks |
+| ~~**Nothing mechanical exists**~~ | **Closed 2026-09-12.** The structure is printed in white PETG, the electronics are mounted, the egg chamber is fitted, and the vehicle weighs 280 g | Done |
+| **No parachute, and nothing has been dropped** | What is left of the mechanical block. Section C scores the real descent and the drag coefficient the 80 cm canopy is sized against is still unmeasured | Days |
+| **The vehicle is 105–135 g under the mass floor** | If 450 g binds, the printed structure needs a high-infill re-print and probably ballast too — see [mechanical/README.md](mechanical/README.md#the-risk-did-not-just-materialise-it-grew). **Blocked on an organizer answer**, not on work | An email, then a re-print |
 
 ---
 
@@ -451,7 +467,7 @@ bash tools/build_host.sh
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **49 / 49** |
 | Python (simulations) | Descent model: canopy sizing, the closed-form fall against both its own limits, ISA air density, the mass-tolerance argument | ✅ **40 / 40** |
 | Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **71 / 71** |
-| Documented claims | Numbers in the documentation checked against the source that defines them — test counts, the generated netlist, and the descent model's canopy diameter included | ✅ **290 / 290** |
+| Documented claims | Numbers in the documentation checked against the source that defines them — test counts, the generated netlist, and the descent model's canopy diameter included | ✅ **300 / 300** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
@@ -480,9 +496,9 @@ requirement is satisfied in flight.
 | Requirement | Our implementation | Status |
 |---|---|---|
 | Team of 3–5 students | Team information not recorded | ⬜ TBD |
-| Self-built, no prefabricated kit | Component-level BOM confirmed | ⬜ Fabrication evidence needed |
-| Egg payload and cushioned chamber | Not designed | ⬜ Not started |
-| Descent system such as a parachute | Not designed | ⬜ Not started |
+| Self-built, no prefabricated kit | Component-level BOM confirmed; board hand-built, structure printed from the team's own CAD | 🟡 Built, photographs still to take |
+| Egg payload and cushioned chamber | **Chamber designed, printed and fitted** — inside the 280 g assembled vehicle. The team has elected not to fly an egg, so PAY-001 is forgone by choice and PAY-002 is built | 🟡 Chamber built, no egg |
+| Descent system such as a parachute | **Sized, not sewn.** 80.0 cm flat canopy from [`simulations/descent.py`](simulations/descent.py), compliant from 315 g to 550 g | 🟡 Computed, nothing built |
 | Altitude, pressure, temperature | BMP280 driver + Bosch compensation, tested against the datasheet vector | 🟡 Implemented, hardware unverified |
 | Gyroscope and accelerometer | MPU-9250-family driver + datasheet scaling, tested | 🟢 **Read on hardware:** bias, noise and acquisition rate recorded |
 | Roll, pitch, yaw, X/Y/Z acceleration fields | Mahony quaternion filter over accelerometer, gyroscope and magnetometer; yaw is magnetic once calibrated and labelled `YR-M`/`YR-G` either way | 🟠 Implemented; **the delivered IMU has no magnetometer**, so yaw is gyro-integrated and drifts. Roll and pitch are still absolutely referenced by gravity |
@@ -494,13 +510,13 @@ requirement is satisfied in flight.
 | Others powered off during another team's launch | Procedure documented in the runbook | 🟡 Documented |
 | Manual ON/OFF switch and visible power LED | **Both parts are held, neither is fitted.** The power LED must light the instant the switch closes, so it goes on the rail rather than on a GPIO; the firmware separately drives a status LED on GP14 whose blink rate names the mission state | 🔴 Not satisfied |
 | Automatic telemetry at power-on | No manual trigger anywhere in the firmware | 🟡 Implemented, unverified |
-| Descent rate ≤ 5 m/s | No descent system built, but it is **sized**: an 80.0 cm flat canopy at 550 g on a hot day, from [`simulations/descent.py`](simulations/descent.py) | 🟡 Computed, nothing built |
-| Stable descent, intact after landing | Mechanical design not started | ⬜ Not started |
+| Descent rate ≤ 5 m/s | No canopy sewn, but it is **sized**: an 80.0 cm flat canopy at 550 g on a hot day, from [`simulations/descent.py`](simulations/descent.py). At the as-built 315 g it gives **3.66 m/s over 8.59 s** — comfortably compliant, and a third longer under canopy than the sizing case | 🟡 Computed, nothing built |
+| Stable descent, intact after landing | Structure printed and assembled; **never dropped** | 🟡 Built, untested |
 | ≥ 5 s of telemetry after impact | `LANDED` holds 5 s; config validation refuses less | 🟡 Implemented and tested |
-| Size and mass limits | **Size: designed and compliant** — 118.5 × 115.0 × 110.0 mm against 21 cm × a 12 cm sided box, confirmed with the organizers. **Mass: 344.299 g committed** against a 450–550 g band, projecting to 414–479 g. **Whether the lower edge binds is an open question** — the disqualification condition names only *exceeding* | 🟡 Size settled; mass may need adding, not removing |
+| Size and mass limits | **Size: designed and compliant** — 118.5 × 115.0 × 110.0 mm against 21 cm × a 12 cm sided box, confirmed with the organizers; the printed part still wants checking with calipers. **Mass: 280 g measured** assembled without a parachute, projecting to **315–345 g** against a 450–550 g band. **Whether the lower edge binds is now the project's most consequential open question** — the disqualification condition names only *exceeding*, and if 450 g binds this vehicle needs 105–135 g added | 🟡 Size settled; mass is short, not over |
 | Dual-ground-station evaluation | Bridge firmware implemented | 🟡 Implemented, compatibility unverified |
 | Four hours for post-launch analysis | CSV export + documented workflow; graphs not produced | 🟡 Partial |
-| Preliminary and final reports | Not prepared | ⬜ Not started |
+| Preliminary and final reports | **Final report written** — [`documentation/project/final-report.md`](documentation/project/final-report.md), with `.docx` and `.pdf` beside it | 🟡 Drafted, needs flight data and photographs |
 | Google Docs submission with permissions | Process not documented | ⬜ TBD |
 | Photos, video, social-media links | No submission evidence | ⬜ Not started |
 | Disqualification conditions avoided | No compliance evidence | ⬜ TBD |
@@ -591,6 +607,7 @@ documentation/
 | [Project Timeline](documentation/project/timeline.md) | History, phase plan, critical path, risk register |
 | [Test Plan](documentation/testing/test-plan.md) | What is tested, what is not, and the hardware test plan |
 | [Bring-Up Record](documentation/testing/bring-up-record.md) | Every prediction paired with what was actually measured, and twenty findings |
+| **[Final Project Report](documentation/project/final-report.md)** | **The whole project in one document** — mission, requirements, architecture, components, electrical, mechanical, simulations, firmware, protocol, testing, timeline, findings and lessons learned. Also as [`.docx`](documentation/project/CanSat-2026-Final-Report.docx) and [`.pdf`](documentation/project/CanSat-2026-Final-Report.pdf) |
 | [Scoring Assessment](documentation/project/scoring-assessment.md) | Where the project stands against the 200-point rulebook, and the cheapest points left |
 | [Operations Runbook](documentation/operations/runbook.md) | Configuration, builds, launch day, troubleshooting |
 | [Avionics](avionics/README.md) · [Electrical](electrical/README.md) · [Mechanical](mechanical/README.md) | Per-subsystem summaries: parts, measurements, open items |
@@ -605,7 +622,8 @@ documentation/
 **Nothing in this repository is claimed as flight-ready.**
 
 The software is built and tested. The board is built, and every device on it has answered on
-a bench. Nothing has flown, nothing mechanical exists, and the vehicle has never run on its
-own battery.
+a bench. The structure is printed, the vehicle is assembled, and it has been on a scale.
+**Nothing has flown, no parachute exists, nothing has been dropped, and the vehicle has never
+run on its own battery.**
 
 </div>

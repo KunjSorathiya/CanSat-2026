@@ -4,7 +4,7 @@ What happens, in order, from the moment the switch closes to the moment the vehi
 in someone's hands — and what the vehicle, the ground station and the operators are each
 doing at every point.
 
-**Status: 2026-09-08.** No lift has been flown. Every timing below is either a firmware
+**Status: 2026-09-12.** No lift has been flown. Every timing below is either a firmware
 constant, a computed figure, or a bench measurement, and each says which it is.
 
 > [!IMPORTANT]
@@ -47,7 +47,7 @@ timeline
     Calibration : gyro bias, accel offset, barometric ground reference : ~2.7 s of samples : armed at 3 s
     Lift : drone climbs to 30.48 m : altitude tracks the climb : FLIGHT declared past 15 m
     Release : free fall until the canopy loads : parachute opens
-    Descent : 6.45 s at 5 m/s : nine packets : GPS logged, not transmitted
+    Descent : 6.45 s at 5 m/s : nine packets : GPS and sound on the air
     Impact : landing detected : 5 s post-impact window
     Recovery : telemetry continues : vehicle located : card read back
 ```
@@ -143,9 +143,21 @@ firmware knows a release happened; it is already in `FLIGHT` and stays there.
 | Packets transmitted in that time | **9**, at 1.43 Hz |
 | Canopy needed, 550 g on a hot day | **80.0 cm** flat diameter |
 
-**The descent is nine packets long.** Every descent-rate number in the post-flight analysis
-comes from those nine. The SD log is the better record — it runs at the sensor rate, not the
-radio rate, and carries GPS position and satellite count that the packet does not.
+> [!NOTE]
+> **The as-built vehicle is lighter than this table assumes, and that lengthens the descent.**
+> It weighs 280 g assembled and projects to ~315 g with a canopy, against the 550 g the
+> canopy was sized at. Under the same 80 cm canopy that is **3.66 m/s over 8.59 s — twelve
+> packets, not nine.** The table above is kept as the sizing case, because it is the worst
+> case the canopy must still pass and because the mass may yet be raised: see
+> [the mass budget](../../mechanical/README.md#what-the-new-mass-does-to-the-descent).
+>
+> Everything below about nine packets is therefore a **floor**, and the floor is the number to
+> plan against.
+
+**The descent is nine packets long** in the sizing case, twelve at the as-built mass. Every
+descent-rate number in the post-flight analysis comes from those. The SD log is the better
+record — it runs at the sensor rate, not the radio rate, and carries satellite count, HDOP
+and full-precision position that the packet does not.
 
 **Operator.** Watch, and do not touch anything. There is nothing to do.
 
@@ -168,8 +180,10 @@ build with a shorter window, because REC-008 is a hard 5 s.
 ### 7 · Recovery — `RECOVERY`
 
 **Vehicle.** Terminal state. **Telemetry continues** — this is what gets the recovery team to
-it. If `transmit_gps` is false, the packets carry no position and the search is by RSSI and
-by eye; the fix is on the card, inside the thing being looked for.
+it, and since 2026-09-11 every rich packet carries `GP-Lat`, `GP-Lon` and `GP-Alt`, so the
+console can point at the vehicle rather than only hearing it. If `transmit_gps` is turned off,
+the search falls back to RSSI and eye, and the fix is on the card inside the thing being
+looked for.
 
 **Operator.** Find it, switch it off, pull the card, and read it back with
 [`tools/read_flight_log.py`](../../tools/read_flight_log.py). Then follow
@@ -330,7 +344,8 @@ and replays. It does not stop somebody who knows the string.
 |---|---|---|
 | **The lift profile** — climb rate, hover duration, release method | Directly drives [F-20](#the-hover-problem-f-20), and the packet budget above assumes numbers nobody has confirmed | Organizers, or a rehearsal |
 | Link performance at 30 m under a swinging canopy | Nine packets is a thin dataset to lose any of | Range testing, gate 8 |
-| Real descent rate | The 6.45 s is a model with an unmeasured drag coefficient | Drop test |
+| Real descent rate | The 6.45 s is a model with an unmeasured drag coefficient, and the flight mass is now known to be lower than the model's sizing case — so the real descent is likely *slower* than 5 m/s and *longer* than 6.45 s | Drop test |
+| **The flight mass** | The vehicle measures 280 g assembled and the budget band is 450–550 g. Whether ballast is added changes the descent rate, the descent time and the packet count in this document | Organizers, on whether 450 g binds |
 | Barometric altitude drift over a multi-minute session | The ground reference is taken once, at power-on | Gate 9 endurance |
 | Yaw over a 3-minute mission | Measured drifting ~70° over 180 s. The delivered IMU is a six-axis **MPU-6500** with no magnetometer, so there is no absolute reference to catch it and every packet declares `YR-G` ([F-1](../hardware/receiving-inspection.md#findings)) | [F-13](../testing/bring-up-record.md#findings), [F-17](../testing/bring-up-record.md#findings) |
 | Whether a relative yaw is acceptable | Mandatory field, and the MPU-6500 cannot produce anything else | Organizers, open question 2 |

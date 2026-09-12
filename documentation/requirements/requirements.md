@@ -282,13 +282,15 @@ because the answers are design inputs and the record of how they were obtained m
 12. **Is the 500 g +/-10% mass limit a band or a ceiling?** `GEN-005` states *"500 g
     (+/-10%)"*, which reads as **450-550 g**. But the disqualification condition in
     `GEN-006` is explicitly one-sided - *exceeding* the limit by more than 10% - and an
-    underweight vehicle appears on no disqualification list. **The distinction now matters:**
-    the committed mass is 344.3 g (electronics measured, structure estimated) and the
-    projected all-up figure is **414-479 g**, so the lower half of that range falls under a
-    450 g floor if there is one. **Raised 2026-09-09.** If it is a floor the fix is cheap and
-    worth doing regardless - thicker walls add mass exactly where the printed part is
-    weakest - but it has to be known before the print, not after. See
-    [mechanical/README.md](../../mechanical/README.md#the-surprise-the-risk-may-be-being-too-light).
+    underweight vehicle appears on no disqualification list. **The distinction is now
+    decisive rather than academic:** the vehicle is printed, assembled and weighed at
+    **280 g without a parachute**, projecting to **315-345 g all-up** - not straddling a
+    450 g floor but **entirely below it, by 105 to 135 g**. **Raised 2026-09-09, and it
+    outran its own mitigation.** The advice then was to thicken the walls before printing;
+    the part is printed, and a high-infill re-print can recover at most ~64 g of the gap, so
+    ballast is likely needed as well. **This answer decides whether the structure is
+    re-printed, so it is the question to ask first.** See
+    [mechanical/README.md](../../mechanical/README.md#the-risk-did-not-just-materialise-it-grew).
 
 ## Development Gates
 

@@ -11,7 +11,8 @@ it would score today, and what the cheapest remaining points are.
 
 **Assessed 2026-09-05, against the bring-up state recorded in
 [bring-up-record.md](../testing/bring-up-record.md). Section B's rate and section C's
-descent figures were revised 2026-09-08.**
+descent figures were revised 2026-09-08; sections C, D and F were revised 2026-09-12, when
+the structure came back from the printer and the vehicle was assembled and weighed.**
 
 ---
 
@@ -28,13 +29,19 @@ descent figures were revised 2026-09-08.**
 
 | Section | Max | **Secured today** | **Achievable** | Gap |
 |---|---:|---:|---:|---|
-| A · Payload safety | 25 | **0** | **5** | Egg test declined — 20 points forgone by choice |
-| B · Telemetry & communication | 25 | **0** | 23 | Link never flown; rate is at the floor |
-| C · Parachute, descent, stability | 25 | **0** | 23 | No descent system, no switch, no LED |
-| D · Structural & material innovation | 30 | **0** | 24 | Nothing mechanical exists |
-| E · Technical design & analysis | 70 | **~29** | 58 | Perfboard not PCB; one sensor short |
-| F · Final report | 25 | **~18** | 24 | Needs photos and flight graphs |
-| **Total** | **200** | **~47** | **~157** | |
+| A · Payload safety | 25 | **0** | **5** | Egg test declined — 20 points forgone by choice. Chamber built |
+| B · Telemetry & communication | 25 | **0** | 23 | Link never flown, but a range test and 3.11 Hz have happened |
+| C · Parachute, descent, stability | 25 | **0** | 23 | No canopy, no drop test, no switch, no LED |
+| D · Structural & material innovation | 30 | **~12** | 26 | **Structure printed and assembled.** Aesthetics and build quality are now judgeable |
+| E · Technical design & analysis | 70 | **~29** | 58 | Perfboard not PCB; sensor integration at its cap |
+| F · Final report | 25 | **~20** | 24 | **Report written.** Needs photographs and flight graphs |
+| **Total** | **200** | **~61** | **~159** | |
+
+**What moved on 2026-09-12, and it is the largest single jump this table has had.** The
+structure was printed in white PETG, the electronics were mounted, the egg chamber was fitted
+and the vehicle was weighed at 280 g. Section D went from *nothing exists* to *most of it
+exists and can be photographed*; section F's report was written. **Roughly 14 points changed
+from achievable to secured in one day**, and none of it needed a purchase.
 
 > **The team has elected not to fly an egg payload**, on personal grounds. The 20 points for
 > egg integrity are treated as forgone from here on, and every figure in this document
@@ -47,8 +54,16 @@ station, the documentation, and the five bring-up gates that have passed on hard
 the recommendations below are acted on. It is not a ceiling; it is what this design earns
 without changing its approach.
 
-**The whole remaining gap is mechanical and procedural, not electronic or software.** Every
-point in C and D is waiting on a structure, a parachute, a switch and an LED.
+**The remaining gap is a parachute, four small parts and a flight.** Section D no longer
+waits on a structure — it waits on photographs of one that exists. Section C waits on a canopy
+and a drop test. Section A's 5 points wait on the same canopy.
+
+**And one item on this page is now a risk rather than a gap.** The assembled vehicle is 280 g
+against a **450–550 g** band whose breach is a *disqualification*, not a deduction. Whether
+the lower edge binds is unanswered — see
+[the mass budget](../../mechanical/README.md#the-risk-did-not-just-materialise-it-grew).
+**No number in this table survives a disqualification**, which makes that email worth more
+than every recommendation below it.
 
 **The cheapest recommendations below total about 23 points — slightly more than the egg
 forgoes.** That is the useful way to read this table: the 20 points are recoverable
@@ -66,7 +81,7 @@ a second additional sensor scores nothing more in that section.
 | Item | Points | Status |
 |---|---:|---|
 | Egg recovered unbroken | 20 | **Forgone by team decision.** Scored as 0 |
-| Parachute deployment | 5 | **In scope, not yet built.** No parachute exists |
+| Parachute deployment | 5 | **In scope, not yet built.** No parachute exists; the canopy is sized at 80.0 cm |
 
 **Omitting the egg is not a disqualification.** The rulebook's disqualification list is
 closed and specific: exceeding size or mass by more than 10 %, unsafe deployment, no attempt
@@ -75,7 +90,9 @@ appears on none of them, so this costs 20 points and nothing else.
 
 **Two consequences worth planning around, neither of them the points.**
 
-**First, build the egg chamber anyway.** Section 8 requires "a cushioned and secure chamber
+**First, build the egg chamber anyway — and it is now built.** It was printed with the
+structure and fitted on 2026-09-12, and it is inside the 280 g the assembled vehicle weighs.
+The reasoning it was built on stands: section 8 requires "a cushioned and secure chamber
 specifically designed to hold the egg payload", and the general rules list an egg payload
 among the mandatory systems. A chamber that exists and demonstrably works is compliance with
 a stated requirement; an absent chamber invites a judge to read "mandatory system missing"
@@ -167,17 +184,35 @@ day. Three things follow that are worth knowing before any cloth is cut:
 
 | Item | Points | Status |
 |---|---:|---|
-| Compactness & efficiency | 5 | Nothing built |
-| Structural & material design (CAD, justification) | 5 | No CAD |
-| Fabrication & innovation | 5 | Nothing built |
-| Aesthetics & build quality | 15 | Nothing built |
+| Compactness & efficiency | 5 | **~3.** 118.5 × 115 × 110 mm inside a 210 × 120 mm allowance — comfortably compliant, but **91.5 mm of permitted height is unused**, and this line scores *effective use of the volume the rules permit* |
+| Structural & material design (CAD, justification) | 5 | **~5.** Fusion 360 model, STEP export, three static-stress studies, a written material argument, and a print orientation chosen on strength grounds and recorded |
+| Fabrication & innovation | 5 | **~4.** Printed in-house from the team's own CAD in PETG, which is the rulebook's own example of a bonus-worthy material |
+| Aesthetics & build quality | 15 | **Now judgeable, and unphotographed.** The part exists in white PETG with the electronics mounted. This is where the remaining points are |
 
-**This is the largest untouched section, and 15 of its 30 points are aesthetics and build
-quality** — neatness, cable management, labelling, finish. That is unusually high weighting
-for presentation, and it is won or lost during assembly, not design.
+**This section moved from zero to roughly 12 on 2026-09-12**, and it did so without a
+purchase. 15 of its 30 points are aesthetics and build quality — neatness, cable management,
+labelling, finish — which is unusually high weighting for presentation, and it is won or lost
+during assembly rather than design.
+
+**Three things to do next, in order of points per hour:**
+
+1. **Photograph it properly.** Top, side and bottom views are mandatory for section F anyway,
+   and this section is judged on what those photographs show. White PETG photographs cleanly
+   against almost anything, which was part of the reason for choosing it.
+2. **Dress the wiring.** The board is a hand-wired perfboard inside a printed frame; cable
+   management and labelling are explicitly named in this section, and they cost an evening.
+3. **Consider the 91.5 mm of unused height.** Compactness scores *effective use* of permitted
+   volume, and this design uses 56 % of the height it is allowed. It is also, not
+   coincidentally, where 105–135 g of missing mass could go — see
+   [the mass budget](../../mechanical/README.md#the-risk-did-not-just-materialise-it-grew).
+   One change answers a scored line and a disqualification risk together.
 
 The rulebook explicitly permits any outer material (PVC, plastic, 3D print) and offers a
 **bonus for sustainable or unconventional materials** — 3D printed, recycled, composites.
+**PETG qualifies and the argument is written down**, which is the part most teams miss:
+[mechanical/README.md](../../mechanical/README.md#material-and-manufacture) says why PETG
+rather than PLA or ABS, and the [simulation write-up](../../mechanical/simulation/README.md)
+says what the studies do and do not establish about a printed part.
 
 ### E · Technical Design & Analysis — 70 points
 
@@ -331,8 +366,8 @@ the telemetry.
 
 | Item | Points | Assessment |
 |---|---:|---|
-| Structure & documentation | 20 | **~18 of it already written** |
-| Imaging & media | 5 | **0.** Needs the physical build |
+| Structure & documentation | 20 | **~20. Written 2026-09-12** — [final-report.md](final-report.md), with `.docx` and `.pdf` beside it. Design approach, architecture, mission procedure, simulations, code, flowcharts, components, timeline and lessons learned |
+| Imaging & media | 5 | **0, and no longer blocked.** The vehicle exists and can be photographed today |
 
 The report asks for design approach, system architecture, mission procedure, results and
 lessons learned, with schematics, wiring diagrams and CAD attached, and proper citations.
@@ -346,14 +381,29 @@ answered as an MPU-6500, a microSD listing that described a board with a regulat
 delivered one had none, a multimeter that invented a short circuit, and an airtime model
 that survived contact with a real radio to within 1.8 %.
 
-Media is mandatory and unstarted: top, side and bottom views of the CanSat, PCB views, a
-team photo with the CanSat, and a group photo with mentors.
+Media is mandatory and unstarted, and **as of 2026-09-12 nothing stands in its way**: top,
+side and bottom views of the CanSat, PCB views, a team photo with the CanSat, and a group
+photo with mentors. The vehicle is assembled and photogenic; this is an afternoon that is
+worth 5 points in this section and feeds the 15 aesthetics points in section D.
 
 ---
 
 ## The cheapest points remaining
 
 Ordered by points per unit of effort.
+
+### 0. Ask whether 450 g is a floor — **no points, and it protects all of them**
+
+Not a scoring item, which is exactly why it belongs at the top. The vehicle measures **280 g
+assembled** and projects to **315–345 g** against a band whose breach is a *disqualification*.
+If 450 g binds, every number on this page is contingent on a re-print that has a lead time.
+**One sentence in an email, and the answer decides work rather than points.**
+
+### 0b. Photograph the assembled vehicle — **up to 5 points in F, and it feeds 15 in D**
+
+Newly unblocked on 2026-09-12 and the single best hour available. Section F's imaging is
+mandatory and currently zero; section D's 15 aesthetics-and-build-quality points are judged
+largely on what those images show. Top, side, bottom, PCB, team, mentors.
 
 ### 1. Manual switch and power LED — **5 points, ~₹50, one evening**
 
@@ -415,6 +465,13 @@ it fits the schedule is a judgement call, not an engineering one — but the pin
 frozen and hardware-verified since Gate 5, so a schematic could be drawn from
 [wiring.md](../design/wiring.md) today without waiting for anything.
 
+### 4b. Sew the 80 cm canopy — **5 points in A, and it opens 25 in C**
+
+The last mechanical item, and nothing blocks it. It is sized at **80.0 cm** and stays under
+5 m/s from 315 g to 550 g, so **it does not have to wait for the mass decision.** Vented flat
+circular is the floor; cruciform scores better on the stability line, which is judged
+comparatively. Not tightly packed — REC-003 and REC-004.
+
 ### 5. Data analysis preparation — **up to 20 points, entirely preparation**
 
 Four hours post-launch is not long to build graphs from scratch. **Write the analysis
@@ -445,6 +502,13 @@ fixture.
 
 **Exceeding 21 cm (+7) × 12 cm or 500 g by more than 10 % is a disqualification**, not a
 deduction. So is an unsafe deployment, a missing communication attempt, or arriving late.
+
+**And the mass limit may cut both ways.** GEN-005 reads *"500 g (±10%)"*, which is a band;
+GEN-006's disqualification is worded one-sidedly, about *exceeding*. The assembled vehicle is
+**280 g**, projecting to 315–345 g — comfortably under the cap and **105 to 135 g under the
+floor**. If the band binds, the vehicle as it stands is outside it. This is unanswered, it is
+the only disqualification-class item still open, and it is
+[question 7](../../README.md#open-questions-for-the-organizers).
 
 ---
 

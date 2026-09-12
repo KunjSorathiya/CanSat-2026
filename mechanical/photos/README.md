@@ -5,10 +5,33 @@
 | [`cansat-d1-render-1.png`](cansat-d1-render-1.png) | `Cansat_D1` render, three-quarter view from above |
 | [`cansat-d1-render-2.png`](cansat-d1-render-2.png) | `Cansat_D1` render, second view |
 
-**These are renders of the CAD, not photographs of hardware. Nothing has been printed.**
-Photographs of the printed article belong here too, when there is one — and they are worth
-taking, because section D awards **15 of its 30 points for aesthetics and build quality**,
-which is judged from what the vehicle looks like rather than from what it is.
+> [!IMPORTANT]
+> **The article exists, and there is still no photograph of it in this directory.** The
+> structure was printed in white PETG, assembled with the electronics and egg chamber, and
+> weighed at 280 g on 2026-09-12 — but the only images here are renders of the CAD.
+>
+> **This is the cheapest outstanding item in the project.** Section D awards **15 of its 30
+> points for aesthetics and build quality**, judged from what the vehicle looks like, and
+> section F separately requires top, side and bottom views, PCB views, a team photo and a
+> photo with mentors. All of it is one afternoon with the vehicle that is already built.
+
+**The two files below are renders of the CAD, not photographs of hardware.** A render shows
+the design; it is not evidence about the article. When the photographs are taken they belong
+here, named for what they show, and this note should be replaced by them.
+
+### The shot list
+
+| Shot | Why |
+|---|---|
+| Top, side, bottom | **Mandatory**, section F imaging |
+| Three-quarter, whole vehicle | The one that carries section D's build-quality impression |
+| Board in situ, lid off | Shows the wiring and the mounting, which is what "build quality" means here |
+| PCB alone, both faces | **Mandatory**, section F |
+| Egg chamber, open | PAY-002 is a requirement in its own right and it is built |
+| Team with the CanSat, and with mentors | **Mandatory**, section F |
+
+White PETG photographs cleanly against almost any background, which was part of the reason
+for choosing it — see [material and manufacture](../README.md#material-and-manufacture).
 
 ---
 

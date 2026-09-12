@@ -15,6 +15,9 @@
 *.gif binary
 *.ico binary
 *.pdf binary
+# The generated Word report. It is a zip; normalising line endings inside one
+# corrupts it, and git's heuristic should not have to guess.
+*.docx binary
 *.whl binary
 *.uf2 binary
 *.bin binary
