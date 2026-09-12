@@ -45,15 +45,27 @@ electrical/                 netlist, PCB notes
 mechanical/                 envelope, mass budget, drawings, CAD
 tools/                      build, syntax check, link-budget calculator, netlist and
                             drawing generators, SD-card and flight-log utilities,
-                            documentation-claim checker, SDK stubs
+                            documentation-claim checker, report figures and renderer,
+                            SDK stubs
 test-data/                  fixtures shared by all three parsers
 documentation/              all engineering documentation
 ```
 
-**Two of those directories hold generated files.** `electrical/schematics/vehicle-netlist.tsv`
+**Three of those directories hold generated files.** `electrical/schematics/vehicle-netlist.tsv`
 and `mechanical/drawings/envelope-and-board-fit.svg` are written by scripts in `tools/`, and
 `check_doc_claims.py` fails the build if the committed file no longer matches its generator.
 Edit the generator, run it, and commit both.
+
+The third is the final report. `documentation/project/final-report.md` is the **source**;
+its figures, `.docx` and `.pdf` are generated beside it and committed so a submission does
+not depend on anybody's toolchain:
+
+```bash
+bash tools/build_report.sh
+```
+
+**Never edit the `.docx`.** It is overwritten on the next build, and the Markdown is what
+`check_doc_claims.py` can police.
 
 ---
 
@@ -99,7 +111,7 @@ Three guards make this enforceable rather than a promise:
 - **[`test-data/protocol-fixtures.tsv`](test-data/protocol-fixtures.tsv)** — 32 packets with
   a recorded verdict each, read by the C++, Python **and** JavaScript parsers. A parser that
   disagrees fails the build.
-- **`tools/check_doc_claims.py`** — 235 documented claims compared against the source that
+- **`tools/check_doc_claims.py`** — 300 documented claims compared against the source that
   defines them: every pin in the wiring table, every test count, every relative link and
   heading anchor, the generated netlist and drawing, and the canopy diameter the mechanical
   build takes out of a simulation. **When you state a number in a document, add a check for
@@ -188,6 +200,7 @@ Documentation is part of the change, not a follow-up.
 | A measurement taken on hardware | `testing/bring-up-record.md` — and a finding row if it disagreed with the prediction |
 | Operating procedure | `runbook.md` |
 | A subsystem's state | the relevant `avionics/*/README.md`, `electrical/README.md` or `mechanical/README.md` |
+| A number the final report quotes | `documentation/project/final-report.md`, then `bash tools/build_report.sh` |
 | Anything notable | `CHANGELOG.md` |
 
 Follow the [documentation rules](documentation/README.md#documentation-rules): evidence
@@ -207,6 +220,10 @@ Document the shared SPI bus constraints
 ```
 
 Not `update code`, `fixes`, or `wip`.
+
+**No attribution trailers.** No `Co-Authored-By:` for tooling, no generated-with footers.
+The commit author is the person who made the change, and that is the only authorship this
+repository records.
 
 ---
 
