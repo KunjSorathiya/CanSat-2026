@@ -11,8 +11,13 @@ it would score today, and what the cheapest remaining points are.
 
 **Assessed 2026-09-05, against the bring-up state recorded in
 [bring-up-record.md](../testing/bring-up-record.md). Section B's rate and section C's
-descent figures were revised 2026-09-08; sections C, D and F were revised 2026-09-12, when
-the structure came back from the printer and the vehicle was assembled and weighed.**
+descent figures were revised 2026-09-08; sections C, D and F on 2026-09-12, when the
+structure was printed; and the whole page on 2026-09-14, at submission.**
+
+> [!IMPORTANT]
+> **This is the assessment at submission, before the launch.** Every point that depends on a
+> flight — descent, stability, landing, data analysis, most of telemetry — is still
+> *achievable*, not *secured*, and cannot be anything else until the vehicle flies.
 
 ---
 
@@ -27,50 +32,30 @@ the structure came back from the printer and the vehicle was assembled and weigh
 
 ## Summary
 
-| Section | Max | **Secured today** | **Achievable** | Gap |
+| Section | Max | **Secured at submission** | **Achievable** | Gap |
 |---|---:|---:|---:|---|
-| A · Payload safety | 25 | **0** | **5** | Egg test declined — 20 points forgone by choice. Chamber built |
-| B · Telemetry & communication | 25 | **0** | 23 | Link never flown, but a range test and 3.11 Hz have happened |
-| C · Parachute, descent, stability | 25 | **0** | 23 | No canopy, no drop test, no switch, no LED |
-| D · Structural & material innovation | 30 | **~12** | 26 | **Structure printed and assembled.** Aesthetics and build quality are now judgeable |
-| E · Technical design & analysis | 70 | **~29** | 58 | Perfboard not PCB; sensor integration at its cap |
-| F · Final report | 25 | **~20** | 24 | **Report written.** Needs photographs and flight graphs |
-| **Total** | **200** | **~61** | **~159** | |
+| A · Payload safety | 25 | **0** | **5** | Egg test declined — 20 points forgone by choice. Canopy built, deployment scored at the launch |
+| B · Telemetry & communication | 25 | **0** | 23 | Scored on what the organizers' station receives in flight |
+| C · Parachute, descent, stability | 25 | **~5** | 23 | **Switch and power LED fitted.** Descent, stability and landing scored at the launch |
+| D · Structural & material innovation | 30 | **~12** | 26 | Structure, egg chamber and canopy built. Build quality is judged from photographs |
+| E · Technical design & analysis | 70 | **~29** | 58 | Perfboard, not PCB; sensor integration at its cap; analysis needs flight data |
+| F · Final report | 25 | **~20** | 24 | **Report submitted.** Imaging not recorded in the repository |
+| **Total** | **200** | **~66** | **~159** | |
 
-**What moved on 2026-09-12, and it is the largest single jump this table has had.** The
-structure was printed in white PETG, the electronics were mounted, the egg chamber was fitted
-and the vehicle was weighed at 280 g. Section D went from *nothing exists* to *most of it
-exists and can be photographed*; section F's report was written. **Roughly 14 points changed
-from achievable to secured in one day**, and none of it needed a purchase.
+**What moved at submission.** The manual switch and the power LED were fitted — section C's
+five bare-minimum points, and the cheapest points on the board — and the canopy was sewn, the
+vehicle ballasted into the mass band, and the report submitted (reported by the team, 2026-09-14).
 
-> **The team has elected not to fly an egg payload**, on personal grounds. The 20 points for
-> egg integrity are treated as forgone from here on, and every figure in this document
-> reflects that. The 5 points for parachute deployment are unaffected and remain in scope.
+> **The team elected not to fly an egg payload**, on personal grounds. The 20 points for egg
+> integrity are forgone, and every figure in this document reflects that. The 5 points for
+> parachute deployment are unaffected.
 
-**"Secured today"** counts only what is built and verified — the firmware, the ground
-station, the documentation, and the five bring-up gates that have passed on hardware.
+**"Secured"** counts only what is built and evidenced, or reported built where no flight is
+needed to score it. **"Achievable"** assumes the flight succeeds. It is not a ceiling; it is
+what this design earns without changing its approach.
 
-**"Achievable"** assumes the mechanical build is done competently, the flight succeeds, and
-the recommendations below are acted on. It is not a ceiling; it is what this design earns
-without changing its approach.
-
-**The remaining gap is a parachute, four small parts and a flight.** Section D no longer
-waits on a structure — it waits on photographs of one that exists. Section C waits on a canopy
-and a drop test. Section A's 5 points wait on the same canopy.
-
-**And one item on this page is now a risk rather than a gap.** The assembled vehicle is 280 g
-against a **450–550 g** band whose breach is a *disqualification*, not a deduction. Whether
-the lower edge binds is unanswered — see
-[the mass budget](../../mechanical/README.md#the-risk-did-not-just-materialise-it-grew).
-**No number in this table survives a disqualification**, which makes that email worth more
-than every recommendation below it.
-
-**The cheapest recommendations below total about 23 points — slightly more than the egg
-forgoes.** That is the useful way to read this table: the 20 points are recoverable
-elsewhere, at a cost of roughly one evening, one small sensor, a configuration change and a
-PCB order. **One of them is now taken**: the additional sensor +5 has been claimed by the
-microphone, which closes sensor integration at its 25-point cap. Note that it is a **cap** —
-a second additional sensor scores nothing more in that section.
+**The rest of the gap is the launch.** Nothing else can move sections A, B or C now, and
+nothing in this repository can predict the comparative descent scoring against other teams.
 
 ---
 
@@ -81,7 +66,7 @@ a second additional sensor scores nothing more in that section.
 | Item | Points | Status |
 |---|---:|---|
 | Egg recovered unbroken | 20 | **Forgone by team decision.** Scored as 0 |
-| Parachute deployment | 5 | **In scope, not yet built.** No parachute exists; the canopy is sized at 80.0 cm |
+| Parachute deployment | 5 | **Canopy sewn and fitted** (reported by the team, 2026-09-14). Scored when it deploys at the launch |
 
 **Omitting the egg is not a disqualification.** The rulebook's disqualification list is
 closed and specific: exceeding size or mass by more than 10 %, unsafe deployment, no attempt
@@ -152,10 +137,10 @@ launch-day judgement about the site, not a scoring one.
 
 | Item | Points | Assessment |
 |---|---:|---|
-| Descent rate & stability | 6 | **Not addressed**, and scored *comparatively against other teams* |
+| Descent rate & stability | 6 | **Canopy built, never dropped.** 4.37–5.00 m/s by model across the mass band; scored *comparatively against other teams* |
 | Sensor data continuity | 9 | **7–9 achievable.** The firmware's strongest area |
-| Structural integrity & post-landing transmission | 5 | Post-landing half is done; structure does not exist |
-| Bare minimum: manual switch + power LED | 5 | **Not built. Five of the cheapest points on the board** |
+| Structural integrity & post-landing transmission | 5 | Post-landing transmission is enforced in firmware; the structure has never been dropped |
+| Bare minimum: manual switch + power LED | 5 | **~5. Both fitted** (reported by the team, 2026-09-14) |
 
 Sensor continuity is where the software earns its keep: faults are classified rather than
 fatal, a failed sensor degrades the packet instead of stopping it, and the packet number is
@@ -176,9 +161,11 @@ day. Three things follow that are worth knowing before any cloth is cut:
 - **Scoring rewards a slow descent, and the cap is a ceiling on rate, not a target.** Sizing
   *larger* than 80 cm descends more slowly and scores better, at the cost of more drift and a
   bulkier pack. That is a live trade, and this is the tool to make it with.
-- **The descent is 6.45 seconds.** At 1.43 Hz that is **nine packets** — the entire
-  over-the-air descent dataset. Section E's data analysis marks will come from the SD log,
-  which runs at 30 Hz, not from the radio.
+- **The descent is 6.45–7.28 seconds** across the mass band. At the 3.11 Hz the vehicle
+  transmits after its command window that is **about twenty packets** — the entire
+  over-the-air descent dataset. The SD log records the same rows — **one per packet, not at
+  the 30 Hz sensor rate** — but loses none to the link and carries the columns the packet
+  omits, so section E's analysis should be built on the card.
 
 ### D · Structural & Material Innovation — 30 points
 
@@ -308,7 +295,7 @@ naming its limits first.
 |---|---|---|
 | **Landing detection** | **High** | Impact is an impulsive transient tens of decibels above anything else in the flight. Even a poor microphone and a comparator catch it |
 | **Flow noise against descent rate** | **Good** | Unshielded electrets are extremely sensitive to airflow. On a descending body that is normally called a defect; here it is the measurement |
-| **Canopy oscillation** | **Good** | Carried by the envelope *between* windows at 30 Hz, not within one. Canopy modes are 0.5–3 Hz, comfortably inside Nyquist |
+| **Canopy oscillation** | **Partial** | Carried by the envelope *between* windows, not within one. The envelope is computed every loop tick but **recorded once per packet** — 3.11 Hz in flight — so modes below about 1.5 Hz are resolvable and the upper half of the 0.5–3 Hz canopy range aliases |
 | **Deployment transient** | **Moderate** | The crack is sharp and loud, but it happens exactly when flow noise is highest. The `sound_gate_pct` channel helps: a transient is a brief high peak at low duty, sustained flow noise is high duty |
 | **Absolute sound pressure level** | **None** | No calibration, no reference, and an unrecorded trimpot |
 | **Frequency spectra** | **None** | A 0.5 ms window resolves ~2 kHz upward, which is not where the useful content is. This vehicle does not claim spectra |
@@ -366,8 +353,8 @@ the telemetry.
 
 | Item | Points | Assessment |
 |---|---:|---|
-| Structure & documentation | 20 | **~20. Written 2026-09-12** — [final-report.md](final-report.md), with `.docx` and `.pdf` beside it. Design approach, architecture, mission procedure, simulations, code, flowcharts, components, timeline and lessons learned |
-| Imaging & media | 5 | **0, and no longer blocked.** The vehicle exists and can be photographed today |
+| Structure & documentation | 20 | **~20. Written 2026-09-12, submitted 2026-09-14** — [final-report.md](final-report.md), with `.docx` and `.pdf` beside it. Design approach, architecture, mission procedure, simulations, code, flowcharts, components, timeline and lessons learned |
+| Imaging & media | 5 | **Not recorded.** No photograph of the built vehicle is in the repository; whether the submission carried the required set is not recorded here |
 
 The report asks for design approach, system architecture, mission procedure, results and
 lessons learned, with schematics, wiring diagrams and CAD attached, and proper citations.
@@ -390,97 +377,23 @@ worth 5 points in this section and feeds the 15 aesthetics points in section D.
 
 ## The cheapest points remaining
 
-Ordered by points per unit of effort.
+**This list was the plan to submission, and it has been played out.** What each item became:
 
-### 0. Ask whether 450 g is a floor — **no points, and it protects all of them**
+| # | Recommendation | Outcome |
+|---|---|---|
+| 0 | Ask whether 450 g is a floor | **Moot** — the vehicle was ballasted into the band |
+| 0b | Photograph the assembled vehicle | **Not recorded** in the repository |
+| 1 | Manual switch and power LED — 5 points | **Taken.** Both fitted |
+| 2 | Add a magnetometer | **Taken instead by the microphone**, 2026-09-05. Yaw stays relative |
+| 3 | Raise the packet rate past 1 Hz | **Taken, and beyond it.** 1.43 Hz, then **3.11 Hz** after the command window, measured with 1 packet in 544 lost |
+| 4 | A custom PCB — up to ~10 points | **Not done.** The vehicle flies on perfboard |
+| 4b | Sew the 80 cm canopy | **Taken.** Sewn and fitted |
+| 5 | Data analysis preparation — up to 20 points | **Still open, and still the best-value item left.** Write the notebook against `test-data/sample-mission.txt` before the launch |
 
-Not a scoring item, which is exactly why it belongs at the top. The vehicle measures **280 g
-assembled** and projects to **315–345 g** against a band whose breach is a *disqualification*.
-If 450 g binds, every number on this page is contingent on a re-print that has a lead time.
-**One sentence in an email, and the answer decides work rather than points.**
-
-### 0b. Photograph the assembled vehicle — **up to 5 points in F, and it feeds 15 in D**
-
-Newly unblocked on 2026-09-12 and the single best hour available. Section F's imaging is
-mandatory and currently zero; section D's 15 aesthetics-and-build-quality points are judged
-largely on what those images show. Top, side, bottom, PCB, team, mentors.
-
-### 1. Manual switch and power LED — **5 points, ~₹50, one evening**
-
-Already an open item in [wiring.md](../design/wiring.md). The rulebook is explicit that
-missing either loses points, and the LED must light **immediately on power-on** — so wire it
-across the 3.3 V rail through a resistor, not from a GPIO the firmware drives. A
-firmware-driven LED does not light until the firmware boots.
-
-### 2. ~~Add a magnetometer~~ — **taken instead by the microphone, 2026-09-05**
-
-The +5 this recommendation was worth has been claimed by the analogue microphone, which reaches the section cap. What the magnetometer would ALSO have done is still undone, and is no longer a scoring item at all: it is the only thing that turns the mandatory yaw field from a relative angle into an absolute one. Track it as the open organizer question, not as points.
-
-<details>
-<summary>The original recommendation, kept because the yaw problem it describes is still live</summary>
-
-#### Add a magnetometer — **5 points, ~₹100–150**
-
-The single best-value part left, because it buys three things at once:
-
-- **+5** in sensor integration, taking the section to its 25-point cap.
-- **Restores absolute yaw**, which the MPU-6500 cannot provide. The firmware's entire
-  magnetometer path — the AK8963 driver, the axis rotation, the `YR-M` / `YR-G` declaration —
-  already exists and is tested; it needs a source.
-- **Removes an open question with the organizers** about whether a relative gyro-integrated
-  yaw is acceptable for the mandatory `Ya-` field.
-
-A **QMC5883L** or **HMC5883L** breakout is 3.3 V, I²C, and sits on the bus already proven at
-GP4/GP5. It needs a new driver — perhaps 150 lines against the existing `Imu` interface
-pattern — plus `MGX`/`MGY`/`MGZ` fields, which the rulebook already defines prefixes for.
-
-</details>
-
-### 3. Raise the packet rate to 2 Hz — **~2–3 points, no new hardware**
-
-The rulebook rewards rates above 1 Hz "provided transmissions remain consistent", and
-penalises loss. We measured airtime on the delivered radio: **333.7 ms** for a 206-byte
-packet, **33.4 %** channel occupancy at 1 Hz.
-
-Naively doubling to 2 Hz gives **66.8 %** occupancy, which is aggressive with other teams on
-the band. **The clean route is already named in [link-budget.md](../design/link-budget.md):
-move to 250 kHz bandwidth**, which roughly halves airtime to ~167 ms and puts 2 Hz back at
-~33 % occupancy — the same duty we run today.
-
-The cost is about 3 dB of receiver sensitivity, against a link that only has to cross **30
-metres**. The margin is enormous at that range.
-
-> **Do this only after a range test at the venue**, and only if loss stays at zero. The
-> rulebook subtracts for packet loss, so a 2 Hz stream with drops scores worse than a clean
-> 1 Hz one. `validate_config()` enforces the airtime arithmetic, so a profile that cannot
-> sustain the rate will refuse to build rather than fly badly.
-
-### 4. A custom PCB — **up to ~10 points, the largest single technical gain**
-
-15 points sit in a section this project currently forfeits. A custom board also feeds
-section D's compactness and build-quality marks, and section F's PCB imaging requirement.
-
-This is the most expensive recommendation in time and the only one with a lead time. Whether
-it fits the schedule is a judgement call, not an engineering one — but the pin map has been
-frozen and hardware-verified since Gate 5, so a schematic could be drawn from
-[wiring.md](../design/wiring.md) today without waiting for anything.
-
-### 4b. Sew the 80 cm canopy — **5 points in A, and it opens 25 in C**
-
-The last mechanical item, and nothing blocks it. It is sized at **80.0 cm** and stays under
-5 m/s from 315 g to 550 g, so **it does not have to wait for the mass decision.** Vented flat
-circular is the floor; cruciform scores better on the stability line, which is judged
-comparatively. Not tightly packed — REC-003 and REC-004.
-
-### 5. Data analysis preparation — **up to 20 points, entirely preparation**
-
-Four hours post-launch is not long to build graphs from scratch. **Write the analysis
-notebook before launch day**, against `test-data/sample-mission.txt`, so that on the day it
-is a matter of pointing it at the real CSV.
-
-Mandatory: altitude, temperature and pressure against time. Extra credit is explicitly
-offered for acceleration profiles, orientation changes, descent rate and correlations — all
-already present in the packet.
+**One item is left that can still earn points before the launch: number 5.** Four hours after
+the flight is not long to build graphs from nothing. The mandatory set is altitude,
+temperature and pressure against time; extra credit is offered for acceleration, orientation,
+descent rate and correlations — all of which are already in the packet and the SD log.
 
 ---
 
@@ -488,13 +401,18 @@ already present in the packet.
 
 **Stray transmission during another team's launch. The 2026 revision made this five times
 harsher: −1 point per 2 packets, where the old rulebook said per 10.** At 1 Hz that is half a
-point per second. Ninety seconds of a CanSat accidentally left on costs more than the entire
-telemetry section is worth. The firmware is *required* to transmit on power-up, so the manual
-switch is the only control — see the runbook.
+point per second, and at the 3.11 Hz the vehicle reaches after its window it is over one and a
+half. The firmware is *required* to transmit on power-up, so **the fitted switch is the only
+control, and the dark power LED is the only confirmation** — see the runbook.
 
 **Wrong sync word.** `0xF3` for testing, `0xA5` for the official launch, and both ends must
 change together. A mismatch is a silent, total loss of telemetry that looks exactly like a
-dead radio.
+dead radio — and it happened once, on the 2026-09-10 range test. Both Picos now fly `0xA5`.
+
+**A lift inside the command window.** Launch detection is off until the vehicle arms, so a
+drone that lifts early carries a vehicle that never declares `FLIGHT`, `LANDED` or its
+post-impact window. The data still flows; the state record the judges read is wrong. **Wait
+for `ST-R11…`.**
 
 **Wrong team number or a malformed packet** zeroes the telemetry section regardless of how
 well the link performs. The firmware guards both, and three parsers hold the format to one
@@ -503,12 +421,10 @@ fixture.
 **Exceeding 21 cm (+7) × 12 cm or 500 g by more than 10 % is a disqualification**, not a
 deduction. So is an unsafe deployment, a missing communication attempt, or arriving late.
 
-**And the mass limit may cut both ways.** GEN-005 reads *"500 g (±10%)"*, which is a band;
-GEN-006's disqualification is worded one-sidedly, about *exceeding*. The assembled vehicle is
-**280 g**, projecting to 315–345 g — comfortably under the cap and **105 to 135 g under the
-floor**. If the band binds, the vehicle as it stands is outside it. This is unanswered, it is
-the only disqualification-class item still open, and it is
-[question 7](../../README.md#open-questions-for-the-organizers).
+**The mass limit could have cut both ways, and no longer does.** GEN-005 reads *"500 g
+(±10%)"* as a band; GEN-006's disqualification names only *exceeding*. The assembled vehicle
+weighed 280 g on 2026-09-12, 105–135 g under the lower edge once finished — and it was
+**ballasted into the 450–550 g band before submission**, which satisfies either reading.
 
 ---
 

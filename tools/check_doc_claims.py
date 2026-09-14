@@ -1024,6 +1024,21 @@ def main() -> int:
     checker.check(f"the descent is documented as {packets} packets",
                   f"**{packets}**" in simulations_readme and f"| **{packets}** |" in conops,
                   str(packets))
+    # The submitted image does not fly at that period: auto_max_rate moves it to the
+    # rich/lean/lean pattern when the command window closes, so the descent the launch will
+    # actually transmit is counted at the pattern's mean interval. The ConOps tabulates it
+    # across the mass band the vehicle was ballasted into, and the 80 cm canopy it carries.
+    cycle_ms = constant(profile, "kMaxRateCycleMs")
+    per_rich = constant(profile, "kMaxRateLeanPerRich")
+    if cycle_ms and per_rich is not None:
+        mean_ms = cycle_ms / (per_rich + 1)
+        for mass_kg, temp_c in ((0.450, 15.0), (0.500, 15.0), (0.550, 35.0)):
+            r = descent.descend(mass_kg=mass_kg, diameter_m=0.80, temperature_c=temp_c,
+                                telemetry_period_ms=mean_ms)
+            cell = f"| {r.total_time_s:.2f} s | ~{r.packets_in_descent} |"
+            checker.check(f"concept-of-operations.md counts {r.packets_in_descent} max-rate "
+                          f"descent packets at {mass_kg * 1000:.0f} g",
+                          cell in conops, cell)
 
     # ---- the requirements table counts itself, and its ids are unique ---------------
     # Two different requirements were both numbered GS-002 for three days, which is the

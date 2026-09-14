@@ -4,7 +4,9 @@ What happens, in order, from the moment the switch closes to the moment the vehi
 in someone's hands — and what the vehicle, the ground station and the operators are each
 doing at every point.
 
-**Status: 2026-09-12.** No lift has been flown. Every timing below is either a firmware
+**Status: 2026-09-14 — submitted, launch pending.** No lift has been flown. This document
+describes the **sealed flight image** that was submitted: a five-minute command window from
+power-on, then max rate, recalibration and arming by itself. Every timing below is either a firmware
 constant, a computed figure, or a bench measurement, and each says which it is.
 
 > [!IMPORTANT]
@@ -43,31 +45,38 @@ launch command, no arming button and no manual trigger anywhere in the firmware.
 ```mermaid
 timeline
     title One mission, ground to recovery
-    Power-on : switch closes : power LED lights immediately : telemetry starts
-    Calibration : gyro bias, accel offset, barometric ground reference : ~2.7 s of samples : armed at 3 s
+    Power-on : switch closes : power LED lights immediately : telemetry starts at 1.43 Hz
+    Command window : five minutes : the vehicle listens between packets : it does not arm
+    Window closes : MAX_RATE or the timeout : max rate, about 3.1 Hz : recalibrate on the pad : armed
     Lift : drone climbs to 30.48 m : altitude tracks the climb : FLIGHT declared past 15 m
     Release : free fall until the canopy loads : parachute opens
-    Descent : 6.45 s at 5 m/s : nine packets : GPS and sound on the air
+    Descent : 6.45 to 7.28 s by model : 20 to 22 packets : GPS and sound every third packet
     Impact : landing detected : 5 s post-impact window
     Recovery : telemetry continues : vehicle located : card read back
 ```
 
 | Milestone | When | Where the number comes from |
 |---|---|---|
-| Telemetry begins | Immediately at power-on | No trigger exists in the firmware |
-| Calibration acceptable | ~2.7 s | 80 samples at 30 Hz (`calib_samples`) |
-| Armed | 3.0 s | `arming_delay_ms`, **and** calibration settled |
-| Calibration times out best-effort | 20.0 s | `calib_timeout_ms` |
+| Telemetry begins | Immediately at power-on, at 700 ms — 1.43 Hz | No trigger exists in the firmware; `kTelemetryPeriodMs` |
+| Command window | 0 – 300 s | `command_window_ms`. The vehicle calibrates once for a working altitude reference and **does not arm** |
+| Window closes | At 300 s, or on an accepted `MAX_RATE` | Whichever comes first. An erase command does not close it |
+| Max rate | From the close | `auto_max_rate`: rich, lean, lean in 374 / 296 / 296 ms slots — **3.11 Hz** measured |
+| Recalibration | ~2.7 s after the close | 80 samples at 30 Hz; the power-on calibration is discarded |
+| **Armed** | **3 s after the close**, once recalibration settles | `arming_delay_ms`, counted from the close, **and** calibration settled |
+| Calibration times out best-effort | 20 s after the close | `calib_timeout_ms` |
 | `READY → FLIGHT` | 15 m above the pad, held 300 ms | `launch_altitude_gain_m`, `launch_confirm_ms` |
 | Release altitude | 30.48 m | Rulebook, MIS-001 |
-| Descent duration | **6.45 s** | [`simulations/descent.py`](../../simulations/descent.py) |
+| Descent duration | **6.45–7.28 s** in the 450–550 g band | [`simulations/descent.py`](../../simulations/descent.py), 80 cm canopy |
 | Descent gate opens | ~1 s into the descent | `landing_descent_rate_mps`, `landing_descent_confirm_ms` |
 | Landing detected | 3 s at rest, **after an observed descent**, no sooner than 3 s into FLIGHT | `landing_confirm_ms`, `min_flight_ms` |
 | Post-impact window | 5.0 s | `post_impact_transmission_ms`, ≥ the rulebook's 5 s |
-| Telemetry period throughout | 700 ms — 1.43 Hz | `kTelemetryPeriodMs` |
 
-**The whole mission from power-on to recovery is a couple of minutes**, and the part that is
-actually a flight is under fifteen seconds of it.
+> [!WARNING]
+> **A lift inside the command window is never detected.** Launch detection is off until the
+> vehicle arms, so a drone that climbs before then carries a vehicle that reports `READY`
+> through the entire flight. **Wait for armed.**
+
+**The pad phase is up to five minutes; the flight is under fifteen seconds of it.**
 
 ---
 
@@ -87,38 +96,43 @@ fitted, and it repeats every 3 s until arming, then stops for good.
 
 **Status LED:** solid on.
 
-### 2 · Calibration and arming — `READY`, unarmed
+### 2 · The command window — `READY`, unarmed
 
-**Vehicle.** While stationary it collects IMU and barometer samples and captures gyro bias,
-accelerometer offset and the **barometric ground reference** — the reason altitude reads
-≈ 0 on the pad rather than the ~23 m an uncalibrated barometer showed on the bench (row 8.5).
-Acceptance needs 80 samples with per-axis gyro standard deviation under 2 °/s and an
-acceleration magnitude within 1.5 m/s² of 1 g.
+**Vehicle.** Transmits at **1.43 Hz** and listens in the gap after each packet for a
+password-authorised command. While stationary it collects IMU and barometer samples and
+captures gyro bias, accelerometer offset and the **barometric ground reference** — the reason
+altitude reads ≈ 0 rather than the ~23 m an uncalibrated barometer showed on the bench
+(row 8.5). **It does not arm**, however long it has been still. The window lasts five
+minutes.
 
 If it is not still, calibration retries until 20 s and then resolves **best-effort**: the
 barometric reference is still used, but gyro and accelerometer bias are **not** applied. A
 bias measured while moving is worse than no correction. A warning fault is raised and the
 mission continues.
 
-**Operator.** Keep it still, and wait for `CAL-1` in the packets. **Do not hand the vehicle
-to the drone before `CAL-1`** — the barometric reference decides every altitude for the rest
-of the flight.
+**Operator.** Carry the vehicle to the pad and set it down. Send `MAX_RATE` from the console
+to close the window early, or wait for it to time out. **The status field reads `ST-R0…`**
+throughout — READY, not armed.
 
-**Status LED:** 900 ms on, 900 ms off — 0.56 Hz.
+**Status LED** (if fitted — not recorded at submission): 900 ms on, 900 ms off.
 
-### 3 · Armed — `READY`, armed
+### 3 · Window closed — max rate, recalibrate, arm
 
-**Vehicle.** Launch detection is now live. `ARM-1` appears in the packets. Nothing else
-changes: it was already transmitting.
+**Vehicle.** On an accepted `MAX_RATE`, or at 300 s, it switches to the max-rate pattern —
+rich, lean, lean, **3.11 Hz** — stops listening for good, **discards the power-on calibration
+and recalibrates where it now sits**, and arms once that settles and 3 s have passed.
 
-**Status LED:** 400 ms on, 400 ms off — 1.25 Hz. This is the visible signal that the vehicle
-is ready to be lifted.
+**Operator.** Keep the vehicle **still** until it reads armed: **`ST-R11…`** — READY, armed,
+calibrated — and the station's received rate has risen to about 3.1 Hz. **Only then hand it
+to the drone.**
+
+**Status LED** (if fitted): 400 ms on, 400 ms off.
 
 ### 4 · Lift — `READY` → `FLIGHT`
 
 **Vehicle.** Enters `FLIGHT` when acceleration exceeds 30 m/s² **or** altitude passes 15 m
 above the pad, held continuously for 300 ms. On a drone lift it is the altitude condition
-that fires, so **`MODE-FLIGHT` appears during the ascent, not at release.** That is correct
+that fires, so **`ST-F…` appears during the ascent, not at release.** That is correct
 and intended — MIS-004 requires telemetry to reflect the altitude change during lifting —
 but it surprises people watching the console.
 
@@ -135,29 +149,24 @@ tracking anything real.
 **Vehicle.** Free fall until the canopy takes load, then a terminal descent. Nothing in the
 firmware knows a release happened; it is already in `FLIGHT` and stays there.
 
-**Numbers**, from [`simulations/descent.py`](../../simulations/descent.py):
+**Numbers**, from [`simulations/descent.py`](../../simulations/descent.py), for the 80 cm
+canopy that was fitted and a vehicle ballasted into the 450–550 g band:
 
-| | |
-|---|---|
-| Descent time from 30.48 m at 5 m/s | **6.45 s** |
-| Packets transmitted in that time | **9**, at 1.43 Hz |
-| Canopy needed, 550 g on a hot day | **80.0 cm** flat diameter |
+| Case | Rate | Descent time | Packets at 3.11 Hz |
+|---|---:|---:|---:|
+| 450 g, ISA 15 °C — the bottom of the band | 4.37 m/s | 7.28 s | ~22 |
+| 500 g, ISA 15 °C | 4.61 m/s | 6.94 s | ~21 |
+| 550 g, 35 °C — the sizing case | 5.00 m/s | 6.45 s | ~20 |
 
-> [!NOTE]
-> **The as-built vehicle is lighter than this table assumes, and that lengthens the descent.**
-> It weighs 280 g assembled and projects to ~315 g with a canopy, against the 550 g the
-> canopy was sized at. Under the same 80 cm canopy that is **3.66 m/s over 8.59 s — twelve
-> packets, not nine.** The table above is kept as the sizing case, because it is the worst
-> case the canopy must still pass and because the mass may yet be raised: see
-> [the mass budget](../../mechanical/README.md#what-the-new-mass-does-to-the-descent).
->
-> Everything below about nine packets is therefore a **floor**, and the floor is the number to
-> plan against.
+**The submitted mass is not recorded**, so the flight cannot be placed on one row until the
+vehicle is weighed. **And none of these is measured** — no drop test was made, so the drag
+coefficient under every row is assumed.
 
-**The descent is nine packets long** in the sizing case, twelve at the as-built mass. Every
-descent-rate number in the post-flight analysis comes from those. The SD log is the better
-record — it runs at the sensor rate, not the radio rate, and carries satellite count, HDOP
-and full-precision position that the packet does not.
+**About twenty packets of descent go over the air**, one in three of them carrying GPS and
+sound. At the 1.43 Hz this document was first written against it would have been nine. The
+SD log is still the better record — not because it is denser (**it writes one row per
+packet**, at the same 3.11 Hz) but because no row is lost to the link, and each carries
+satellite count, HDOP and full-precision position that the packet does not.
 
 **Operator.** Watch, and do not touch anything. There is nothing to do.
 
@@ -276,48 +285,60 @@ Recorded as [F-20](../testing/bring-up-record.md#findings), covered by
 
 ## The data budget
 
-At 700 ms per packet, and assuming a 10 s lift and a 20 s hover:
+Assuming a 10 s lift and a 20 s hover, and the command window run to its full five minutes:
 
-| Phase | Duration | Packets |
+| Phase | Duration | Rate | Packets |
+|---|---:|---:|---:|
+| Command window | 300 s | 1.43 Hz | ~428 |
+| Recalibrate and arm | ~3 s | 3.11 Hz | ~9 |
+| Pad, armed, before the lift | operator-dependent | 3.11 Hz | — |
+| Lift to 30.48 m | ~10 s | 3.11 Hz | ~31 |
+| Hover before release | ~20 s | 3.11 Hz | ~62 |
+| **Descent** | **6.45–7.28 s** | 3.11 Hz | **~20–22** |
+| Post-impact window | 5 s | 3.11 Hz | ~15 |
+| Recovery, until switched off | operator-dependent | 3.11 Hz | — |
+
+**For comparison — the failure the warning above is about.** If the drone lifts inside the
+command window, the vehicle is still at 1.43 Hz and never arms, so the descent goes over the
+air at the slower rate and `FLIGHT` is never declared:
+
+| Case | Descent | Packets at 1.43 Hz |
 |---|---:|---:|
-| Power-on to armed | 3 s | 4 |
-| Pad, armed, before the lift | operator-dependent | — |
-| Lift to 30.48 m | ~10 s | ~14 |
-| Hover before release | ~20 s | ~28 |
-| **Descent** | **6.45 s** | **9** |
-| Post-impact window | 5 s | 7 |
-| Recovery, until switched off | operator-dependent | — |
+| 500 g, lifted inside the command window | 6.94 s | **9** |
 
-**Nine packets is the whole descent dataset over the air.** Two consequences:
+**About twenty packets is the whole descent dataset over the air.** Two consequences:
 
-1. **The SD log is the primary record, not a backup.** It runs at the 30 Hz sensor rate and
-   carries GPS position, satellite count and HDOP that never go on the air.
-2. **A single lost packet is 11 % of the descent.** The link has measured 0 % loss at bench
-   range over 66 packets; nothing is known about loss at 30 m with the vehicle swinging under
-   a canopy.
+1. **The SD log is the primary record, not a backup.** It writes one row per packet — the
+   same ~20 descent rows — but none are lost to the link, and each carries satellite count and
+   HDOP that never go on the air. *It does not run at the 30 Hz sensor rate, which this page
+   said until 2026-09-14; the append is in `emit_telemetry()`.*
+2. **A single lost packet is 5 % of the descent.** The max-rate pattern lost 1 packet in 544
+   at bench range (row 8.18); nothing is known about loss at 30 m with the vehicle swinging
+   under a canopy.
 
 ---
 
 ## What is autonomous, and what is not
 
-**Everything in flight is autonomous.** The vehicle powers on, calibrates, arms, detects its
-own launch and landing, and keeps talking through every failure it can survive. There is no
-launch command and no manual trigger.
+**Everything in flight is autonomous.** Once armed, the vehicle detects its own launch and
+landing and keeps talking through every failure it can survive. There is no launch command
+and no manual trigger.
 
-**One ground-to-vehicle command exists, and it is inert by construction.** It erases the
-onboard log between bench runs. Three things hold it shut:
+**The pad is not autonomous, by design.** The submitted image has an uplink, and it is open
+for exactly one phase:
 
-1. `allow_ground_commands` defaults to **false**, and a flight build leaves it false. A
-   vehicle built that way never enters receive mode and has no uplink at all.
-2. Even enabled, the vehicle acts on a command **only in `READY` with `ARM-0`** — on the
-   ground, before flight. The window is shut for the whole of flight, landing and recovery,
-   which is every state holding a log that cannot be recreated.
-3. The command carries a 64-bit digest of a shared secret **and the packet number the
-   operator was looking at**, so the wire never sees the secret and a captured frame cannot
-   be replayed.
+1. **Only during the five-minute command window**, before arming. Once the window closes the
+   vehicle never enters receive mode again for the power cycle, so the uplink is shut for the
+   whole of flight, landing and recovery — every state holding a log that cannot be
+   recreated. A watchdog reset skips the window entirely.
+2. **Two commands exist**: `MAX_RATE`, which closes the window early, and an erase for bench
+   runs.
+3. **Each command carries a digest of a shared secret, the command name and the packet number
+   the operator was looking at**, so the wire never sees the secret and a captured frame
+   cannot be replayed or reused for the other command.
 
 **It is not cryptography**, and the documentation says so: it stops accidents, stray frames
-and replays. It does not stop somebody who knows the string.
+and replays. It does not stop somebody who knows the password.
 
 ---
 
@@ -343,12 +364,12 @@ and replays. It does not stop somebody who knows the string.
 | Unknown | Why it matters | Where it gets answered |
 |---|---|---|
 | **The lift profile** — climb rate, hover duration, release method | Directly drives [F-20](#the-hover-problem-f-20), and the packet budget above assumes numbers nobody has confirmed | Organizers, or a rehearsal |
-| Link performance at 30 m under a swinging canopy | Nine packets is a thin dataset to lose any of | Range testing, gate 8 |
-| Real descent rate | The 6.45 s is a model with an unmeasured drag coefficient, and the flight mass is now known to be lower than the model's sizing case — so the real descent is likely *slower* than 5 m/s and *longer* than 6.45 s | Drop test |
-| **The flight mass** | The vehicle measures 280 g assembled and the budget band is 450–550 g. Whether ballast is added changes the descent rate, the descent time and the packet count in this document | Organizers, on whether 450 g binds |
-| Barometric altitude drift over a multi-minute session | The ground reference is taken once, at power-on | Gate 9 endurance |
+| Link performance at 30 m under a swinging canopy | About twenty descent packets is a thin dataset to lose any of | The launch |
+| Real descent rate | The 4.37–5.00 m/s is a model with an unmeasured drag coefficient. No drop test was made before submission | The launch — time it from the SD log |
+| Barometric altitude drift over a multi-minute session | The ground reference is retaken when the command window closes, then held for the flight | Gate 9 endurance |
 | Yaw over a 3-minute mission | Measured drifting ~70° over 180 s. The delivered IMU is a six-axis **MPU-6500** with no magnetometer, so there is no absolute reference to catch it and every packet declares `YR-G` ([F-1](../hardware/receiving-inspection.md#findings)) | [F-13](../testing/bring-up-record.md#findings), [F-17](../testing/bring-up-record.md#findings) |
 | Whether a relative yaw is acceptable | Mandatory field, and the MPU-6500 cannot produce anything else | Organizers, open question 2 |
+| **The submitted mass** | Ballasted into the band, number not recorded. It decides which descent row the flight is compared against | Weigh it before the launch |
 
 ---
 

@@ -462,7 +462,7 @@ exists because a fault in a shared bus is far easier to find with one device on 
 | 2 | I2C scan | MPU-9250 and BMP280 both acknowledge, on different addresses |
 | 3 | IMU | Stationary: total acceleration ≈ 1 g, rotation rates ≈ 0 |
 | 4 | Barometer | Pressure within a few hundred Pa of a local reference |
-| 5 | Calibration | `CAL-1` appears in telemetry within the sample budget while still |
+| 5 | Calibration | The third character of `ST-` becomes `1` within the sample budget while still |
 | 5b | Acquisition rate | Loop actually achieves 30 Hz ([sensor-rates.md](design/sensor-rates.md)) |
 | 6 | GPS | Raw NMEA arrives; fix acquired **outdoors**; checksum errors ≈ 0 |
 | 7 | Radio identity | RA-02 version register reads back over SPI |

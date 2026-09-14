@@ -2,8 +2,9 @@
 
 The radio link, the packet, and the onboard log.
 
-**Status: 2026-09-08.** The link closed end to end on the bench on 2026-09-07. Nothing has
-been tested beyond bench range.
+**Status: 2026-09-14 — submitted, launch pending.** The link closed end to end on the bench
+on 2026-09-07, one range test was made on 2026-09-10, and the max-rate pattern was measured at
+**3.11 Hz with 1 packet in 544 lost**. Nothing has been transmitted from a descending vehicle.
 
 ---
 
@@ -15,7 +16,7 @@ been tested beyond bench range.
 | Modem | SF7, 125 kHz, CR 4/5, 8-symbol preamble, payload CRC on |
 | Power | 17 dBm on PA_BOOST — the RA-02's maximum without PA_DAC |
 | Sync words | **`0xA5` on both ends** — the rulebook's official word, and the only one the organizers' station hears (`0xF3` is the rulebook's test word). The only radio parameters the rulebook fixes |
-| Telemetry period | **700 ms — 1.43 Hz** |
+| Telemetry period | **700 ms — 1.43 Hz** for the five-minute command window, then the max-rate pattern — **3.11 Hz** — for the flight |
 | Worst-case packet | **200 bytes** — the organizers' receiver discards anything longer. Every packet carries GPS and sound; the diagnostic tags are off the air |
 
 Every one of those except the sync words is a project engineering choice, defined **once**
@@ -72,9 +73,10 @@ changes took the vehicle from exactly the floor to 43 % above it:
    logging was enough — and the ruling reversed it.
 2. **The period sized from measured airtime**, as above.
 
-**What it costs is live mission state, not points.** Without `MODE` and `ARM` on the air the
-console shows mission state as unreported; it is in the SD log and in the vehicle's startup
-summary over USB. The position is back on the air, which is also what makes a vehicle that
+**What it cost was live mission state, and that has been won back.** With `MODE` and `ARM`
+off the air the console showed mission state as unreported; since 2026-09-11 the nine-byte
+`ST-` field carries state, armed, calibrated and the active fault count on every rich packet
+it fits, and the full tags stay in the SD log. The position is back on the air, which is also what makes a vehicle that
 lands out of sight findable from the ground station.
 
 After the max-rate command the vehicle leaves 700 ms for a rich, lean, lean pattern — 3.11 Hz

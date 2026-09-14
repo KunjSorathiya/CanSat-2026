@@ -105,7 +105,7 @@ earlier version of this workflow discarded exactly the lines that named the erro
 | Python ground station | 8 modules | ✅ **143 / 143 tests** |
 | Python tooling | `tools/link_budget.py`, and `tools/cad_dimensions.py` — the STEP reader the mechanical documents take their dimensions from, tested against hand-built STEP files with known extents, the trailing-dot real literal that first defeated it, a circle bulging past every vertex, and the two files it must refuse rather than under-measure | ✅ **49 / 49 tests** |
 | Python simulations | `simulations/descent.py` — canopy sizing, the closed-form fall against both of its own limits, ISA air density, and the mass-tolerance argument | ✅ **40 / 40 tests** |
-| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **300 / 300 claims** |
+| Documented claims | `tools/check_doc_claims.py` — pin numbers, rates, watchdogs, packet sizes, UART timing, rulebook constants, the test counts on this page, and every link and heading anchor in the documentation | ✅ **303 / 303 claims** |
 | Web console (Node) | Framing, parser, validator, link health, extracted from `index.html` | ✅ **71 / 71 tests** |
 | Pico syntax check | 11 translation units | ✅ All OK |
 
@@ -560,7 +560,7 @@ Sequence follows the [bring-up order](../design/wiring.md#bring-up-order).
 | 2 | I2C bus scan | MPU-9250, BMP280 and (with the pass-through bridge enabled) the AK8963 at `0x0C` all acknowledge, on distinct addresses | ⬜ |
 | 3 | IMU read | Stationary vehicle reads about 1 g total, rates near zero | ⬜ |
 | 4 | Barometer read | Pressure within a few hundred Pa of a local reference; temperature plausible | ⬜ |
-| 5 | Calibration | `CAL-1` within the sample budget while stationary | ⬜ |
+| 5 | Calibration | `ST-` calibrated flag set within the sample budget while stationary | ⬜ |
 | 5b | Acquisition rate | Logged loop actually achieves 30 Hz with under 6 % jitter; barometer returns a fresh conversion every sample ([sensor-rates.md](../design/sensor-rates.md)) | ⬜ |
 | 6 | GPS | Raw NMEA received; fix acquired outdoors; checksum errors near zero | ⬜ |
 | 7 | RA-02 identity | Chip version register reads back correctly over SPI | ⬜ |

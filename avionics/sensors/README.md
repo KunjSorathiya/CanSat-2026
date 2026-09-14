@@ -2,7 +2,8 @@
 
 Everything the vehicle measures, and what each one has actually read on hardware.
 
-**Status: 2026-09-08.** All four sensors are fitted to the soldered board and answer.
+**Status: 2026-09-14 — submitted.** All four sensors are fitted to the soldered board,
+answer, and reach both the SD log and the air.
 
 ---
 
@@ -13,7 +14,7 @@ Everything the vehicle measures, and what each one has actually read on hardware
 | **MPU-6500** IMU | I2C0, GP4/GP5 | `0x68` | Acceleration (3 axis), angular rate (3 axis) | 🟢 Verified. **Sold as an MPU-9250; it is not one** |
 | **GY-BMP280** | I2C0, GP4/GP5 | `0x76` | Pressure, temperature, altitude | 🟢 Verified |
 | **NEO-6M** GPS | UART0, GP12/GP13 | 9600 8N1 | Latitude, longitude, altitude, satellites, HDOP | 🟠 Talking; **no fix acquired yet** |
-| **LM393** sound module | ADC1 GP27, digital GP15 | — | Relative acoustic level, and a threshold duty | 🟠 Fitted; its data reaches neither the card nor the radio yet ([F-15](../../documentation/testing/bring-up-record.md#findings)) |
+| **LM393** sound module | ADC1 GP27, digital GP15 | — | Relative acoustic level, and a threshold duty | 🟢 **Fitted, logged and transmitted** — `sound_mv_pp` in the SD log, `SN-` on the air. [F-15](../../documentation/testing/bring-up-record.md#findings) closed |
 
 Both I2C devices share one bus, and `0x0C` is **correctly absent** — that address would be
 the AK8963 magnetometer inside a real MPU-9250.
@@ -77,7 +78,7 @@ relative yaw is acceptable ([open question 6](../../README.md)).
 | **GPS fix outdoors** | Sky view | Row 4.2. Indoors it reached one satellite in 5 s, which is the receiver working, not a fix |
 | **Gyro drift across temperature** | A thermal soak | [F-13](../../documentation/testing/bring-up-record.md#findings). The bias measured on a warm bench is not the bias at altitude |
 | **IMU `INT` on GP7** | Firmware | The pin is wired. Nothing enables the interrupt, so it sits static — which is correct behaviour, not a fault |
-| **Microphone data reaching the log** | [F-15](../../documentation/testing/bring-up-record.md#findings) | The module is fitted and the columns exist; the values do not arrive |
+| ~~Microphone data reaching the log~~ | [F-15](../../documentation/testing/bring-up-record.md#findings) | **Closed.** The level reaches the SD log and the air |
 | **Trimpot position recorded** | Nobody has written it down | The LM393's gain is an unmarked trimpot that nothing reads back, so **two flights at different positions produce incomparable numbers** |
 | **Barometer against a reference** | A second barometer | Row 3.6 |
 

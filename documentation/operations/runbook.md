@@ -215,27 +215,28 @@ courtesy.** At 1.43 Hz the 2026 penalty of −1 point per 2 packets is **0.71 po
 second**: 35 seconds throws away the entire 25-point telemetry section, 70 seconds costs
 fifty points. There is no recovering that with a good flight.
 
+**And a vehicle left on does not stay at 1.43 Hz.** Five minutes after power-on its command
+window closes and it goes to max rate by itself — **3.11 Hz, over 1.5 points per second**, so
+the same 25 points go in about sixteen seconds.
+
 ### What "off" means today
 
-> [!WARNING]
-> **The manual ON/OFF switch is not fitted, and neither is the power LED.** Both parts are
-> held ([purchase list](../hardware/purchase-list.md)), neither is soldered, and both are
-> mandatory requirements in their own right ([PWR-001](../requirements/requirements.md),
-> PWR-002, PWR-003).
+> [!NOTE]
+> **The manual ON/OFF switch and the power LED are fitted** (reported by the team,
+> 2026-09-14), satisfying [PWR-001](../requirements/requirements.md) and PWR-002. "Off" is
+> now the switch open **and the power LED dark** — a glance from outside the structure
+> rather than opening the vehicle to look at a battery lead.
 >
-> Until they are fitted, **"off" means the battery lead is physically disconnected**, and
-> there is **no indicator that says so from the outside.** You have to open the vehicle and
-> look. That is slow, it is easy to get wrong under time pressure, and it is the single
-> strongest practical argument for fitting the switch and the LED before the competition —
-> ahead of their five points.
+> **Still true: the Schottky diode is not fitted.** Without it, USB back-powers the LiPo, so
+> **never connect a USB cable while the battery is connected**, switch closed or not. If the
+> vehicle has to be reflashed on the field, disconnect the battery first.
 
 ### Before another team's launch
 
 - [ ] **One named person owns the power state**, for the whole event. Not "the team" — a
       person. Shared ownership of a switch is how a vehicle gets left on.
-- [ ] **Disconnect the battery** (or open the switch, once fitted).
-- [ ] **Confirm the vehicle is dark.** With the LED fitted this is a glance; without it,
-      confirm the lead is out of the connector by eye, not by memory.
+- [ ] **Open the switch.** Disconnect the battery as well if the vehicle will sit for long.
+- [ ] **Confirm the power LED is dark** — by eye, not by memory.
 - [ ] **Also power down the ground bridge** if you are not using it. It only transmits on an
       uplink command, but a Pico you are not watching is a Pico you are not sure about.
 
@@ -524,8 +525,11 @@ without it has no uplink and no window, and arms three seconds after power-on as
 - [ ] Both images flashed from the same source revision
 - [ ] `reference_pressure_pa` set from a field barometer reading
 - [ ] Battery charged; microSD card inserted, blank and seated
+- [ ] **No USB cable connected while the battery is in** — the Schottky is not fitted
 - [ ] Antennas attached to **both** radios — never power a radio without its antenna
-- [ ] Egg installed and secured; parachute packed for immediate deployment
+- [ ] Ballast secured and the vehicle inside the 450–550 g band — weigh it if a scale is available
+- [ ] Egg chamber closed. **No egg flies** — team decision, [PAY-001](../requirements/requirements.md)
+- [ ] Parachute stowed for immediate deployment, **not tightly packed** (REC-003, REC-004)
 
 ### T-30 — Ground station up
 
@@ -544,15 +548,25 @@ without it has no uplink and no window, and arms three seconds after power-on as
 - [ ] Power switched on; the LED lights **immediately**
 - [ ] Telemetry starts automatically with no manual trigger
 - [ ] First packet is `P-001`
-- [ ] The `MODE` tag advances `INIT` → `SELF_TEST` → `READY`
-- [ ] `CAL-1` appears — calibration settled; keep the vehicle still until it does
-- [ ] `ARM-1` appears after the arming delay
-- [ ] `FAULTS-0`, or every active fault understood and accepted
+- [ ] The status field reads `ST-R0…` — READY, not yet armed. The five diagnostic tags
+      (`MODE`, `FAULTS`, `CAL`, `ARM`, `YR`) are **not on the air** since 2026-09-11; `ST-`
+      carries the same facts in nine bytes, on rich packets whenever it fits
+- [ ] Calibration settles: the third character becomes `1`, e.g. `ST-R010`. Keep the
+      vehicle still until it does
+- [ ] Faults: the fourth character is `0`, or every active fault is understood and accepted
 - [ ] Altitude reads approximately zero at the ground baseline
-- [ ] Packet numbering is unbroken and the rate is steady
+- [ ] Packet numbering is unbroken and the rate is steady at 1.43 Hz
+- [ ] **Five-minute command window.** Send `MAX_RATE` from the console to close it early, or
+      wait it out; either way the vehicle then goes to max rate by itself and arms
+- [ ] **Armed: `ST-R11…`**, and the rate at the station rises to ~3.1 Hz
+
+> [!WARNING]
+> **Do not let the drone lift until the vehicle reads armed.** Launch detection is disabled
+> for the whole command window, so a lift that starts inside it is never detected and the
+> vehicle reports `READY` through the entire flight.
 
 > [!IMPORTANT]
-> Keep the vehicle **still** until `CAL-1`. Calibration needs stationary samples; motion
+> Keep the vehicle **still** until calibration settles. Calibration needs stationary samples; motion
 > forces a best-effort result in which gyro and accelerometer bias are not applied, and
 > raises a `calibration` warning.
 
@@ -560,14 +574,14 @@ without it has no uplink and no window, and arms three seconds after power-on as
 
 - [ ] Other teams' CanSats powered off during your launch, and yours off during theirs
 - [ ] Recording confirmed on the ground station
-- [ ] Watch for `MODE-FLIGHT` at release
+- [ ] Watch the status field reach `ST-F…` — on a drone lift this happens during the climb, past 15 m, not at release
 
 ### Descent and landing
 
 - [ ] Altitude rises during the lift and falls during descent
-- [ ] `MODE-LANDED` at impact
+- [ ] `ST-L…` about three seconds after impact
 - [ ] Telemetry continues for at least 5 s after impact — a mandatory requirement
-- [ ] `MODE-RECOVERY` follows
+- [ ] `ST-V…` (RECOVERY) five seconds later
 - [ ] Keep receiving until the vehicle is physically recovered
 
 ### Recovery
@@ -575,7 +589,7 @@ without it has no uplink and no window, and arms three seconds after power-on as
 - [ ] Vehicle located and powered off
 - [ ] microSD card removed and its contents copied before anything else
 - [ ] Ground-station logs copied and backed up in two places
-- [ ] Egg condition and structural state photographed
+- [ ] Structure, egg chamber and canopy photographed as found, before anything is moved
 
 ---
 
@@ -605,7 +619,7 @@ Work through it in this order:
 A packet looks like this:
 
 ```text
-CAN-Team-01; P-042; Ti-00:01:23:450; A-118.4; Pr-99821.33; T-24.6; Ro-2.1; Pi--1.4; Ya-15.9; AX-0.12; AY--0.31; AZ-9.79; GP-Lat-21.164500; GP-Lon-72.784800; GP-Alt-121.3; MODE-FLIGHT; FAULTS-0; CAL-1; ARM-1;
+CAN-Team-25; P-042; Ti-00:01:23:450; A-18.4; Pr-100821.33; T-24.6; Ro-2.1; Pi--1.4; Ya-15.9; AX-0.12; AY--0.31; AZ-9.79; GP-Lat-21.16450; GP-Lon-72.78480; GP-Alt-21; SN-412.5; ST-F110;
 ```
 
 Everything up to `AZ-` is mandatory and fixed by the rulebook. Everything after it is
@@ -613,17 +627,15 @@ optional and appended by our firmware.
 
 | Tag | Meaning | Watch for |
 |---|---|---|
-| `MODE` | Mission state | `FAULT` at any point; `FLIGHT` at release; `LANDED` at impact |
-| `FAULTS` | Count of currently active faults | Anything above 0 before launch |
-| `CAL` | 1 once calibration settled | Must be 1 before launch |
-| `ARM` | 1 once launch detection is enabled | Must be 1 before launch |
+| `SN-` | Acoustic level, mV peak-to-peak — relative, not dB | Absent only if the microphone is stale |
+| `ST-` | Status in four characters: state, armed, calibrated, active faults. `ST-F110` is FLIGHT, armed, calibrated, no faults. State letters: `I` INIT, `T` SELF_TEST, `R` READY, `F` FLIGHT, `L` LANDED, `V` RECOVERY, `X` FAULT | `X` at any point; armed must be `1` before the drone lifts. Opportunistic: dropped from any packet it would push past 200 bytes, so its absence from one packet means nothing |
 | `GP-*` | GPS position, only while the receiver keeps confirming a fix | Absence is normal indoors and is not a fault. Fields that were present and then disappear mid-flight mean the receiver stopped refreshing its fix — the vehicle withdraws the position rather than repeat a stale one, and raises `gps_unavailable`. Use the last logged fix for recovery, and note its timestamp |
 
 Link health on the ground station:
 
 | Indicator | Healthy | Investigate |
 |---|---|---|
-| Rate | Steady at the configured rate, **1.43 Hz** (700 ms) by default — 1.18 Hz with `transmit_gps` | Falling rate means range or power trouble. Anything below 1.00 Hz is a rulebook failure, not just a warning, and the station says so: the headless form prints `RATE BELOW THE RULEBOOK MINIMUM` and the dashboard carries a `>= 1 Hz rulebook` row |
+| Rate | **1.43 Hz** (700 ms) through the five-minute command window, then about **3.11 Hz** once the vehicle goes to max rate | Falling rate means range or power trouble. Anything below 1.00 Hz is a rulebook failure, not just a warning, and the station says so: the headless form prints `RATE BELOW THE RULEBOOK MINIMUM` and the dashboard carries a `>= 1 Hz rulebook` row |
 | Loss % | Near zero | Rising loss means range, antenna or orientation |
 | CRC errors | Zero | Non-zero means transport corruption, not sensor trouble |
 | Missing | Zero | Gaps in numbering mean lost packets over the air |
@@ -764,7 +776,7 @@ this distinction stays visible. Reseat the USB cable and try another port.
 </details>
 
 <details>
-<summary><b>Calibration never reaches CAL-1</b></summary>
+<summary><b>Calibration never settles (the third `ST-` character stays 0)</b></summary>
 
 The vehicle is not stationary enough: per-axis gyro standard deviation must be under
 2 °/s and the acceleration magnitude within 1.5 m/s² of 1 g, over 80 samples. Wind, a
@@ -778,7 +790,7 @@ barometric reference is still used, but gyro and accelerometer bias are not appl
 
 Altitude is reported relative to the power-on ground baseline captured during calibration
 (`altitude_relative_to_baseline`). If it reads non-zero, calibration probably did not
-capture a clean barometric reference. Power-cycle on a still surface and watch for `CAL-1`.
+capture a clean barometric reference. Power-cycle on a still surface and watch the third `ST-` character become `1`.
 </details>
 
 <details>

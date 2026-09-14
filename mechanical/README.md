@@ -3,19 +3,19 @@
 The structure, the egg chamber, the parachute and the recovery system.
 
 > [!IMPORTANT]
-> **The structure is printed and the vehicle is assembled.** `Cansat_D1` came back from the
-> printer in **white PETG**, the electronics are mounted in it, the egg chamber is fitted,
-> and the whole thing has been on a scale: **280 g without a parachute**. That is the first
-> mechanical measurement this project has ever had.
+> **Built and submitted.** `Cansat_D1` was printed in **white PETG** and assembled on
+> 2026-09-12 — electronics mounted, egg chamber fitted, **280 g without a parachute** on the
+> scale. Before submission on 2026-09-14 the **80 cm canopy was sewn and fitted** and the
+> vehicle was **ballasted into the 450–550 g band** (both reported by the team).
 >
-> **Still not done: the parachute, and the drop test.** Nothing has descended under a canopy,
-> the structure has never been dropped, and no descent rate has been measured. Gate 7 is
-> partially, not wholly, addressed.
+> **What was never done: a drop test.** No descent rate has been measured, the structure has
+> never been dropped, and the canopy has never opened. The launch will be the first time any
+> of it happens.
 
-**Status: 2026-09-12.** Gate 7 (mechanical and recovery verified) is **part-passed**: a
-structure exists, is assembled and is weighed. Recovery — canopy, deployment, drop test —
-remains untouched, and it is still the largest single block of unclaimed points in the
-project. See [scoring-assessment.md](../documentation/project/scoring-assessment.md).
+**Status: 2026-09-14 — submitted, launch pending.** Gate 7 (mechanical and recovery
+verified) is **built but not verified**: structure, egg chamber and canopy all exist, and
+nothing about recovery has been tested. See
+[scoring-assessment.md](../documentation/project/scoring-assessment.md).
 
 **Every dimension on this page is read from
 [`CAD/Cansat_D1.step`](CAD/Cansat_D1.step)** by
@@ -33,7 +33,8 @@ and run `bash tools/build_host.sh` — it will tell you which numbers moved.
 - [Structural simulation](#structural-simulation)
 - [The parachute](#the-parachute)
 - [Mass budget](#mass-budget)
-- [What has to be decided](#what-has-to-be-decided)
+- [What was decided](#what-was-decided)
+- [What was never done](#what-was-never-done)
 - [Directory contents](#directory-contents)
 
 ---
@@ -200,6 +201,11 @@ where to look; the drop test says whether it was right.
 
 ## The parachute
 
+**Sewn and fitted before submission** (reported by the team, 2026-09-14), to the 80.0 cm
+flat-diameter specification below. **Not recorded here, and worth recording:** the canopy
+type actually sewn (vented, cruciform or plain flat), its measured diameter, and where it is
+stowed on the vehicle — the last two decide REC-003, REC-004 and REC-006.
+
 Sized by [`simulations/descent.py`](../simulations/descent.py), which is run by the host
 test suite and pinned to closed-form limits — see [simulations/README.md](../simulations/README.md).
 
@@ -230,16 +236,26 @@ the top is compliant across the whole band and costs 6 cm of cloth.
   means the antenna and the battery connection have to survive the arrival.
 
 **The uncertainty that paper cannot close.** Drag coefficient is the dominant term and the
-spread between canopy types is larger than everything else combined. Close it with a drop
-test: known mass, known height, a stopwatch, and the measured rate fed back into the model.
+spread between canopy types is larger than everything else combined. **No drop test was made
+before submission**, so the launch itself is the measurement: time the descent from the
+release to the landing transient in the SD log, and feed the rate back into the model.
 
 ---
 
 ## Mass budget
 
-**The structure is printed and the vehicle is assembled. This table is now a measurement,
-not an estimate — and the estimate it replaced was wrong by 64 g in the direction that
-matters.**
+> [!NOTE]
+> **Closed before submission: the vehicle was ballasted into the 450–550 g band** (reported
+> by the team, 2026-09-14). **The final all-up mass was not recorded in this repository** —
+> the last scale reading here is the 280 g below. If the submitted mass is known, add it to
+> the table as its own row rather than editing the history beneath it.
+>
+> Everything below this note is the record of how the vehicle got there, and it is kept
+> because the lesson in it — two estimates wrong by tens of grams in opposite directions — is
+> the useful part.
+
+**The structure is printed and the vehicle is assembled. This table is a measurement, not an
+estimate — and the estimate it replaced was wrong by 64 g in the direction that matters.**
 
 | Item | Mass | How |
 |---|---:|---|
@@ -248,8 +264,10 @@ matters.**
 | **Electronics, all-up** | **151.299 g** | Sum |
 | **Printed structure + egg chamber** | **≈ 128.7 g** | **By difference**, see below |
 | **As-built vehicle, no parachute** | **280 g** | **Weighed 2026-09-12** |
-| Parachute, lines, harness | 30–55 g | Not built |
-| Switch, LEDs, Schottky, divider | 5–10 g | Not fitted |
+| Parachute, lines, harness | 30–55 g | Sewn and fitted after this weighing |
+| Switch, LEDs, Schottky, divider | 5–10 g | Switch, power LED and divider fitted; Schottky not |
+| Ballast | to the band | **Added before submission** — amount not recorded |
+| **Submitted vehicle** | **450–550 g** | **Reported by the team, 2026-09-14** — no scale reading on record |
 | **Budget** | **450–550 g** | [GEN-005](../documentation/requirements/requirements.md) — 500 g ± 10 % |
 
 **What was measured and what was derived.** The scale figure is the **280 g assembled
@@ -292,17 +310,17 @@ The projection then was 414–479 g and straddled the floor; the measured articl
 the egg chamber came free inside that. Nothing here is close to the 550 g cap. **Every
 remaining mass question on this vehicle is about adding, not removing.**
 
-> [!IMPORTANT]
-> **Whether 450 g is a floor is still unanswered, and it is now the single most consequential
-> open question in the project.** GEN-005 states *"500 g (±10%)"*, which reads as a band. But
-> the **disqualification condition is explicitly one-sided** —
-> [GEN-006](../documentation/requirements/requirements.md) is about *exceeding* the limit by
-> more than 10 %, and an underweight vehicle appears on no disqualification list.
->
-> Three days ago this was worth one line in an email. **At 280 g measured it decides whether
-> the vehicle needs a re-print**, so ask it before anything else on this page is acted on.
+> [!NOTE]
+> ~~**Whether 450 g is a floor is still unanswered.**~~ **Made moot by ballasting into the
+> band.** GEN-005 reads *"500 g (±10%)"* as a band while
+> [GEN-006](../documentation/requirements/requirements.md)'s disqualification names only
+> *exceeding*. A vehicle inside 450–550 g satisfies both readings, so the answer stopped
+> mattering the moment the ballast went in.
 
 ### If 450 g binds, there are two routes and one of them is free
+
+*Written 2026-09-12, before the decision. The team took route 2 — ballast — before
+submission; whether a re-print was also made is not recorded.*
 
 **Route 1 — re-print heavier, and prefer it.** The printed part is ≈ 128.7 g against a
 152.0 cm³ solid volume that would weigh 193 g. Raising infill and wall count moves the part
@@ -321,7 +339,13 @@ also helps descent stability under REC-006.
 ### What the new mass does to the descent
 
 **Nothing that needs a new canopy.** The 80.0 cm flat diameter was sized at 550 g on a hot
-day and is compliant across the whole range this vehicle can now occupy:
+day and is compliant across the whole range this vehicle could occupy.
+
+**The vehicle flies in the band, so the first row below no longer applies to the flight** —
+it is kept as the unballasted comparison. Inside the band the canopy gives **4.37 m/s over
+7.28 s at 450 g** (ISA) up to **5.00 m/s over 6.45 s at 550 g on a 35 °C day**: 9 or 10
+packets of descent at 1.43 Hz, or 20 to 22 at the 3.11 Hz the vehicle will actually be
+transmitting after its command window closes.
 
 | Flight mass | Rate under the 80 cm canopy | Descent time | Packets at 1.43 Hz |
 |---|---:|---:|---:|
@@ -335,46 +359,53 @@ ballast decision turns out to be.** Two things follow that are worth having:
 - **Flying light descends more slowly, and section C scores descent time comparatively.**
   8.59 s against 6.45 s is a third longer under canopy, and 12 packets instead of 9 is a
   third more descent telemetry — the dataset this mission is thinnest on.
-- **So the mass question is not only compliance.** If 450 g does *not* bind, staying light is
-  the better flight. If it does, ballasting to 450 rather than 500 keeps some of that.
+- **So the mass question was not only compliance.** Ballasting to the bottom of the band
+  rather than the middle keeps some of that longer descent — which is a reason to record the
+  submitted mass, since it decides which row the flight should be compared against.
 
 Figures from [`simulations/descent.py`](../simulations/descent.py); reproduce with
 `python simulations/descent.py --mass 0.315 --diameter 0.80`.
 
 ### What is still unweighed
 
-The parachute and its harness, the switch, the LEDs, the Schottky and the divider resistors.
-The last four are grams; the parachute is 30–55 g and is the only remaining item large enough
-to move the table.
+**The submitted vehicle.** The canopy, the switch, the LED and the ballast all went in after
+the 280 g reading, and the team reports the result inside the band without a number on
+record.
 
-**Weigh the vehicle again when it is complete**, rather than adding figures to a measured
-base. This page has now been wrong twice by tens of grams in the same direction — the
+**Weigh it before the launch if a scale is available**, rather than adding figures to a
+measured base. This page has now been wrong twice by tens of grams in the same direction — the
 electronics estimate by 31 g high, the structure estimate by 64 g high — and both times the
 scale settled it in one minute.
 
 ---
 
-## What has to be decided
+## What was decided
 
-One of these is now blocked on the organizers — whether 450 g is a floor decides whether the
-structure is re-printed. The rest are open because nobody has started.
+Everything on this list was settled before submission. Rows that closed without evidence in
+the repository say so.
 
-| Decision | Depends on | Note |
-|---|---|---|
-| ~~Board orientation~~ | — | **Settled by the design.** A 100 mm board fits the 115 × 110 mm section flat |
-| ~~How "12 cm across" is measured~~ | — | **Answered 2026-09-09: a 12 cm sided box is acceptable.** The design fits with 2.5 and 5.0 mm per side |
-| **Where the protruding features go** | Structure | Switch, LED, connector, chute attachment, antenna. **2.5 mm per side is all the clearance there is**, and the structure is now printed — so anything that does not fit is a re-print or a file, not a model edit |
-| **Whether to re-print heavier** | The organizers' answer on the 450 g floor | The as-built vehicle is **280 g against a 450 g floor**. See [the mass budget](#mass-budget): a high-infill re-print is the route that buys strength at the same time |
-| **Re-measure the printed envelope** | Nothing | Every dimension on this page is read from the STEP. A printed part is not its model — check the as-built section against 120 mm with calipers before anything is claimed on it |
-| ~~Structure material~~ | — | **PETG, decided 2026-09-09; printed in white and assembled 2026-09-12.** The reasoning is [above](#material-and-manufacture) and section D rewards having it |
-| ~~Print orientation~~ | — | **Decided 2026-09-09: as modelled**, printed on its base. Layers stack vertically, so the weak direction is vertical tension and interlayer shear |
-| **A vertical impact case** | Nothing | All three studies load horizontally, and a vehicle under a parachute lands base-first — along the build axis, which is the print's weak direction |
-| Whether to use the 91.5 mm of unused height | Nothing | The body allowance is 210 mm and the design is 118.5 mm. Section D scores *effective use of the volume the rules permit*, and half of it is currently empty |
-| ~~Egg chamber, built even though no egg flies~~ | — | **Built and fitted 2026-09-12.** PAY-002 is a separate requirement from PAY-001, it carries the +7 cm allowance, and section D scores use of permitted volume. It is inside the 280 g |
-| Canopy type and material | Sewing capability | Vented flat circular is the floor; cruciform scores better on stability |
-| Deployment arrangement | Structure | REC-003/REC-004 forbid tight packing |
-| Antenna routing and strain relief | Board orientation | The u.FL connector is the most fragile joint on the vehicle |
-| Switch and LED placement | Structure | PWR-001 to PWR-003, and **5 of the cheapest points on the board** |
+| Decision | Outcome |
+|---|---|
+| ~~Board orientation~~ | **Settled by the design.** A 100 mm board fits the 115 × 110 mm section flat |
+| ~~How "12 cm across" is measured~~ | **Answered 2026-09-09: a 12 cm sided box is acceptable.** The design fits with 2.5 and 5.0 mm per side |
+| ~~Structure material~~ | **PETG, decided 2026-09-09; printed in white and assembled 2026-09-12.** The reasoning is [above](#material-and-manufacture) |
+| ~~Print orientation~~ | **As modelled, printed on its base.** Layers stack vertically, so the weak direction is vertical tension and interlayer shear |
+| ~~Egg chamber~~ | **Built and fitted 2026-09-12**, inside the 280 g. No egg flies — PAY-001, team decision |
+| ~~Mass~~ | **Ballasted into the 450–550 g band** before submission (reported). Final mass not recorded |
+| ~~Canopy~~ | **80 cm canopy sewn and fitted** (reported). Type and stowage not recorded |
+| ~~Switch and LED placement~~ | **Fitted** (reported), in the rectangular cutout and the two holes beside it |
+
+## What was never done
+
+Not decisions — tests. None of them happened before submission, and each is now answered, if
+at all, by the launch.
+
+| Item | Why it matters |
+|---|---|
+| **A drop test** | The only measurement of the drag coefficient the canopy is sized against, and the only check that the structure survives an arrival |
+| **A vertical impact case** | All three stress studies load horizontally; a vehicle under a canopy lands base-first, along the print's weak axis |
+| **Calipers on the printed envelope** | Every dimension here is read from the STEP. A printed part is not its model, and the clearance is 2.5 mm per side |
+| **Photographs of the built vehicle** | Mandatory media, and section D's 15 build-quality points are judged from them. [photos/](photos/README.md) still holds only CAD renders |
 
 ---
 

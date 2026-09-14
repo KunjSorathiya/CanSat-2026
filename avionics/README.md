@@ -2,13 +2,14 @@
 
 The three onboard subsystems, each summarised against what has actually been measured.
 
-**Status: 2026-09-08.** The vehicle board is built and every device on it answers.
+**Status: 2026-09-14 — submitted, launch pending.** The vehicle board is built, every device
+on it answers, and it flies inside the printed structure.
 
 | Subsystem | State | Detail |
 |---|---|---|
 | [Sensors](sensors/) | 🟢 **All four verified on the soldered board** | IMU, barometer and GPS read; microphone fitted. One part is not what it was sold as |
 | [Telemetry](telemetry/) | 🟢 **Link closed on the bench 2026-09-07** | 66 packets, no gaps, no duplicates, −44 dBm. Range untested |
-| [Power](power/) | 🟠 **Rail measured and holding; battery path incomplete** | No regulator needed. Switch, Schottky and divider not fitted |
+| [Power](power/) | 🟢 **Rail measured; switch, power LED and divider fitted** | No regulator needed. The Schottky was not fitted, so USB and battery must never be connected together |
 
 ---
 
@@ -51,7 +52,8 @@ never been tried.
 **Power — the regulator question resolved itself.** Every load runs from the Pico's own
 `3V3(OUT)`, which held 3.28–3.29 V through 45 back-to-back transmits. The AMS1117 that
 blocked the design for weeks turned out not to be needed. What is left is the battery end:
-a switch, a diode and two resistors, none of them fitted.
+a switch, a diode and two resistors. The switch and the divider went in before submission; the
+diode did not.
 
 ---
 

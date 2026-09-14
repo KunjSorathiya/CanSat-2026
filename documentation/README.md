@@ -2,12 +2,17 @@
 
 Every engineering document for CanSat 2026, grouped by what you are trying to do.
 
+> **Status: submitted 2026-09-14, launch pending.** The CanSat and the
+> [final report](project/final-report.md) are handed in. Every document here describes the
+> vehicle as submitted; nothing in this directory describes a flight yet.
+
 ---
 
 ## Start here
 
 | I want to… | Read |
 |---|---|
+| **Prepare for the launch** | **[Launch-day procedure](operations/runbook.md#launch-day-procedure)** |
 | **Build one of these from nothing** | **[Quick Start Guide](quick-start.md)** |
 | **Record the parts that just arrived** | **[Receiving Inspection Record](hardware/receiving-inspection.md)** |
 | **Solder the vehicle board** | **[Assembly Procedure](hardware/assembly-procedure.md)** |
@@ -56,7 +61,9 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | [concept-of-operations.md](mission/concept-of-operations.md) | The mission from power-on to recovery: the profile, phase by phase, the data budget, what is autonomous, failure behaviour, and what is still unknown. **It is also where [F-20](testing/bring-up-record.md#findings) was found** |
 
 **Launch logs, flight records and post-flight reports belong in this directory too.** There
-are none yet, because nothing has flown.
+are none yet: the vehicle was submitted on 2026-09-14 and the launch is still ahead. When it
+happens, copy the SD card and the ground-station logs here first, then follow
+[post-flight analysis](operations/runbook.md#post-flight-analysis).
 
 ---
 

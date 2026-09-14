@@ -111,7 +111,7 @@ Three guards make this enforceable rather than a promise:
 - **[`test-data/protocol-fixtures.tsv`](test-data/protocol-fixtures.tsv)** — 32 packets with
   a recorded verdict each, read by the C++, Python **and** JavaScript parsers. A parser that
   disagrees fails the build.
-- **`tools/check_doc_claims.py`** — 300 documented claims compared against the source that
+- **`tools/check_doc_claims.py`** — 303 documented claims compared against the source that
   defines them: every pin in the wiring table, every test count, every relative link and
   heading anchor, the generated netlist and drawing, and the canopy diameter the mechanical
   build takes out of a simulation. **When you state a number in a document, add a check for

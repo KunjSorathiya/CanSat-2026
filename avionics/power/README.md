@@ -1,9 +1,11 @@
 # Power
 
-One battery, one rail, and three parts that are not fitted yet.
+One battery, one rail, and one part that never made it in.
 
-**Status: 2026-09-08.** The rail is measured and holds under every load tried. The battery
-end of the path is incomplete.
+**Status: 2026-09-14 — submitted.** The rail is measured and holds under every load tried.
+The **switch, the power LED and the battery divider are fitted**; the **Schottky diode is
+not** (reported by the team, 2026-09-14). The consequence of that last one is operational, not electrical:
+**never connect USB while the battery is connected.**
 
 ---
 
@@ -12,7 +14,7 @@ end of the path is incomplete.
 ```text
 LiPo 1S  →  SW1  →  D1 (Schottky)  →  Pico VSYS  →  Pico 3V3(OUT)  →  everything
  3.7 V     switch    stops USB          pin 39         pin 36          one rail
-1500 mAh  NOT FITTED  back-powering    2.6–5.5 V      3.28–3.30 V      no second rail
+1500 mAh   FITTED    back-powering    2.6–5.5 V      3.28–3.30 V      no second rail
                        NOT FITTED                       measured
 ```
 
@@ -49,17 +51,17 @@ gate stays amber rather than green: the individual questions are closed, the tot
 
 ---
 
-## What is not fitted
+## The battery end of the path
 
-Four items, all held or cheap, and two of them are mandatory requirements.
+Five items. The two mandatory ones are in; the one that was never bought is not.
 
 | Item | Requirement | Why it matters | State |
 |---|---|---|---|
-| **Manual ON/OFF switch** | [PWR-001](../../documentation/requirements/requirements.md), mandatory | There is no way to turn the vehicle on and off | Held, not fitted |
-| **Power LED**, immediate | PWR-002, PWR-003, mandatory | **Red 5 mm on the regulated `+3V3` rail**, not a GPIO — a firmware-driven LED waits for boot and cannot be immediate. On `+3V3` rather than the switched battery node so brightness does not fade with the cell: [the indicator LEDs](../../documentation/design/electrical-architecture.md#the-indicator-leds). **1 kΩ gives it 1.3 mA, which is bench-bright and marginal outdoors** — 220–470 Ω is the better choice and is not held | Held, not fitted |
-| **Schottky diode**, 1 A | Pico datasheet §4.5 | Without it **USB back-powers the LiPo**. Until it is in, the battery switch must be OFF whenever a USB cable is connected — which is most of bring-up | **Not bought.** ~₹10, the only outstanding purchase |
-| **Status LED** on GP14 | — | **Green 5 mm.** Its blink rate names the mission state, and bring-up rows 1.1–1.3 cannot be taken without it. **Measure its forward voltage first**: a 5 mm green is either ~2.0 V or ~3.1 V, and at 3.3 V through 1 kΩ that is the difference between 1.3 mA and 0.1 mA | Held, not fitted |
-| **Battery divider**, 33 kΩ / 33 kΩ → GP26 | — | `battery_divider_ratio` stays 0 and the firmware reports the raw pin voltage rather than inventing a scale | Resistors held, not fitted |
+| **Manual ON/OFF switch** | [PWR-001](../../documentation/requirements/requirements.md), mandatory | The only way to turn the vehicle off, and so the only control behind radio silence during other teams' launches | **Fitted** (reported by the team, 2026-09-14) |
+| **Power LED**, immediate | PWR-002, PWR-003, mandatory | **Red 5 mm on the regulated `+3V3` rail**, not a GPIO — a firmware-driven LED waits for boot and cannot be immediate. On `+3V3` rather than the switched battery node so brightness does not fade with the cell: [the indicator LEDs](../../documentation/design/electrical-architecture.md#the-indicator-leds). **1 kΩ gives it 1.3 mA, which is bench-bright and marginal outdoors** — 220–470 Ω is the better choice | **Fitted** (reported by the team, 2026-09-14). Resistor value and outdoor visibility not recorded |
+| **Schottky diode**, 1 A | Pico datasheet §4.5 | Without it **USB back-powers the LiPo**. Never connect a USB cable while the battery is connected | **Not fitted at submission** |
+| **Status LED** on GP14 | — | **Green 5 mm.** Its blink rate names the mission state, and bring-up rows 1.1–1.3 cannot be taken without it. **Measure its forward voltage first**: a 5 mm green is either ~2.0 V or ~3.1 V, and at 3.3 V through 1 kΩ that is the difference between 1.3 mA and 0.1 mA | **Not recorded** whether it was fitted before submission |
+| **Battery divider**, 33 kΩ / 33 kΩ → GP26 | — | Lets the firmware report the cell voltage and raise `battery_low` below 3.5 V | **Fitted**, confirmed by the team 2026-09-11; the flight image sets `battery_divider_ratio = 2.0`. Bring-up row 2.6, the measurement, was never taken |
 
 **Not a 1N4001.** A silicon diode drops 0.7 V for nothing here; the part is a `1N5817`,
 `SS14` or `SS34`.
@@ -106,7 +108,8 @@ empty log or a radio that stops.
 - **Pico pin 40 is `VBUS`, live 5 V. Nothing on this board tolerates 5 V.** It is wired to
   nothing and must stay that way.
 - **`AGND` (pin 33) is a separate plane.** Tie it to ground exactly once, beside pin 38.
-- **Battery switch OFF whenever USB is connected**, until the Schottky is fitted.
+- **Never connect USB while the battery is connected.** The Schottky was not fitted, so
+  the switch alone does not protect the cell from being back-powered.
 - Charge the LiPo on a non-flammable surface, attended.
 
 Related: [electrical-architecture.md](../../documentation/design/electrical-architecture.md) ·

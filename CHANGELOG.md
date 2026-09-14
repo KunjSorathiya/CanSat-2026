@@ -8,6 +8,95 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-14 (cycle 54) — submitted
+
+The CanSat and the final report were submitted. Every document in the repository now
+describes the vehicle as submitted, and says plainly which facts are on record and which were
+reported by the team without a file behind them.
+
+### Changed — the submitted state, as reported by the team
+
+Reported on 2026-09-14, and marked *reported* wherever it appears:
+
+| Item | At submission |
+|---|---|
+| CanSat and final report | **Submitted.** The launch has not happened |
+| Canopy | **80 cm, sewn and fitted.** Type, measured diameter and stowage not recorded |
+| Manual ON/OFF switch, power LED | **Fitted** — PWR-001 and PWR-002 move to `Complete` |
+| Mass | **Ballasted into the 450–550 g band.** The final number is not recorded; the last scale reading is still the 280 g of 2026-09-12 |
+| Schottky diode | **Not fitted.** USB and the battery must never be connected together |
+| Drop test | **Not done.** The launch is the first descent under the canopy |
+
+The requirements table moves from 37 to **49 rows `Complete`** of 127. Question 12 — whether
+450 g binds — is struck through as moot: a vehicle inside the band satisfies either reading.
+
+### Fixed — the SD log never ran at 30 Hz
+
+Four documents, and the final report written on 2026-09-12, said the onboard log runs at the
+30 Hz sensor rate. **It does not.** `Controller::emit_telemetry()` appends one row per
+telemetry packet, so the log runs at the radio's cadence — 3.11 Hz in flight. The 30 Hz figure
+is true of the acquisition loop and had drifted into a claim about the log. The 36.8-minute
+bench log had shown the real rate all along: 2209 rows at the 1 Hz period it then carried.
+
+What that changes: the SD log is still the primary record, but for **completeness, not
+density** — the same ~20 descent rows the radio sends, none lost to the link, with satellite
+count, HDOP and full-precision position. And **canopy oscillation drops from "good" to
+"partial"** as a microphone use: logged at 3.11 Hz, only modes below about 1.5 Hz are
+resolvable, and the canopy range is 0.5–3 Hz. Corrected in the ConOps, the scoring
+assessment, the timeline and the report, which also gains a tenth lesson about it.
+
+### Fixed — the launch-day documents described a vehicle that no longer exists
+
+The sealed flight image of 2026-09-11 arms only after a five-minute command window and flies at
+3.11 Hz, with the diagnostic tags off the air. Several documents had not caught up:
+
+- **The concept of operations said the vehicle arms at 3 s.** It arms 3 s after the command
+  window closes — up to five minutes after power-on. The profile, milestone table, phases and
+  data budget are rewritten around the window, and **a lift inside the window is called out as
+  the one mistake that costs the flight its state detection**.
+- **The runbook's launch-day checklist watched `MODE-`, `CAL-1` and `ARM-1`**, none of which are
+  transmitted. It now reads the `ST-` status field (`ST-R11…` is armed), includes the command
+  window, drops "egg installed", adds the ballast and the no-USB-with-battery rule, and its
+  radio-silence section describes the fitted switch rather than a battery lead.
+- **The README still carried the old tag table and a packet example with them in it**, and
+  said every packet carries `YR-`.
+- **The descent packet count moved from 9 to about 20** everywhere it is quoted, because the
+  flight transmits at max rate.
+- **avionics/power and electrical listed the battery divider as unfitted**; it has been fitted
+  since 2026-09-11. **avionics/sensors still said the microphone reached neither card nor
+  radio**; F-15 closed on 2026-09-07.
+
+### Changed — the impact study is no longer conservative at the top of the band
+
+On 2026-09-12 the simulation write-up said the light as-built vehicle made study 3's 100 N
+conservative. Ballasted into the band it does not: at 550 g on a hot day the landing momentum
+is **2.75 N·s against the 2.50 N·s studied**, 10 % harder. The capped safety factor scales to
+about 13.6 and the worst derated figure to about 8 — plenty — but the claim is replaced by a
+table bracketing the whole band.
+
+### Changed — figures
+
+Four of the report's eight figures encoded the pre-submission state and are regenerated:
+the flight profile now starts at arming and uses 500 g; the mass budget runs from the 280 g
+reading to a *reported* in-band bracket, with the unrecorded ballast drawn as a range; the
+descent chart marks the band floor and the sizing case, with 315 g kept as the unballasted
+comparison; and the verification chart shows gate 9 as submitted.
+
+### Added — checks
+
+`check_doc_claims.py` now pins the ConOps' max-rate descent packet counts across the mass band
+to the link profile's slot constants and the descent model — **303 claims**, up from 300. The
+existing 700 ms check is kept honest by a row it can point at: the descent a vehicle would
+transmit if it were lifted inside the command window.
+
+### Not recorded, and left visibly open
+
+The submitted mass, the canopy type and stowage, whether the GP14 status LED was fitted, and
+photographs or video of the built vehicle. None is in the repository, and no document claims
+otherwise.
+
+---
+
 ## [Unreleased] — 2026-09-12 (cycle 53) — the vehicle becomes an object
 
 The structure came back from the printer, the electronics went into it, and the whole thing

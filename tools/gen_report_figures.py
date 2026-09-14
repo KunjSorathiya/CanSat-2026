@@ -65,12 +65,16 @@ def save(fig, name: str) -> None:
 
 
 def fig_mission_profile() -> None:
-    """Altitude against mission time, with the state transitions marked.
+    """Altitude against time since arming, with the state transitions marked.
 
-    The lift and hover are the concept of operations' assumed profile (10 s climb, 20 s
-    hover); the descent is the real model at the as-built mass.
+    The submitted image arms only after its five-minute command window, which cannot be drawn
+    at the scale of a 15-second flight, so the clock starts at arming. The lift and hover are
+    the concept of operations' assumed profile (10 s climb, 20 s hover). The descent is the
+    model for a 500 g vehicle -- the submitted mass is inside the band but not recorded --
+    counted at the max-rate pattern's mean packet interval, which is what the flight uses.
     """
-    r = descent.descend(mass_kg=0.315, diameter_m=0.80)
+    mean_packet_ms = 966.0 / 3.0   # kMaxRateCycleMs over one rich and two lean slots
+    r = descent.descend(mass_kg=0.500, diameter_m=0.80, telemetry_period_ms=mean_packet_ms)
     climb_s, hover_s, pad_s = 10.0, 20.0, 8.0
     release_t = pad_s + climb_s + hover_s
 
@@ -114,8 +118,7 @@ def fig_mission_profile() -> None:
     # Staggered on two rows: several of these transitions are seconds apart and their
     # labels are wider than the gap.
     marks = [
-        (0.0, "power-on\nINIT", 0, "left"),
-        (3.0, "armed\nREADY", 1, "center"),
+        (0.0, "armed\nST-R11", 0, "left"),
         (pad_s + climb_s * 15.0 / 30.48, "FLIGHT", 0, "center"),
         (release_t, "release", 1, "center"),
         (land_t, "LANDED", 0, "center"),
@@ -130,12 +133,12 @@ def fig_mission_profile() -> None:
                 arrowprops=dict(arrowstyle="<->", color=GOOD, lw=1.2))
     ax.text(release_t - 1.5, 6.0,
             f"descent {r.total_time_s:.2f} s at {r.terminal_mps:.2f} m/s\n"
-            f"{r.packets_in_descent} packets",
+            f"~{r.packets_in_descent} packets at 3.11 Hz",
             ha="right", fontsize=7.5, color=GOOD, linespacing=1.3)
 
-    ax.set_xlabel("mission time (s)")
+    ax.set_xlabel("time since arming (s) — arming follows the command window, up to five minutes after power-on")
     ax.set_ylabel("altitude above the pad (m)")
-    ax.set_title("Mission profile — as-built 315 g under the 80 cm canopy")
+    ax.set_title("Flight profile after arming — 500 g under the fitted 80 cm canopy")
     ax.set_ylim(-19, 36)
     ax.set_xlim(-1, land_t + 13)
     ax.set_yticks([0, 10, 20, 30])
@@ -144,27 +147,31 @@ def fig_mission_profile() -> None:
 
 
 def fig_mass_budget() -> None:
-    """The as-built mass against the rulebook band -- the project's largest open risk."""
+    """From the last scale reading to the submitted vehicle.
+
+    The 280 g stack is measured. Everything added after it -- canopy, switch, LED, ballast --
+    went in before submission and the result is reported inside the band, but no final
+    number is on record. The figure draws that honestly: measured bars solid, reported
+    additions hatched, and the submitted mass as a bracket over the band, not a bar.
+    """
     pcb, battery = 110.573, 40.726
     structure = 280.0 - pcb - battery
-    chute_lo, chute_hi = 30.0, 55.0
-    parts_lo, parts_hi = 5.0, 10.0
+    parts_lo, parts_hi = 35.0, 65.0      # canopy and harness 30-55 g, switch/LED/divider 5-10 g
 
-    fig, ax = plt.subplots(figsize=(7.2, 2.9))
+    fig, ax = plt.subplots(figsize=(7.2, 3.0))
 
-    # The compliant band, and the as-built stack drawn against it.
     ax.axvspan(450, 550, color=GOOD, alpha=0.10, zorder=0)
     ax.axvline(450, color=GOOD, lw=1.4)
     ax.axvline(550, color=GOOD, lw=1.4)
     ax.axvline(500, color=GOOD, lw=0.9, ls=":")
-    ax.text(500, 1.62, "500 g nominal", ha="center", fontsize=7.5, color=GOOD)
-    ax.text(450, 1.44, "450 g floor", ha="center", fontsize=8, color=GOOD, weight="bold")
-    ax.text(550, 1.44, "550 g cap", ha="center", fontsize=8, color=GOOD, weight="bold")
+    ax.text(450, 1.66, "450 g", ha="center", fontsize=8, color=GOOD, weight="bold")
+    ax.text(550, 1.66, "550 g", ha="center", fontsize=8, color=GOOD, weight="bold")
+    ax.text(500, 1.66, "500 g", ha="center", fontsize=7.5, color=GOOD)
 
     segs = [
         ("vehicle PCB", pcb, VEHICLE),
         ("battery", battery, "#1565c0"),
-        ("printed structure\n+ egg chamber", structure, "#5c6bc0"),
+        ("printed structure" + NL + "+ egg chamber", structure, "#5c6bc0"),
     ]
     left = 0.0
     for label, w, colour in segs:
@@ -175,28 +182,32 @@ def fig_mass_budget() -> None:
                 color=INK, linespacing=1.2)
         left += w
 
-    # Everything still to add, as a range rather than a number.
-    ax.barh(0.75, (chute_hi + parts_hi) - (chute_lo + parts_lo), left=280 + chute_lo + parts_lo,
-            height=0.34, color=WARN, alpha=0.35, edgecolor=WARN, lw=1.0, hatch="///")
-    ax.barh(0.75, chute_lo + parts_lo, left=280.0, height=0.34,
-            color=WARN, alpha=0.6, edgecolor="white", lw=1.0)
-    ax.text(280 + (chute_hi + parts_hi) / 2, 0.96, "parachute + last parts (estimated)",
-            ha="center", va="bottom", fontsize=7, color=WARN)
-
-    ax.annotate("", xy=(450, 1.18), xytext=(345, 1.18),
-                arrowprops=dict(arrowstyle="<->", color=BAD, lw=1.4))
-    ax.text(397, 1.24, "105–135 g SHORT", ha="center", fontsize=8.5,
-            color=BAD, weight="bold")
-
     ax.plot([280], [0.75], marker="|", color=INK, ms=14, mew=1.6)
-    ax.text(272, 0.28, "280 g\nweighed", ha="center", va="top", fontsize=7.5,
+    ax.text(272, 0.28, "280 g" + NL + "last scale reading", ha="center", va="top", fontsize=7.2,
             color=INK, weight="bold", linespacing=1.2)
 
+    # Reported additions: canopy, switch, LED, divider -- then ballast into the band. The
+    # ballast amount is not recorded, so its bar runs to the band as a range, not a number.
+    ax.barh(0.75, parts_hi, left=280.0, height=0.34, color=WARN, alpha=0.55,
+            edgecolor="white", lw=1.0, hatch="///")
+    ax.text(280 + parts_hi / 2, 0.96, "canopy, switch," + NL + "LED, divider", ha="center",
+            va="bottom", fontsize=6.8, color=WARN, linespacing=1.15)
+    ax.barh(0.75, 450 - (280 + parts_lo), left=280 + parts_lo, height=0.34, color=MUTED,
+            alpha=0.25, edgecolor=MUTED, lw=0.8, hatch="..", zorder=1)
+    ax.text(395, 0.50, "ballast" + NL + "(amount not recorded)", ha="center", va="top",
+            fontsize=7, color=MUTED, linespacing=1.2)
+
+    ax.annotate("", xy=(450, 1.30), xytext=(550, 1.30),
+                arrowprops=dict(arrowstyle="|-|", color=GOOD, lw=1.4, mutation_scale=4))
+    ax.text(500, 1.38, "submitted: inside the band" + NL + "(reported by the team)",
+            ha="center", va="bottom", fontsize=7.5, color=GOOD, weight="bold",
+            linespacing=1.2)
+
     ax.set_xlim(0, 600)
-    ax.set_ylim(0.0, 1.75)
+    ax.set_ylim(0.0, 1.85)
     ax.set_yticks([])
     ax.set_xlabel("mass (g)")
-    ax.set_title("Mass budget — the as-built vehicle against the 500 g ± 10 % band")
+    ax.set_title("Mass budget — from the last scale reading to the submitted vehicle")
     ax.spines[["top", "right", "left"]].set_visible(False)
     save(fig, "fig-02-mass-budget.png")
 
@@ -229,13 +240,14 @@ def fig_descent_vs_mass() -> None:
 
     # The three cases the mechanical page tabulates, each on the curve it belongs to.
     cases = [
-        (315, 15.0, "as-built", BAD, (0, 11), "center"),
-        (500, 15.0, "ballasted 500 g", MUTED, (-6, -20), "right"),
-        (550, 35.0, "sizing case", WARN, (-7, 9), "right"),
+        (315, 15.0, "unballasted", MUTED, ((-10, -6), "right"), ((10, 4), "left")),
+        (450, 15.0, "band floor", GOOD, ((10, -16), "left"), ((-10, -16), "right")),
+        (550, 35.0, "sizing case", WARN, ((-7, 9), "right"), ((-8, -22), "right")),
     ]
-    for ax, value_of, fmt in ((ax1, lambda r: r.terminal_mps, "{:.2f} m/s"),
-                              (ax2, lambda r: r.total_time_s, "{:.2f} s")):
-        for g_, temp_c, label, colour, offset, ha in cases:
+    for panel, (ax, value_of, fmt) in enumerate(((ax1, lambda r: r.terminal_mps, "{:.2f} m/s"),
+                                                 (ax2, lambda r: r.total_time_s, "{:.2f} s"))):
+        for g_, temp_c, label, colour, *placements in cases:
+            offset, ha = placements[panel]
             r = descent.descend(mass_kg=g_ / 1000.0, diameter_m=0.80, temperature_c=temp_c)
             y = value_of(r)
             ax.plot([g_], [y], "o", color=colour, ms=5, zorder=5)
@@ -256,7 +268,7 @@ def fig_descent_vs_mass() -> None:
     ax2.legend(fontsize=7, frameon=False, loc="upper right", bbox_to_anchor=(1.02, 1.04))
     ax1.text(452, 3.02, "450–550 g band", fontsize=7, color=GOOD)
 
-    fig.suptitle("The 80 cm canopy stays compliant across every mass this vehicle can have",
+    fig.suptitle("The fitted 80 cm canopy across the band the vehicle was ballasted into",
                  fontsize=10, weight="bold", y=1.02)
     save(fig, "fig-03-descent-vs-mass.png")
 
@@ -501,7 +513,7 @@ def fig_verification() -> None:
         ("Web console (Node)", 71, GROUND),
         ("Python tooling", 49, "#00838f"),
         ("Python simulations", 40, "#00838f"),
-        ("Documented claims", 300, MUTED),
+        ("Documented claims", 303, MUTED),
     ]
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7.4, 3.5),
                                    gridspec_kw={"width_ratios": [1.0, 1.15]})
@@ -516,7 +528,7 @@ def fig_verification() -> None:
     ax1.set_yticklabels(names, fontsize=7.2, linespacing=1.2)
     ax1.set_xlim(0, 5600)
     ax1.set_xlabel("assertions / tests passing")
-    ax1.set_title("On the host — 6088 checks, no hardware", fontsize=9.5)
+    ax1.set_title("On the host — 6091 checks, no hardware", fontsize=9.5)
     ax1.spines[["top", "right"]].set_visible(False)
 
     # ---- the gates, which is the honest half ----
@@ -525,17 +537,17 @@ def fig_verification() -> None:
     # be exactly the kind of number this project refuses to print.
     gates = [
         ("1  requirements locked", "partial", "6 organizer questions open"),
-        ("2  electrical architecture", "partial", "switch, LED, Schottky unfitted"),
-        ("3  power system tested", "partial", "rail measured; no series current"),
+        ("2  electrical architecture", "partial", "built; Schottky never fitted"),
+        ("3  power system tested", "partial", "rail measured; no power-cycle test"),
         ("4  sensors verified", "partial", "no GPS fix outdoors"),
         ("5  telemetry verified", "partial", "66-packet link, not 500"),
         ("6  ground station verified", "partial", "official station untested"),
-        ("7  mechanical + recovery", "partial", "printed and weighed; no chute"),
-        ("8  full integration", "partial", "range test done; never on battery"),
-        ("9  competition readiness", "none", "blocked by gate 8"),
+        ("7  mechanical + recovery", "partial", "built, canopy fitted; never dropped"),
+        ("8  full integration", "partial", "range test; no full rehearsal"),
+        ("9  competition readiness", "submitted", "submitted 2026-09-14; launch ahead"),
     ]
-    fill = {"partial": WARN, "none": "#90a4ae"}
-    word = {"partial": "PARTIAL", "none": "NOT STARTED"}
+    fill = {"partial": WARN, "none": "#90a4ae", "submitted": GOOD}
+    word = {"partial": "PARTIAL", "none": "NOT STARTED", "submitted": "SUBMITTED"}
     labels = [g[0] for g in gates][::-1]
     for i, (name, status, note) in enumerate(gates[::-1]):
         ax2.barh(i, 1.0, color=fill[status], height=0.66)
@@ -547,13 +559,13 @@ def fig_verification() -> None:
     ax2.set_xlim(0, 4.6)
     ax2.set_xticks([])
     ax2.set_xlabel("recorded gate status")
-    ax2.set_title("On hardware — not one gate is closed", fontsize=9.5)
+    ax2.set_title("On hardware — submitted, no gate closed", fontsize=9.5)
     ax2.spines[["top", "right", "bottom"]].set_visible(False)
 
     fig.text(0.5, -0.06,
              "A passing test suite is not flight verification. Nothing in the left panel "
              "needs a vehicle;" + NL + ""
-             "nothing in the right panel is finished, and nothing at all has flown.",
+             "nothing in the right panel is closed, because the evidence for the last gate is the launch.",
              ha="center", fontsize=7.2, color=INK, style="italic", linespacing=1.4)
     fig.tight_layout()
     save(fig, "fig-07-verification.png")

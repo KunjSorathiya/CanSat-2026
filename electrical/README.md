@@ -2,16 +2,16 @@
 
 The vehicle's electrical design: what is connected to what, and what carries the current.
 
-**Status: 2026-09-08.** The board is **built and working**. Every device on it answers, and
-the 3.3 V rail has been measured under load. Three parts of the power path are still
-missing, and all three are cheap.
+**Status: 2026-09-14 — submitted.** The board is **built and working**, every device on it
+answers, and the 3.3 V rail has been measured under load. The switch, the power LED and the
+battery divider were fitted before submission; **the Schottky diode was not** (reported by the team, 2026-09-14).
 
 | | |
 |---|---|
 | 🟢 **Signal wiring** | Complete and verified. I2C0, SPI0 and UART0 all pass on the soldered board |
 | 🟢 **3.3 V rail** | **No separate regulator is needed.** Every load runs from the Pico's own `3V3(OUT)`, measured at **3.28–3.29 V through 45 back-to-back transmits** and 3.28–3.30 V at 100 % microSD write duty |
-| 🔴 **Battery path** | The **switch**, the **Schottky** and the **divider** are not fitted. Until the Schottky is in, the battery switch must be OFF whenever USB is connected |
-| 🔴 **Indicators** | The power LED and the status LED are not fitted. They are **5 of the cheapest points in the rulebook** |
+| 🟠 **Battery path** | **Switch and divider fitted; Schottky not.** Never connect USB while the battery is connected |
+| 🟢 **Power LED** | **Fitted** — PWR-002. Whether the GP14 status LED was also fitted is not recorded |
 
 ---
 
@@ -85,11 +85,11 @@ one wins and the lower one is the bug.
 
 | Item | Why it is open | Cost |
 |---|---|---|
-| **Schottky diode** between the switch and `VSYS` | Not bought. Required by the Pico datasheet §4.5 for a second supply; without it USB back-powers the LiPo | ~₹10 |
-| **Manual ON/OFF switch** | Held, not fitted. [PWR-001](../documentation/requirements/requirements.md), mandatory | held |
-| **Power LED**, lit the instant the switch closes | Held, not fitted. PWR-002 and PWR-003, mandatory, **and it must be immediate** — so it goes on the rail, not on a GPIO | held |
-| **Status LED** on GP14 | Held, not fitted. Not a requirement, but it is the only diagnostic visible on a sealed vehicle, and bring-up rows 1.1–1.3 cannot be taken without it | held |
-| **Battery divider**, 33 kΩ / 33 kΩ into GP26 | Resistors held, not fitted. `battery_divider_ratio` stays 0 until it is measured, and the firmware reports the raw pin voltage rather than inventing a scale | held |
+| **Schottky diode** between the switch and `VSYS` | **Not fitted at submission.** Required by the Pico datasheet §4.5 for a second supply; without it USB back-powers the LiPo | ~₹10 |
+| ~~Manual ON/OFF switch~~ | **Fitted** (reported by the team, 2026-09-14). [PWR-001](../documentation/requirements/requirements.md) | — |
+| ~~Power LED~~, lit the instant the switch closes | **Fitted** (reported by the team, 2026-09-14). PWR-002; PWR-003's immediate-on behaviour is not observed on record | — |
+| **Status LED** on GP14 | **Not recorded** whether it was fitted. Not a requirement, but it is the only diagnostic visible on a sealed vehicle | — |
+| ~~Battery divider~~, 33 kΩ / 33 kΩ into GP26 | **Fitted** (confirmed 2026-09-11); `battery_divider_ratio = 2.0` in the flight image. Row 2.6 never measured it | — |
 | **Series current draw** | Four bench sessions have skipped it. The 3.3 V test link (`J1`) exists to make it a one-minute measurement | — |
 | **Radio and card drawing together** | Each has been measured alone and the rail holds. Nothing has yet run both at once — that is bring-up gate 7 | — |
 

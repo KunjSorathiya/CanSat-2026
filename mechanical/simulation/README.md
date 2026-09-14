@@ -116,23 +116,27 @@ or soil, with the structure and the parachute doing some of the work. A rigid la
 concrete is several times worse. Neither is wrong; the assumption just has to be written
 down beside the result, which is what this section is for.
 
-**The as-built vehicle makes the assumption more conservative, not less.** At the measured
-315 g all-up under the 80 cm canopy the descent rate is **3.66 m/s**, not 5.00, so the
-momentum to absorb is **1.15 N·s against the 2.50 N·s study 3 assumed** — less than half.
-A 25 ms arrest at that momentum is 46 N, and even a hard 10 ms arrest is 115 N, barely above
-the load already analysed.
+**The mass band brackets the assumption.** The vehicle was ballasted into 450–550 g before
+submission (reported by the team, 2026-09-14), and under the fitted 80 cm canopy its landing
+momentum sits either side of the studied case:
 
 | Case | Mass | Rate | Momentum | Force at 25 ms | at 10 ms |
 |---|---:|---:|---:|---:|---:|
 | Study 3's assumption | 500 g | 5.00 m/s | 2.50 N·s | **100 N** | 250 N |
-| As-built, unballasted | 315 g | 3.66 m/s | 1.15 N·s | 46 N | 115 N |
-| Ballasted to 500 g | 500 g | 4.61 m/s | 2.31 N·s | 92 N | 231 N |
+| Bottom of the band, ISA | 450 g | 4.37 m/s | 1.97 N·s | 79 N | 197 N |
+| Nominal, ISA | 500 g | 4.61 m/s | 2.31 N·s | 92 N | 231 N |
+| Top of the band, 35 °C | 550 g | 5.00 m/s | 2.75 N·s | **110 N** | 275 N |
+| *Unballasted, for comparison* | *315 g* | *3.66 m/s* | *1.15 N·s* | *46 N* | *115 N* |
 
-**So the structure is analysed against a harder landing than the one it is now likely to
-have** — which is the right way round, and it stays true in both mass cases. It does not
-retire the caveat: **all three studies still load horizontally**, and a vehicle under a
-canopy lands base-first along the print's weak axis. Lower force in the wrong direction is
-still the wrong direction.
+**At the top of the band the landing is 10 % harder than study 3**, which scales the capped
+safety factor of 15 to about 13.6 and the worst derated figure to about 8. The margin absorbs
+it easily. *Until 2026-09-14 this section said the as-built mass made the study conservative;
+that was true of the unballasted 315 g vehicle and stopped being true when the ballast went
+in.*
+
+**None of this retires the bigger caveat: all three studies load horizontally**, and a vehicle
+under a canopy lands base-first, along the print's weak axis. A similar force in the wrong
+direction is still the wrong direction.
 
 **A drop test settles it**, and it is also what section C actually scores.
 
