@@ -12,6 +12,7 @@ implementation on purpose.
 | [`optional-tag-cases.tsv`](optional-tag-cases.tsv) | the C++, Python and JavaScript **parsers** | How each optional tag splits into a key and a value. The mandatory block is positional and nobody disagrees about it; the optional tags are where three implementations can quietly diverge |
 | [`command-tokens.tsv`](command-tokens.tsv) | the C++ **command authoriser** and the JavaScript **console** | The digest both ends must compute from a password and a packet number, so the two implementations of FNV-1a cannot drift apart |
 | [`sample-mission.txt`](sample-mission.txt) | anyone following the documentation | A replayable mission, so every documented `replay` command runs against a file that exists |
+| [`synthetic-flight/`](synthetic-flight/README.md) | the **post-flight analysis** and its tests | A **SYNTHETIC** flight with known answers, in the SD-log, raw-packet and ground-CSV formats. Not flight data |
 
 ## `sample-mission.txt`
 

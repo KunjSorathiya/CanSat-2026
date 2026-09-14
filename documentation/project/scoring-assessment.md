@@ -208,7 +208,7 @@ says what the studies do and do not establish about a printed part.
 | PCB design | 15 | ~0 | Perfboard, not a custom PCB |
 | Code originality | 10 | **~9** | The strongest single area in the project |
 | Sensor integration | 25 | **25** | 15 mandatory + 5 GPS + 5 microphone — **at the cap**, and a further sensor adds nothing here |
-| Data analysis | 20 | ~0 | Tooling ready; needs flight data |
+| Data analysis | 20 | ~0 | **Analysis written and tested before the launch**; scored on the flight's data |
 
 **Code originality — 9 or 10 of 10.** Self-written, no third-party libraries anywhere in the
 flight path, heavily commented, and held by 4879 assertions across 229 Python and 62 Node
@@ -388,12 +388,13 @@ worth 5 points in this section and feeds the 15 aesthetics points in section D.
 | 3 | Raise the packet rate past 1 Hz | **Taken, and beyond it.** 1.43 Hz, then **3.11 Hz** after the command window, measured with 1 packet in 544 lost |
 | 4 | A custom PCB — up to ~10 points | **Not done.** The vehicle flies on perfboard |
 | 4b | Sew the 80 cm canopy | **Taken.** Sewn and fitted |
-| 5 | Data analysis preparation — up to 20 points | **Still open, and still the best-value item left.** Write the notebook against `test-data/sample-mission.txt` before the launch |
+| 5 | Data analysis preparation — up to 20 points | **Taken 2026-09-14.** [`analysis/`](../../analysis/README.md): a notebook and a one-command CLI, tested against a synthetic flight with known answers |
 
-**One item is left that can still earn points before the launch: number 5.** Four hours after
-the flight is not long to build graphs from nothing. The mandatory set is altitude,
-temperature and pressure against time; extra credit is offered for acceleration, orientation,
-descent rate and correlations — all of which are already in the packet and the SD log.
+**Nothing on this list is still open.** Number 5 was the last: the analysis now exists before
+the flight. It writes the mandatory altitude, temperature and pressure graphs and the extra-credit
+set — descent rate and drag coefficient, acceleration, orientation, spin, drift, sound and
+correlations — in one command, and it corrects the vehicle's altitude for the ISA-formula bias
+that would otherwise understate the descent rate by ~5 % ([F-21](../testing/bring-up-record.md#findings)).
 
 ---
 

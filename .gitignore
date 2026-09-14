@@ -9,6 +9,11 @@ venv/
 .claude/
 host.log
 
+# Launch-day working copies and the analysis's output. The flight's logs are copied in and the
+# figures written out here; they are committed deliberately, into documentation/, not by accident.
+analysis-input/
+analysis-output/
+
 # Python wheels and other downloaded installers are never project sources.
 *.whl
 *.tar.gz

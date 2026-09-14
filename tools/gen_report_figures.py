@@ -513,7 +513,8 @@ def fig_verification() -> None:
         ("Web console (Node)", 71, GROUND),
         ("Python tooling", 49, "#00838f"),
         ("Python simulations", 40, "#00838f"),
-        ("Documented claims", 303, MUTED),
+        ("Post-flight analysis", 37, "#00838f"),
+        ("Documented claims", 306, MUTED),
     ]
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7.4, 3.5),
                                    gridspec_kw={"width_ratios": [1.0, 1.15]})
@@ -528,7 +529,7 @@ def fig_verification() -> None:
     ax1.set_yticklabels(names, fontsize=7.2, linespacing=1.2)
     ax1.set_xlim(0, 5600)
     ax1.set_xlabel("assertions / tests passing")
-    ax1.set_title("On the host — 6091 checks, no hardware", fontsize=9.5)
+    ax1.set_title("On the host — 6131 checks, no hardware", fontsize=9.5)
     ax1.spines[["top", "right"]].set_visible(False)
 
     # ---- the gates, which is the honest half ----

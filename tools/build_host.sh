@@ -123,6 +123,17 @@ if command -v python >/dev/null 2>&1; then
   # run goes at the END of this block, never between the two above it.
   echo "== running simulation tests =="
   ( cd "$ROOT" && log python -m unittest discover -s simulations/tests -p "test_*.py" )
+
+  # The post-flight analysis runs once for real, inside the rulebook's four-hour window, on
+  # data nobody has seen. It is held here to a synthetic flight with known answers, and its
+  # notebook is executed cell by cell. Fourth, and last, for the positional reason above.
+  # It needs numpy and matplotlib; without them it is skipped rather than failed.
+  if python -c "import numpy, matplotlib" >/dev/null 2>&1; then
+    echo "== running post-flight analysis tests =="
+    ( cd "$ROOT" && MPLBACKEND=Agg log python -m unittest discover -s analysis/tests -p "test_*.py" )
+  else
+    echo "== SKIPPED post-flight analysis tests (numpy or matplotlib not installed) =="
+  fi
 fi
 
 # The web console is a single self-contained HTML file with no build step. Its parser,

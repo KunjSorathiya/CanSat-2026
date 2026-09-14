@@ -8,6 +8,64 @@ development cycle.
 
 ---
 
+## [Unreleased] — 2026-09-14 (cycle 55) — the analysis, before the flight
+
+The rulebook allows four hours after the launch for data analysis, worth 20 points, and the
+analysis did not exist. It does now, and it has been run against a flight whose answers are known.
+
+### Added — `analysis/`
+
+- **`flight_analysis.ipynb`** — the notebook: configuration, data quality, phases, the three
+  mandatory graphs, descent rate and drag coefficient, dynamics, sound, GPS, the SD-against-ground
+  comparison, and export. Committed without outputs, and free of IPython-only syntax.
+- **`flight_analysis.py`** — everything the notebook calls, and a command line that does the whole
+  analysis in one step: ten figures, a `summary.md` ready for the report, and `analysis.json`.
+  It reads **any** of the three logs a flight leaves — the SD log, the ground CSV, raw packets —
+  detecting which from the file, and through the ground station's own parser. numpy and
+  matplotlib only; **Jupyter is not needed on launch day**, and was not installed on the machine
+  this was written on.
+- **`synthetic_flight.py`** and **`test-data/synthetic-flight/`** — a SYNTHETIC flight in the exact
+  formats a real one leaves: the sealed image's schedule, a drone lift and hover, a canopy
+  descent from the drag equation, packets lost on the ground copy including one mid-descent, and
+  the ground CSV produced by the **real** `replay --export`.
+- **37 tests.** The analysis recovers the synthetic flight's release time (within 0.15 s),
+  landing, descent rate (3 %), drag coefficient (6 %), spin, pendulum frequency, GPS drift and
+  the packet lost in the descent; its SD columns and detection thresholds are read out of the
+  firmware source and compared; the committed fixture must be what the generator produces; and
+  the notebook is executed cell by cell. `build_host.sh` runs them fourth, after the simulations.
+
+### Found — F-21, the vehicle's altitude reads ~5 % low on a hot day
+
+Writing the descent-rate analysis found it. `sensors::pressure_altitude_m()` is the ISA formula,
+which assumes the standard atmosphere's temperature; real height per pascal scales with the real
+absolute temperature, so at 31 °C every transmitted `A-` is short by 288 K ÷ 304 K — and **a
+descent rate taken from it reads ~5 % low**, the difference between a 5.05 m/s descent and a
+compliant-looking 4.8. The sealed image cannot change, so the analysis takes the descent from
+temperature-corrected height, reports both rates, and reports the scale factor it measured
+against the one theory predicts (0.948 against 0.947 on the synthetic flight). The synthetic
+flight is generated with the bias in it, so the correction is tested against the real thing.
+
+### Found while testing it
+
+- **Uncalibrated power-on rows are a launch by the threshold alone.** The first seconds read
+  ~23 m before calibration, which is "15 m above the ground for 0.3 s". The first version of the
+  phase detection declared a launch at 0.7 s; launch detection now starts once the barometer
+  first reads near the ground. A test holds it.
+- **The median packet interval overstates the max-rate cadence** — one 374 ms slot and two of
+  296 ms give a median of 296 ms, 3.38 Hz, where the rate is 3.11. The analysis uses the mean.
+
+### Changed
+
+- **Requirements:** GS-004, DAT-002, DAT-003, DAT-004 and DAT-005 move to `Complete`, with the
+  tests as evidence — 54 of 127 rows. DAT-001, the four-hour window, is `In Progress`: the
+  analysis runs in seconds, and no timed rehearsal with the team is recorded.
+- **Runbook:** the post-flight section runs the analysis, and says to quote the corrected rate.
+- **Scoring:** the last open recommendation, data-analysis preparation, is taken.
+- **Test counts:** 269 Python tests, 5825 host checks; `check_doc_claims.py` pins the analysis
+  suite's count in the test plan, the README and `analysis/README.md` — 306 claims.
+
+---
+
 ## [Unreleased] — 2026-09-14 (cycle 54) — submitted
 
 The CanSat and the final report were submitted. Every document in the repository now

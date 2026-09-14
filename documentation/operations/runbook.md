@@ -680,10 +680,21 @@ and pressure, each against time or packet number.
 
    The summary line it prints (`received=… accepted=… rejected=…`) is worth reading before
    the graphs: `received=0` means the file is not what the command thinks it is.
-3. Produce the three mandatory graphs.
-4. Optional analysis that scores additional credit: acceleration profile, orientation
-   history, descent-rate derivation, packet-loss versus altitude, GPS ground track,
-   correlation between barometric and GPS altitude.
+3. **Run the analysis** — written and tested before the launch, in
+   [`analysis/`](../../analysis/README.md). Extract the SD log, then one command writes the
+   three mandatory graphs, the optional analysis and a `summary.md`:
+   ```bash
+   python tools/read_flight_log.py FLIGHT.CSV --out-dir analysis-input
+   python analysis/flight_analysis.py analysis-input/flight-1.csv --compare logs/telemetry.csv --mass 0.50 --out analysis-output
+   ```
+   Or open `analysis/flight_analysis.ipynb`, change the paths in its **Configuration** cell,
+   and *Run All*. **Read `summary.md`'s data table before any graph.**
+4. The optional analysis is in the same output: descent rate and the drag coefficient it
+   implies, acceleration, orientation, spin and pendulum, GPS drift, acoustic level against
+   speed, and pressure and temperature against altitude. **Quote the descent rate from
+   temperature-corrected height, not from the vehicle's altitude** — the firmware's ISA formula
+   reads ~5 % low on a hot day ([F-21](../testing/bring-up-record.md#findings)), and the summary
+   gives both.
 5. Compare the transmitted stream against the onboard SD log: differences are radio loss,
    not sensor loss, and the difference itself is a useful result.
 

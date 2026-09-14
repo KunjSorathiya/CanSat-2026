@@ -9,7 +9,7 @@ chamber, and streams telemetry from power-on through recovery.**
 
 [![CI](https://github.com/KunjSorathiya/CanSat-Team-Singularity/actions/workflows/ci.yml/badge.svg)](https://github.com/KunjSorathiya/CanSat-Team-Singularity/actions/workflows/ci.yml)
 [![C++ tests](https://img.shields.io/badge/C%2B%2B%20tests-5485%20assertions-1b5e20)](documentation/testing/test-plan.md)
-[![Python tests](https://img.shields.io/badge/Python%20tests-232%20passing-1b5e20)](documentation/testing/test-plan.md)
+[![Python tests](https://img.shields.io/badge/Python%20tests-269%20passing-1b5e20)](documentation/testing/test-plan.md)
 [![Firmware](https://img.shields.io/badge/firmware-C%2B%2B17%20%C2%B7%20RP2040-0d47a1)](firmware/)
 [![Ground station](https://img.shields.io/badge/ground%20station-Python%20%C2%B7%20stdlib%20only-00695c)](ground-station/)
 [![Link](https://img.shields.io/badge/telemetry-433%20MHz%20LoRa-4527a0)](documentation/design/telemetry-protocol.md)
@@ -34,7 +34,7 @@ chamber, and streams telemetry from power-on through recovery.**
 | Layer | State |
 |---|---|
 | 🟢 **Submission** | **The CanSat and the final report were submitted on 2026-09-14** (reported by the team). The launch has not happened, so no flight result exists anywhere in this repository |
-| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 5788 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
+| 🟢 **Software** | Flight core, telemetry protocol, ground station and web console **implemented and passing 5825 automated checks on the host**, including an end-to-end trace from the flight controller through the ground pipeline |
 | 🟢 **Firmware drivers** | **Every driver has run on real silicon** and its numbers are recorded — IMU, barometer, GPS, radio and microSD. **The flight image itself runs**: it was flashed, it printed its startup summary, it wrote a card, and it produced [F-16](documentation/testing/bring-up-record.md#findings) and [F-19](documentation/testing/bring-up-record.md#findings), which are defects only a running image could have found |
 | 🟢 **Hardware** | **The vehicle board is built and every device on it works** — **34 of 94 recorded measurements taken.** **The radio link closed end to end on 2026-09-07** — 66 packets, `P-001` to `P-066`, no gaps, no duplicates, 1.0000 Hz, −44 dBm at bench range, so Gate 8 has a bench link. Gates 3, 4, 5, 6 and 7 all pass on the soldered board — the IMU and barometer share I2C0 (`0x68` and `0x76`, `0x0C` correctly absent), the GPS emits clean NMEA at 162 B/s, the radio sends 5/5, 5/5 and 45/45 with airtimes within 1.8 % of the model, the card writes 100/100 and sustains ~300 writes/s, and the shared SPI0 bus passes every row. **Power is answered:** the Pico's own 3.3 V rail held **3.28–3.29 V through 45 back-to-back transmits** and 3.28–3.30 V at 100 % write duty, so no separate rail is needed. Sensor read costs 0.833 ms worst against a 33 ms period. **Open:** [F-12](documentation/testing/bring-up-record.md#findings), a card intermittent that failed three of its first four runs and has passed twelve since with the supply measured innocent; and [F-17](documentation/testing/bring-up-record.md#findings), **yaw measured drifting more than a full revolution in a 36.8-minute stationary log** — and, more usefully, holding to ±0.8° for the first 15 minutes before switching to 0.4 dps, which is **70° over a 3-minute flight** on a vehicle with no magnetometer; and [F-18](documentation/testing/bring-up-record.md#findings), a stationary GPS jumping 55.6 m in one second because nothing gates a fix on satellite count or HDOP. **Fitted before submission:** the manual ON/OFF switch and the power LED (reported by the team, 2026-09-14) and the battery divider (33 kΩ / 33 kΩ, ratio 2.0, never measured). **Not fitted: the Schottky diode** — so USB and the battery must never be connected together. The microphone reaches the air as `SN-` |
 | 🟢 **Mechanical** | **Built and in the mass band.** `Cansat_D1` was printed in **white PETG** and assembled on 2026-09-12 — electronics mounted, egg chamber fitted, **280 g without a parachute** on the scale. Before submission the **80 cm canopy was sewn and fitted** and the vehicle was **ballasted into the 450–550 g band** (reported by the team, 2026-09-14; the final mass is not recorded). Designed at **118.5 × 115.0 × 110.0 mm**, inside a 12 cm sided box confirmed by the organizers with **2.5 and 5.0 mm of clearance per side**. Three static-stress studies report **minimum safety factor ≥ 15**, derated for a printed part to **6 to 13**. In the band the canopy gives **4.37–5.00 m/s** by model. **Never done: a drop test** — the launch is the first descent |
@@ -475,8 +475,9 @@ bash tools/build_host.sh
 | Python (ground station) | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, shared protocol fixtures, and a cross-language end-to-end trace of real vehicle output | ✅ **143 / 143** |
 | Python (tooling) | LoRa airtime model, pinned to published SX127x reference vectors | ✅ **49 / 49** |
 | Python (simulations) | Descent model: canopy sizing, the closed-form fall against both its own limits, ISA air density, the mass-tolerance argument | ✅ **40 / 40** |
+| Python (post-flight analysis) | Recovers a synthetic flight's known descent rate, drag coefficient, spin, drift and lost packet; the notebook runs cell by cell | ✅ **37 / 37** |
 | Web console (Node) | Framing, parser, validator, link health and bridge status, extracted from `index.html` | ✅ **71 / 71** |
-| Documented claims | Numbers in the documentation checked against the source that defines them — test counts, the generated netlist, and the descent model's canopy diameter included | ✅ **303 / 303** |
+| Documented claims | Numbers in the documentation checked against the source that defines them — test counts, the generated netlist, and the descent model's canopy diameter included | ✅ **306 / 306** |
 | Pico syntax | 11 translation units against SDK stubs | ✅ All OK |
 
 Highlights of what is actually proven: the emitted packet matches the rulebook format byte
@@ -586,6 +587,7 @@ electrical/
 mechanical/            envelope, mass budget, canopy spec  (nothing built)
   CAD/  drawings/
 simulations/           descent model + tests
+analysis/              post-flight analysis: notebook, one-command CLI, synthetic flight, tests
 tools/                 host build, Pico syntax check, LoRa link-budget calculator,
                        netlist and drawing generators, documentation-claim checker,
                        SD-card and flight-log utilities, SDK stubs
@@ -615,12 +617,13 @@ documentation/
 | [Requirements Checklist](documentation/requirements/requirements.md) | Every requirement, its status, and the development gates |
 | [Project Timeline](documentation/project/timeline.md) | History, phase plan, critical path, risk register |
 | [Test Plan](documentation/testing/test-plan.md) | What is tested, what is not, and the hardware test plan |
-| [Bring-Up Record](documentation/testing/bring-up-record.md) | Every prediction paired with what was actually measured, and twenty findings |
+| [Bring-Up Record](documentation/testing/bring-up-record.md) | Every prediction paired with what was actually measured, and twenty-one findings |
 | **[Final Project Report](documentation/project/final-report.md)** | **The whole project in one document** — mission, requirements, architecture, components, electrical, mechanical, simulations, firmware, protocol, testing, timeline, findings and lessons learned. Also as [`.docx`](documentation/project/CanSat-2026-Final-Report.docx) and [`.pdf`](documentation/project/CanSat-2026-Final-Report.pdf) |
 | [Scoring Assessment](documentation/project/scoring-assessment.md) | Where the project stands against the 200-point rulebook, and the cheapest points left |
 | [Operations Runbook](documentation/operations/runbook.md) | Configuration, builds, launch day, troubleshooting |
 | [Avionics](avionics/README.md) · [Electrical](electrical/README.md) · [Mechanical](mechanical/README.md) | Per-subsystem summaries: parts, measurements, open items |
 | [Simulations](simulations/README.md) | The descent model — canopy sizing, descent time, telemetry yield |
+| [Post-flight analysis](analysis/README.md) | **The four-hour analysis, ready before the launch** — a notebook and a one-command CLI that produce the mandatory graphs, the descent rate and drag coefficient, and a summary |
 | [Repository Audit](documentation/audit/2026-09-04-repository-audit.md) | File-by-file verification of every claim made here |
 | [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) | What changed; how to work on it |
 

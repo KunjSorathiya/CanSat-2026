@@ -137,7 +137,7 @@ or after the launch.
 
 - ~~Final report~~ — **submitted 2026-09-14**
 - **Launch**, following the [launch-day procedure](../operations/runbook.md#launch-day-procedure). **Do not let the drone lift until the vehicle reads armed** (`ST-R11…`)
-- **Analysis inside the four-hour window** — the tooling exists; no analysis notebook has been written against sample data
+- **Analysis inside the four-hour window** — **ready**: [`analysis/`](../../analysis/README.md), a notebook and a one-command CLI, tested against a synthetic flight
 - **Required photographs, video and social-media posts** tagging Physics Club, SVNIT — **not recorded in this repository** whether these were part of the submission
 
 ---
@@ -201,8 +201,9 @@ flowchart TD
 
 1. **Weigh the submitted vehicle** if a scale is available. The final mass is not on record, and
    it decides which modelled descent the flight is compared against.
-2. **Write the analysis notebook now**, against `test-data/sample-mission.txt`. Four hours is
-   not long to build graphs from nothing, and data analysis is worth 20 points.
+2. ~~**Write the analysis notebook now.**~~ **Done 2026-09-14** — [`analysis/`](../../analysis/README.md),
+   tested against a synthetic flight. Rehearse it once on the synthetic data so the four hours
+   start with a tool the team has already run.
 3. **Rehearse the pad sequence once**: power on, command window, `MAX_RATE`, wait for
    `ST-R11…`. The one failure that loses the flight's state detection is a drone lifting
    inside the window.

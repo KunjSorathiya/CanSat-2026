@@ -1,0 +1,4 @@
+# The post-flight analysis needs these two and nothing else. Pinned to the versions it was
+# written and tested with, so the four-hour window is not where a new release is discovered.
+numpy==2.3.3
+matplotlib==3.10.6

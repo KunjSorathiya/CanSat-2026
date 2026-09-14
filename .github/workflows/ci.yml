@@ -47,6 +47,12 @@ jobs:
         with:
           node-version: '24'
 
+      # The post-flight analysis suite needs numpy and matplotlib. build_host.sh skips it when
+      # they are missing -- and check_doc_claims.py then cannot read any test count -- so CI
+      # installs the pinned versions rather than letting both checks lapse silently.
+      - name: Install the post-flight analysis dependencies
+        run: python -m pip install -r analysis/requirements.txt
+
       - name: Toolchain versions
         run: |
           g++ --version
@@ -64,6 +70,13 @@ jobs:
         run: |
           if grep -q 'SKIPPED web console tests' host.log; then
             echo "::error::web console tests were skipped in CI" >&2
+            exit 1
+          fi
+
+      - name: Fail if the post-flight analysis suite was skipped
+        run: |
+          if grep -q 'SKIPPED post-flight analysis tests' host.log; then
+            echo "::error::post-flight analysis tests were skipped in CI" >&2
             exit 1
           fi
 
@@ -89,6 +102,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+
+      # The post-flight analysis suite needs numpy and matplotlib. build_host.sh skips it when
+      # they are missing -- and check_doc_claims.py then cannot read any test count -- so CI
+      # installs the pinned versions rather than letting both checks lapse silently.
+      - name: Install the post-flight analysis dependencies
+        run: python -m pip install -r analysis/requirements.txt
 
       # A warning is a finding, not decoration. -Wshadow catches a local hiding a member,
       # -Wcast-align a pointer cast that faults on ARM but not on x86, -Wdouble-promotion

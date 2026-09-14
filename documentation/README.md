@@ -13,6 +13,7 @@ Every engineering document for CanSat 2026, grouped by what you are trying to do
 | I want to… | Read |
 |---|---|
 | **Prepare for the launch** | **[Launch-day procedure](operations/runbook.md#launch-day-procedure)** |
+| **Analyse the flight inside the four hours** | **[Post-flight analysis](../analysis/README.md)** — notebook and one-command CLI |
 | **Build one of these from nothing** | **[Quick Start Guide](quick-start.md)** |
 | **Record the parts that just arrived** | **[Receiving Inspection Record](hardware/receiving-inspection.md)** |
 | **Solder the vehicle board** | **[Assembly Procedure](hardware/assembly-procedure.md)** |
@@ -137,7 +138,7 @@ documents above rather than competing with them.
 | Document | Contents |
 |---|---|
 | [test-plan.md](testing/test-plan.md) | Automated coverage, per-suite descriptions, hardware and mission test plans |
-| [bring-up-record.md](testing/bring-up-record.md) | Every prediction this repository makes, paired with what was measured against it, across nine gates — and twenty findings |
+| [bring-up-record.md](testing/bring-up-record.md) | Every prediction this repository makes, paired with what was measured against it, across nine gates — and twenty-one findings |
 
 ## Operations
 

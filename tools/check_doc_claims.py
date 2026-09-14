@@ -59,18 +59,20 @@ def suite_counts() -> dict[str, int] | None:
                "fat_volume": "fat_volume"}.get(name)
         if key:
             counts[key] = int(total)
-    # unittest prints "Ran N tests" once per discovery run. tools/build_host.sh runs three,
-    # in this order: ground station, tooling, simulations. The order is load-bearing -- it
-    # is read positionally -- and build_host.sh says so where the runs are defined.
+    # unittest prints "Ran N tests" once per discovery run. tools/build_host.sh runs four,
+    # in this order: ground station, tooling, simulations, post-flight analysis. The order is
+    # load-bearing -- it is read positionally -- and build_host.sh says so where the runs are
+    # defined.
     ran = [int(n) for n in re.findall(r"^Ran (\d+) tests?", log, re.MULTILINE)]
-    if len(ran) >= 3:
-        counts["python_ground"], counts["python_tools"], counts["python_sims"] = ran[:3]
+    if len(ran) >= 4:
+        (counts["python_ground"], counts["python_tools"], counts["python_sims"],
+         counts["python_analysis"]) = ran[:4]
     node = re.search(r"^\D*pass (\d+)$", log, re.MULTILINE)
     if node:
         counts["node"] = int(node.group(1))
 
     required = {"flight_tests", "sx1278", "sd_card", "fat_volume", "python_ground",
-                "python_tools", "python_sims", "node"}
+                "python_tools", "python_sims", "python_analysis", "node"}
     return counts if required <= counts.keys() else None
 
 
@@ -928,10 +930,15 @@ def main() -> int:
                           f"**{n} / {n} assertions**" in test_plan, str(n))
         for suite, label in (("python_ground", "Python ground station"),
                              ("python_tools", "Python tooling"),
-                             ("python_sims", "Python simulations")):
+                             ("python_sims", "Python simulations"),
+                             ("python_analysis", "Python post-flight analysis")):
             n = counts[suite]
             checker.check(f"test-plan.md states {label} ran {n} tests",
                           f"**{n} / {n} tests**" in test_plan, str(n))
+        analysis_readme = read("analysis/README.md")
+        checker.check(f"analysis/README.md states its {counts['python_analysis']} tests",
+                      f"| {counts['python_analysis']} tests:" in analysis_readme,
+                      str(counts["python_analysis"]))
         node = counts["node"]
         checker.check(f"test-plan.md states the web console ran {node} tests",
                       f"**{node} / {node} tests**" in test_plan, str(node))
@@ -942,7 +949,7 @@ def main() -> int:
         # The README carries the same results table as the test plan, in shorter form. It
         # is the first page anyone reads, so it is the worst place for a stale figure.
         for suite in ("flight_tests", "sx1278", "sd_card", "fat_volume", "python_ground",
-                      "python_tools", "python_sims", "node"):
+                      "python_tools", "python_sims", "python_analysis", "node"):
             n = counts[suite]
             checker.check(f"README's results table states {suite} at {n}",
                           f"**{n} / {n}**" in readme, str(n))
@@ -951,7 +958,7 @@ def main() -> int:
         checker.check(f"README states {len(listed)} syntax-checked translation units",
                       f"{len(listed)} translation units" in readme, str(len(listed)))
         python_total = (counts["python_ground"] + counts["python_tools"] +
-                        counts["python_sims"])
+                        counts["python_sims"] + counts["python_analysis"])
         checker.check(f"quick-start.md states {cpp_total} C++ assertions",
                       f"**{cpp_total} C++ assertions" in quick_start, str(cpp_total))
         checker.check(f"quick-start.md states {python_total} Python tests",

@@ -65,7 +65,7 @@ streams telemetry continuously from power-on through recovery.
 | Layer | State |
 |---|---|
 | **Submission** | **The CanSat and this report were submitted** (reported by the team, 2026-09-14). **The launch has not happened** |
-| **Software** | Complete and passing **6091 automated checks** on the host — flight core, telemetry protocol, ground station, web console, simulations and documentation claims |
+| **Software** | Complete and passing **6131 automated checks** on the host — flight core, telemetry protocol, ground station, web console, simulations and documentation claims |
 | **Firmware drivers** | Every driver has run on real silicon: IMU, barometer, GPS, radio and microSD. The sealed flight image has been flashed and run |
 | **Electronics** | Built, and **every device on it works**. The radio link has closed end to end. **Switch, power LED and battery divider fitted; the Schottky diode never was** |
 | **Structure** | **Printed in white PETG and assembled**, egg chamber fitted, **ballasted into the 450–550 g band** (reported by the team, 2026-09-14) |
@@ -1012,11 +1012,12 @@ documentation against the source. **All of it runs without hardware.**
 | Python — ground station | Parser, validator, transport, health, logging robustness, bridge status, vehicle-restart recovery, and a cross-language end-to-end trace of real vehicle output | **143 / 143** |
 | Python — tooling | LoRa airtime model, pinned to published SX127x reference vectors | **49 / 49** |
 | Python — simulations | Descent model against closed-form limits, ISA density, mass-tolerance argument | **40 / 40** |
+| Python — post-flight analysis | Recovers a synthetic flight's known descent rate, drag coefficient, spin, drift and lost packet; the notebook executed cell by cell | **37 / 37** |
 | Node — web console | Framing, parser, validator, link health, bridge status, extracted from `index.html` | **71 / 71** |
-| Documented claims | Numbers in the documentation checked against the source that defines them | **303 / 303** |
+| Documented claims | Numbers in the documentation checked against the source that defines them | **306 / 306** |
 | Pico syntax | 11 translation units against SDK stubs | All OK |
 
-**Total: 6091 automated checks.**
+**Total: 6131 automated checks.**
 
 ### 14.1 What is actually proven
 
@@ -1094,7 +1095,7 @@ disconnected**, and it has not been done.
 
 ## 16. Findings register
 
-Twenty findings are recorded across receiving inspection and bring-up. The ones that changed
+Twenty-one findings are recorded across receiving inspection, bring-up and the post-flight analysis. The ones that changed
 the design:
 
 | # | What was expected | What happened | Outcome |
@@ -1108,6 +1109,7 @@ the design:
 | **F-17** | Yaw to drift steadily | **It did not drift at all for 15 minutes, then drifted hard** | **Open.** 0.39 dps is 70° over a 180 s flight |
 | **F-18** | A reported fix to be a holdable fix | **739 fixes from a stationary receiver: median 8.1 m from the centroid, max 50.9 m, and the largest single-second jump 55.6 m** | **Gated.** The parser rejected only `quality <= 0` and never tested satellite count at all. It now refuses a fix below 4 satellites or above HDOP 5.0, and parses HDOP — which it previously discarded |
 | **F-20** | Landing detection to need a landing | **A landing declared under a hovering drone, 12 s before release** | **Closed by the descent gate** |
+| **F-21** | The vehicle's altitude to be its height above the pad | **About 5 % low on a hot day.** The firmware's ISA formula assumes 15 °C; real height per pascal scales with the real temperature | **Corrected in the analysis**, since the sealed image cannot change: the descent rate is taken from temperature-corrected height, which matters because the uncorrected rate reads ~5 % low — enough to make a 5.05 m/s descent look compliant |
 
 **Two things are worth noticing about that list.** Every one of these came from *running*
 something rather than from reading it. And **the defects a host suite of five thousand
@@ -1152,8 +1154,9 @@ launch is what is left.
 
 1. **Weigh the submitted vehicle.** The final mass is not on record, and it decides which
    modelled descent the flight is compared against.
-2. **Write the analysis notebook now**, against `test-data/sample-mission.txt`. Data analysis
-   is worth 20 points and four hours is not long to build it from nothing.
+2. ~~**Write the analysis notebook.**~~ **Done** — `analysis/`: a notebook and a one-command CLI
+   that write the mandatory graphs, the descent rate and drag coefficient, and a summary, tested
+   against a synthetic flight. Rehearse it once before the launch.
 3. **Rehearse the pad sequence once**: power on, command window, `MAX_RATE`, wait for
    `ST-R11…`. A drone lifting inside the window is the one mistake that costs the flight its
    state detection.
@@ -1186,7 +1189,7 @@ egg *chamber* was built anyway, because PAY-002 is a separate requirement, it ca
 ### 18.1 Where the strength is
 
 **Code originality — 9 or 10 of 10.** Self-written, no third-party libraries in the flight
-path, heavily commented, held by 6091 automated checks. This section rewards exactly what this
+path, heavily commented, held by 6131 automated checks. This section rewards exactly what this
 repository is.
 
 **Sensor integration — 25 of 25, at the cap.** The mandatory set is 15, GPS is the first +5,
@@ -1201,9 +1204,12 @@ boards *instead of* generic dev boards. A hand-wired prototype board is the oppo
 on every criterion. **The pin map has been frozen and hardware-verified since gate 5**, so a
 schematic could be drawn today.
 
-**Data analysis — 20 points, tooling ready and unused.** The ground station exports CSV and
-the web console plots live. Four hours post-launch is not long to build graphs from scratch:
-**write the analysis notebook before launch day**, against `test-data/sample-mission.txt`.
+**Data analysis — 20 points, ready before the flight.** `analysis/flight_analysis.py` and its
+notebook read the SD log, the ground CSV or raw packets, and in one command write the three
+mandatory graphs, the descent rate by regression, the implied drag coefficient, acceleration,
+orientation, spin, pendulum frequency, GPS drift, acoustic level and SD-against-ground radio loss.
+It is tested against a synthetic flight whose answers are known — rate within 3 %, drag
+coefficient within 6 %, release within 0.15 s — and it corrects F-21's altitude bias.
 
 ### 18.3 What would lose points
 
@@ -1387,6 +1393,7 @@ electrical/
   PCB/                 board layout — perfboard today, nothing fabricated
 mechanical/            envelope, mass budget, canopy spec, CAD, stress studies
 simulations/           descent model + tests
+analysis/              post-flight analysis: notebook, one-command CLI, synthetic flight
 tools/                 host build, Pico syntax check, LoRa link-budget calculator,
                        netlist and drawing generators, documentation-claim checker,
                        SD-card and flight-log utilities, report figures, SDK stubs
